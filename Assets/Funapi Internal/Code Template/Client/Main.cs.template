@@ -1,0 +1,45 @@
+using UnityEngine;
+using System.Collections;
+
+
+public class Main : MonoBehaviour {
+
+  // is login complete?
+  private bool loginComplete_ = false;
+  // my name..
+  private string username_ = "username";
+  // my player
+  GameObject myPlayer_;
+  // protocol handler
+  private ProtocolHandler handler_;
+
+
+  void Start() {
+    myPlayer_ = GameObject.Find("Player");
+    handler_ = (ProtocolHandler)GameObject.
+        Find("NetworkManager").GetComponent("ProtocolHandler");
+    print("main start!");
+  }
+
+  public bool loginComplete {
+    get { return loginComplete_; }
+  }
+
+  public string username {
+    get { return username_; }
+    set { username_ = value; }
+  }
+
+  public void ReceivedLoginResponse() {
+    myPlayer_.renderer.enabled = true;
+    loginComplete_ = true;
+  }
+
+  public void ReceivedLogoutResponse() {
+    myPlayer_.renderer.enabled = false;
+    loginComplete_ = false;
+
+    // disconnect
+    handler_.Disconnect();
+  }
+}

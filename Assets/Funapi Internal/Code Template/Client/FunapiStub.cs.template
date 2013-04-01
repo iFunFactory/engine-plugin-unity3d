@@ -1,0 +1,160 @@
+using UnityEngine;
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+
+using ProtoBuf;
+
+using account_messages;
+using app_messages_for_client;
+using funapi_client_messages;
+using funapi_server_messages;
+
+
+public class FunapiStub : MonoBehaviour {
+
+  private const int BufferSize_ = 524288;
+  private const string IP_ = "10.10.138.18";
+  private const int Port_ = 8012;
+  private const int PayloadLengthSize_ = 4;
+  private const int UUIDSize_ = 16;
+
+  private Socket workSocket_ = null;
+  private Guid clientUUID_ = Guid.Empty;
+  private byte[] receiveBuffer_ = null;
+  private int currentIndex_ = 0;
+
+  private ProtocolHandler handler_;
+
+
+  public void Start() {
+    // alloc buffer.. don't use field initializer
+    receiveBuffer_ = new byte[BufferSize_];
+    handler_ = (ProtocolHandler)GameObject.Find("NetworkManager").
+        GetComponent("ProtocolHandler");
+  }
+
+  public void ConnectToServer() {
+    Socket newsock = new Socket(AddressFamily.InterNetwork,
+        SocketType.Stream, ProtocolType.Tcp);
+    IPEndPoint iep = new IPEndPoint(IPAddress.Parse(IP_), Port_);
+    // begin connect
+    newsock.BeginConnect(iep, new AsyncCallback(ConnectedCallback), newsock);
+  }
+
+  public void ConnectedCallback(IAsyncResult iar) {
+    workSocket_ = (Socket)iar.AsyncState;
+    try {
+      workSocket_.EndConnect(iar);
+       print("Connected to: " + workSocket_.RemoteEndPoint.ToString());
+      // begin receive
+      workSocket_.BeginReceive(receiveBuffer_, currentIndex_, BufferSize_,
+                               SocketFlags.None,
+                               new AsyncCallback(ReceiveCallback),
+                               workSocket_);
+    } catch (SocketException) {
+      print("Socket Error!");
+    }
+  }
+
+  public void ReceiveCallback(IAsyncResult iar) {
+    workSocket_ = (Socket)iar.AsyncState;
+    int size = workSocket_.EndReceive(iar);
+    if (size <= 0) {
+      print ("receive 0");
+    }
+
+    currentIndex_ += size;
+
+    // message handling
+    HandleMessages(workSocket_);
+    // begin receive messages again
+    workSocket_.BeginReceive(receiveBuffer_, currentIndex_, BufferSize_,
+                             SocketFlags.None,
+                             new AsyncCallback(ReceiveCallback),
+                             workSocket_);
+  }
+
+  public void ShutdownClient() {
+    workSocket_.Shutdown(SocketShutdown.Both);
+    workSocket_.Close();
+  }
+
+  private void HandleMessages(Socket sock) {
+    const int PacketHeaderSize = UUIDSize_ + PayloadLengthSize_;
+
+    if (currentIndex_ >= PacketHeaderSize) {
+      // decode payload length
+      byte[] payloadLengthBuf = new byte[PayloadLengthSize_];
+      Array.Copy(receiveBuffer_, payloadLengthBuf, PayloadLengthSize_);
+      payloadLengthBuf = payloadLengthBuf.Reverse().ToArray();
+      int payloadLength = BitConverter.ToInt32(payloadLengthBuf, 0);
+
+      int messageSize = payloadLength + PayloadLengthSize_;
+      // check at least one message receive complete
+      if (currentIndex_ >= messageSize) {
+        // decode uuid
+        byte[] UUIDBuf = new byte[UUIDSize_];
+        Array.Copy(receiveBuffer_, PayloadLengthSize_, UUIDBuf, 0,
+                   UUIDSize_);
+        Guid IncomingUUID = new Guid(UUIDBuf);
+        if (IncomingUUID != clientUUID_) {
+          clientUUID_ = IncomingUUID;
+          print("Session ID Changed! -> " + clientUUID_.ToString());
+        }
+
+        // get data
+        int dataLength = payloadLength - UUIDSize_;
+        byte[] dataBuffer = new byte[dataLength];
+        Array.Copy(receiveBuffer_, PacketHeaderSize, dataBuffer, 0,
+                   dataLength);
+
+        // deserialize
+        var ms = new MemoryStream(dataBuffer);
+        ServerAccountMessage message =
+            Serializer.Deserialize<ServerAccountMessage>(ms);
+        handler_.ReceiveMessage(message);
+
+        // move buffer
+        currentIndex_ -= messageSize;
+        byte[] tempBuffer = new byte[currentIndex_];
+        Array.Copy(receiveBuffer_, messageSize, tempBuffer, 0, currentIndex_);
+        Array.Clear(receiveBuffer_, 0, BufferSize_);
+        Array.Copy(tempBuffer, 0, receiveBuffer_, 0, currentIndex_);
+
+        // try more messages
+        HandleMessages(sock);
+      }
+    }
+  }
+
+  public void SendFunapiMessage(ClientAccountMessage message) {
+    using (MemoryStream ms = new MemoryStream()) {
+      // serialize data
+      Serializer.Serialize(ms, message);
+
+      // set payload length for send packet
+      const int PacketHeaderSize = UUIDSize_ + PayloadLengthSize_;
+      int size = ms.ToArray().Length + UUIDSize_;
+      int hostint = IPAddress.NetworkToHostOrder(size);
+      byte[] hostbyte = BitConverter.GetBytes(hostint);
+
+      // make buffer
+      byte[] buffer = new byte[size + PayloadLengthSize_];
+      Array.Clear (buffer, 0, size + PayloadLengthSize_);
+
+      // copy to buffer
+      Array.Copy(hostbyte, 0, buffer, 0, PayloadLengthSize_);
+      Array.Copy(clientUUID_.ToByteArray(), 0, buffer, PayloadLengthSize_,
+                 UUIDSize_);
+      Array.Copy(ms.ToArray(), 0, buffer, PacketHeaderSize,
+                 ms.ToArray().Length);
+
+      // send
+      workSocket_.Send(buffer, 0, buffer.Length, SocketFlags.None);
+    }
+  }
+}

@@ -1,0 +1,51 @@
+using UnityEngine;
+using System.Collections;
+
+
+public class FunapiOperator : MonoBehaviour {
+
+  // packet send interval
+  private const float INTERVAL = 0.1f;
+  // last send delta accum time
+  private float lastDeltaAccumTime = 0.0f;
+  // my player
+  GameObject myPlayer_;
+  // main
+  Main main_;
+  // protocol handler
+  ProtocolHandler handler_;
+
+
+  // Use this for initialization
+  void Start () {
+    myPlayer_ = GameObject.Find("Player");
+    main_ = (Main)GameObject.Find("Game").GetComponent("Main");
+    handler_ = (ProtocolHandler)GameObject.
+        Find("NetworkManager").GetComponent("ProtocolHandler");
+  }
+
+  // Update is called once per frame
+  void Update () {
+    if (!main_.loginComplete)
+      return;
+
+    if (CheckSendInterval()) {
+      SendMyPosition();
+    }
+  }
+
+  private bool CheckSendInterval() {
+    bool ret = false;
+    lastDeltaAccumTime += Time.deltaTime;
+    if (lastDeltaAccumTime > INTERVAL) {
+      ret = true;
+      lastDeltaAccumTime = 0.0f;
+    }
+    return ret;
+  }
+
+  private void SendMyPosition() {
+    // send my player position
+    handler_.SendPosition(myPlayer_.transform.position);
+  }
+}

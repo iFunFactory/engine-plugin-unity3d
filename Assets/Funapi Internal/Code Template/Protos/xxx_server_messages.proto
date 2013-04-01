@@ -1,0 +1,3 @@
+message ServerAppDummyMessage {
+  optional int32 server_dummy = 1;
+}

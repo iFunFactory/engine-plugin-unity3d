@@ -1,0 +1,108 @@
+using UnityEngine;
+using System;
+using System.Collections;
+
+using ProtoBuf;
+
+using account_messages;
+using app_messages_for_client;
+using funapi_client_messages;
+using funapi_server_messages;
+
+
+public class ProtocolHandler : MonoBehaviour {
+
+  private Queue msg_queue_;
+  private FunapiStub funapi_;
+  private FunapiUtil funapiUtil_;
+  private Main main_;
+
+
+  // Use this for initialization
+  void Start() {
+    funapi_ = (FunapiStub)GameObject.Find("NetworkManager").
+        GetComponent("FunapiStub");
+    funapiUtil_ = (FunapiUtil)GameObject.Find("NetworkManager").
+        GetComponent("FunapiUtil");
+    main_ = (Main)GameObject.Find("Game").GetComponent("Main");
+    msg_queue_ = new Queue();
+  }
+
+  void Update() {
+    lock (msg_queue_) {
+      foreach(ServerAccountMessage message in msg_queue_) {
+        switch(message.type) {
+          case ServerAccountMessage.Type.kAttributeUpdatesMessage: {
+            AttributeUpdatesMessage updates = message.attribute_updates;
+            foreach(var update in updates.attribute_update) {
+              funapiUtil_.AttributeParse(update);
+            }
+          }
+          break;
+          case ServerAccountMessage.Type.kAccountLoginResponse:
+            main_.ReceivedLoginResponse();
+          break;
+          case ServerAccountMessage.Type.kAccountLogoutResponse:
+            main_.ReceivedLogoutResponse();
+          break;
+          default:
+          break;
+        }
+      }
+      msg_queue_.Clear();
+    }
+  }
+
+  // Connect to Server
+  public void Connect() {
+    funapi_.ConnectToServer();
+  }
+
+  // Disconnect to Server
+  public void Disconnect() {
+    funapi_.ShutdownClient();
+  }
+
+  // Send login message
+  public void SendLoginMessage(string name) {
+    ClientAccountMessage request = new ClientAccountMessage {
+      type = ClientAccountMessage.Type.kAccountLoginRequest,
+      login = new AccountLoginRequest {
+        local_account = name
+      }
+    };
+    funapi_.SendFunapiMessage(request);
+  }
+
+  // Send logout message
+  public void SendLogoutMessage() {
+    ClientAccountMessage request = new ClientAccountMessage {
+      type = ClientAccountMessage.Type.kAccountLogoutRequest,
+    };
+    funapi_.SendFunapiMessage(request);
+  }
+
+  // Send player position
+  public void SendPosition(Vector3 position) {
+    ClientAccountMessage request = new ClientAccountMessage {
+      type = ClientAccountMessage.Type.kClientAppMessage,
+      app_message = new ClientAppMessage()
+    };
+    PlayerPosition player_pos = new PlayerPosition {
+      pos_x = position.x,
+      pos_y = position.y,
+      pos_z = position.z
+    };
+    Extensible.AppendValue<PlayerPosition>(request.app_message,
+        (int)ClientAppMessageType.Type.kPlayerPosition, player_pos);
+    funapi_.SendFunapiMessage(request);
+  }
+
+  // Receive messages
+  public void ReceiveMessage(ServerAccountMessage message) {
+    lock (msg_queue_) {
+      msg_queue_.Enqueue(message);
+    }
+    print(message.type);
+  }
+}

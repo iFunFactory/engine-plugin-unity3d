@@ -1,0 +1,167 @@
+// hierarchy is ..
+// world --- players --- player
+//               ㄴ   --- player
+//                          ㄴname, pos_x, pos_y, pos_z       
+
+using UnityEngine;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
+
+// mit license third party library.. replaceable
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+using account_messages;
+using app_messages_for_client;
+using funapi_client_messages;
+using funapi_server_messages;
+
+
+public class FunapiUtil : MonoBehaviour {
+
+  private FunapiObject world_;
+
+
+  // Use this for initialization
+  void Start() {
+    world_ = new FunapiObject();
+  }
+
+  public FunapiObject world {
+    get { return world_; }
+  }
+
+  // parse attribute recursively
+  public void AttributeParse(
+      AttributeUpdatesMessage.AttributeUpdateMessage message) {
+    Guid uuid = GetObjectUuid(message);
+    string name = message.attribute_name;
+
+    if (name == "players") {
+      world_.uuid = uuid;
+      world_.objectMap = GetAttributeObjectMap(message);
+      print(uuid.ToString());
+
+    } else if (name == "name") {
+      FunapiObject fobject = FindFunapiObjectByUuid(uuid);
+      if (fobject != null) {
+        fobject.attrName = GetAttributeString(message);
+      } else {
+        print(uuid.ToString());
+      }
+
+    } else if (name == "pos_x") {
+      FunapiObject fobject = FindFunapiObjectByUuid(uuid);
+      if (fobject != null) {
+        fobject.posX = GetAttributeString(message);
+      } else {
+        print(uuid.ToString());
+      }
+
+    } else if (name == "pos_y") {
+      FunapiObject fobject = FindFunapiObjectByUuid(uuid);
+      if (fobject != null) {
+        fobject.posY = GetAttributeString(message);
+      } else {
+        print(uuid.ToString());
+      }
+
+    } else if (name == "pos_z") {
+      FunapiObject fobject = FindFunapiObjectByUuid(uuid);
+      if (fobject != null) {
+        fobject.posZ = GetAttributeString(message);
+      } else {
+        print(uuid.ToString());
+      }
+    }
+  }
+
+  private Guid GetObjectUuid(
+    AttributeUpdatesMessage.AttributeUpdateMessage message) {
+    return new Guid(message.object_uuid);
+  }
+
+  private Dictionary<string, FunapiObject> GetAttributeObjectMap(
+      AttributeUpdatesMessage.AttributeUpdateMessage message) {
+    Dictionary<string, FunapiObject> map = new Dictionary<string, FunapiObject>();
+
+    JsonTextReader reader = new JsonTextReader(new StringReader(message.new_json));
+    reader.Read(); // header
+    reader.Read(); // header
+    while(reader.Read()) {
+      if (reader.TokenType == JsonToken.StartObject) {
+        ParseObject(reader, map);
+      }
+    }
+    return map;
+  }
+
+  private void ParseObject(JsonTextReader reader,
+      Dictionary<string, FunapiObject> map) {
+    FunapiObject fobject = new FunapiObject();
+    reader.Read(); // id
+
+    reader.Read(); // StartArray
+    reader.Read(); // Int64
+    Int64 high = (Int64)reader.Value; // high
+    reader.Read(); // Int64
+    Int64 low = (Int64)reader.Value; // low
+    fobject.uuid = ConvertInt64ToGuid(high, low);
+    reader.Read(); // EndArray
+
+    reader.Read(); // model
+    reader.Read(); // Player
+
+    reader.Read(); // name
+    reader.Read(); // player id
+    fobject.attrName = reader.Value.ToString();
+
+    reader.Read(); // pos_x
+    reader.Read(); // pos_x value
+    fobject.posX = reader.Value.ToString();
+
+    reader.Read(); // pos_y
+    reader.Read(); // pos_y value
+    fobject.posY = reader.Value.ToString();
+
+    reader.Read(); // pos_y
+    reader.Read(); // pos_y value
+    fobject.posZ = reader.Value.ToString();
+
+    map.Add(fobject.attrName, fobject);
+  } 
+
+  private string GetAttributeString (
+      AttributeUpdatesMessage.AttributeUpdateMessage message) {
+    JsonTextReader reader = new JsonTextReader(new StringReader(message.new_json));
+    reader.Read();
+    return reader.Value.ToString();
+  }
+
+  private FunapiObject FindFunapiObjectByUuid(Guid uuid) {
+    if (uuid == world_.uuid)
+      return world_;
+
+    foreach(var fobject in world_.objectMap) {
+      if (fobject.Value.uuid == uuid)
+        return fobject.Value;
+    }
+    return null;
+  }
+
+  private Guid ConvertInt64ToGuid(Int64 high, Int64 low) {
+    byte[] byteLow = BitConverter.GetBytes(low);
+    Array.Reverse(byteLow);
+    byte[] byteHigh = BitConverter.GetBytes(high);
+    Array.Reverse(byteHigh);
+
+    byte[] total = new byte[16];
+    Array.Copy(byteHigh, total, 8);
+    Array.Copy(byteLow, 0, total, 8, 8);
+
+    return new Guid(total);
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "attributes" : {
+    "players" : {
+      "data_type" : {
+        "base" : "object_map",
+        "ownership" : "owner",
+        "capacity" : 16
+      },
+      "persistent" : false,
+      "channels" : ["room"]
+    },
+    "name" : {
+      "data_type" : {
+        "base" : "string",
+        "default" : "(no name)",
+        "max_length" : 128
+      },
+      "persistent" : true,
+      "channels" : ["room"]
+    },
+    "pos_x" : {
+      "data_type" : {
+        "base" : "string",
+        "default" : "0.0",
+        "max_length" : 128
+      },
+      "persistent" : true,
+      "channels" : ["room"]
+    },
+    "pos_y" : {
+      "data_type" : {
+        "base" : "string",
+        "default" : "0.0",
+        "max_length" : 128
+      },
+      "persistent" : true,
+      "channels" : ["room"]
+    },
+    "pos_z" : {
+      "data_type" : {
+        "base" : "string",
+        "default" : "0.0",
+        "max_length" : 128
+      },
+      "persistent" : true,
+      "channels" : ["room"]
+    }
+  }
+}

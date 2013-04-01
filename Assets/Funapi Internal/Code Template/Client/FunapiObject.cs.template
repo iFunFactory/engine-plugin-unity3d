@@ -1,0 +1,51 @@
+using UnityEngine;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+
+public class FunapiObject {
+
+  private Guid uuid_;
+  private string attrName_ = string.Empty;
+  private string posX_ = string.Empty;
+  private string posY_ = string.Empty;
+  private string posZ_ = string.Empty;
+  private Dictionary<string, FunapiObject> objectMap_;
+
+
+  // Use this for initialization
+  public FunapiObject() {
+    objectMap_ = new Dictionary<string, FunapiObject>();
+  }
+
+  public Guid uuid {
+    get { return uuid_; }
+    set { uuid_ = value; }
+  }
+
+  public string attrName {
+    get { return attrName_; }
+    set { attrName_ = value; }
+  }
+
+  public string posX {
+    get { return posX_; }
+    set { posX_ = value; }
+  }
+
+  public string posY {
+    get { return posY_; }
+    set { posY_ = value; }
+  }
+
+  public string posZ {
+    get { return posZ_; }
+    set { posZ_ = value; }
+  }
+
+  public Dictionary<string, FunapiObject> objectMap {
+    get { return objectMap_; }
+    set { objectMap_ = value; }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "UnityServer" : {
+    "attributes" : {
+      "players" : {
+        "value" : {}
+      }
+    }
+  },
+  "Player" : {
+    "attributes" : {
+      "name" : {
+        "value" : "(none)"
+      },
+      "pos_x" : {
+        "value" : "0.0"
+      },
+      "pos_y" : {
+        "value" : "0.0"
+      },
+      "pos_z" : {
+        "value" : "0.0"
+      }
+    }
+  }
+}

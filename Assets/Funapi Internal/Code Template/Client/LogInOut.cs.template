@@ -1,0 +1,41 @@
+using UnityEngine;
+using System.Collections;
+
+
+public class LogInOut : MonoBehaviour {
+
+  private string username_ = "username";
+
+
+  void OnGUI() {
+    // get handler
+    ProtocolHandler handler = (ProtocolHandler)GameObject.Find("NetworkManager").
+        GetComponent("ProtocolHandler");
+    // get main
+    Main main = (Main)GameObject.Find("Game").GetComponent("Main");
+
+    // Make the actual text field.
+    username_ = GUI.TextField(new Rect(10,10,100,20), username_);
+
+    // If the user presses this button, keyboard focus will lost.
+    if (GUI.Button(new Rect(10,40,100,20), "login")) {
+      // connect to server
+      handler.Connect();
+
+      // login
+      handler.SendLoginMessage(username_);
+
+      // lost focus
+      GUI.FocusControl("");
+
+      // set name
+      main.username = username_;
+    }
+
+    // If the user presses this button, keyboard focus will lost.
+    if (GUI.Button(new Rect(10,70,100,20), "logout")) {
+      // logout
+      handler.SendLogoutMessage();
+    }
+  }
+}
