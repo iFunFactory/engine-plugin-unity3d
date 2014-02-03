@@ -1,5 +1,0 @@
-message PlayerPosition {
-  optional float pos_x = 1;
-  optional float pos_y = 2;
-  optional float pos_z = 3;
-}
