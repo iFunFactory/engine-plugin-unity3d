@@ -1,0 +1,695 @@
+﻿#define DEBUG
+
+using UnityEngine;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using SimpleJSON;
+
+
+namespace Fun {
+
+    // Abstract class to represent Transport used by Funapi
+    // There are 3 transport types at the moment (though this plugin implements only TCP one.)
+    // TCP, UDP, and HTTP.
+    public abstract class FunapiTransport
+    {
+        public delegate void OnReceived(Dictionary<string, string> header, JSONClass body);
+        public delegate void OnStopped();
+
+        // Registers handlers for socket-level events. (i.e., received bytes and closed)
+        public abstract void RegisterEventHandlers(OnReceived on_received, OnStopped on_stopped);
+
+        // Starts a socket.
+        public abstract void Start();
+
+        // Stops a socket.
+        public abstract void Stop();
+
+        // Sends a JSON message through a socket.
+        public abstract void SendMessage(JSONClass message);
+
+        public abstract bool Started
+        {
+            get;
+        }
+    }
+
+
+    // TCP transport layer
+    public class FunapiTcpTransport : FunapiTransport
+    {
+        #region public interface
+        public FunapiTcpTransport(string hostname_or_ip, UInt16 port)
+        {
+            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
+            IPAddress address = host_info.AddressList[0];
+            end_point_ = new IPEndPoint(address, port);
+        }
+
+        public override void RegisterEventHandlers(OnReceived on_received, OnStopped on_stopped)
+        {
+            mutex_.WaitOne();
+            on_received_ = on_received;
+            on_stopped_ = on_stopped;
+            mutex_.ReleaseMutex();
+        }
+
+        public override void Start()
+        {
+            mutex_.WaitOne();
+
+            bool failed = false;
+            try
+            {
+                // Resets states.
+                header_decoded_ = false;
+                received_size_ = 0;
+                next_decoding_offset_ = 0;
+                header_fields_ = new Dictionary<string, string>();
+                sending_.Clear();
+
+                // Initiates a new socket.
+                state_ = State.kConnecting;
+                sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                sock_.BeginConnect(end_point_, new AsyncCallback(this.StartCb), this);
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failred in Start: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
+        public override void Stop()
+        {
+            mutex_.WaitOne();
+            if (sock_ != null)
+            {
+                sock_.Close();
+                sock_ = null;
+            }
+            mutex_.ReleaseMutex();
+        }
+
+        public override void SendMessage(JSONClass message)
+        {
+            string body = message.ToString();
+            ArraySegment<byte> body_as_bytes = new ArraySegment<byte>(Encoding.Default.GetBytes(body));
+
+            string header = "";
+            header += kVersionHeaderFiled + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
+            header += kLengthHeaderFiled + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
+            header += kHeaderDelimeter;
+            ArraySegment<byte> header_as_bytes = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header));
+
+            UnityEngine.Debug.Log("Header to send: " + header);
+            UnityEngine.Debug.Log("JSON to send: " + body);
+
+            mutex_.WaitOne();
+            bool failed = false;
+            try
+            {
+                pending_.Add(header_as_bytes);
+                pending_.Add(body_as_bytes);
+                if (state_ == State.kConnected && sending_.Count == 0)
+                {
+                    List<ArraySegment<byte>> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
+                }
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in SendMessage: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
+        public override bool Started
+        {
+            get
+            {
+                return sock_ != null && sock_.Connected;
+            }
+        }
+        #endregion
+
+        #region internal implementation
+        private void StartCb(IAsyncResult ar)
+        {
+            UnityEngine.Debug.Log("StartCb called.");
+            mutex_.WaitOne();
+
+            bool failed = false;
+            try
+            {
+                state_ = State.kConnected;
+                sock_.EndConnect(ar);
+                if (sock_.Connected == false)
+                {
+                    UnityEngine.Debug.Log("Failed to connect.");
+                    return;
+                }
+
+                // Starts to handle incoming messages.
+                UnityEngine.Debug.Log("Connected.");
+                ArraySegment<byte> wrapped = new ArraySegment<byte>(receiving_, 0, receiving_.Length);
+                List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                buffer.Add(wrapped);
+                sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
+                UnityEngine.Debug.Log("Ready to receive.");
+
+                // If there any data already queued, start to process.
+                if (pending_.Count > 0)
+                {
+                    UnityEngine.Debug.Log("Flushing pending messages.");
+                    List<ArraySegment<byte>> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
+                }
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failrued in StartCb: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
+        private void SendBytesCb(IAsyncResult ar)
+        {
+            mutex_.WaitOne();
+
+            bool failed = false;
+            try
+            {
+                int nSent = sock_.EndSend(ar);
+                UnityEngine.Debug.Log("Sent " + nSent + "bytes");
+
+                // Removes any segment fully sent.
+                while (nSent > 0)
+                {
+                    if (sending_[0].Count > nSent)
+                    {
+                        // partial data
+                        UnityEngine.Debug.Log("Partially sent. Will resume.");
+                        break;
+                    }
+                    else
+                    {
+                        // fully sent.
+                        UnityEngine.Debug.Log("Discarding a fully sent message.");
+                        nSent -= sending_[0].Count;
+                        sending_.RemoveAt(0);
+                    }
+                }
+
+                // If the first segment has been sent partially, we need to reconstruct the first segment.
+                if (nSent > 0)
+                {
+                    DebugUtils.Assert(sending_.Count > 0);
+                    ArraySegment<byte> original = sending_[0];
+
+                    DebugUtils.Assert(nSent <= sending_[0].Count);
+                    ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
+                    sending_[0] = adjusted;
+                }
+
+                if (sending_.Count > 0)
+                {
+                    // If we have any segment failed to transmit, we need to retry.
+                    UnityEngine.Debug.Log("Retrying unsent messages.");
+                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
+                }
+                else if (pending_.Count > 0)
+                {
+                    // Otherwise, try to process pending messages.
+                    List<ArraySegment<byte>> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
+                }
+
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in SendBytesCb: " + e.ToString ());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
+        private void ReceiveBytesCb(IAsyncResult ar)
+        {
+            UnityEngine.Debug.Log("ReceiveBytesCb called.");
+            mutex_.WaitOne();
+
+            bool failed = false;
+            try
+            {
+                int nRead = sock_.EndReceive(ar);
+                if (nRead > 0)
+                {
+                    received_size_ += nRead;
+                    UnityEngine.Debug.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+                }
+
+                // Try to decode as many messages as possible.
+                while (true)
+                {
+                    if (header_decoded_ == false)
+                    {
+                        if (TryToDecodeHeader() == false)
+                        {
+                            break;
+                        }
+                    }
+                    if (header_decoded_)
+                    {
+                        if (TryToDecodeBody() == false)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (nRead > 0)
+                {
+                    // Checks buffer space before starting another async receive.
+                    if (receiving_.Length - received_size_ == 0)
+                    {
+                        // If there are space can be collected, compact it first.
+                        // Otherwise, increase the receiving buffer size.
+                        if (next_decoding_offset_ > 0)
+                        {
+                            UnityEngine.Debug.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
+                            Buffer.BlockCopy(receiving_, next_decoding_offset_, receiving_, 0, received_size_ - next_decoding_offset_);
+                            received_size_ -= next_decoding_offset_;
+                            next_decoding_offset_ = 0;
+                        }
+                        else
+                        {
+                            UnityEngine.Debug.Log("Increasing a receive buffer to " + (receiving_.Length + kUnitBufferSize) + " bytes.");
+                            byte[] new_buffer = new byte[receiving_.Length + kUnitBufferSize];
+                            Buffer.BlockCopy(receiving_, 0, new_buffer, 0, received_size_);
+                            receiving_ = new_buffer;
+                        }
+                    }
+
+                    // Starts another async receive
+                    ArraySegment<byte> residual = new ArraySegment<byte>(receiving_, received_size_, receiving_.Length - received_size_);
+                    List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                    buffer.Add(residual);
+                    sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
+                    UnityEngine.Debug.Log("Ready to receive more. We can receive upto " + (receiving_.Length - received_size_) + " more bytes");
+                }
+                else
+                {
+                    UnityEngine.Debug.Log ("Socket closed");
+                    if (received_size_ - next_decoding_offset_ > 0)
+                    {
+                        UnityEngine.Debug.Log("Buffer has " + (receiving_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                    }
+                    failed = true;
+                }
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in ReceiveBytesCb: " + e.ToString ());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
+        private bool TryToDecodeHeader()
+        {
+            UnityEngine.Debug.Log("Trying to decode header fields.");
+            for (; next_decoding_offset_ < received_size_; )
+            {
+                ArraySegment<byte> haystack = new ArraySegment<byte>(receiving_, next_decoding_offset_, received_size_ - next_decoding_offset_);
+                int offset = BytePatternMatch(haystack, kHeaderDelimeterAsNeedle);
+                if (offset < 0)
+                {
+                    // Not enough bytes. Wait for more bytes to come.
+                    UnityEngine.Debug.Log("We need more bytes for a header field. Waiting.");
+                    return false;
+                }
+                string line = Encoding.ASCII.GetString(receiving_, next_decoding_offset_, offset - next_decoding_offset_);
+                next_decoding_offset_ = offset + 1;
+
+                if (line == "")
+                {
+                    // End of header.
+                    header_decoded_ = true;
+                    UnityEngine.Debug.Log("End of header reached. Will decode body from now.");
+                    return true;
+                }
+
+                UnityEngine.Debug.Log("Header line: " + line);
+                string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
+                UnityEngine.Debug.Log("Decoded header field '" + tuple[0] + "' => '" + tuple[1] + "'");
+                DebugUtils.Assert(tuple.Length == 2);
+                header_fields_[tuple[0]] = tuple[1];
+            }
+            return false;
+        }
+
+        private bool TryToDecodeBody()
+        {
+            DebugUtils.Assert(header_fields_.ContainsKey(kVersionHeaderFiled));
+            int version = Convert.ToUInt16(header_fields_[kVersionHeaderFiled]);
+            DebugUtils.Assert(version == kCurrentFunapiProtocolVersion);
+
+            DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderFiled));
+            int body_length = Convert.ToUInt16(header_fields_[kLengthHeaderFiled]);
+            UnityEngine.Debug.Log("We need " + body_length + " bytes for a message body. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+
+            if (received_size_ - next_decoding_offset_ < body_length)
+            {
+                // Need more bytes.
+                UnityEngine.Debug.Log("We need more bytes for a message body. Waiting.");
+                return false;
+            }
+
+            string body = Encoding.Default.GetString(receiving_, next_decoding_offset_, body_length);
+            next_decoding_offset_ += body_length;
+            //UnityEngine.Debug.Log("Payload: " + body);
+
+            JSONNode json = JSON.Parse(body);
+            DebugUtils.Assert(json is JSONClass);
+            UnityEngine.Debug.Log("Parsed json: " + json.ToString());
+
+            // Parsed json message should have reserved fields.
+            // The network module eats the fields and invoke registered handler with a remaining json body.
+            UnityEngine.Debug.Log("Invoking a receive handler.");
+            if (on_received_ != null)
+            {
+                on_received_(header_fields_, json.AsObject);
+            }
+
+            // Prepares a next message.
+            header_decoded_ = false;
+            header_fields_ = new Dictionary<string, string>();
+            return true;
+        }
+
+        private static int BytePatternMatch(ArraySegment<byte> haystack, ArraySegment<byte> needle)
+        {
+            //UnityEngine.Debug.Log("Haystack offset:" + haystack.Offset + ", count:" + haystack.Count);
+            //UnityEngine.Debug.Log("needle offset:" + needle.Offset + ", count:" + needle.Count);
+            if (haystack.Count < needle.Count)
+            {
+                return -1;
+            }
+
+            for (int i = 0; i < haystack.Count - needle.Count; ++i)
+            {
+                bool found = true;
+                for (int j = 0; j < needle.Count; ++j)
+                {
+                    if (haystack.Array[haystack.Offset + i + j] != needle.Array[needle.Offset + j])
+                    {
+                        found = false;
+                    }
+                }
+                if (found)
+                {
+                    //UnityEngine.Debug.Log("Found a needle at " + (haystack.Offset + i));
+                    return haystack.Offset + i;
+                }
+            }
+            //UnityEngine.Debug.Log("Failed to find a need from a hay stack.");
+            return -1;
+        }
+
+        private enum State {
+            kDisconnected = 0,
+            kConnecting,
+            kConnected,
+        };
+
+        // Buffer-related constants.
+        private static readonly int kUnitBufferSize = 65536;
+
+        // Funapi header-related constants.
+        private static readonly string kHeaderDelimeter = "\n";
+        private static readonly string kHeaderFieldDelimeter = ":";
+        private static readonly string kVersionHeaderFiled = "VER";
+        private static readonly string kLengthHeaderFiled = "LEN";
+        private static readonly int kCurrentFunapiProtocolVersion = 1;
+
+        // for speed-up.
+        private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(Encoding.ASCII.GetBytes(kHeaderDelimeter));
+        private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
+
+        // Registered event handlers.
+        private OnReceived on_received_;
+        private OnStopped on_stopped_;
+
+        // State-related.
+        private State state_ = State.kDisconnected;
+        private Mutex mutex_ = new Mutex();
+        private IPEndPoint end_point_;
+        private Socket sock_;
+        private List<ArraySegment<byte>> sending_ = new List<ArraySegment<byte>>();
+        private List<ArraySegment<byte>> pending_ = new List<ArraySegment<byte>>();
+        private byte[] receiving_ = new byte[kUnitBufferSize];
+        private bool header_decoded_ = false;
+        private int received_size_ = 0;
+        private int next_decoding_offset_ = 0;
+        private Dictionary<string, string> header_fields_;
+        #endregion
+    }
+
+
+    // Driver to use Funapi network plugin.
+    public class FunapiNetwork
+    {
+        #region Handler delegate definition
+        public delegate void MessageHandler(string msg_type, JSONClass body);
+        public delegate void OnSessionInitiated(string session_id);
+        public delegate void OnSessionClosed();
+        #endregion
+
+        #region public interface
+        public FunapiNetwork(FunapiTransport transport, OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
+        {
+            transport_ = transport;
+            on_session_initiated_ = on_session_initiated;
+            on_session_closed_ = on_session_closed;
+            transport_.RegisterEventHandlers(this.OnTransportReceived, this.OnTransportStopped);
+        }
+
+        public void Start()
+        {
+            message_handlers_[kNewSessionMessageType] = this.OnNewSession;
+            message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
+            UnityEngine.Debug.Log("Starting a network module.");
+            transport_.Start();
+            started_ = true;
+        }
+
+        public void Stop()
+        {
+            UnityEngine.Debug.Log("Stopping a network module.");
+            started_ = false;
+            transport_.Stop();
+        }
+
+        public bool Started
+        {
+            get
+            {
+                return started_;
+            }
+        }
+
+        public bool Connected
+        {
+            get
+            {
+                return transport_.Started;
+            }
+        }
+
+        public void SendMessage(string msg_type, JSONClass body)
+        {
+            // Invalidates session id if it is too stale.
+            if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
+            {
+                UnityEngine.Debug.Log("Session is too stale. The server might have invalidated my session. Resetting.");
+                session_id_ = "";
+            }
+
+            // Encodes a messsage type.
+            body[kMsgTypeBodyField] = msg_type;
+
+            // Encodes a session id, if any.
+            if (session_id_ != null && session_id_.Length > 0)
+            {
+                body[kSessionIdBodyField] = session_id_;
+            }
+            transport_.SendMessage(body);
+        }
+
+        public void RegisterHandler(string type, MessageHandler handler)
+        {
+            UnityEngine.Debug.Log("New handler for message type '" + type + "'");
+            message_handlers_[type] = handler;
+        }
+        #endregion
+
+        #region internal implementation
+        private void OnTransportReceived(Dictionary<string, string> header, JSONClass body)
+        {
+            UnityEngine.Debug.Log("OnReceived invoked.");
+            last_received_ = DateTime.Now;
+
+            JSONNode msg_type_node = body[kMsgTypeBodyField];
+            DebugUtils.Assert(msg_type_node is JSONData);
+            DebugUtils.Assert(msg_type_node.Value is string);
+            string msg_type = msg_type_node.Value;
+            body.Remove(msg_type_node);
+
+            JSONNode session_id_node = body[kSessionIdBodyField];
+            DebugUtils.Assert(session_id_node is JSONData);
+            DebugUtils.Assert(session_id_node.Value is String);
+            string session_id = session_id_node.Value;
+            body.Remove(session_id_node);
+
+            if (session_id_.Length == 0)
+            {
+                session_id_ = session_id;
+                UnityEngine.Debug.Log("New session id: " + session_id);
+                if (on_session_initiated_ != null)
+                {
+                    on_session_initiated_(session_id_);
+                }
+            }
+
+            if (session_id_ != session_id)
+            {
+                UnityEngine.Debug.Log("Session id changed: " + session_id_ + " => " + session_id);
+                session_id_ = session_id;
+                if (on_session_closed_ != null)
+                {
+                    on_session_closed_();
+                }
+                if (on_session_initiated_ != null)
+                {
+                    on_session_initiated_(session_id_);
+                }
+            }
+
+            if (!message_handlers_.ContainsKey(msg_type))
+            {
+                UnityEngine.Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
+            } else {
+                message_handlers_[msg_type](msg_type, body);
+            }
+        }
+
+        private void OnTransportStopped()
+        {
+            UnityEngine.Debug.Log("Transport terminated. Stopping. You may restart again.");
+            Stop();
+        }
+
+        #region Funapi system message handlers
+        private void OnNewSession(string msg_type, JSONClass body)
+        {
+            // ignore.
+        }
+
+        private void OnSessionTimedout(string msg_type, JSONClass body)
+        {
+            UnityEngine.Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
+            session_id_ = "";
+            on_session_closed_();
+        }
+        #endregion
+
+        // Funapi message-related constants.
+        private static readonly float kFunapiSessionTimeout = 3600.0f;
+        private static readonly string kMsgTypeBodyField = "msgtype";
+        private static readonly string kSessionIdBodyField = "sid";
+        private static readonly string kNewSessionMessageType = "_session_opened";
+        private static readonly string kSessionClosedMessageType = "_session_closed";
+
+        // member variables.
+        private bool started_ = false;
+        private FunapiTransport transport_;
+        private OnSessionInitiated on_session_initiated_;
+        private OnSessionClosed on_session_closed_;
+        private string session_id_ = "";
+        private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
+        private DateTime last_received_ = DateTime.Now;
+        #endregion
+    }
+
+
+    // Utility class
+    public class DebugUtils {
+        [Conditional("DEBUG")]
+        public static void Assert(bool condition)
+        {
+            if (!condition) throw new Exception();
+        }
+    }
+}  // namespace Fun
