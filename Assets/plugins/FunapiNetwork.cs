@@ -51,6 +51,7 @@ namespace Fun {
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             IPAddress address = host_info.AddressList[0];
             end_point_ = new IPEndPoint(address, port);
+            encryption_method_ = EncryptionMethod.kNone;
         }
 
         public override void RegisterEventHandlers(OnReceived on_received, OnStopped on_stopped)
@@ -114,8 +115,8 @@ namespace Fun {
             ArraySegment<byte> body_as_bytes = new ArraySegment<byte>(Encoding.Default.GetBytes(body));
 
             string header = "";
-            header += kVersionHeaderFiled + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
-            header += kLengthHeaderFiled + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
+            header += kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
+            header += kLengthHeaderField + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
             header += kHeaderDelimeter;
             ArraySegment<byte> header_as_bytes = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header));
 
@@ -133,7 +134,7 @@ namespace Fun {
                     List<ArraySegment<byte>> tmp = sending_;
                     sending_ = pending_;
                     pending_ = tmp;
-                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
+                    EncryptThenSendMessage(sending_);
                 }
             }
             catch (Exception e)
@@ -157,7 +158,7 @@ namespace Fun {
         {
             get
             {
-                return sock_ != null && sock_.Connected;
+                return sock_ != null && sock_.Connected && state_ == State.kConnected;
             }
         }
         #endregion
@@ -171,31 +172,21 @@ namespace Fun {
             bool failed = false;
             try
             {
-                state_ = State.kConnected;
                 sock_.EndConnect(ar);
                 if (sock_.Connected == false)
                 {
                     UnityEngine.Debug.Log("Failed to connect.");
                     return;
                 }
-
-                // Starts to handle incoming messages.
                 UnityEngine.Debug.Log("Connected.");
+
+                state_ = State.kEncryptionHandshaking;
+
+                  // Wait for encryption handshaking message.
                 ArraySegment<byte> wrapped = new ArraySegment<byte>(receiving_, 0, receiving_.Length);
                 List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                 buffer.Add(wrapped);
                 sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                UnityEngine.Debug.Log("Ready to receive.");
-
-                // If there any data already queued, start to process.
-                if (pending_.Count > 0)
-                {
-                    UnityEngine.Debug.Log("Flushing pending messages.");
-                    List<ArraySegment<byte>> tmp = sending_;
-                    sending_ = pending_;
-                    pending_ = tmp;
-                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
-                }
             }
             catch (Exception e)
             {
@@ -265,7 +256,7 @@ namespace Fun {
                     List<ArraySegment<byte>> tmp = sending_;
                     sending_ = pending_;
                     pending_ = tmp;
-                    sock_.BeginSend(sending_, 0, new AsyncCallback(this.SendBytesCb), this);
+                    EncryptThenSendMessage(sending_);
                 }
 
             }
@@ -377,6 +368,19 @@ namespace Fun {
             }
         }
 
+        private void EncryptThenSendMessage(List<ArraySegment<byte>> sending)
+        {
+            if (encryption_method_ == EncryptionMethod.kIFunEngine1) {
+                DebugUtils.Assert(encryptor_ != null);
+                for (int i = 1; i < sending.Count; i+=2)
+                {
+                    // even index = header, odd index = payload
+                    encryptor_.Encrypt(sending[i], sending[i]);
+                }
+            }
+            sock_.BeginSend(sending, 0, new AsyncCallback(this.SendBytesCb), this);
+        }
+
         private bool TryToDecodeHeader()
         {
             UnityEngine.Debug.Log("Trying to decode header fields.");
@@ -403,6 +407,7 @@ namespace Fun {
 
                 UnityEngine.Debug.Log("Header line: " + line);
                 string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
+                tuple[0] = tuple[0].ToUpper();
                 UnityEngine.Debug.Log("Decoded header field '" + tuple[0] + "' => '" + tuple[1] + "'");
                 DebugUtils.Assert(tuple.Length == 2);
                 header_fields_[tuple[0]] = tuple[1];
@@ -412,12 +417,12 @@ namespace Fun {
 
         private bool TryToDecodeBody()
         {
-            DebugUtils.Assert(header_fields_.ContainsKey(kVersionHeaderFiled));
-            int version = Convert.ToUInt16(header_fields_[kVersionHeaderFiled]);
+            DebugUtils.Assert(header_fields_.ContainsKey(kVersionHeaderField));
+            int version = Convert.ToUInt16(header_fields_[kVersionHeaderField]);
             DebugUtils.Assert(version == kCurrentFunapiProtocolVersion);
 
-            DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderFiled));
-            int body_length = Convert.ToUInt16(header_fields_[kLengthHeaderFiled]);
+            DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderField));
+            int body_length = Convert.ToUInt16(header_fields_[kLengthHeaderField]);
             UnityEngine.Debug.Log("We need " + body_length + " bytes for a message body. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
 
             if (received_size_ - next_decoding_offset_ < body_length)
@@ -427,20 +432,70 @@ namespace Fun {
                 return false;
             }
 
-            string body = Encoding.Default.GetString(receiving_, next_decoding_offset_, body_length);
-            next_decoding_offset_ += body_length;
-            //UnityEngine.Debug.Log("Payload: " + body);
-
-            JSONNode json = JSON.Parse(body);
-            DebugUtils.Assert(json is JSONClass);
-            UnityEngine.Debug.Log("Parsed json: " + json.ToString());
-
-            // Parsed json message should have reserved fields.
-            // The network module eats the fields and invoke registered handler with a remaining json body.
-            UnityEngine.Debug.Log("Invoking a receive handler.");
-            if (on_received_ != null)
+            if (state_ == State.kEncryptionHandshaking)
             {
-                on_received_(header_fields_, json.AsObject);
+                DebugUtils.Assert(body_length == 0);
+
+                string enc_header = header_fields_[kEncryptionHeaderField];
+                string[] enc_header1 = enc_header.Split(new char[] {'-'});
+                enc_header1[0] = enc_header1[0].ToLower();
+
+                if (enc_header1[0] == kEncryptionNoneString)
+                {
+                    encryption_method_ = EncryptionMethod.kNone;
+                } else if (enc_header1[0] == kEncryptionIFunEngine1String)
+                {
+                    UInt32 seed = Convert.ToUInt32(enc_header1[1]);
+                    encryptor_ = new PacketEncryptor(seed);
+                    decryptor_ = new PacketEncryptor(seed);
+                    encryption_method_ = EncryptionMethod.kIFunEngine1;
+                } else {
+                    UnityEngine.Debug.Log("Unknown encryption: " + enc_header1[0]);
+                    DebugUtils.Assert(false);
+                }
+
+                // Makes a state transition.
+                state_ = State.kConnected;
+                UnityEngine.Debug.Log ("Encryption: " + enc_header1[0]);
+                UnityEngine.Debug.Log("Ready to receive.");
+
+                // If there any data already queued, start to process.
+                if (pending_.Count > 0)
+                {
+                    UnityEngine.Debug.Log("Flushing pending messages.");
+                    List<ArraySegment<byte>> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+                    EncryptThenSendMessage(sending_);
+                }
+            }
+
+            if (body_length > 0)
+            {
+                if (encryption_method_ == EncryptionMethod.kIFunEngine1)
+                {
+                    ArraySegment<byte> body_bytes = new ArraySegment<byte>(receiving_, next_decoding_offset_, body_length);
+                    DebugUtils.Assert(body_bytes.Count == body_length);
+                    decryptor_.Decrypt(body_bytes, body_bytes);
+                }
+                string body = Encoding.Default.GetString(receiving_, next_decoding_offset_, body_length);
+                next_decoding_offset_ += body_length;
+                //UnityEngine.Debug.Log("Payload: " + body);
+
+
+                UnityEngine.Debug.Log (">>> " + body);
+
+                JSONNode json = JSON.Parse(body);
+                DebugUtils.Assert(json is JSONClass);
+                UnityEngine.Debug.Log("Parsed json: " + json.ToString());
+
+                // Parsed json message should have reserved fields.
+                // The network module eats the fields and invoke registered handler with a remaining json body.
+                UnityEngine.Debug.Log("Invoking a receive handler.");
+                if (on_received_ != null)
+                {
+                    on_received_(header_fields_, json.AsObject);
+                }
             }
 
             // Prepares a next message.
@@ -458,7 +513,7 @@ namespace Fun {
                 return -1;
             }
 
-            for (int i = 0; i < haystack.Count - needle.Count; ++i)
+            for (int i = 0; i <= haystack.Count - needle.Count; ++i)
             {
                 bool found = true;
                 for (int j = 0; j < needle.Count; ++j)
@@ -481,8 +536,14 @@ namespace Fun {
         private enum State {
             kDisconnected = 0,
             kConnecting,
+            kEncryptionHandshaking,
             kConnected,
         };
+
+        private enum EncryptionMethod {
+            kNone = 0,
+            kIFunEngine1
+        }
 
         // Buffer-related constants.
         private static readonly int kUnitBufferSize = 65536;
@@ -490,9 +551,14 @@ namespace Fun {
         // Funapi header-related constants.
         private static readonly string kHeaderDelimeter = "\n";
         private static readonly string kHeaderFieldDelimeter = ":";
-        private static readonly string kVersionHeaderFiled = "VER";
-        private static readonly string kLengthHeaderFiled = "LEN";
+        private static readonly string kVersionHeaderField = "VER";
+        private static readonly string kLengthHeaderField = "LEN";
+        private static readonly string kEncryptionHeaderField = "ENC";
         private static readonly int kCurrentFunapiProtocolVersion = 1;
+
+        // Encryption-releated constants.
+        private static readonly string kEncryptionNoneString = "none";
+        private static readonly string kEncryptionIFunEngine1String = "ife1";
 
         // for speed-up.
         private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(Encoding.ASCII.GetBytes(kHeaderDelimeter));
@@ -514,6 +580,9 @@ namespace Fun {
         private int received_size_ = 0;
         private int next_decoding_offset_ = 0;
         private Dictionary<string, string> header_fields_;
+        private PacketEncryptor encryptor_;
+        private PacketEncryptor decryptor_;
+        private EncryptionMethod encryption_method_;
         #endregion
     }
 
@@ -681,6 +750,62 @@ namespace Fun {
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private DateTime last_received_ = DateTime.Now;
         #endregion
+    }
+
+
+    // Encryption class used by tcp transport layer
+    public class PacketEncryptor
+    {
+        public PacketEncryptor(UInt32 key)
+        {
+            key_ = key;
+        }
+
+        public int Encrypt(ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            if (dst.Count < src.Count)
+                return 0;
+
+            key_ = 8253729 * key_ + 2396403;
+
+            uint shift_len = key_ & 0x0F;
+
+            if (!BitConverter.IsLittleEndian)
+                Array.Reverse(src.Array, src.Offset, src.Count);
+
+            for (int i = 0; i < (src.Count / kBlockSize); ++i)
+            {
+                UInt32 s = BitConverter.ToUInt32(src.Array, src.Offset + i * kBlockSize);
+                byte[] d = BitConverter.GetBytes(s ^ (CircularLeftShift(key_, shift_len)));
+                DebugUtils.Assert(d.Length == sizeof(UInt32));
+
+                for (int j = 0; j < d.Length; ++j) {
+                    dst.Array[dst.Offset + i * kBlockSize + j] = d[j];
+                }
+            }
+
+            for (int i = 0; i < (src.Count % kBlockSize); ++i)
+            {
+                int idx = src.Count - 1 - i;
+                dst.Array[dst.Offset + idx] = (byte)(src.Array[src.Offset + idx] ^ (byte)(CircularLeftShift(key_, shift_len)));
+            }
+
+            return src.Count;
+        }
+
+        public int Decrypt(ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            return Encrypt(src, dst);
+        }
+
+        private UInt32 CircularLeftShift(UInt32 value, uint shift_len)
+        {
+            return (value << (int)shift_len) | (value >> (int)(sizeof(UInt32)- shift_len));
+        }
+
+        private static readonly int kBlockSize = sizeof(UInt32);
+
+        private UInt32 key_ = 0;
     }
 
 
