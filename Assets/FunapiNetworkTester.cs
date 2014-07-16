@@ -3,17 +3,8 @@
 using SimpleJSON;
 using Fun;
 
-public class FunapiNetworkTester : MonoBehaviour {
-
-    // Use this for initialization
-    public void Start()
-    {
-        UnityEngine.Debug.Log("Creating a network instance.");
-        // You should pass an instance of FunapiTransport.
-        // Currently only FunapiTcpTransport is supported.
-        network_ = new FunapiNetwork(new FunapiTcpTransport("192.168.244.151", 8012), this.OnSessionInitiated, this.OnSessionClosed);
-    }
-
+public class FunapiNetworkTester : MonoBehaviour
+{
     // Update is called once per frame
     public void Update()
     {
@@ -21,15 +12,21 @@ public class FunapiNetworkTester : MonoBehaviour {
         {
             if (start_time_ + 5.0f < Time.time)
             {
-                if (network_.Connected == false)
+                if (network_ == null)
+                {
+                    UnityEngine.Debug.Log("Failed to make a connection. Network instance was not generated.");
+                }
+                else if (network_.Connected == false)
                 {
                     UnityEngine.Debug.Log("Failed to make a connection. Maybe the server is down? Stopping the network module.");
                     network_.Stop();
+                    network_ = null;
                 }
                 else
                 {
                     UnityEngine.Debug.Log("Seems network succeeded to make a connection to a server.");
                 }
+
                 start_time_ = 0.0f;
             }
         }
@@ -38,42 +35,72 @@ public class FunapiNetworkTester : MonoBehaviour {
     public void OnGUI()
     {
         // For debugging
-        if (GUI.Button(new Rect(10, 30, 120, 20), "Connect"))
+        GUI.enabled = network_ == null;
+        if (GUI.Button(new Rect(30, 30, 120, 20), "Connect (TCP)"))
         {
-            if (network_.Started)
-            {
-                UnityEngine.Debug.Log("Already connected. Disconnect first.");
-            }
-            else
-            {
-                network_.RegisterHandler("echo", this.OnEcho);
-                start_time_ = Time.time;
-                network_.Start();
-            }
+            Connect(new FunapiTcpTransport(IP, 8012));
         }
-        if (GUI.Button(new Rect(10, 60, 120, 20), "Disconnect"))
+        if (GUI.Button(new Rect(30, 60, 120, 20), "Connect (UDP)"))
         {
-            if (network_.Started == false)
-            {
-                UnityEngine.Debug.Log("You should connect first.");
-            }
-            else
-            {
-                network_.Stop();
-            }
+            Connect(new FunapiUdpTransport(IP, 8013));
+            SendEchoMessage();
         }
-        if (GUI.Button(new Rect(10, 90, 120, 20), "Send 'Hello World'"))
+
+        GUI.enabled = false;
+        if (GUI.Button(new Rect(30, 90, 120, 20), "Connect (HTTP)"))
         {
-            if (network_.Started == false)
-            {
-                UnityEngine.Debug.Log("You should connect first.");
-            }
-            else
-            {
-                JSONClass example = new JSONClass();
-                example["message"] = "hello world";
-                network_.SendMessage("echo", example);
-            }
+            //Connect(new FunapiHttpTransport(IP, 8018));
+            //SendEchoMessage();
+        }
+
+        GUI.enabled = network_ != null;
+        if (GUI.Button(new Rect(30, 120, 120, 20), "Disconnect"))
+        {
+            DisConnect();
+        }
+        if (GUI.Button(new Rect(30, 150, 120, 20), "Send 'Hello World'"))
+        {
+            SendEchoMessage();
+        }
+    }
+
+    private void Connect (FunapiTransport transport)
+    {
+        UnityEngine.Debug.Log("Creating a network instance.");
+        // You should pass an instance of FunapiTransport.
+        network_ = new FunapiNetwork(transport, this.OnSessionInitiated, this.OnSessionClosed);
+
+        network_.RegisterHandler("echo", this.OnEcho);
+        start_time_ = Time.time;
+        network_.Start();
+    }
+
+    private void DisConnect ()
+    {
+        start_time_ = 0.0f;
+
+        if (network_.Started == false)
+        {
+            UnityEngine.Debug.Log("You should connect first.");
+        }
+        else
+        {
+            network_.Stop();
+            network_ = null;
+        }
+    }
+
+    private void SendEchoMessage ()
+    {
+        if (network_.Started == false)
+        {
+            UnityEngine.Debug.Log("You should connect first.");
+        }
+        else
+        {
+            JSONClass example = new JSONClass();
+            example["message"] = "hello world";
+            network_.SendMessage("echo", example);
         }
     }
 
@@ -92,7 +119,12 @@ public class FunapiNetworkTester : MonoBehaviour {
         UnityEngine.Debug.Log("Received an echo message: " + body.ToString());
     }
 
-    private FunapiNetwork network_;
+
+    // Please change IP for test.
+    private const string IP = "192.168.35.129";
+
+    // member variables.
+    private FunapiNetwork network_ = null;
     private float start_time_ = 0.0f;
 
     // Another Funapi-specific features will go here...
