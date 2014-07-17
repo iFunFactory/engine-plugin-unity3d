@@ -39,18 +39,17 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(30, 30, 120, 20), "Connect (TCP)"))
         {
             Connect(new FunapiTcpTransport(IP, 8012));
+            start_time_ = Time.time;
         }
         if (GUI.Button(new Rect(30, 60, 120, 20), "Connect (UDP)"))
         {
             Connect(new FunapiUdpTransport(IP, 8013));
             SendEchoMessage();
         }
-
-        GUI.enabled = false;
         if (GUI.Button(new Rect(30, 90, 120, 20), "Connect (HTTP)"))
         {
-            //Connect(new FunapiHttpTransport(IP, 8018));
-            //SendEchoMessage();
+            Connect(new FunapiHttpTransport(IP, 8018));
+            SendEchoMessage();
         }
 
         GUI.enabled = network_ != null;
@@ -71,7 +70,6 @@ public class FunapiNetworkTester : MonoBehaviour
         network_ = new FunapiNetwork(transport, this.OnSessionInitiated, this.OnSessionClosed);
 
         network_.RegisterHandler("echo", this.OnEcho);
-        start_time_ = Time.time;
         network_.Start();
     }
 
@@ -120,7 +118,7 @@ public class FunapiNetworkTester : MonoBehaviour
     }
 
 
-    // Please change IP for test.
+    // Please change this IP for test.
     private const string IP = "192.168.35.129";
 
     // member variables.

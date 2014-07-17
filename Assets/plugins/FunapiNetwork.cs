@@ -95,7 +95,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failred in Start: " + e.ToString());
+                UnityEngine.Debug.Log("Failure in Start: " + e.ToString());
                 failed = true;
             }
             finally
@@ -370,7 +370,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failrued in StartCb: " + e.ToString());
+                UnityEngine.Debug.Log("Failure in StartCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -610,7 +610,7 @@ namespace Fun
             {
                 if (offset > kUnitBufferSize)
                 {
-                    UnityEngine.Debug.LogWarning("Packet is greater than 64KB. It will be truncated.");
+                    UnityEngine.Debug.LogWarning("Message is greater than 64KB. It will be truncated.");
                     DebugUtils.Assert(false);
                 }
 
@@ -761,34 +761,232 @@ namespace Fun
 
 
     // HTTP transport layer
-    /*public class FunapiHttpTransport : FunapiTransport
+    public class FunapiHttpTransport : FunapiTransport
     {
         #region public interface
-        public FunapiHttpTransport(string hostname_or_ip, UInt16 port)
+        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, Protocol protocol = Protocol.HTTP)
         {
+            // Url
+            if (protocol == Protocol.HTTP)
+                host_url_ = "http://";
+            else if (protocol == Protocol.HTTPS)
+                host_url_ = "https://";
+            else
+            {
+                UnityEngine.Debug.LogWarning("Only supports HTTP and HTTPS protocols.");
+                DebugUtils.Assert(false);
+            }
+
+            host_url_ += hostname_or_ip + ":" + port + "/";
+
+            // Version
+            host_url_ += "v" + kCurrentFunapiProtocolVersion + "/";
         }
 
         public override void Start()
         {
+            UnityEngine.Debug.Log("Started.");
         }
 
         public override void Stop()
         {
+            mutex_.WaitOne();
+            UnityEngine.Debug.Log("Stopped.");
+
+            foreach (WebState state in list_)
+            {
+                if (state.request != null)
+                    state.request.Abort();
+
+                if (state.stream != null)
+                    state.stream.Close();
+            }
+
+            list_.Clear();
+            mutex_.ReleaseMutex();
         }
 
         public override bool Started
         {
-            get { return false; }
+            get { return true; }
         }
 
         public override void SendMessage(JSONClass message)
         {
+            mutex_.WaitOne();
+            UnityEngine.Debug.Log("Send a Message.");
+
+            bool failed = false;
+            try
+            {
+                string sending = message.ToString();
+                ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.Default.GetBytes(sending));
+
+                UnityEngine.Debug.Log("Host Url: " + host_url_);
+                UnityEngine.Debug.Log("JSON to send: " + sending);
+
+                // Request
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
+                request.Method = "POST";
+                request.ContentType = "application/x-www-form-urlencoded";
+                request.ContentLength = buffer.Count;
+
+                Stream stream = request.GetRequestStream();
+                stream.Write(buffer.Array, 0, buffer.Count);
+                stream.Close();
+                UnityEngine.Debug.Log("Sent " + buffer.Count + "bytes");
+
+                // Response
+                WebState state = new WebState();
+                state.request = request;
+                list_.Add(state);
+
+                request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in SendMessage: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
         }
         #endregion
 
         #region internal implementation
+        private void ResponseCb (IAsyncResult ar)
+        {
+            mutex_.WaitOne();
+            UnityEngine.Debug.Log("ResponseCb called.");
+
+            bool failed = false;
+            try
+            {
+                WebState state = (WebState)ar.AsyncState;
+                HttpWebResponse response = (HttpWebResponse)state.request.EndGetResponse(ar);
+                state.request = null;
+
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    Stream stream = response.GetResponseStream();
+                    state.stream = stream;
+
+                    stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
+                }
+                else
+                {
+                    UnityEngine.Debug.Log("Failed response. status:" + response.StatusDescription);
+                    DebugUtils.Assert(false);
+                    list_.Remove(state);
+                }
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in Response: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
+        private void ReadCb (IAsyncResult ar)
+        {
+            mutex_.WaitOne();
+            UnityEngine.Debug.Log("ReadCb called.");
+
+            bool failed = false;
+            try
+            {
+                WebState state = (WebState)ar.AsyncState;
+                int nRead = state.stream.EndRead(ar);
+
+                if (nRead > 0)
+                {
+                    UnityEngine.Debug.Log("We need more bytes for response. Waiting.");
+                    state.read_data += Encoding.ASCII.GetString(state.buffer, 0, nRead);
+                    state.stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
+                }
+                else
+                {
+                    UnityEngine.Debug.Log(">>> " + state.read_data);
+
+                    JSONNode json = JSON.Parse(state.read_data);
+                    DebugUtils.Assert(json is JSONClass);
+                    UnityEngine.Debug.Log("Parsed json: " + json.ToString());
+
+                    // Parsed json message should have reserved fields.
+                    // The network module eats the fields and invoke registered handler with a remaining json body.
+                    UnityEngine.Debug.Log("Invoking a receive handler.");
+                    if (on_received_ != null)
+                    {
+                        on_received_(null, json.AsObject);
+                    }
+
+                    state.stream.Close();
+                    state.stream = null;
+                    list_.Remove(state);
+                }
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in Read: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
         #endregion
-    }*/
+
+
+        // HTTP protocol type.
+        public enum Protocol
+        {
+            HTTP,
+            HTTPS
+        }
+
+        // Response-related.
+        class WebState
+        {
+            public HttpWebRequest request = null;
+            public HttpWebResponse response = null;
+            public Stream stream = null;
+            public string read_data = "";
+            public byte[] buffer = new byte[kUnitBufferSize];
+        }
+
+
+        // Buffer-related constants.
+        private static readonly int kUnitBufferSize = 65536;
+
+        // member variables.
+        private string host_url_;
+        private List<WebState> list_ = new List<WebState>();
+    }
 
 
     // Driver to use Funapi network plugin.
