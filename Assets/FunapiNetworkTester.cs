@@ -1,6 +1,12 @@
-﻿using UnityEngine;
+﻿// Copyright (C) 2013 iFunFactory Inc. All Rights Reserved.
+//
+// This work is confidential and proprietary to iFunFactory Inc. and
+// must not be used, disclosed, copied, or distributed without the prior
+// consent of iFunFactory Inc.
 
+using UnityEngine;
 using SimpleJSON;
+using System;
 using Fun;
 
 public class FunapiNetworkTester : MonoBehaviour
@@ -38,19 +44,31 @@ public class FunapiNetworkTester : MonoBehaviour
         GUI.enabled = network_ == null;
         if (GUI.Button(new Rect(30, 30, 120, 20), "Connect (TCP)"))
         {
-            Connect(new FunapiTcpTransport(IP, 8012));
+            Connect(new FunapiTcpTransport(kServerIp, 8012));
             start_time_ = Time.time;
         }
         if (GUI.Button(new Rect(30, 60, 120, 20), "Connect (UDP)"))
         {
-            Connect(new FunapiUdpTransport(IP, 8013));
+            Connect(new FunapiUdpTransport(kServerIp, 8013));
             SendEchoMessage();
         }
         if (GUI.Button(new Rect(30, 90, 120, 20), "Connect (HTTP)"))
         {
-            Connect(new FunapiHttpTransport(IP, 8018));
+            Connect(new FunapiHttpTransport(kServerIp, 8018));
             SendEchoMessage();
         }
+
+        GUI.enabled = downloader_ == null;
+        if (GUI.Button(new Rect(180, 30, 170, 20), "File Download (HTTP)"))
+        {
+            downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
+            downloader_.StartDownload(kResourceServerIp, 8000, "resources");
+            downloader_.StartDownload(kResourceServerIp, 8000, "sounds");
+            message_ = " start downloading..";
+        }
+
+        GUI.enabled = true;
+        GUI.TextField(new Rect(180, 55, 480, 24), message_);
 
         GUI.enabled = network_ != null;
         if (GUI.Button(new Rect(30, 120, 120, 20), "Disconnect"))
@@ -117,13 +135,42 @@ public class FunapiNetworkTester : MonoBehaviour
         UnityEngine.Debug.Log("Received an echo message: " + body.ToString());
     }
 
+    private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
+    {
+        message_ = " downloading - path:" + path + " / received:" + bytes_received + " / total:" + total_bytes + " / " + percentage + "%";
+        UnityEngine.Debug.Log(message_);
+    }
 
-    // Please change this IP for test.
-    private const string IP = "192.168.35.129";
+    private void OnDownloadFinished (DownloadResult code)
+    {
+        downloader_ = null;
+        message_ = " download completed. result:" + code;
+    }
+
+    // Get a personal path.
+    private string GetLocalResourcePath()
+    {
+        if ((Application.platform == RuntimePlatform.Android) ||
+            (Application.platform == RuntimePlatform.IPhonePlayer))
+        {
+            return Application.persistentDataPath;
+        }
+        else
+        {
+            return Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+        }
+    }
+
+
+    // Please change this address for test.
+    private const string kServerIp = "192.168.35.130";
+    private const string kResourceServerIp = "127.0.0.1";
 
     // member variables.
     private FunapiNetwork network_ = null;
+    private FunapiHttpDownloader downloader_ = null;
     private float start_time_ = 0.0f;
+    private string message_ = "";
 
     // Another Funapi-specific features will go here...
 }
