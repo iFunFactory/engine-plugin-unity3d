@@ -42,24 +42,24 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         // For debugging
         GUI.enabled = network_ == null;
-        if (GUI.Button(new Rect(30, 30, 120, 20), "Connect (TCP)"))
+        if (GUI.Button(new Rect(30, 30, 240, 40), "Connect (TCP)"))
         {
             Connect(new FunapiTcpTransport(kServerIp, 8012));
             start_time_ = Time.time;
         }
-        if (GUI.Button(new Rect(30, 60, 120, 20), "Connect (UDP)"))
+        if (GUI.Button(new Rect(30, 90, 240, 40), "Connect (UDP)"))
         {
             Connect(new FunapiUdpTransport(kServerIp, 8013));
             SendEchoMessage();
         }
-        if (GUI.Button(new Rect(30, 90, 120, 20), "Connect (HTTP)"))
+        if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
         {
             Connect(new FunapiHttpTransport(kServerIp, 8018));
             SendEchoMessage();
         }
 
         GUI.enabled = downloader_ == null;
-        if (GUI.Button(new Rect(180, 30, 170, 20), "File Download (HTTP)"))
+        if (GUI.Button(new Rect(280, 30, 340, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
             downloader_.StartDownload(kResourceServerIp, 8000, "resources");
@@ -68,14 +68,14 @@ public class FunapiNetworkTester : MonoBehaviour
         }
 
         GUI.enabled = true;
-        GUI.TextField(new Rect(180, 55, 480, 24), message_);
+        GUI.TextField(new Rect(280, 71, 480, 24), message_);
 
         GUI.enabled = network_ != null;
-        if (GUI.Button(new Rect(30, 120, 120, 20), "Disconnect"))
+        if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
         {
             DisConnect();
         }
-        if (GUI.Button(new Rect(30, 150, 120, 20), "Send 'Hello World'"))
+        if (GUI.Button(new Rect(30, 270, 240, 40), "Send 'Hello World'"))
         {
             SendEchoMessage();
         }
