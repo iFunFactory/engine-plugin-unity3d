@@ -49,7 +49,12 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         if (GUI.Button(new Rect(30, 90, 240, 40), "Connect (UDP)"))
         {
-            Connect(new FunapiUdpTransport(kServerIp, 8013));
+            FunapiUdpTransport transport = new FunapiUdpTransport(kServerIp, 8013);
+
+            // Please set the same encryption type as the encryption type of server.
+            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+
+            Connect(transport);
             SendEchoMessage();
         }
         if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
