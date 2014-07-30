@@ -848,23 +848,18 @@ namespace Fun
     public class FunapiHttpTransport : FunapiTransport
     {
         #region public interface
-        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, Protocol protocol = Protocol.HTTP)
+        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https = false)
         {
             // Url
-            if (protocol == Protocol.HTTP)
-                host_url_ = "http://";
-            else if (protocol == Protocol.HTTPS)
+            if (https)
                 host_url_ = "https://";
             else
-            {
-                UnityEngine.Debug.LogWarning("Only supports HTTP and HTTPS protocols.");
-                DebugUtils.Assert(false);
-            }
+                host_url_ = "http://";
 
-            host_url_ += hostname_or_ip + ":" + port + "/";
+            host_url_ += hostname_or_ip + ":" + port;
 
             // Version
-            host_url_ += "v" + kCurrentFunapiProtocolVersion + "/";
+            host_url_ += "/v" + kCurrentFunapiProtocolVersion + "/";
         }
 
         public override void Start()
@@ -1046,13 +1041,6 @@ namespace Fun
         #endregion
 
 
-        // HTTP protocol type.
-        public enum Protocol
-        {
-            HTTP,
-            HTTPS
-        }
-
         // Response-related.
         class WebState
         {
@@ -1062,7 +1050,6 @@ namespace Fun
             public string read_data = "";
             public byte[] buffer = new byte[kUnitBufferSize];
         }
-
 
         // Buffer-related constants.
         private static readonly int kUnitBufferSize = 65536;
