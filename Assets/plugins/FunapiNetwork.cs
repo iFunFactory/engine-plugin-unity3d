@@ -94,7 +94,7 @@ namespace Fun
                 header_decoded_ = false;
                 received_size_ = 0;
                 next_decoding_offset_ = 0;
-                header_fields_ = new Dictionary<string, string>();
+                header_fields_.Clear();
                 sending_.Clear();
 
                 Init();
@@ -259,7 +259,7 @@ namespace Fun
 
             // Prepares a next message.
             header_decoded_ = false;
-            header_fields_ = new Dictionary<string, string>();
+            header_fields_.Clear();
             return true;
         }
 
@@ -723,7 +723,7 @@ namespace Fun
                     // Prepares a next message.
                     received_size_ = 0;
                     next_decoding_offset_ = 0;
-                    header_fields_ = new Dictionary<string, string>();
+                    header_fields_.Clear();
 
                     // Starts another async receive
                     sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
