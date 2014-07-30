@@ -11,33 +11,6 @@ using Fun;
 
 public class FunapiNetworkTester : MonoBehaviour
 {
-    // Update is called once per frame
-    public void Update()
-    {
-        if (start_time_ != 0.0f)
-        {
-            if (start_time_ + 5.0f < Time.time)
-            {
-                if (network_ == null)
-                {
-                    UnityEngine.Debug.Log("Failed to make a connection. Network instance was not generated.");
-                }
-                else if (network_.Connected == false)
-                {
-                    UnityEngine.Debug.Log("Failed to make a connection. Maybe the server is down? Stopping the network module.");
-                    network_.Stop();
-                    network_ = null;
-                }
-                else
-                {
-                    UnityEngine.Debug.Log("Seems network succeeded to make a connection to a server.");
-                }
-
-                start_time_ = 0.0f;
-            }
-        }
-    }
-
     public void OnGUI()
     {
         // For debugging
@@ -45,7 +18,8 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(30, 30, 240, 40), "Connect (TCP)"))
         {
             Connect(new FunapiTcpTransport(kServerIp, 8012));
-            start_time_ = Time.time;
+            SendEchoMessage();
+            Invoke("CheckConnection", 3f);
         }
         if (GUI.Button(new Rect(30, 90, 240, 40), "Connect (UDP)"))
         {
@@ -56,11 +30,13 @@ public class FunapiNetworkTester : MonoBehaviour
 
             Connect(transport);
             SendEchoMessage();
+            Invoke("CheckConnection", 3f);
         }
         if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
         {
             Connect(new FunapiHttpTransport(kServerIp, 8018));
             SendEchoMessage();
+            Invoke("CheckConnection", 3f);
         }
 
         GUI.enabled = downloader_ == null;
@@ -98,7 +74,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void DisConnect ()
     {
-        start_time_ = 0.0f;
+        CancelInvoke();
 
         if (network_.Started == false)
         {
@@ -108,6 +84,26 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             network_.Stop();
             network_ = null;
+        }
+    }
+
+    private void CheckConnection ()
+    {
+        if (network_ == null)
+        {
+            UnityEngine.Debug.LogWarning("Failed to make a connection. Network instance was not generated.");
+        }
+        else if (!network_.Connected || session_id_.Length <= 0)
+        {
+            UnityEngine.Debug.LogWarning("Failed to make a connection. Stopping the network module.");
+            UnityEngine.Debug.LogWarning("Maybe the server is down? Otherwise check out the encryption type.");
+
+            network_.Stop();
+            network_ = null;
+        }
+        else
+        {
+            UnityEngine.Debug.Log("Seems network succeeded to make a connection to a server.");
         }
     }
 
@@ -127,6 +123,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnSessionInitiated(string session_id)
     {
+        session_id_ = session_id;
         UnityEngine.Debug.Log("Session initiated. Session id:" + session_id);
     }
 
@@ -174,7 +171,7 @@ public class FunapiNetworkTester : MonoBehaviour
     // member variables.
     private FunapiNetwork network_ = null;
     private FunapiHttpDownloader downloader_ = null;
-    private float start_time_ = 0.0f;
+    private string session_id_ = "";
     private string message_ = "";
 
     // Another Funapi-specific features will go here...
