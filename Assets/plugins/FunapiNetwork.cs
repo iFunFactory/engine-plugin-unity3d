@@ -1121,7 +1121,7 @@ namespace Fun
             try
             {
                 string sending = message.ToString();
-                ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.Default.GetBytes(sending));
+                ArraySegment<byte> content = new ArraySegment<byte>(Encoding.Default.GetBytes(sending));
 
                 UnityEngine.Debug.Log("Host Url: " + host_url_);
                 UnityEngine.Debug.Log("JSON to send: " + sending);
@@ -1130,19 +1130,15 @@ namespace Fun
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
                 request.Method = "POST";
                 request.ContentType = "application/x-www-form-urlencoded";
-                request.ContentLength = buffer.Count;
-
-                Stream stream = request.GetRequestStream();
-                stream.Write(buffer.Array, 0, buffer.Count);
-                stream.Close();
-                UnityEngine.Debug.Log("Sent " + buffer.Count + "bytes");
+                request.ContentLength = content.Count;
 
                 // Response
                 WebState state = new WebState();
                 state.request = request;
+                state.sending = content;
                 list_.Add(state);
 
-                request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
+                request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
             }
             catch (Exception e)
             {
@@ -1163,6 +1159,41 @@ namespace Fun
         #endregion
 
         #region internal implementation
+        private void RequestStreamCb (IAsyncResult ar)
+        {
+            mutex_.WaitOne();
+            UnityEngine.Debug.Log("RequestStreamCb called.");
+
+            bool failed = false;
+            try
+            {
+                WebState state = (WebState)ar.AsyncState;
+                HttpWebRequest request = state.request;
+
+                Stream stream = request.EndGetRequestStream(ar);
+                stream.Write(state.sending.Array, 0, state.sending.Count);
+                stream.Close();
+                UnityEngine.Debug.Log("Sent " + state.sending.Count + "bytes");
+
+                request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.Log("Failure in RequestStreamCb: " + e.ToString());
+                failed = true;
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+
+            if (failed)
+            {
+                Stop();
+                on_stopped_();
+            }
+        }
+
         private void ResponseCb (IAsyncResult ar)
         {
             mutex_.WaitOne();
@@ -1180,6 +1211,7 @@ namespace Fun
                     Stream stream = response.GetResponseStream();
                     state.stream = stream;
 
+                    state.buffer = new byte[kUnitBufferSize];
                     stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
                 }
                 else
@@ -1191,7 +1223,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in Response: " + e.ToString());
+                UnityEngine.Debug.Log("Failure in ResponseCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -1246,7 +1278,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in Read: " + e.ToString());
+                UnityEngine.Debug.Log("Failure in ReadCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -1270,7 +1302,8 @@ namespace Fun
             public HttpWebResponse response = null;
             public Stream stream = null;
             public string read_data = "";
-            public byte[] buffer = new byte[kUnitBufferSize];
+            public byte[] buffer = null;
+            public ArraySegment<byte> sending;
         }
 
         // Buffer-related constants.
