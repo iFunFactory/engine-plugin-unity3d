@@ -10,9 +10,11 @@ using System.ComponentModel;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using SimpleJSON;
+
 
 namespace Fun
 {
@@ -197,16 +199,29 @@ namespace Fun
                 return;
 
             List<DownloadFile> remove_list = new List<DownloadFile>();
+            DateTime list_file_time = File.GetLastWriteTime(target_path_ + kSaveFile);
 
             foreach (DownloadFile item in list)
             {
                 DownloadFile info = cached_files_list_.Find(i => i.path == item.path);
                 if (info != null)
                 {
+                    bool is_same = true;
                     if (info.md5 != item.md5)
-                        cached_files_list_.Remove(info);
+                    {
+                        is_same = false;
+                    }
                     else
+                    {
+                        DateTime time = File.GetLastWriteTime(target_path_ + info.path);
+                        if (time.Ticks > list_file_time.Ticks)
+                            is_same = false;
+                    }
+
+                    if (is_same)
                         remove_list.Add(item);
+                    else
+                        cached_files_list_.Remove(info);
                 }
             }
 
@@ -373,7 +388,9 @@ namespace Fun
                 {
                     if (download_list_.Count > 0)
                     {
+                        cur_download_.md5 = GetMd5Hash(target_path_ + cur_download_.path);
                         cached_files_list_.Add(cur_download_);
+
                         download_list_.RemoveAt(0);
                     }
 
@@ -394,6 +411,29 @@ namespace Fun
             {
                 Stop();
             }
+        }
+
+        private string GetMd5Hash (string path)
+        {
+            if (!File.Exists(path))
+            {
+                Debug.Log("GetMd5Hash - Can't find a file. path: " + path);
+                return "";
+            }
+
+            FileStream file = File.OpenRead(path);
+            byte[] buf = new byte[file.Length];
+            file.Read(buf, 0, (int)file.Length);
+            file.Close();
+
+            byte[] data = md5_.ComputeHash(buf);
+            buf = null;
+
+            string md5hash = "";
+            foreach (byte n in data)
+                md5hash += n.ToString("x2");
+
+            return md5hash;
         }
         #endregion
 
@@ -429,12 +469,13 @@ namespace Fun
         private readonly string kSaveFile = "cached_files_list";
 
         // member variables.
+        private Mutex mutex_ = new Mutex();
+        private MD5 md5_ = MD5.Create();
         private State state_ = State.Ready;
         private WebClient web_client_ = new WebClient();
         private List<DownloadUrl> url_list_ = new List<DownloadUrl>();
         private List<DownloadFile> download_list_ = new List<DownloadFile>();
         private List<DownloadFile> cached_files_list_ = new List<DownloadFile>();
-        private Mutex mutex_ = new Mutex();
         private string host_url_ = "";
         private string target_path_ = "";
         private DownloadFile cur_download_ = null;
