@@ -178,7 +178,7 @@ namespace Fun
                 Debug.Log("SAVE DATA: " + data);
 
                 string path = target_path_ + kSaveFile;
-                FileStream file = File.OpenWrite(path);
+                FileStream file = File.Open(path, FileMode.Create);
                 StreamWriter stream = new StreamWriter(file);
                 stream.Write(data);
                 stream.Flush();
@@ -195,10 +195,34 @@ namespace Fun
         // Check MD5
         private void CheckFileList (List<DownloadFile> list)
         {
-            if (cached_files_list_.Count <= 0)
+            if (list.Count <= 0 || cached_files_list_.Count <= 0)
                 return;
 
             List<DownloadFile> remove_list = new List<DownloadFile>();
+
+            // Deletes local files
+            foreach (DownloadFile item in cached_files_list_)
+            {
+                DownloadFile info = list.Find(i => i.path == item.path);
+                if (info == null)
+                {
+                    remove_list.Add(item);
+                    File.Delete(target_path_ + item.path);
+                    Debug.Log("Deleted resource file. path: " + item.path);
+                }
+            }
+
+            if (remove_list.Count > 0)
+            {
+                foreach (DownloadFile item in remove_list)
+                {
+                    cached_files_list_.Remove(item);
+                }
+
+                remove_list.Clear();
+            }
+
+            // Check download files
             DateTime list_file_time = File.GetLastWriteTime(target_path_ + kSaveFile);
 
             foreach (DownloadFile item in list)
@@ -225,10 +249,17 @@ namespace Fun
                 }
             }
 
-            foreach (DownloadFile item in remove_list)
+            if (remove_list.Count > 0)
             {
-                list.Remove(item);
+                foreach (DownloadFile item in remove_list)
+                {
+                    list.Remove(item);
+                }
+
+                remove_list.Clear();
             }
+
+            remove_list = null;
         }
 
         private void DownloadListFile (string url)
