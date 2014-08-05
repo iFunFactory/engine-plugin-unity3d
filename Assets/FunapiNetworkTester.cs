@@ -39,7 +39,6 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
             downloader_.StartDownload(kResourceServerIp, 8000, "resources");
-            downloader_.StartDownload(kResourceServerIp, 8000, "sounds");
             message_ = " start downloading..";
         }
 
