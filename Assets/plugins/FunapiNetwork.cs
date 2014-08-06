@@ -6,7 +6,7 @@
 
 #define DEBUG
 
-using UnityEngine;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,10 +16,17 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using SimpleJSON;
+using funapi.network.fun_message;
 
 
 namespace Fun
 {
+    public enum FunMsgType
+    {
+        kJson,
+        kProtobuf
+    }
+
     // Abstract class to represent Transport used by Funapi
     // There are 3 transport types at the moment (though this plugin implements only TCP one.)
     // TCP, UDP, and HTTP.
@@ -35,7 +42,8 @@ namespace Fun
         public abstract bool Started { get; }
 
         // Send a message
-        public abstract void SendMessage(JSONClass message, EncryptionType encryption = EncryptionType.kDefaultEncryption);
+        public abstract void SendMessage(JSONClass message, EncryptionType encryption);
+        public abstract void SendMessage(FunMessage message, EncryptionType encryption);
 
         // Socket-level registers handlers for the event. (i.e., received bytes and closed)
         public void RegisterEventHandlers(OnReceived on_received, OnStopped on_stopped)
@@ -62,7 +70,7 @@ namespace Fun
         }
 
         // Event handler delegate
-        public delegate void OnReceived(Dictionary<string, string> header, JSONClass body);
+        public delegate void OnReceived(Dictionary<string, string> header, ArraySegment<byte> body);
         public delegate void OnStopped();
 
         // Funapi Version
@@ -146,19 +154,38 @@ namespace Fun
         // Sends a JSON message through a socket.
         public override void SendMessage (JSONClass message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
+            string str = message.ToString();
+            byte[] body = Encoding.Default.GetBytes(str);
+
+            UnityEngine.Debug.Log("JSON to send : " + str);
+
+            SendMessage(body, encryption);
+        }
+
+        public override void SendMessage (FunMessage message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        {
+            MemoryStream stream = new MemoryStream();
+            Serializer.Serialize(stream, message);
+
+            byte[] body = new byte[stream.Length];
+            stream.Seek(0, SeekOrigin.Begin);
+            stream.Read(body, 0, body.Length);
+
+            SendMessage(body, encryption);
+        }
+        #endregion
+
+        #region internal implementation
+        private void SendMessage (byte[] body, EncryptionType encryption)
+        {
             mutex_.WaitOne();
-
-            string body = message.ToString();
-            ArraySegment<byte> body_as_bytes = new ArraySegment<byte>(Encoding.Default.GetBytes(body));
-
-            UnityEngine.Debug.Log("JSON to send (" + body_as_bytes.Count + " bytes): " + body);
 
             bool failed = false;
             bool sendable = false;
 
             try
             {
-                pending_.Add(new SendingBuffer(body_as_bytes, encryption));
+                pending_.Add(new SendingBuffer(new ArraySegment<byte>(body), encryption));
 
                 if (state_ == State.kConnected && sending_.Count == 0)
                 {
@@ -190,9 +217,7 @@ namespace Fun
                 on_stopped_();
             }
         }
-        #endregion
 
-        #region internal implementation
         protected bool EncryptThenSendMessage()
         {
             DebugUtils.Assert(state_ == State.kConnected);
@@ -483,21 +508,14 @@ namespace Fun
                     DebugUtils.Assert(body_length == nSize);
                 }
 
-                string body = Encoding.Default.GetString(receive_buffer, next_decoding_offset_, body_length);
+                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer, next_decoding_offset_, body_length);
                 next_decoding_offset_ += body_length;
 
-                UnityEngine.Debug.Log(">>> " + body);
-
-                JSONNode json = JSON.Parse(body);
-                DebugUtils.Assert(json is JSONClass);
-                UnityEngine.Debug.Log("Parsed json: " + json.ToString());
-
-                // Parsed json message should have reserved fields.
-                // The network module eats the fields and invoke registered handler with a remaining json body.
-                UnityEngine.Debug.Log("Invoking a receive handler.");
+                // The network module eats the fields and invoke registered handler.
                 if (on_received_ != null)
                 {
-                    on_received_(header_fields_, json.AsObject);
+                    UnityEngine.Debug.Log("Invoking a receive handler.");
+                    on_received_(header_fields_, body);
                 }
             }
 
@@ -1114,17 +1132,39 @@ namespace Fun
 
         public override void SendMessage(JSONClass message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
+            string str = message.ToString();
+            byte[] body = Encoding.Default.GetBytes(str);
+
+            UnityEngine.Debug.Log("JSON to send: " + str);
+
+            SendMessage(body, encryption);
+        }
+
+        public override void SendMessage(FunMessage message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        {
+            MemoryStream stream = new MemoryStream();
+            Serializer.Serialize(stream, message);
+
+            byte[] body = new byte[stream.Length];
+            stream.Seek(0, SeekOrigin.Begin);
+            stream.Read(body, 0, body.Length);
+
+            SendMessage(body, encryption);
+        }
+        #endregion
+
+        #region internal implementation
+        private void SendMessage (byte[] body, EncryptionType encryption)
+        {
             mutex_.WaitOne();
             UnityEngine.Debug.Log("Send a Message.");
 
             bool failed = false;
             try
             {
-                string sending = message.ToString();
-                ArraySegment<byte> content = new ArraySegment<byte>(Encoding.Default.GetBytes(sending));
+                ArraySegment<byte> content = new ArraySegment<byte>(body);
 
                 UnityEngine.Debug.Log("Host Url: " + host_url_);
-                UnityEngine.Debug.Log("JSON to send: " + sending);
 
                 // Request
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
@@ -1156,9 +1196,7 @@ namespace Fun
                 on_stopped_();
             }
         }
-        #endregion
 
-        #region internal implementation
         private void RequestStreamCb (IAsyncResult ar)
         {
             mutex_.WaitOne();
@@ -1210,8 +1248,10 @@ namespace Fun
                 {
                     Stream stream = response.GetResponseStream();
                     state.stream = stream;
-
                     state.buffer = new byte[kUnitBufferSize];
+                    state.read_data = new byte[kUnitBufferSize];
+                    state.read_offset = 0;
+
                     stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
                 }
                 else
@@ -1252,23 +1292,27 @@ namespace Fun
                 if (nRead > 0)
                 {
                     UnityEngine.Debug.Log("We need more bytes for response. Waiting.");
-                    state.read_data += Encoding.ASCII.GetString(state.buffer, 0, nRead);
+                    if (state.read_offset + nRead > state.read_data.Length)
+                    {
+                        byte[] temp = new byte[state.read_data.Length + kUnitBufferSize];
+                        Buffer.BlockCopy(state.read_data, 0, temp, 0, state.read_offset);
+                        state.read_data = temp;
+                    }
+
+                    Buffer.BlockCopy(state.buffer, 0, state.read_data, state.read_offset, nRead);
+                    state.read_offset += nRead;
+
                     state.stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
                 }
                 else
                 {
-                    UnityEngine.Debug.Log(">>> " + state.read_data);
+                    ArraySegment<byte> body = new ArraySegment<byte>(state.read_data, 0, state.read_offset);
 
-                    JSONNode json = JSON.Parse(state.read_data);
-                    DebugUtils.Assert(json is JSONClass);
-                    UnityEngine.Debug.Log("Parsed json: " + json.ToString());
-
-                    // Parsed json message should have reserved fields.
-                    // The network module eats the fields and invoke registered handler with a remaining json body.
-                    UnityEngine.Debug.Log("Invoking a receive handler.");
+                    // The network module eats the fields and invoke registered handler.
                     if (on_received_ != null)
                     {
-                        on_received_(null, json.AsObject);
+                        UnityEngine.Debug.Log("Invoking a receive handler.");
+                        on_received_(null, body);
                     }
 
                     state.stream.Close();
@@ -1301,8 +1345,9 @@ namespace Fun
             public HttpWebRequest request = null;
             public HttpWebResponse response = null;
             public Stream stream = null;
-            public string read_data = "";
             public byte[] buffer = null;
+            public byte[] read_data = null;
+            public int read_offset = 0;
             public ArraySegment<byte> sending;
         }
 
@@ -1319,15 +1364,17 @@ namespace Fun
     public class FunapiNetwork
     {
         #region Handler delegate definition
-        public delegate void MessageHandler(string msg_type, JSONClass body);
+        public delegate void MessageHandler(string msg_type, object body);
         public delegate void OnSessionInitiated(string session_id);
         public delegate void OnSessionClosed();
         #endregion
 
         #region public interface
-        public FunapiNetwork(FunapiTransport transport, OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
+        public FunapiNetwork(FunapiTransport transport, FunMsgType type,
+                             OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
         {
             transport_ = transport;
+            msg_type_ = type;
             on_session_initiated_ = on_session_initiated;
             on_session_closed_ = on_session_closed;
             transport_.RegisterEventHandlers(this.OnTransportReceived, this.OnTransportStopped);
@@ -1365,6 +1412,29 @@ namespace Fun
             }
         }
 
+        public FunMsgType MsgType
+        {
+            get { return msg_type_; }
+        }
+
+        public void SendMessage(FunMessage message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        {
+            // Invalidates session id if it is too stale.
+            if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
+            {
+                UnityEngine.Debug.Log("Session is too stale. The server might have invalidated my session. Resetting.");
+                session_id_ = "";
+            }
+
+            // Encodes a session id, if any.
+            if (session_id_ != null && session_id_.Length > 0)
+            {
+                message.sid = session_id_;
+            }
+
+            transport_.SendMessage(message, encryption);
+        }
+
         public void SendMessage(string msg_type, JSONClass body, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
             // Invalidates session id if it is too stale.
@@ -1382,6 +1452,7 @@ namespace Fun
             {
                 body[kSessionIdBodyField] = session_id_;
             }
+
             transport_.SendMessage(body, encryption);
         }
 
@@ -1393,22 +1464,53 @@ namespace Fun
         #endregion
 
         #region internal implementation
-        private void OnTransportReceived(Dictionary<string, string> header, JSONClass body)
+        private void OnTransportReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
             UnityEngine.Debug.Log("OnReceived invoked.");
             last_received_ = DateTime.Now;
 
-            JSONNode msg_type_node = body[kMsgTypeBodyField];
-            DebugUtils.Assert(msg_type_node is JSONData);
-            DebugUtils.Assert(msg_type_node.Value is string);
-            string msg_type = msg_type_node.Value;
-            body.Remove(msg_type_node);
+            string msg_type = "";
+            string session_id = "";
 
-            JSONNode session_id_node = body[kSessionIdBodyField];
-            DebugUtils.Assert(session_id_node is JSONData);
-            DebugUtils.Assert(session_id_node.Value is String);
-            string session_id = session_id_node.Value;
-            body.Remove(session_id_node);
+            if (msg_type_ == FunMsgType.kJson)
+            {
+                string str = Encoding.Default.GetString(body.Array, body.Offset, body.Count);
+                JSONNode json = JSON.Parse(str);
+                DebugUtils.Assert(json is JSONClass);
+                UnityEngine.Debug.Log("Parsed json: " + json.ToString());
+
+                JSONNode msg_type_node = json[kMsgTypeBodyField];
+                DebugUtils.Assert(msg_type_node is JSONData);
+                DebugUtils.Assert(msg_type_node.Value is string);
+                msg_type = msg_type_node.Value;
+                json.Remove(msg_type_node);
+
+                JSONNode session_id_node = json[kSessionIdBodyField];
+                DebugUtils.Assert(session_id_node is JSONData);
+                DebugUtils.Assert(session_id_node.Value is String);
+                session_id = session_id_node.Value;
+                json.Remove(session_id_node);
+
+                if (message_handlers_.ContainsKey(msg_type))
+                    message_handlers_[msg_type](msg_type, json);
+            }
+            else if (msg_type_ == FunMsgType.kProtobuf)
+            {
+                MemoryStream stream = new MemoryStream(body.Array, body.Offset, body.Count, false);
+                FunMessage message = Serializer.Deserialize<FunMessage>(stream);
+
+                msg_type = message.msgtype;
+                session_id = message.sid;
+
+                if (message_handlers_.ContainsKey(msg_type))
+                    message_handlers_[msg_type](msg_type, message);
+            }
+            else
+            {
+                UnityEngine.Debug.LogWarning("Invalid message type. type: " + msg_type_);
+                DebugUtils.Assert(false);
+                return;
+            }
 
             if (session_id_.Length == 0)
             {
@@ -1437,8 +1539,6 @@ namespace Fun
             if (!message_handlers_.ContainsKey(msg_type))
             {
                 UnityEngine.Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
-            } else {
-                message_handlers_[msg_type](msg_type, body);
             }
         }
 
@@ -1449,18 +1549,19 @@ namespace Fun
         }
 
         #region Funapi system message handlers
-        private void OnNewSession(string msg_type, JSONClass body)
+        private void OnNewSession(string msg_type, object body)
         {
             // ignore.
         }
 
-        private void OnSessionTimedout(string msg_type, JSONClass body)
+        private void OnSessionTimedout(string msg_type, object body)
         {
             UnityEngine.Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
             session_id_ = "";
             on_session_closed_();
         }
         #endregion
+
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
@@ -1470,6 +1571,7 @@ namespace Fun
         private static readonly string kSessionClosedMessageType = "_session_closed";
 
         // member variables.
+        private FunMsgType msg_type_;
         private bool started_ = false;
         private FunapiTransport transport_;
         private OnSessionInitiated on_session_initiated_;

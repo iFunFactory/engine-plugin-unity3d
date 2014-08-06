@@ -4,10 +4,14 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using UnityEngine;
+using Fun;
+using ProtoBuf;
 using SimpleJSON;
 using System;
-using Fun;
+using UnityEngine;
+using funapi.network.fun_message;
+using pbuf_echo;
+
 
 public class FunapiNetworkTester : MonoBehaviour
 {
@@ -65,9 +69,10 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         UnityEngine.Debug.Log("Creating a network instance.");
         // You should pass an instance of FunapiTransport.
-        network_ = new FunapiNetwork(transport, this.OnSessionInitiated, this.OnSessionClosed);
+        network_ = new FunapiNetwork(transport, FunMsgType.kProtobuf, this.OnSessionInitiated, this.OnSessionClosed);
 
         network_.RegisterHandler("echo", this.OnEcho);
+        network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
         network_.Start();
     }
 
@@ -114,9 +119,23 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else
         {
-            JSONClass example = new JSONClass();
-            example["message"] = "hello world";
-            network_.SendMessage("echo", example);
+            if (network_.MsgType == FunMsgType.kJson)
+            {
+                JSONClass example = new JSONClass();
+                example["message"] = "hello world";
+                network_.SendMessage("echo", example);
+            }
+            else if (network_.MsgType == FunMsgType.kProtobuf)
+            {
+                FunMessage example = new FunMessage();
+                example.msgtype = "pbuf_echo";
+
+                PbufEchoMessage echo = new PbufEchoMessage();
+                echo.message = "hello proto";
+                Extensible.AppendValue<PbufEchoMessage>(example, 16, echo);
+
+                network_.SendMessage(example);
+            }
         }
     }
 
@@ -131,9 +150,19 @@ public class FunapiNetworkTester : MonoBehaviour
         UnityEngine.Debug.Log("Session closed");
     }
 
-    private void OnEcho(string msg_type, JSONClass body)
+    private void OnEcho(string msg_type, object body)
     {
-        UnityEngine.Debug.Log("Received an echo message: " + body.ToString());
+        DebugUtils.Assert(body is JSONClass);
+        JSONClass json = body as JSONClass;
+        UnityEngine.Debug.Log("Received an echo message: " + json.ToString());
+    }
+
+    private void OnEchoWithProtobuf(string msg_type, object body)
+    {
+        DebugUtils.Assert(body is FunMessage);
+        FunMessage msg = body as FunMessage;
+        PbufEchoMessage echo = Extensible.GetValue<PbufEchoMessage>(msg, 16);
+        UnityEngine.Debug.Log("Received an echo message: " + echo.message);
     }
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
