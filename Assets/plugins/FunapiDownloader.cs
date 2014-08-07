@@ -419,13 +419,11 @@ namespace Fun
                 {
                     if (download_list_.Count > 0)
                     {
-                        cur_download_.md5 = GetMd5Hash(target_path_ + cur_download_.path);
                         cached_files_list_.Add(cur_download_);
-
                         download_list_.RemoveAt(0);
-                    }
 
-                    DownloadResourceFile();
+                        MD5Async.Compute(target_path_ + cur_download_.path, OnMd5Finish);
+                    }
                 }
             }
             catch (Exception e)
@@ -444,27 +442,12 @@ namespace Fun
             }
         }
 
-        private string GetMd5Hash (string path)
+        private void OnMd5Finish (string md5hash)
         {
-            if (!File.Exists(path))
-            {
-                Debug.Log("GetMd5Hash - Can't find a file. path: " + path);
-                return "";
-            }
+            cur_download_.md5 = md5hash;
 
-            FileStream file = File.OpenRead(path);
-            byte[] buf = new byte[file.Length];
-            file.Read(buf, 0, (int)file.Length);
-            file.Close();
-
-            byte[] data = md5_.ComputeHash(buf);
-            buf = null;
-
-            string md5hash = "";
-            foreach (byte n in data)
-                md5hash += n.ToString("x2");
-
-            return md5hash;
+            // Check next download file.
+            DownloadResourceFile();
         }
         #endregion
 
@@ -501,7 +484,6 @@ namespace Fun
 
         // member variables.
         private Mutex mutex_ = new Mutex();
-        private MD5 md5_ = MD5.Create();
         private State state_ = State.Ready;
         private WebClient web_client_ = new WebClient();
         private List<DownloadUrl> url_list_ = new List<DownloadUrl>();
