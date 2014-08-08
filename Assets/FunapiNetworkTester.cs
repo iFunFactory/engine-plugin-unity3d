@@ -9,6 +9,8 @@ using ProtoBuf;
 using SimpleJSON;
 using System;
 using UnityEngine;
+
+// Protobuf
 using funapi.network.fun_message;
 using pbuf_echo;
 
@@ -62,7 +64,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void Connect (FunapiTransport transport)
     {
-        UnityEngine.Debug.Log("Creating a network instance.");
+        Debug.Log("Creating a network instance.");
         // You should pass an instance of FunapiTransport.
         network_ = new FunapiNetwork(transport, FunMsgType.kProtobuf, this.OnSessionInitiated, this.OnSessionClosed);
 
@@ -77,7 +79,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (network_.Started == false)
         {
-            UnityEngine.Debug.Log("You should connect first.");
+            Debug.Log("You should connect first.");
         }
         else
         {
@@ -90,18 +92,18 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         if (network_ == null)
         {
-            UnityEngine.Debug.LogWarning("Failed to make a connection. Network instance was not generated.");
+            Debug.LogWarning("Failed to make a connection. Network instance was not generated.");
         }
         else if (!network_.Connected || session_id_.Length <= 0)
         {
-            UnityEngine.Debug.LogWarning("Maybe the server is down? Stopping the network module.");
+            Debug.LogWarning("Maybe the server is down? Stopping the network module.");
 
             network_.Stop();
             network_ = null;
         }
         else
         {
-            UnityEngine.Debug.Log("Seems network succeeded to make a connection to a server.");
+            Debug.Log("Seems network succeeded to make a connection to a server.");
         }
     }
 
@@ -109,7 +111,7 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         if (network_.Started == false)
         {
-            UnityEngine.Debug.Log("You should connect first.");
+            Debug.Log("You should connect first.");
         }
         else
         {
@@ -136,19 +138,19 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnSessionInitiated(string session_id)
     {
         session_id_ = session_id;
-        UnityEngine.Debug.Log("Session initiated. Session id:" + session_id);
+        Debug.Log("Session initiated. Session id:" + session_id);
     }
 
     private void OnSessionClosed()
     {
-        UnityEngine.Debug.Log("Session closed");
+        Debug.Log("Session closed");
     }
 
     private void OnEcho(string msg_type, object body)
     {
         DebugUtils.Assert(body is JSONClass);
         JSONClass json = body as JSONClass;
-        UnityEngine.Debug.Log("Received an echo message: " + json.ToString());
+        Debug.Log("Received an echo message: " + json.ToString());
     }
 
     private void OnEchoWithProtobuf(string msg_type, object body)
@@ -156,13 +158,13 @@ public class FunapiNetworkTester : MonoBehaviour
         DebugUtils.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
         PbufEchoMessage echo = Extensible.GetValue<PbufEchoMessage>(msg, 16);
-        UnityEngine.Debug.Log("Received an echo message: " + echo.message);
+        Debug.Log("Received an echo message: " + echo.message);
     }
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
         message_ = " downloading - path:" + path + " / received:" + bytes_received + " / total:" + total_bytes + " / " + percentage + "%";
-        UnityEngine.Debug.Log(message_);
+        Debug.Log(message_);
     }
 
     private void OnDownloadFinished (DownloadResult code)

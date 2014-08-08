@@ -4,18 +4,18 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-#define DEBUG
-
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using SimpleJSON;
+using UnityEngine;
+
+// Protobuf
 using funapi.network.fun_message;
 
 
@@ -108,7 +108,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in Start: " + e.ToString());
+                Debug.Log("Failure in Start: " + e.ToString());
                 failed = true;
             }
             finally
@@ -151,7 +151,7 @@ namespace Fun
             string str = message.ToString();
             byte[] body = Encoding.Default.GetBytes(str);
 
-            UnityEngine.Debug.Log("JSON to send : " + str);
+            Debug.Log("JSON to send : " + str);
 
             SendMessage(body);
         }
@@ -197,7 +197,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in SendMessage: " + e.ToString());
+                Debug.Log("Failure in SendMessage: " + e.ToString());
                 failed = true;
             }
             finally
@@ -219,7 +219,7 @@ namespace Fun
 
         protected bool TryToDecodeHeader()
         {
-            UnityEngine.Debug.Log("Trying to decode header fields.");
+            Debug.Log("Trying to decode header fields.");
 
             for (; next_decoding_offset_ < received_size_; )
             {
@@ -228,7 +228,7 @@ namespace Fun
                 if (offset < 0)
                 {
                     // Not enough bytes. Wait for more bytes to come.
-                    UnityEngine.Debug.Log("We need more bytes for a header field. Waiting.");
+                    Debug.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
                 string line = Encoding.ASCII.GetString(receive_buffer, next_decoding_offset_, offset - next_decoding_offset_);
@@ -238,14 +238,14 @@ namespace Fun
                 {
                     // End of header.
                     header_decoded_ = true;
-                    UnityEngine.Debug.Log("End of header reached. Will decode body from now.");
+                    Debug.Log("End of header reached. Will decode body from now.");
                     return true;
                 }
 
-                UnityEngine.Debug.Log("Header line: " + line);
+                Debug.Log("Header line: " + line);
                 string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
                 tuple[0] = tuple[0].ToUpper();
-                UnityEngine.Debug.Log("Decoded header field '" + tuple[0] + "' => '" + tuple[1] + "'");
+                Debug.Log("Decoded header field '" + tuple[0] + "' => '" + tuple[1] + "'");
                 DebugUtils.Assert(tuple.Length == 2);
                 header_fields_[tuple[0]] = tuple[1];
             }
@@ -263,12 +263,12 @@ namespace Fun
             // Header length
             DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderField));
             int body_length = Convert.ToUInt16(header_fields_[kLengthHeaderField]);
-            UnityEngine.Debug.Log("We need " + body_length + " bytes for a message body. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+            Debug.Log("We need " + body_length + " bytes for a message body. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
 
             if (received_size_ - next_decoding_offset_ < body_length)
             {
                 // Need more bytes.
-                UnityEngine.Debug.Log("We need more bytes for a message body. Waiting.");
+                Debug.Log("We need more bytes for a message body. Waiting.");
                 return false;
             }
 
@@ -278,7 +278,7 @@ namespace Fun
 
                 if (state_ != State.kConnected)
                 {
-                    UnityEngine.Debug.Log("Unexpected message.");
+                    Debug.Log("Unexpected message.");
                     return false;
                 }
 
@@ -288,7 +288,7 @@ namespace Fun
                 // The network module eats the fields and invoke registered handler.
                 if (on_received_ != null)
                 {
-                    UnityEngine.Debug.Log("Invoking a receive handler.");
+                    Debug.Log("Invoking a receive handler.");
                     on_received_(header_fields_, body);
                 }
             }
@@ -389,24 +389,24 @@ namespace Fun
         private void StartCb(IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("StartCb called.");
+            Debug.Log("StartCb called.");
 
             bool failed = false;
             try
             {
                 if (sock_ == null)
                 {
-                    UnityEngine.Debug.Log("Failed to connect.");
+                    Debug.Log("Failed to connect.");
                     return;
                 }
 
                 sock_.EndConnect(ar);
                 if (sock_.Connected == false)
                 {
-                    UnityEngine.Debug.Log("Failed to connect.");
+                    Debug.Log("Failed to connect.");
                     return;
                 }
-                UnityEngine.Debug.Log("Connected.");
+                Debug.Log("Connected.");
 
                 state_ = State.kConnected;
 
@@ -418,7 +418,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in StartCb: " + e.ToString());
+                Debug.Log("Failure in StartCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -436,7 +436,7 @@ namespace Fun
         private void SendBytesCb(IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("SendBytesCb called.");
+            Debug.Log("SendBytesCb called.");
 
             bool failed = false;
             bool sendable = false;
@@ -447,7 +447,7 @@ namespace Fun
                     return;
 
                 int nSent = sock_.EndSend(ar);
-                UnityEngine.Debug.Log("Sent " + nSent + "bytes");
+                Debug.Log("Sent " + nSent + "bytes");
 
                 // Removes any segment fully sent.
                 while (nSent > 0)
@@ -455,13 +455,13 @@ namespace Fun
                     if (sending_[0].Count > nSent)
                     {
                         // partial data
-                        UnityEngine.Debug.Log("Partially sent. Will resume.");
+                        Debug.Log("Partially sent. Will resume.");
                         break;
                     }
                     else
                     {
                         // fully sent.
-                        UnityEngine.Debug.Log("Discarding a fully sent message.");
+                        Debug.Log("Discarding a fully sent message.");
                         nSent -= sending_[0].Count;
                         sending_.RemoveAt(0);
                     }
@@ -481,7 +481,7 @@ namespace Fun
                 if (sending_.Count > 0)
                 {
                     // If we have more segments to send, we process more.
-                    UnityEngine.Debug.Log("Retrying unsent messages.");
+                    Debug.Log("Retrying unsent messages.");
                     WireSend(sending_);
                 }
                 else if (pending_.Count > 0)
@@ -495,7 +495,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in SendBytesCb: " + e.ToString ());
+                Debug.Log("Failure in SendBytesCb: " + e.ToString ());
                 failed = true;
             }
             finally
@@ -518,7 +518,7 @@ namespace Fun
         private void ReceiveBytesCb(IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("ReceiveBytesCb called.");
+            Debug.Log("ReceiveBytesCb called.");
 
             bool failed = false;
             try
@@ -530,7 +530,7 @@ namespace Fun
                 if (nRead > 0)
                 {
                     received_size_ += nRead;
-                    UnityEngine.Debug.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+                    Debug.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
                 }
 
                 // Try to decode as many messages as possible.
@@ -561,14 +561,14 @@ namespace Fun
                         // Otherwise, increase the receiving buffer size.
                         if (next_decoding_offset_ > 0)
                         {
-                            UnityEngine.Debug.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
+                            Debug.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
                             Buffer.BlockCopy(receive_buffer, next_decoding_offset_, receive_buffer, 0, received_size_ - next_decoding_offset_);
                             received_size_ -= next_decoding_offset_;
                             next_decoding_offset_ = 0;
                         }
                         else
                         {
-                            UnityEngine.Debug.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
+                            Debug.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
                             byte[] new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
                             Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
                             receive_buffer = new_buffer;
@@ -580,21 +580,21 @@ namespace Fun
                     List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                     buffer.Add(residual);
                     sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                    UnityEngine.Debug.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
+                    Debug.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
                 }
                 else
                 {
-                    UnityEngine.Debug.Log("Socket closed");
+                    Debug.Log("Socket closed");
                     if (received_size_ - next_decoding_offset_ > 0)
                     {
-                        UnityEngine.Debug.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                        Debug.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                     }
                     failed = true;
                 }
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in ReceiveBytesCb: " + e.ToString ());
+                Debug.Log("Failure in ReceiveBytesCb: " + e.ToString ());
                 failed = true;
             }
             finally
@@ -637,7 +637,7 @@ namespace Fun
             sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
-            UnityEngine.Debug.Log("Connected.");
+            Debug.Log("Connected.");
         }
 
         // Send a packet.
@@ -665,7 +665,7 @@ namespace Fun
             {
                 if (offset > kUnitBufferSize)
                 {
-                    UnityEngine.Debug.LogWarning("Message is greater than 64KB. It will be truncated.");
+                    Debug.LogWarning("Message is greater than 64KB. It will be truncated.");
                     DebugUtils.Assert(false);
                 }
 
@@ -677,7 +677,7 @@ namespace Fun
         private void SendBytesCb(IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("SendBytesCb called.");
+            Debug.Log("SendBytesCb called.");
 
             bool failed = false;
             bool sendable = false;
@@ -688,7 +688,7 @@ namespace Fun
                     return;
 
                 int nSent = sock_.EndSend(ar);
-                UnityEngine.Debug.Log("Sent " + nSent + "bytes");
+                Debug.Log("Sent " + nSent + "bytes");
 
                 // Removes header and body segment
                 int nToSend = 0;
@@ -700,14 +700,14 @@ namespace Fun
 
                 if (nSent > 0 && nSent < nToSend)
                 {
-                    UnityEngine.Debug.LogWarning("Failed to transfer hole messages.");
+                    Debug.LogWarning("Failed to transfer hole messages.");
                     DebugUtils.Assert(false);
                 }
 
                 if (sending_.Count > 0)
                 {
                     // If we have more segments to send, we process more.
-                    UnityEngine.Debug.Log("Retrying unsent messages.");
+                    Debug.Log("Retrying unsent messages.");
                     WireSend(sending_);
                 }
                 else if (pending_.Count > 0)
@@ -721,7 +721,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in SendBytesCb: " + e.ToString ());
+                Debug.Log("Failure in SendBytesCb: " + e.ToString ());
                 failed = true;
             }
             finally
@@ -744,7 +744,7 @@ namespace Fun
         private void ReceiveBytesCb(IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("ReceiveBytesCb called.");
+            Debug.Log("ReceiveBytesCb called.");
 
             bool failed = false;
             try
@@ -756,7 +756,7 @@ namespace Fun
                 if (nRead > 0)
                 {
                     received_size_ += nRead;
-                    UnityEngine.Debug.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+                    Debug.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
                 }
 
                 // Decoding a message
@@ -764,13 +764,13 @@ namespace Fun
                 {
                     if (TryToDecodeBody() == false)
                     {
-                        UnityEngine.Debug.LogWarning("Failed to decode body.");
+                        Debug.LogWarning("Failed to decode body.");
                         DebugUtils.Assert(false);
                     }
                 }
                 else
                 {
-                    UnityEngine.Debug.LogWarning("Failed to decode header.");
+                    Debug.LogWarning("Failed to decode header.");
                     DebugUtils.Assert(false);
                 }
 
@@ -785,14 +785,14 @@ namespace Fun
                     sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
                                            ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
-                    UnityEngine.Debug.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
+                    Debug.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
                 }
                 else
                 {
-                    UnityEngine.Debug.Log("Socket closed");
+                    Debug.Log("Socket closed");
                     if (received_size_ - next_decoding_offset_ > 0)
                     {
-                        UnityEngine.Debug.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                        Debug.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                     }
 
                     failed = true;
@@ -800,7 +800,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in ReceiveBytesCb: " + e.ToString ());
+                Debug.Log("Failure in ReceiveBytesCb: " + e.ToString ());
                 failed = true;
             }
             finally
@@ -842,13 +842,13 @@ namespace Fun
 
         public override void Start()
         {
-            UnityEngine.Debug.Log("Started.");
+            Debug.Log("Started.");
         }
 
         public override void Stop()
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("Stopped.");
+            Debug.Log("Stopped.");
 
             foreach (WebState state in list_)
             {
@@ -873,7 +873,7 @@ namespace Fun
             string str = message.ToString();
             byte[] body = Encoding.Default.GetBytes(str);
 
-            UnityEngine.Debug.Log("JSON to send: " + str);
+            Debug.Log("JSON to send: " + str);
 
             SendMessage(body);
         }
@@ -895,14 +895,14 @@ namespace Fun
         private void SendMessage (byte[] body)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("Send a Message.");
+            Debug.Log("Send a Message.");
 
             bool failed = false;
             try
             {
                 ArraySegment<byte> content = new ArraySegment<byte>(body);
 
-                UnityEngine.Debug.Log("Host Url: " + host_url_);
+                Debug.Log("Host Url: " + host_url_);
 
                 // Request
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
@@ -920,7 +920,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in SendMessage: " + e.ToString());
+                Debug.Log("Failure in SendMessage: " + e.ToString());
                 failed = true;
             }
             finally
@@ -938,7 +938,7 @@ namespace Fun
         private void RequestStreamCb (IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("RequestStreamCb called.");
+            Debug.Log("RequestStreamCb called.");
 
             bool failed = false;
             try
@@ -949,13 +949,13 @@ namespace Fun
                 Stream stream = request.EndGetRequestStream(ar);
                 stream.Write(state.sending.Array, 0, state.sending.Count);
                 stream.Close();
-                UnityEngine.Debug.Log("Sent " + state.sending.Count + "bytes");
+                Debug.Log("Sent " + state.sending.Count + "bytes");
 
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in RequestStreamCb: " + e.ToString());
+                Debug.Log("Failure in RequestStreamCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -973,7 +973,7 @@ namespace Fun
         private void ResponseCb (IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("ResponseCb called.");
+            Debug.Log("ResponseCb called.");
 
             bool failed = false;
             try
@@ -994,14 +994,14 @@ namespace Fun
                 }
                 else
                 {
-                    UnityEngine.Debug.Log("Failed response. status:" + response.StatusDescription);
+                    Debug.Log("Failed response. status:" + response.StatusDescription);
                     DebugUtils.Assert(false);
                     list_.Remove(state);
                 }
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in ResponseCb: " + e.ToString());
+                Debug.Log("Failure in ResponseCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -1019,7 +1019,7 @@ namespace Fun
         private void ReadCb (IAsyncResult ar)
         {
             mutex_.WaitOne();
-            UnityEngine.Debug.Log("ReadCb called.");
+            Debug.Log("ReadCb called.");
 
             bool failed = false;
             try
@@ -1029,7 +1029,7 @@ namespace Fun
 
                 if (nRead > 0)
                 {
-                    UnityEngine.Debug.Log("We need more bytes for response. Waiting.");
+                    Debug.Log("We need more bytes for response. Waiting.");
                     if (state.read_offset + nRead > state.read_data.Length)
                     {
                         byte[] temp = new byte[state.read_data.Length + kUnitBufferSize];
@@ -1049,7 +1049,7 @@ namespace Fun
                     // The network module eats the fields and invoke registered handler.
                     if (on_received_ != null)
                     {
-                        UnityEngine.Debug.Log("Invoking a receive handler.");
+                        Debug.Log("Invoking a receive handler.");
                         on_received_(null, body);
                     }
 
@@ -1060,7 +1060,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                UnityEngine.Debug.Log("Failure in ReadCb: " + e.ToString());
+                Debug.Log("Failure in ReadCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -1122,14 +1122,14 @@ namespace Fun
         {
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
-            UnityEngine.Debug.Log("Starting a network module.");
+            Debug.Log("Starting a network module.");
             transport_.Start();
             started_ = true;
         }
 
         public void Stop()
         {
-            UnityEngine.Debug.Log("Stopping a network module.");
+            Debug.Log("Stopping a network module.");
             started_ = false;
             transport_.Stop();
         }
@@ -1160,7 +1160,7 @@ namespace Fun
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
             {
-                UnityEngine.Debug.Log("Session is too stale. The server might have invalidated my session. Resetting.");
+                Debug.Log("Session is too stale. The server might have invalidated my session. Resetting.");
                 session_id_ = "";
             }
 
@@ -1178,7 +1178,7 @@ namespace Fun
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
             {
-                UnityEngine.Debug.Log("Session is too stale. The server might have invalidated my session. Resetting.");
+                Debug.Log("Session is too stale. The server might have invalidated my session. Resetting.");
                 session_id_ = "";
             }
 
@@ -1196,7 +1196,7 @@ namespace Fun
 
         public void RegisterHandler(string type, MessageHandler handler)
         {
-            UnityEngine.Debug.Log("New handler for message type '" + type + "'");
+            Debug.Log("New handler for message type '" + type + "'");
             message_handlers_[type] = handler;
         }
         #endregion
@@ -1204,7 +1204,7 @@ namespace Fun
         #region internal implementation
         private void OnTransportReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
-            UnityEngine.Debug.Log("OnReceived invoked.");
+            Debug.Log("OnReceived invoked.");
             last_received_ = DateTime.Now;
 
             string msg_type = "";
@@ -1215,7 +1215,7 @@ namespace Fun
                 string str = Encoding.Default.GetString(body.Array, body.Offset, body.Count);
                 JSONNode json = JSON.Parse(str);
                 DebugUtils.Assert(json is JSONClass);
-                UnityEngine.Debug.Log("Parsed json: " + json.ToString());
+                Debug.Log("Parsed json: " + json.ToString());
 
                 JSONNode msg_type_node = json[kMsgTypeBodyField];
                 DebugUtils.Assert(msg_type_node is JSONData);
@@ -1245,7 +1245,7 @@ namespace Fun
             }
             else
             {
-                UnityEngine.Debug.LogWarning("Invalid message type. type: " + msg_type_);
+                Debug.LogWarning("Invalid message type. type: " + msg_type_);
                 DebugUtils.Assert(false);
                 return;
             }
@@ -1253,7 +1253,7 @@ namespace Fun
             if (session_id_.Length == 0)
             {
                 session_id_ = session_id;
-                UnityEngine.Debug.Log("New session id: " + session_id);
+                Debug.Log("New session id: " + session_id);
                 if (on_session_initiated_ != null)
                 {
                     on_session_initiated_(session_id_);
@@ -1262,7 +1262,7 @@ namespace Fun
 
             if (session_id_ != session_id)
             {
-                UnityEngine.Debug.Log("Session id changed: " + session_id_ + " => " + session_id);
+                Debug.Log("Session id changed: " + session_id_ + " => " + session_id);
                 session_id_ = session_id;
                 if (on_session_closed_ != null)
                 {
@@ -1276,13 +1276,13 @@ namespace Fun
 
             if (!message_handlers_.ContainsKey(msg_type))
             {
-                UnityEngine.Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
+                Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
             }
         }
 
         private void OnTransportStopped()
         {
-            UnityEngine.Debug.Log("Transport terminated. Stopping. You may restart again.");
+            Debug.Log("Transport terminated. Stopping. You may restart again.");
             Stop();
         }
 
@@ -1294,7 +1294,7 @@ namespace Fun
 
         private void OnSessionTimedout(string msg_type, object body)
         {
-            UnityEngine.Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
+            Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
             session_id_ = "";
             on_session_closed_();
         }
@@ -1318,15 +1318,5 @@ namespace Fun
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private DateTime last_received_ = DateTime.Now;
         #endregion
-    }
-
-
-    // Utility class
-    public class DebugUtils {
-        [Conditional("DEBUG")]
-        public static void Assert(bool condition)
-        {
-            if (!condition) throw new Exception();
-        }
     }
 }  // namespace Fun
