@@ -23,8 +23,6 @@ namespace Fun
         #region public interface
         public FunapiHttpDownloader (string target_path, OnUpdate on_update, OnFinished on_finished)
         {
-            state_ = State.Ready;
-
             target_path_ = target_path;
             if (target_path_[target_path_.Length - 1] != '/')
                 target_path_ += "/";
@@ -66,7 +64,7 @@ namespace Fun
                 int index = url.IndexOf(ver);
                 if (index <= 0)
                 {
-                    Debug.LogError("Invalid request url : " + url);
+					Debug.Log("Invalid request url : " + url);
                     DebugUtils.Assert(false);
                     return;
                 }
@@ -82,8 +80,8 @@ namespace Fun
                     return;
                 }
 
+				state_ = State.Start;
                 Debug.Log("Start Download.");
-                state_ = State.Downloading;
 
                 DownloadListFile(url);
             }
@@ -97,18 +95,24 @@ namespace Fun
         {
             mutex_.WaitOne();
 
-            if (state_ == State.Downloading)
-            {
-                if (on_finished_ != null)
-                    on_finished_(DownloadResult.FAILED);
-            }
+			if (state_ == State.Start || state_ == State.Downloading)
+			{
+				web_client_.CancelAsync();
 
-            state_ = State.Ready;
+				if (on_finished_ != null)
+					on_finished_(DownloadResult.FAILED);
+			}
+
             url_list_.Clear();
             download_list_.Clear();
 
             mutex_.ReleaseMutex();
         }
+
+		public bool Connected
+		{
+			get { return state_ == State.Downloading || state_ == State.Completed; }
+		}
         #endregion
 
         #region internal implementation
@@ -129,7 +133,7 @@ namespace Fun
 
                 if (data.Length <= 0)
                 {
-                    Debug.LogWarning("Failed to get a file list.");
+                    Debug.Log("Failed to get a file list.");
                     DebugUtils.Assert(false);
                     return;
                 }
@@ -330,19 +334,25 @@ namespace Fun
         // Callback function for list of files
         private void DownloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
         {
-            mutex_.WaitOne();
+			mutex_.WaitOne();
 
             bool failed = false;
             try
             {
                 if (ar.Error != null)
                 {
-                    Debug.LogError("Exception Error: " + ar.Error);
+                    Debug.Log("Exception Error: " + ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
                 else
                 {
+					// It can be null when CancelAsync() called in Stop().
+					if (ar.Result == null)
+						return;
+
+					state_ = State.Downloading;
+
                     // Parse json
                     string data = Encoding.ASCII.GetString(ar.Result);
                     JSONNode json = JSON.Parse(data);
@@ -353,7 +363,7 @@ namespace Fun
                     JSONArray list = json["data"].AsArray;
                     if (list.Count <= 0)
                     {
-                        Debug.LogWarning("Invalid list data. List count is 0.");
+                        Debug.Log("Invalid list data. List count is 0.");
                         DebugUtils.Assert(false);
                         failed = true;
                     }
@@ -411,7 +421,7 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    Debug.LogError("Exception Error: " + ar.Error);
+					Debug.Log("Exception Error: " + ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
@@ -455,6 +465,7 @@ namespace Fun
         enum State
         {
             Ready,
+			Start,
             Downloading,
             Completed
         }

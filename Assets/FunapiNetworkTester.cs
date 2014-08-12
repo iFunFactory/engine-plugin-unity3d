@@ -44,8 +44,9 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 30, 340, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
-            downloader_.StartDownload(kResourceServerIp, 8000, "resources");
+            downloader_.StartDownload(kResourceServerIp, 8020, "list");
             message_ = " start downloading..";
+			Invoke("CheckDownloadConnection", 3f);
         }
 
         GUI.enabled = true;
@@ -92,7 +93,7 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         if (network_ == null)
         {
-            Debug.LogWarning("Failed to make a connection. Network instance was not generated.");
+            Debug.Log("Failed to make a connection. Network instance was not generated.");
         }
         else if (!network_.Connected || session_id_.Length <= 0)
         {
@@ -106,6 +107,17 @@ public class FunapiNetworkTester : MonoBehaviour
             Debug.Log("Seems network succeeded to make a connection to a server.");
         }
     }
+
+	private void CheckDownloadConnection ()
+	{
+		if (downloader_ != null && !downloader_.Connected)
+		{
+			Debug.Log("Maybe the server is down? Stopping Download.");
+
+			downloader_.Stop();
+			downloader_ = null;
+		}
+	}
 
     private void SendEchoMessage ()
     {
