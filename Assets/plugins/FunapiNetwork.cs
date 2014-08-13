@@ -853,7 +853,10 @@ namespace Fun
             foreach (WebState state in list_)
             {
                 if (state.request != null)
+                {
+                    state.aborted = true;
                     state.request.Abort();
+                }
 
                 if (state.stream != null)
                     state.stream.Close();
@@ -979,6 +982,9 @@ namespace Fun
             try
             {
                 WebState state = (WebState)ar.AsyncState;
+                if (state.aborted)
+                    return;
+
                 HttpWebResponse response = (HttpWebResponse)state.request.EndGetResponse(ar);
                 state.request = null;
 
@@ -1081,11 +1087,11 @@ namespace Fun
         class WebState
         {
             public HttpWebRequest request = null;
-            public HttpWebResponse response = null;
             public Stream stream = null;
             public byte[] buffer = null;
             public byte[] read_data = null;
             public int read_offset = 0;
+            public bool aborted = false;
             public ArraySegment<byte> sending;
         }
 
@@ -1284,6 +1290,9 @@ namespace Fun
         {
             Debug.Log("Transport terminated. Stopping. You may restart again.");
             Stop();
+
+            if (on_session_closed_ != null)
+                on_session_closed_();
         }
 
         #region Funapi system message handlers
@@ -1296,7 +1305,9 @@ namespace Fun
         {
             Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
             session_id_ = "";
-            on_session_closed_();
+
+            if (on_session_closed_ != null)
+                on_session_closed_();
         }
         #endregion
 
