@@ -32,7 +32,7 @@ public class FunapiNetworkTester : MonoBehaviour
             FunapiUdpTransport transport = new FunapiUdpTransport(kServerIp, 8013);
 
             // Please set the same encryption type as the encryption type of server.
-            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            //transport.SetEncryption(EncryptionType.kIFunEngine1Encryption);
 
             Connect(transport);
             SendEchoMessage();
@@ -72,8 +72,7 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         Debug.Log("Creating a network instance.");
         // You should pass an instance of FunapiTransport.
-        network_ = new FunapiNetwork(transport, FunMsgType.kProtobuf, this.OnSessionInitiated, this.OnSessionClosed);
-
+        network_ = new FunapiNetwork(transport, FunMsgType.kJson, this.OnSessionInitiated, this.OnSessionClosed);
         network_.RegisterHandler("echo", this.OnEcho);
         network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
         network_.Start();
@@ -161,6 +160,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnSessionClosed()
     {
+        session_id_ = "";
+        network_ = null;
         Debug.Log("Session closed");
     }
 
@@ -207,8 +208,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
 
     // Please change this address for test.
-    private const string kServerIp = "192.168.35.130";
-    private const string kResourceServerIp = "127.0.0.1";
+    private const string kServerIp = "192.168.35.135";
+    private const string kResourceServerIp = "192.168.35.135";
 
     // member variables.
     private FunapiNetwork network_ = null;
