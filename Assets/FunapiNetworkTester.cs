@@ -65,6 +65,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void Connect (FunapiTransport transport)
     {
+        transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
+
         Debug.Log("Creating a network instance.");
         // You should pass an instance of FunapiTransport.
         network_ = new FunapiNetwork(transport, FunMsgType.kJson, this.OnSessionInitiated, this.OnSessionClosed);
@@ -155,8 +157,13 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnSessionClosed()
     {
         session_id_ = "";
-        network_ = null;
         Debug.Log("Session closed");
+    }
+
+    private void OnTransportClosed()
+    {
+        network_ = null;
+        Debug.Log("Transport closed");
     }
 
     private void OnEcho(string msg_type, object body)
