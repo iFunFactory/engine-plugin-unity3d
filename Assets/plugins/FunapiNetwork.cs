@@ -27,11 +27,17 @@ namespace Fun
         kProtobuf
     }
 
+    // Event handler delegate
+    public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
+    public delegate void StoppedEventHandler();
+
+
     // Abstract class to represent Transport used by Funapi
     // There are 3 transport types at the moment (though this plugin implements only TCP one.)
     // TCP, UDP, and HTTP.
     public abstract class FunapiTransport
     {
+        #region public interface
         // Start connecting
         public abstract void Start();
 
@@ -45,16 +51,24 @@ namespace Fun
         public abstract void SendMessage(JSONClass message, EncryptionType encryption);
         public abstract void SendMessage(FunMessage message, EncryptionType encryption);
 
-        // Socket-level registers handlers for the event. (i.e., received bytes and closed)
-        public void RegisterEventHandlers(OnReceived on_received, OnStopped on_stopped)
+        // Registered event handlers.
+        public event ReceivedEventHandler ReceivedCallback;
+        public event StoppedEventHandler StoppedCallback;
+        #endregion
+
+        #region internal implementation
+        protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
-            mutex_.WaitOne();
-            on_received_ = on_received;
-            on_stopped_ = on_stopped;
-            mutex_.ReleaseMutex();
+            ReceivedCallback(header, body);
+        }
+
+        protected void OnStopped ()
+        {
+            StoppedCallback();
         }
 
 
+        //
         protected enum State
         {
             kDisconnected = 0,
@@ -69,19 +83,12 @@ namespace Fun
             kIFunEngine1
         }
 
-        // Event handler delegate
-        public delegate void OnReceived(Dictionary<string, string> header, ArraySegment<byte> body);
-        public delegate void OnStopped();
-
         // Funapi Version
         protected static readonly int kCurrentFunapiProtocolVersion = 1;
 
-        // Registered event handlers.
-        protected OnReceived on_received_;
-        protected OnStopped on_stopped_;
-
         protected State state_ = State.kDisconnected;
         protected Mutex mutex_ = new Mutex();
+        #endregion
     }
 
 
@@ -125,7 +132,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -134,15 +140,25 @@ namespace Fun
         {
             mutex_.WaitOne();
 
-            state_ = State.kDisconnected;
-
-            if (sock_ != null)
+            try
             {
-                sock_.Close();
-                sock_ = null;
-            }
+                if (state_ == State.kDisconnected)
+                    return;
 
-            mutex_.ReleaseMutex();
+                state_ = State.kDisconnected;
+
+                if (sock_ != null)
+                {
+                    sock_.Close();
+                    sock_ = null;
+                }
+
+                OnStopped();
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
         }
 
         public override bool Started
@@ -214,7 +230,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -512,11 +527,7 @@ namespace Fun
                 next_decoding_offset_ += body_length;
 
                 // The network module eats the fields and invoke registered handler.
-                if (on_received_ != null)
-                {
-                    Debug.Log("Invoking a receive handler.");
-                    on_received_(header_fields_, body);
-                }
+                OnReceived(header_fields_, body);
             }
 
             // Prepares a next message.
@@ -676,7 +687,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -759,7 +769,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -853,7 +862,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -897,8 +905,6 @@ namespace Fun
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
-
-            Debug.Log("Connected.");
         }
 
         // Send a packet.
@@ -999,7 +1005,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -1073,7 +1078,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -1105,32 +1109,46 @@ namespace Fun
         public override void Start()
         {
             Debug.Log("Started.");
+            state_ = State.kConnected;
         }
 
         public override void Stop()
         {
             mutex_.WaitOne();
-            Debug.Log("Stopped.");
 
-            foreach (WebState state in list_)
+            try
             {
-                if (state.request != null)
+                if (state_ == State.kDisconnected)
+                    return;
+
+                Debug.Log("Stopped.");
+                state_ = State.kDisconnected;
+
+                foreach (WebState state in list_)
                 {
-                    state.aborted = true;
-                    state.request.Abort();
+                    if (state.request != null)
+                    {
+                        state.aborted = true;
+                        state.request.Abort();
+                    }
+
+                    if (state.stream != null)
+                        state.stream.Close();
                 }
 
-                if (state.stream != null)
-                    state.stream.Close();
-            }
+                list_.Clear();
 
-            list_.Clear();
-            mutex_.ReleaseMutex();
+                OnStopped();
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
         }
 
         public override bool Started
         {
-            get { return true; }
+            get { return state_ == State.kConnected; }
         }
 
         public override void SendMessage(JSONClass message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
@@ -1196,7 +1214,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -1231,7 +1248,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -1280,7 +1296,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
 
@@ -1315,11 +1330,7 @@ namespace Fun
                     ArraySegment<byte> body = new ArraySegment<byte>(state.read_data, 0, state.read_offset);
 
                     // The network module eats the fields and invoke registered handler.
-                    if (on_received_ != null)
-                    {
-                        Debug.Log("Invoking a receive handler.");
-                        on_received_(null, body);
-                    }
+                    OnReceived(null, body);
 
                     state.stream.Close();
                     state.stream = null;
@@ -1339,7 +1350,6 @@ namespace Fun
             if (failed)
             {
                 Stop();
-                on_stopped_();
             }
         }
         #endregion
@@ -1383,7 +1393,8 @@ namespace Fun
             msg_type_ = type;
             on_session_initiated_ = on_session_initiated;
             on_session_closed_ = on_session_closed;
-            transport_.RegisterEventHandlers(this.OnTransportReceived, this.OnTransportStopped);
+            transport_.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+            transport_.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
         }
 
         public void Start()
@@ -1399,7 +1410,9 @@ namespace Fun
         {
             Debug.Log("Stopping a network module.");
             started_ = false;
-            transport_.Stop();
+
+            if (transport_.Started)
+                transport_.Stop();
         }
 
         public bool Started
@@ -1472,7 +1485,7 @@ namespace Fun
         #region internal implementation
         private void OnTransportReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
-            Debug.Log("OnReceived invoked.");
+            Debug.Log("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
 
             string msg_type = "";
@@ -1552,9 +1565,6 @@ namespace Fun
         {
             Debug.Log("Transport terminated. Stopping. You may restart again.");
             Stop();
-
-            if (on_session_closed_ != null)
-                on_session_closed_();
         }
 
         #region Funapi system message handlers
