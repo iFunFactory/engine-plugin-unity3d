@@ -4,6 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using MiniJSON;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using SimpleJSON;
 using UnityEngine;
 
 // Protobuf
@@ -48,7 +48,7 @@ namespace Fun
         public abstract bool Started { get; }
 
         // Send a message
-        public abstract void SendMessage(JSONClass message, EncryptionType encryption);
+        public abstract void SendMessage(Dictionary<string, object> message, EncryptionType encryption);
         public abstract void SendMessage(FunMessage message, EncryptionType encryption);
 
         // Registered event handlers.
@@ -168,9 +168,9 @@ namespace Fun
 
 
         // Sends a JSON message through a socket.
-        public override void SendMessage (JSONClass message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public override void SendMessage (Dictionary<string, object> message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
-            string str = message.ToString();
+            string str = Json.Serialize(message);
             byte[] body = Encoding.Default.GetBytes(str);
 
             Debug.Log("JSON to send : " + str);
@@ -1151,9 +1151,9 @@ namespace Fun
             get { return state_ == State.kConnected; }
         }
 
-        public override void SendMessage(JSONClass message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public override void SendMessage(Dictionary<string, object> message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
-            string str = message.ToString();
+            string str = Json.Serialize(message);
             byte[] body = Encoding.Default.GetBytes(str);
 
             Debug.Log("JSON to send: " + str);
@@ -1454,7 +1454,7 @@ namespace Fun
             transport_.SendMessage(message, encryption);
         }
 
-        public void SendMessage(string msg_type, JSONClass body, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public void SendMessage(string msg_type, Dictionary<string, object> body, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
@@ -1494,21 +1494,18 @@ namespace Fun
             if (msg_type_ == FunMsgType.kJson)
             {
                 string str = Encoding.Default.GetString(body.Array, body.Offset, body.Count);
-                JSONNode json = JSON.Parse(str);
-                DebugUtils.Assert(json is JSONClass);
-                Debug.Log("Parsed json: " + json.ToString());
+                Dictionary<string, object> json = Json.Deserialize(str) as Dictionary<string, object>;
+                Debug.Log("Parsed json: " + str);
 
-                JSONNode msg_type_node = json[kMsgTypeBodyField];
-                DebugUtils.Assert(msg_type_node is JSONData);
-                DebugUtils.Assert(msg_type_node.Value is string);
-                msg_type = msg_type_node.Value;
-                json.Remove(msg_type_node);
+                DebugUtils.Assert(json[kMsgTypeBodyField] is string);
+                string msg_type_node = json[kMsgTypeBodyField] as string;
+                msg_type = msg_type_node;
+                json.Remove(kMsgTypeBodyField);
 
-                JSONNode session_id_node = json[kSessionIdBodyField];
-                DebugUtils.Assert(session_id_node is JSONData);
-                DebugUtils.Assert(session_id_node.Value is String);
-                session_id = session_id_node.Value;
-                json.Remove(session_id_node);
+                DebugUtils.Assert(json[kSessionIdBodyField] is string);
+                string session_id_node = json[kSessionIdBodyField] as string;
+                session_id = session_id_node;
+                json.Remove(kSessionIdBodyField);
 
                 if (message_handlers_.ContainsKey(msg_type))
                     message_handlers_[msg_type](msg_type, json);

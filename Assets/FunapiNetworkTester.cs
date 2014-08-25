@@ -5,9 +5,10 @@
 // consent of iFunFactory Inc.
 
 using Fun;
+using MiniJSON;
 using ProtoBuf;
-using SimpleJSON;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // Protobuf
@@ -136,7 +137,7 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             if (network_.MsgType == FunMsgType.kJson)
             {
-                JSONClass example = new JSONClass();
+                Dictionary<string, object> example = new Dictionary<string, object>();
                 example["message"] = "hello world";
                 network_.SendMessage("echo", example);
             }
@@ -174,9 +175,9 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnEcho(string msg_type, object body)
     {
-        DebugUtils.Assert(body is JSONClass);
-        JSONClass json = body as JSONClass;
-        Debug.Log("Received an echo message: " + json.ToString());
+        DebugUtils.Assert(body is Dictionary<string, object>);
+        string strJson = Json.Serialize(body as Dictionary<string, object>);
+        Debug.Log("Received an echo message: " + strJson);
     }
 
     private void OnEchoWithProtobuf(string msg_type, object body)
@@ -215,8 +216,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
 
     // Please change this address for test.
-    private const string kServerIp = "192.168.35.135";
-    private const string kResourceServerIp = "192.168.35.135";
+    private const string kServerIp = "127.0.0.1";
+    private const string kResourceServerIp = "127.0.0.1";
 
     // member variables.
     private FunapiNetwork network_ = null;
