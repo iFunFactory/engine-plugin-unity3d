@@ -4,6 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using MiniJSON;
 using UnityEngine;
 using System;
 using System.ComponentModel;
@@ -13,7 +14,6 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using SimpleJSON;
 
 
 namespace Fun
@@ -138,16 +138,14 @@ namespace Fun
                     return;
                 }
 
-                JSONNode json = JSON.Parse(data);
-                DebugUtils.Assert(json is JSONClass);
+                Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
+                List<object> list = json["data"] as List<object>;
 
-                JSONArray list = json["data"].AsArray;
-
-                foreach (JSONNode node in list)
+                foreach (Dictionary<string, object> node in list)
                 {
                     DownloadFile info = new DownloadFile();
-                    info.path = node["path"];
-                    info.md5 = node["md5"];
+                    info.path = node["path"] as string;
+                    info.md5 = node["md5"] as string;
 
                     cached_files_list_.Add(info);
                 }
@@ -347,20 +345,19 @@ namespace Fun
                 }
                 else
                 {
-					// It can be null when CancelAsync() called in Stop().
-					if (ar.Result == null)
-						return;
+                    // It can be null when CancelAsync() called in Stop().
+                    if (ar.Result == null)
+                    return;
 
-					state_ = State.Downloading;
+                    state_ = State.Downloading;
 
                     // Parse json
                     string data = Encoding.ASCII.GetString(ar.Result);
-                    JSONNode json = JSON.Parse(data);
-                    DebugUtils.Assert(json is JSONClass);
+                    Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
 
                     Debug.Log("Json data >>  " + data);
 
-                    JSONArray list = json["data"].AsArray;
+                    List<object> list = json["data"] as List<object>;
                     if (list.Count <= 0)
                     {
                         Debug.Log("Invalid list data. List count is 0.");
@@ -369,11 +366,11 @@ namespace Fun
                     }
                     else
                     {
-                        foreach (JSONNode node in list)
+                        foreach (Dictionary<string, object> node in list)
                         {
                             DownloadFile info = new DownloadFile();
-                            info.path = node["path"];
-                            info.md5 = node["md5"];
+                            info.path = node["path"] as string;
+                            info.md5 = node["md5"] as string;
 
                             download_list_.Add(info);
                         }
