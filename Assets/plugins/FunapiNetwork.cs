@@ -1583,8 +1583,8 @@ namespace Fun
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
-        private static readonly string kMsgTypeBodyField = "msgtype";
-        private static readonly string kSessionIdBodyField = "sid";
+        private static readonly string kMsgTypeBodyField = "_msgtype";
+        private static readonly string kSessionIdBodyField = "_sid";
         private static readonly string kNewSessionMessageType = "_session_opened";
         private static readonly string kSessionClosedMessageType = "_session_closed";
 
