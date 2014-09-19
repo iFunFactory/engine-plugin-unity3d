@@ -31,6 +31,52 @@ namespace Fun
     public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
     public delegate void StoppedEventHandler();
 
+    // Container to hold json-related functions.
+    public abstract class JsonAccessor
+    {
+        public abstract string Serialize(object json_obj);
+        public abstract object Deserialize(string json_str);
+        public abstract string GetStringField(object json_obj, string field_name);
+        public abstract void SetStringField(object json_obj, string field_name, string value);
+        public abstract void RemoveStringField(object json_obj, string field_name);
+    }
+
+    public class DictionaryJsonAccessor : JsonAccessor
+    {
+        public override string Serialize(object json_obj)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert(d != null);
+            return Json.Serialize(d);
+        }
+
+        public override object Deserialize(string json_string)
+        {
+            return Json.Deserialize(json_string) as Dictionary<string, object>;
+        }
+
+        public override string GetStringField(object json_obj, string field_name)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert(d != null);
+            return d[field_name] as string;
+        }
+
+        public override void SetStringField(object json_obj, string field_name, string value)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert(d != null);
+            d[field_name] = value;
+        }
+
+        public override void RemoveStringField(object json_obj, string field_name)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert(d != null);
+            d.Remove(field_name);
+        }
+    }
+
 
     // Abstract class to represent Transport used by Funapi
     // There are 3 transport types at the moment (though this plugin implements only TCP one.)
@@ -48,13 +94,20 @@ namespace Fun
         public abstract bool Started { get; }
 
         // Send a message
-        public abstract void SendMessage(Dictionary<string, object> message, EncryptionType encryption);
+        public abstract void SendMessage(object json_message, EncryptionType encryption);
         public abstract void SendMessage(FunMessage message, EncryptionType encryption);
 
         // Registered event handlers.
         public event ReceivedEventHandler ReceivedCallback;
         public event StoppedEventHandler StoppedCallback;
         #endregion
+
+        // Encoding/Decoding related
+        public JsonAccessor JsonHelper
+        {
+            get { return json_accessor_; }
+            set { json_accessor_ = value; }
+        }
 
         #region internal implementation
         protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
@@ -88,6 +141,7 @@ namespace Fun
 
         protected State state_ = State.kDisconnected;
         protected Mutex mutex_ = new Mutex();
+        protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         #endregion
     }
 
@@ -168,9 +222,9 @@ namespace Fun
 
 
         // Sends a JSON message through a socket.
-        public override void SendMessage (Dictionary<string, object> message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public override void SendMessage (object json_message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
-            string str = Json.Serialize(message);
+            string str = this.JsonHelper.Serialize(json_message);
             byte[] body = Encoding.Default.GetBytes(str);
 
             Debug.Log("JSON to send : " + str);
@@ -1151,9 +1205,9 @@ namespace Fun
             get { return state_ == State.kConnected; }
         }
 
-        public override void SendMessage(Dictionary<string, object> message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public override void SendMessage(object json_message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
-            string str = Json.Serialize(message);
+            string str = this.JsonHelper.Serialize(json_message);
             byte[] body = Encoding.Default.GetBytes(str);
 
             Debug.Log("JSON to send: " + str);
@@ -1454,7 +1508,7 @@ namespace Fun
             transport_.SendMessage(message, encryption);
         }
 
-        public void SendMessage(string msg_type, Dictionary<string, object> body, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public void SendMessage(string msg_type, object body, EncryptionType encryption = EncryptionType.kDefaultEncryption)
         {
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
@@ -1464,12 +1518,12 @@ namespace Fun
             }
 
             // Encodes a messsage type.
-            body[kMsgTypeBodyField] = msg_type;
+            transport_.JsonHelper.SetStringField(body, kMsgTypeBodyField, msg_type);
 
             // Encodes a session id, if any.
             if (session_id_ != null && session_id_.Length > 0)
             {
-                body[kSessionIdBodyField] = session_id_;
+                transport_.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
             }
 
             transport_.SendMessage(body, encryption);
@@ -1494,18 +1548,18 @@ namespace Fun
             if (msg_type_ == FunMsgType.kJson)
             {
                 string str = Encoding.Default.GetString(body.Array, body.Offset, body.Count);
-                Dictionary<string, object> json = Json.Deserialize(str) as Dictionary<string, object>;
+                object json = transport_.JsonHelper.Deserialize(str);
                 Debug.Log("Parsed json: " + str);
 
-                DebugUtils.Assert(json[kMsgTypeBodyField] is string);
-                string msg_type_node = json[kMsgTypeBodyField] as string;
+                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
+                string msg_type_node = transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
                 msg_type = msg_type_node;
-                json.Remove(kMsgTypeBodyField);
+                transport_.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
 
-                DebugUtils.Assert(json[kSessionIdBodyField] is string);
-                string session_id_node = json[kSessionIdBodyField] as string;
+                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
+                string session_id_node = transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
                 session_id = session_id_node;
-                json.Remove(kSessionIdBodyField);
+                transport_.JsonHelper.RemoveStringField(json, kSessionIdBodyField);
 
                 if (message_handlers_.ContainsKey(msg_type))
                     message_handlers_[msg_type](msg_type, json);
@@ -1579,7 +1633,6 @@ namespace Fun
                 on_session_closed_();
         }
         #endregion
-
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;

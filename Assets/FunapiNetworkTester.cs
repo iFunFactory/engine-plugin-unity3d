@@ -52,7 +52,7 @@ public class FunapiNetworkTester : MonoBehaviour
             downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
             downloader_.StartDownload(kResourceServerIp, 8020, "list");
             message_ = " start downloading..";
-			Invoke("CheckDownloadConnection", 3f);
+            Invoke("CheckDownloadConnection", 3f);
         }
 
         GUI.enabled = true;
@@ -76,6 +76,11 @@ public class FunapiNetworkTester : MonoBehaviour
         Debug.Log("Creating a network instance.");
         // You should pass an instance of FunapiTransport.
         network_ = new FunapiNetwork(transport, FunMsgType.kJson, this.OnSessionInitiated, this.OnSessionClosed);
+
+        // If you prefer use specific Json implementation other than Dictionary,
+        // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
+        // E.g., transport.JsonHelper = new YourJsonAccessorClass
+
         network_.RegisterHandler("echo", this.OnEcho);
         network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
         network_.Start();
@@ -137,6 +142,10 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             if (network_.MsgType == FunMsgType.kJson)
             {
+                // In this example, we are using Dictionary<string, object>.
+                // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
+                // by changing JsonHelper member in FunapiTransport.
+                // Please refer to comments inside Connect() function.
                 Dictionary<string, object> example = new Dictionary<string, object>();
                 example["message"] = "hello world";
                 network_.SendMessage("echo", example);
