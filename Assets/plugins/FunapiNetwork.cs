@@ -39,7 +39,11 @@ namespace Fun
         public abstract object Deserialize(string json_str);
         public abstract string GetStringField(object json_obj, string field_name);
         public abstract void SetStringField(object json_obj, string field_name, string value);
+        public abstract Int64 GetIntegerField(object json_obj, string field_name);
+        public abstract void SetIntegerField(object json_obj, string field_name, Int64 value);
+        public abstract bool HasField(object json_obj, string field_name);
         public abstract void RemoveStringField(object json_obj, string field_name);
+        public abstract object Clone(object json_obj);
     }
 
     public class DictionaryJsonAccessor : JsonAccessor
@@ -70,11 +74,40 @@ namespace Fun
             d[field_name] = value;
         }
 
+        public override Int64 GetIntegerField(object json_obj, string field_name)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert(d != null);
+            return Convert.ToInt64(d [field_name]);
+        }
+
+        public override void SetIntegerField(object json_obj, string field_name, Int64 value)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert (d != null);
+            d [field_name] = value;
+        }
+
+        public override bool HasField(object json_obj, string field_name)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert (d != null);
+            return d.ContainsKey (field_name);
+        }
+
         public override void RemoveStringField(object json_obj, string field_name)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
             DebugUtils.Assert(d != null);
             d.Remove(field_name);
+        }
+
+        public override object Clone(object json_obj)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            DebugUtils.Assert(d != null);
+            return new Dictionary<string, object>(d);
+
         }
     }
 
@@ -1230,18 +1263,35 @@ namespace Fun
         public delegate void MessageHandler(string msg_type, object body);
         public delegate void OnSessionInitiated(string session_id);
         public delegate void OnSessionClosed();
+        public delegate void OnTransportClosed();
         #endregion
 
         #region public interface
-        public FunapiNetwork(FunapiTransport transport, FunMsgType type,
+        public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
                              OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
         {
+            state_ = State.kUnknown;
             transport_ = transport;
             msg_type_ = type;
             on_session_initiated_ = on_session_initiated;
             on_session_closed_ = on_session_closed;
             transport_.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+            transport_.StartedCallback += new StartedEventHandler(OnTransportStarted);
             transport_.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
+
+            if (session_reliability && transport.IsStream() && !transport.IsRequestResponse())
+            {
+                session_reliability_ = true;
+            }
+            else
+            {
+                session_reliability_ = false;
+            }
+            seq_ = 0;
+            seq_recvd_ = 0;
+            first_receiving_ = true;
+            send_queue_ = new System.Collections.Queue();
+            rnd_ = new System.Random();
         }
 
         public void Start()
@@ -1278,6 +1328,14 @@ namespace Fun
             }
         }
 
+        public bool SessionReliability
+        {
+            get
+            {
+                return session_reliability_;
+            }
+        }
+
         public FunMsgType MsgType
         {
             get { return msg_type_; }
@@ -1285,6 +1343,8 @@ namespace Fun
 
         public void SendMessage(FunMessage message)
         {
+            DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
+
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
             {
@@ -1298,11 +1358,27 @@ namespace Fun
                 message.sid = session_id_;
             }
 
-            transport_.SendMessage(message);
+            if (session_reliability_)
+            {
+                if (session_id_ == null || session_id_.Length == 0)
+                {
+                    seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+                }
+                message.seq = seq_;
+                ++seq_;
+                send_queue_.Enqueue(message);
+            }
+
+            if (state_ == State.kUnknown || state_ == State.kEstablished)
+            {
+                transport_.SendMessage(message, encryption);
+            }
         }
 
         public void SendMessage(string msg_type, object body)
         {
+            DebugUtils.Assert (msg_type_ == FunMsgType.kJson);
+
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
             {
@@ -1319,7 +1395,21 @@ namespace Fun
                 transport_.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
             }
 
-            transport_.SendMessage(body);
+            if (session_reliability_)
+            {
+                if (session_id_ == null || session_id_.Length == 0)
+                {
+                    seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+                }
+                transport_.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
+                ++seq_;
+                send_queue_.Enqueue(transport_.JsonHelper.Clone(body));
+            }
+
+            if (state_ == State.kUnknown || state_ == State.kEstablished)
+            {
+                transport_.SendMessage(body, encryption);
+            }
         }
 
         public void RegisterHandler(string type, MessageHandler handler)
@@ -1330,6 +1420,55 @@ namespace Fun
         #endregion
 
         #region internal implementation
+        private void PrepareSession(string session_id)
+        {
+            if (session_id_.Length == 0)
+            {
+                Debug.Log("New session id: " + session_id);
+                OpenSession(session_id);
+            }
+
+            if (session_id_ != session_id)
+            {
+                Debug.Log("Session id changed: " + session_id_ + " => " + session_id);
+
+                CloseSession();
+                OpenSession(session_id);
+            }
+        }
+
+        private void OpenSession(string session_id)
+        {
+            DebugUtils.Assert(session_id_.Length == 0);
+            session_id_ = session_id;
+            state_ = State.kEstablished;
+            if (on_session_initiated_ != null)
+            {
+                on_session_initiated_(session_id_);
+            }
+        }
+
+        private void CloseSession()
+        {
+            if (session_id_.Length == 0)
+                return;
+
+            session_id_ = "";
+            state_ = State.kUnknown;
+            if (session_reliability_)
+            {
+                seq_ = 0;
+                seq_recvd_ = 0;
+                first_receiving_ = true;
+                send_queue_.Clear();
+            }
+
+            if (on_session_closed_ != null)
+            {
+                on_session_closed_();
+            }
+        }
+
         private void OnTransportReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
             Debug.Log("OnTransportReceived invoked.");
@@ -1344,15 +1483,39 @@ namespace Fun
                 object json = transport_.JsonHelper.Deserialize(str);
                 Debug.Log("Parsed json: " + str);
 
-                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
-                string msg_type_node = transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
-                msg_type = msg_type_node;
-                transport_.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
-
                 DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
                 string session_id_node = transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
                 session_id = session_id_node;
                 transport_.JsonHelper.RemoveStringField(json, kSessionIdBodyField);
+
+                PrepareSession(session_id);
+
+                if (session_reliability_)
+                {
+                    if (transport_.JsonHelper.HasField(json, kAckNumberField))
+                    {
+                        UInt32 ack = (UInt32)transport_.JsonHelper.GetIntegerField(json, kAckNumberField);
+                        OnAckReceived(ack);
+                        // Does not support piggybacking.
+                        DebugUtils.Assert(!transport_.JsonHelper.HasField(json, kMsgTypeBodyField));
+                        return;
+                    }
+
+                    if (transport_.JsonHelper.HasField(json, kSeqNumberField))
+                       {
+                        UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(json, kSeqNumberField);
+                        if (!OnSeqReceived(seq))
+                        {
+                            return;
+                        }
+                        transport_.JsonHelper.RemoveStringField(json, kSeqNumberField);
+                    }
+                }
+
+                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
+                string msg_type_node = transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+                msg_type = msg_type_node;
+                transport_.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
 
                 if (message_handlers_.ContainsKey(msg_type))
                     message_handlers_[msg_type](msg_type, json);
@@ -1362,8 +1525,28 @@ namespace Fun
                 MemoryStream stream = new MemoryStream(body.Array, body.Offset, body.Count, false);
                 FunMessage message = Serializer.Deserialize<FunMessage>(stream);
 
-                msg_type = message.msgtype;
                 session_id = message.sid;
+                PrepareSession(session_id);
+
+                if (session_reliability_)
+                {
+                    if (message.ackSpecified)
+                    {
+                        OnAckReceived(message.ack);
+                        // Does not support piggybacking.
+                        return;
+                    }
+
+                    if (message.seqSpecified)
+                    {
+                        if (!OnSeqReceived(message.seq))
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                msg_type = message.msgtype;
 
                 if (message_handlers_.ContainsKey(msg_type))
                     message_handlers_[msg_type](msg_type, message);
@@ -1375,40 +1558,143 @@ namespace Fun
                 return;
             }
 
-            if (session_id_.Length == 0)
-            {
-                session_id_ = session_id;
-                Debug.Log("New session id: " + session_id);
-                if (on_session_initiated_ != null)
-                {
-                    on_session_initiated_(session_id_);
-                }
-            }
-
-            if (session_id_ != session_id)
-            {
-                Debug.Log("Session id changed: " + session_id_ + " => " + session_id);
-                session_id_ = session_id;
-                if (on_session_closed_ != null)
-                {
-                    on_session_closed_();
-                }
-                if (on_session_initiated_ != null)
-                {
-                    on_session_initiated_(session_id_);
-                }
-            }
-
             if (!message_handlers_.ContainsKey(msg_type))
             {
                 Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
             }
         }
 
+        private bool SeqLess(UInt32 x, UInt32 y)
+        {
+            Int32 dist = (Int32)(x - y);
+            return dist > 0;
+        }
+
+        private void SendAck(UInt32 ack)
+        {
+            DebugUtils.Assert(session_reliability_);
+
+            if (msg_type_ == FunMsgType.kJson)
+            {
+                object ack_msg = transport_.JsonHelper.Deserialize("{}");
+                transport_.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
+                transport_.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
+                transport_.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
+            }
+            else
+            {
+                FunMessage ack_msg = new FunMessage();
+                ack_msg.sid = session_id_;
+                ack_msg.ack = ack;
+                transport_.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
+            }
+        }
+
+        private bool OnSeqReceived(UInt32 seq)
+        {
+            if (first_receiving_)
+            {
+                first_receiving_ = false;
+            }
+            else
+            {
+                if (seq_recvd_ + 1 != seq)
+                {
+                    Debug.Log("Received wrong sequence number " + seq.ToString() +
+                              ".(" + (seq_recvd_ + 1).ToString() + " expected");
+                    DebugUtils.Assert(false);
+                    Stop();
+                    return false;
+                }
+            }
+
+            seq_recvd_ = seq;
+            SendAck(seq_recvd_ + 1);
+            return true;
+        }
+
+        private void OnAckReceived(UInt32 ack)
+        {
+            DebugUtils.Assert (session_reliability_);
+
+            while (send_queue_.Count > 0)
+            {
+                UInt32 seq;
+                object last_msg = send_queue_.Peek();
+                if (msg_type_ == FunMsgType.kJson)
+                {
+                    seq = (UInt32)transport_.JsonHelper.GetIntegerField(last_msg, kSeqNumberField);
+                }
+                else if (msg_type_ == FunMsgType.kProtobuf)
+                {
+                    seq = (last_msg as FunMessage).seq;
+                }
+                else
+                {
+                    DebugUtils.Assert(false);
+                    seq = 0;
+                }
+
+                if (SeqLess(ack, seq))
+                {
+                    send_queue_.Dequeue();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (state_ == State.kWaitForAck)
+            {
+                foreach (object msg in send_queue_)
+                {
+                    if (msg_type_ == FunMsgType.kJson)
+                    {
+                        UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(msg, kSeqNumberField);
+                        DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
+                        transport_.SendMessage(msg, EncryptionType.kDefaultEncryption);
+                    }
+                    else if (msg_type_ == FunMsgType.kProtobuf)
+                    {
+                        UInt32 seq = (msg as FunMessage).seq;
+                        DebugUtils.Assert(seq == ack || SeqLess (seq, ack));
+                        transport_.SendMessage(msg as FunMessage, EncryptionType.kDefaultEncryption);
+                    }
+                    else
+                    {
+                        DebugUtils.Assert(false);
+                    }
+                }
+
+                state_ = State.kEstablished;
+            }
+        }
+
+        private void OnTransportStarted()
+        {
+            if (!session_reliability_)
+            {
+                return;
+            }
+
+            if (state_ == State.kTransportClosed)
+            {
+                state_ = State.kWaitForAck;
+                SendAck(seq_recvd_ + 1);
+            }
+        }
+
         private void OnTransportStopped()
         {
+            if (session_reliability_)
+            {
+                if (state_ == State.kEstablished || state_ == State.kWaitForAck)
+                {
+                    state_ = State.kTransportClosed;
+                }
+            }
             Debug.Log("Transport terminated. Stopping. You may restart again.");
-            Stop();
         }
 
         #region Funapi system message handlers
@@ -1420,17 +1706,26 @@ namespace Fun
         private void OnSessionTimedout(string msg_type, object body)
         {
             Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
-            session_id_ = "";
 
-            if (on_session_closed_ != null)
-                on_session_closed_();
+            CloseSession();
         }
         #endregion
+
+        enum State {
+            kUnknown = 0,
+            kEstablished,
+            kTransportClosed,
+            kWaitForAck
+        }
+
+        State state_;
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
         private static readonly string kMsgTypeBodyField = "_msgtype";
         private static readonly string kSessionIdBodyField = "_sid";
+        private static readonly string kSeqNumberField = "_seq";
+        private static readonly string kAckNumberField = "_ack";
         private static readonly string kNewSessionMessageType = "_session_opened";
         private static readonly string kSessionClosedMessageType = "_session_closed";
 
@@ -1443,6 +1738,15 @@ namespace Fun
         private string session_id_ = "";
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private DateTime last_received_ = DateTime.Now;
+
+        // reliability-releated member variables.
+        private bool session_reliability_;
+        private UInt32 seq_;
+        private UInt32 seq_recvd_;
+        private bool first_receiving_;
+        private System.Collections.Queue send_queue_;
+        private System.Random rnd_;
+
         #endregion
     }
 }  // namespace Fun
