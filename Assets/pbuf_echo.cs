@@ -16,7 +16,6 @@ namespace pbuf_echo
   {
     public PbufEchoMessage() {}
     
-
     private string _message = "";
     [global::ProtoBuf.ProtoMember(1, IsRequired = false, Name=@"message", DataFormat = global::ProtoBuf.DataFormat.Default)]
     [global::System.ComponentModel.DefaultValue("")]
@@ -35,7 +34,6 @@ namespace pbuf_echo
   {
     public PbufAnotherMessage() {}
     
-
     private string _message = "";
     [global::ProtoBuf.ProtoMember(1, IsRequired = false, Name=@"message", DataFormat = global::ProtoBuf.DataFormat.Default)]
     [global::System.ComponentModel.DefaultValue("")]

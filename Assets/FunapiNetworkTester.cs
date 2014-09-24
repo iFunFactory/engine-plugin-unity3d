@@ -21,11 +21,18 @@ public class FunapiNetworkTester : MonoBehaviour
     public void OnGUI()
     {
         // For debugging
-        GUI.enabled = network_ == null;
+        GUI.enabled = (network_ == null ||  !network_.Connected);
         if (GUI.Button(new Rect(30, 30, 240, 40), "Connect (TCP)"))
         {
-            Connect(new FunapiTcpTransport(kServerIp, 8012));
-            SendEchoMessage();
+            if (network_ != null && network_.SessionReliability)
+            {
+                network_.Start();
+            }
+            else
+            {
+                Connect(new FunapiTcpTransport(kServerIp, 8012));
+                SendEchoMessage();
+            }
             Invoke("CheckConnection", 3f);
         }
         if (GUI.Button(new Rect(30, 90, 240, 40), "Connect (UDP)"))
@@ -58,11 +65,13 @@ public class FunapiNetworkTester : MonoBehaviour
         GUI.enabled = true;
         GUI.TextField(new Rect(280, 71, 480, 24), message_);
 
-        GUI.enabled = network_ != null;
+        GUI.enabled = (network_ != null && network_.Connected);
         if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
         {
             DisConnect();
         }
+
+        GUI.enabled = (network_ != null && (network_.Connected || network_.SessionReliability));
         if (GUI.Button(new Rect(30, 270, 240, 40), "Send 'Hello World'"))
         {
             SendEchoMessage();
@@ -71,11 +80,11 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void Connect (FunapiTransport transport)
     {
-        transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
-
         Debug.Log("Creating a network instance.");
+
         // You should pass an instance of FunapiTransport.
-        network_ = new FunapiNetwork(transport, FunMsgType.kJson, this.OnSessionInitiated, this.OnSessionClosed);
+        network_ = new FunapiNetwork(transport, FunMsgType.kJson, false, this.OnSessionInitiated, this.OnSessionClosed);
+        transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
 
         // If you prefer use specific Json implementation other than Dictionary,
         // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
@@ -97,7 +106,6 @@ public class FunapiNetworkTester : MonoBehaviour
         else
         {
             network_.Stop();
-            network_ = null;
         }
     }
 
@@ -134,7 +142,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void SendEchoMessage ()
     {
-        if (network_.Started == false)
+        if (network_.Started == false && !network_.SessionReliability)
         {
             Debug.Log("You should connect first.");
         }
@@ -178,8 +186,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnTransportClosed()
     {
-        network_ = null;
         Debug.Log("Transport closed");
+
     }
 
     private void OnEcho(string msg_type, object body)
@@ -225,7 +233,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
 
     // Please change this address for test.
-    private const string kServerIp = "10.10.1.4";
+    private const string kServerIp = "127.0.0.1";
     private const string kResourceServerIp = "127.0.0.1";
 
     // member variables.

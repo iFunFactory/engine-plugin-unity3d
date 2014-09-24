@@ -7,6 +7,8 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
+// Option: missing-value detection (*Specified/ShouldSerialize*/Reset*) enabled
+    
 // Generated from: funapi/network/fun_message.proto
 namespace funapi.network.fun_message
 {
@@ -15,24 +17,74 @@ namespace funapi.network.fun_message
   {
     public FunMessage() {}
     
-
-    private string _sid = "";
+    private string _sid;
     [global::ProtoBuf.ProtoMember(1, IsRequired = false, Name=@"sid", DataFormat = global::ProtoBuf.DataFormat.Default)]
-    [global::System.ComponentModel.DefaultValue("")]
     public string sid
     {
-      get { return _sid; }
+      get { return _sid?? ""; }
       set { _sid = value; }
     }
-
-    private string _msgtype = "";
+    [global::System.Xml.Serialization.XmlIgnore]
+    [global::System.ComponentModel.Browsable(false)]
+    public bool sidSpecified
+    {
+      get { return this._sid != null; }
+      set { if (value == (this._sid== null)) this._sid = value ? this.sid : (string)null; }
+    }
+    private bool ShouldSerializesid() { return sidSpecified; }
+    private void Resetsid() { sidSpecified = false; }
+    
+    private string _msgtype;
     [global::ProtoBuf.ProtoMember(2, IsRequired = false, Name=@"msgtype", DataFormat = global::ProtoBuf.DataFormat.Default)]
-    [global::System.ComponentModel.DefaultValue("")]
     public string msgtype
     {
-      get { return _msgtype; }
+      get { return _msgtype?? ""; }
       set { _msgtype = value; }
     }
+    [global::System.Xml.Serialization.XmlIgnore]
+    [global::System.ComponentModel.Browsable(false)]
+    public bool msgtypeSpecified
+    {
+      get { return this._msgtype != null; }
+      set { if (value == (this._msgtype== null)) this._msgtype = value ? this.msgtype : (string)null; }
+    }
+    private bool ShouldSerializemsgtype() { return msgtypeSpecified; }
+    private void Resetmsgtype() { msgtypeSpecified = false; }
+    
+    private uint? _seq;
+    [global::ProtoBuf.ProtoMember(3, IsRequired = false, Name=@"seq", DataFormat = global::ProtoBuf.DataFormat.TwosComplement)]
+    public uint seq
+    {
+      get { return _seq?? default(uint); }
+      set { _seq = value; }
+    }
+    [global::System.Xml.Serialization.XmlIgnore]
+    [global::System.ComponentModel.Browsable(false)]
+    public bool seqSpecified
+    {
+      get { return this._seq != null; }
+      set { if (value == (this._seq== null)) this._seq = value ? this.seq : (uint?)null; }
+    }
+    private bool ShouldSerializeseq() { return seqSpecified; }
+    private void Resetseq() { seqSpecified = false; }
+    
+    private uint? _ack;
+    [global::ProtoBuf.ProtoMember(4, IsRequired = false, Name=@"ack", DataFormat = global::ProtoBuf.DataFormat.TwosComplement)]
+    public uint ack
+    {
+      get { return _ack?? default(uint); }
+      set { _ack = value; }
+    }
+    [global::System.Xml.Serialization.XmlIgnore]
+    [global::System.ComponentModel.Browsable(false)]
+    public bool ackSpecified
+    {
+      get { return this._ack != null; }
+      set { if (value == (this._ack== null)) this._ack = value ? this.ack : (uint?)null; }
+    }
+    private bool ShouldSerializeack() { return ackSpecified; }
+    private void Resetack() { ackSpecified = false; }
+    
     private global::ProtoBuf.IExtension extensionObject;
     global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
       { return global::ProtoBuf.Extensible.GetExtensionObject(ref extensionObject, createIfMissing); }
