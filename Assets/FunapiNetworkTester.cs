@@ -219,7 +219,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
 
     // Please change this address for test.
-    private const string kServerIp = "127.0.0.1";
+    private const string kServerIp = "10.10.1.4";
     private const string kResourceServerIp = "127.0.0.1";
 
     // member variables.
