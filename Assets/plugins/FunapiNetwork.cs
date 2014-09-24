@@ -29,6 +29,7 @@ namespace Fun
 
     // Event handler delegate
     public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
+    public delegate void StartedEventHandler();
     public delegate void StoppedEventHandler();
 
     // Container to hold json-related functions.
@@ -99,6 +100,7 @@ namespace Fun
 
         // Registered event handlers.
         public event ReceivedEventHandler ReceivedCallback;
+        public event StartedEventHandler StartedCallback;
         public event StoppedEventHandler StoppedCallback;
         #endregion
 
@@ -115,13 +117,34 @@ namespace Fun
             ReceivedCallback(header, body);
         }
 
+        protected void OnStarted ()
+        {
+            if (StartedCallback != null)
+            {
+                StartedCallback();
+            }
+        }
+
         protected void OnStopped ()
         {
             StoppedCallback();
         }
 
+        public virtual bool IsStream()
+        {
+            return false;
+        }
 
-        //
+        public virtual bool IsDatagram()
+        {
+            return false;
+        }
+
+        public virtual bool IsRequestResponse()
+        {
+            return false;
+        }
+
         protected enum State
         {
             kDisconnected = 0,
@@ -172,6 +195,8 @@ namespace Fun
                 sending_.Clear();
 
                 Init();
+
+                OnStarted();
             }
             catch (Exception e)
             {
@@ -676,6 +701,11 @@ namespace Fun
             IPAddress address = host_info.AddressList[0];
             connect_ep_ = new IPEndPoint(address, port);
         }
+
+        public override bool IsStream()
+        {
+            return true;
+        }
         #endregion
 
         #region internal implementation
@@ -949,6 +979,11 @@ namespace Fun
             default_encryptor_ = (int)encryption;
             encryptors_[encryption] = encryptor;
         }
+
+        public override bool IsDatagram()
+        {
+            return true;
+        }
         #endregion
 
         #region internal implementation
@@ -1164,6 +1199,7 @@ namespace Fun
         {
             Debug.Log("Started.");
             state_ = State.kConnected;
+            OnStarted();
         }
 
         public override void Stop()
@@ -1226,6 +1262,12 @@ namespace Fun
 
             SendMessage(body, encryption);
         }
+
+        public override bool IsRequestResponse()
+        {
+            return true;
+        }
+
         #endregion
 
         #region internal implementation
