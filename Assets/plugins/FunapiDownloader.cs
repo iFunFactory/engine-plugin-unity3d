@@ -69,18 +69,19 @@ namespace Fun
                     return;
                 }
 
-                host_url_ = url.Substring(0, index + ver.Length);
+                string host_url = url.Substring(0, index + ver.Length);
 
                 if (state_ == State.Downloading)
                 {
                     DownloadUrl info = new DownloadUrl();
-                    info.host = host_url_;
+                    info.host = host_url;
                     info.url = url;
                     url_list_.Add(info);
                     return;
                 }
 
 				state_ = State.Start;
+                host_url_ = host_url;
                 Debug.Log("Start Download.");
 
                 DownloadListFile(url);
