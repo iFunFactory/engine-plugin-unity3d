@@ -40,7 +40,7 @@ public class FunapiNetworkTester : MonoBehaviour
             FunapiUdpTransport transport = new FunapiUdpTransport(kServerIp, 8013);
 
             // Please set the same encryption type as the encryption type of server.
-            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
 
             Connect(transport);
             SendEchoMessage();
@@ -57,7 +57,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 30, 340, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
-            downloader_.StartDownload(kResourceServerIp, 8020, "list");
+            downloader_.StartDownload(kServerIp, 8020, "list");
             message_ = " start downloading..";
             Invoke("CheckDownloadConnection", 3f);
         }
@@ -234,7 +234,6 @@ public class FunapiNetworkTester : MonoBehaviour
 
     // Please change this address for test.
     private const string kServerIp = "127.0.0.1";
-    private const string kResourceServerIp = "127.0.0.1";
 
     // member variables.
     private FunapiNetwork network_ = null;
