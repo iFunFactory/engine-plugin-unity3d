@@ -250,34 +250,26 @@ namespace Fun
         // Stops a socket.
         public override void Stop()
         {
-            mutex_.WaitOne();
+            if (state_ == State.kDisconnected)
+                return;
 
-            try
-            {
-                if (state_ == State.kDisconnected)
-                    return;
+            state_ = State.kDisconnected;
 
-                state_ = State.kDisconnected;
-
-                if (sock_ != null)
-                {
-                    sock_.Close();
-                    sock_ = null;
-                }
-
-                OnStopped();
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
+            OnStopped();
         }
 
-        public override bool Started
+        public void SetEncryption (EncryptionType encryption)
         {
-            get { return sock_ != null && sock_.Connected && state_ == State.kConnected; }
-        }
+            Encryptor encryptor = Encryptor.Create(encryption);
+            if (encryptor == null)
+            {
+                Debug.LogWarning("Failed to create encryptor: " + encryption);
+                return;
+            }
 
+            default_encryptor_ = (int)encryption;
+            encryptors_[encryption] = encryptor;
+        }
 
         // Sends a JSON message through a socket.
         public override void SendMessage (object json_message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
@@ -692,11 +684,11 @@ namespace Fun
         protected static readonly int kUnitBufferSize = 65536;
 
         // Funapi header-related constants.
-        private static readonly string kHeaderDelimeter = "\n";
-        private static readonly string kHeaderFieldDelimeter = ":";
-        private static readonly string kVersionHeaderField = "VER";
-        private static readonly string kLengthHeaderField = "LEN";
-        private static readonly string kEncryptionHeaderField = "ENC";
+        protected static readonly string kHeaderDelimeter = "\n";
+        protected static readonly string kHeaderFieldDelimeter = ":";
+        protected static readonly string kVersionHeaderField = "VER";
+        protected static readonly string kLengthHeaderField = "LEN";
+        protected static readonly string kEncryptionHeaderField = "ENC";
 
         // Encryption-releated constants.
         private static readonly string kEncryptionHandshakeBegin = "HELLO!";
@@ -709,7 +701,6 @@ namespace Fun
         private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
         // State-related.
-        protected Socket sock_;
         protected bool header_decoded_ = false;
         protected int received_size_ = 0;
         protected int next_decoding_offset_ = 0;
@@ -733,6 +724,35 @@ namespace Fun
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
             connect_ep_ = new IPEndPoint(address, port);
+        }
+
+        // Stops a socket.
+        public override void Stop()
+        {
+            mutex_.WaitOne();
+
+            try
+            {
+                if (state_ == State.kDisconnected)
+                    return;
+
+                base.Stop();
+
+                if (sock_ != null)
+                {
+                    sock_.Close();
+                    sock_ = null;
+                }
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+        }
+
+        public override bool Started
+        {
+            get { return sock_ != null && sock_.Connected && state_ == State.kConnected; }
         }
 
         public override bool IsStream()
@@ -982,6 +1002,7 @@ namespace Fun
             }
         }
 
+        protected Socket sock_;
         private IPEndPoint connect_ep_;
         #endregion
     }
@@ -1000,17 +1021,33 @@ namespace Fun
             receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, port);
         }
 
-        public void SetEncryption (EncryptionType encryption)
+        // Stops a socket.
+        public override void Stop()
         {
-            Encryptor encryptor = Encryptor.Create(encryption);
-            if (encryptor == null)
-            {
-                Debug.LogWarning("Failed to create encryptor: " + encryption);
-                return;
-            }
+            mutex_.WaitOne();
 
-            default_encryptor_ = (int)encryption;
-            encryptors_[encryption] = encryptor;
+            try
+            {
+                if (state_ == State.kDisconnected)
+                    return;
+
+                base.Stop();
+
+                if (sock_ != null)
+                {
+                    sock_.Close();
+                    sock_ = null;
+                }
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+        }
+
+        public override bool Started
+        {
+            get { return sock_ != null && sock_.Connected && state_ == State.kConnected; }
         }
 
         public override bool IsDatagram()
@@ -1204,6 +1241,7 @@ namespace Fun
         }
 
 
+        protected Socket sock_;
         private IPEndPoint send_ep_;
         private EndPoint receive_ep_;
         #endregion
@@ -1211,7 +1249,7 @@ namespace Fun
 
 
     // HTTP transport layer
-    public class FunapiHttpTransport : FunapiTransport
+    public class FunapiHttpTransport : FunapiEncryptedTransport
     {
         #region public interface
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https = false)
@@ -1228,13 +1266,6 @@ namespace Fun
             host_url_ += "/v" + kCurrentFunapiProtocolVersion + "/";
         }
 
-        public override void Start()
-        {
-            Debug.Log("Started.");
-            state_ = State.kConnected;
-            OnStarted();
-        }
-
         public override void Stop()
         {
             mutex_.WaitOne();
@@ -1244,8 +1275,7 @@ namespace Fun
                 if (state_ == State.kDisconnected)
                     return;
 
-                Debug.Log("Stopped.");
-                state_ = State.kDisconnected;
+                base.Stop();
 
                 foreach (WebState state in list_)
                 {
@@ -1260,8 +1290,6 @@ namespace Fun
                 }
 
                 list_.Clear();
-
-                OnStopped();
             }
             finally
             {
@@ -1274,28 +1302,6 @@ namespace Fun
             get { return state_ == State.kConnected; }
         }
 
-        public override void SendMessage(object json_message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
-        {
-            string str = this.JsonHelper.Serialize(json_message);
-            byte[] body = Encoding.Default.GetBytes(str);
-
-            Debug.Log("JSON to send: " + str);
-
-            SendMessage(body, encryption);
-        }
-
-        public override void SendMessage(FunMessage message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
-        {
-            MemoryStream stream = new MemoryStream();
-            Serializer.Serialize(stream, message);
-
-            byte[] body = new byte[stream.Length];
-            stream.Seek(0, SeekOrigin.Begin);
-            stream.Read(body, 0, body.Length);
-
-            SendMessage(body, encryption);
-        }
-
         public override bool IsRequestResponse()
         {
             return true;
@@ -1304,35 +1310,52 @@ namespace Fun
         #endregion
 
         #region internal implementation
-        private void SendMessage (byte[] body, EncryptionType encryption)
+        protected override void Init()
         {
-            mutex_.WaitOne();
+            state_ = State.kConnected;
+        }
+
+        protected override void WireSend(List<SendingBuffer> sending)
+        {
+            DebugUtils.Assert(sending.Count >= 2);
             Debug.Log("Send a Message.");
 
+            mutex_.WaitOne();
             bool failed = false;
             try
             {
-                ArraySegment<byte> content = new ArraySegment<byte>(body);
-
                 Debug.Log("Host Url: " + host_url_);
+
+                SendingBuffer header = sending[0];
+                SendingBuffer body = sending[1];
 
                 // Request
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
                 request.Method = "POST";
                 request.ContentType = "application/x-www-form-urlencoded";
-                request.ContentLength = content.Count;
+                request.ContentLength = body.data.Count;
+
+                // encryption type
+                string str_header = Encoding.Default.GetString(header.data.Array, header.data.Offset, header.data.Count);
+                int start_offset = str_header.IndexOf(kEncryptionHeaderField);
+                if (start_offset != -1)
+                {
+                    start_offset += kEncryptionHeaderField.Length + 1;
+                    int end_offset = str_header.IndexOf(kHeaderDelimeter, start_offset);
+                    request.Headers[kEncryptionHttpHeaderField] = str_header.Substring(start_offset, end_offset - start_offset);
+                }
 
                 // Response
                 WebState state = new WebState();
                 state.request = request;
-                state.sending = content;
+                state.sending = body.data;
                 list_.Add(state);
 
                 request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
             }
             catch (Exception e)
             {
-                Debug.Log("Failure in SendMessage: " + e.ToString());
+                Debug.Log("Failure in WireSend: " + e.ToString());
                 failed = true;
             }
             finally
@@ -1361,6 +1384,10 @@ namespace Fun
                 stream.Write(state.sending.Array, 0, state.sending.Count);
                 stream.Close();
                 Debug.Log("Sent " + state.sending.Count + "bytes");
+
+                // Removes header and body segment
+                sending_.RemoveAt(0);
+                sending_.RemoveAt(0);
 
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
             }
@@ -1394,6 +1421,7 @@ namespace Fun
 
                 HttpWebResponse response = (HttpWebResponse)state.request.EndGetResponse(ar);
                 state.request = null;
+                state.response = response;
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
@@ -1434,6 +1462,7 @@ namespace Fun
             Debug.Log("ReadCb called.");
 
             bool failed = false;
+            bool sendable = false;
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1456,14 +1485,65 @@ namespace Fun
                 }
                 else
                 {
-                    ArraySegment<byte> body = new ArraySegment<byte>(state.read_data, 0, state.read_offset);
+                    if (state.response == null)
+                    {
+                        Debug.LogWarning("Response instance is null.");
+                        DebugUtils.Assert(false);
+                    }
 
-                    // The network module eats the fields and invoke registered handler.
-                    OnReceived(null, body);
+                    // header
+                    byte[] header = state.response.Headers.ToByteArray();
+                    string str_header = Encoding.Default.GetString(header, 0, header.Length);
+                    str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter);
+                    str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
+                    str_header = str_header.Replace(kEncryptionHttpHeaderField, kEncryptionHeaderField);
+                    str_header = str_header.Replace("\r", "");
+                    header = Encoding.ASCII.GetBytes(str_header);
+
+                    // copy to buffer
+                    int length = header.Length + state.read_offset;
+                    if (length > receive_buffer.Length)
+                        receive_buffer = new byte[length];
+
+                    Buffer.BlockCopy(header, 0, receive_buffer, 0, header.Length);
+                    Buffer.BlockCopy(state.read_data, 0, receive_buffer, header.Length, state.read_offset);
+
+                    received_size_ = length;
+                    next_decoding_offset_ = 0;
+
+                    // Decoding a message
+                    if (TryToDecodeHeader())
+                    {
+                        if (TryToDecodeBody() == false)
+                        {
+                            Debug.LogWarning("Failed to decode body.");
+                            DebugUtils.Assert(false);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("Failed to decode header.");
+                        DebugUtils.Assert(false);
+                    }
 
                     state.stream.Close();
                     state.stream = null;
                     list_.Remove(state);
+
+                    if (sending_.Count > 0)
+                    {
+                        // If we have more segments to send, we process more.
+                        Debug.Log("Retrying unsent messages.");
+                        WireSend(sending_);
+                    }
+                    else if (pending_.Count > 0)
+                    {
+                        // Otherwise, try to process pending messages.
+                        List<SendingBuffer> tmp = sending_;
+                        sending_ = pending_;
+                        pending_ = tmp;
+                        sendable = true;
+                    }
                 }
             }
             catch (Exception e)
@@ -1476,6 +1556,12 @@ namespace Fun
                 mutex_.ReleaseMutex();
             }
 
+            if (sendable)
+            {
+                if (!EncryptThenSendMessage())
+                    failed = true;
+            }
+
             if (failed)
             {
                 Stop();
@@ -1484,10 +1570,15 @@ namespace Fun
         #endregion
 
 
+        // Funapi header-related constants.
+        private static readonly string kLengthHttpHeaderField = "content-length";
+        private static readonly string kEncryptionHttpHeaderField = "X-iFun-Enc";
+
         // Response-related.
         class WebState
         {
             public HttpWebRequest request = null;
+            public HttpWebResponse response = null;
             public Stream stream = null;
             public byte[] buffer = null;
             public byte[] read_data = null;
@@ -1495,9 +1586,6 @@ namespace Fun
             public bool aborted = false;
             public ArraySegment<byte> sending;
         }
-
-        // Buffer-related constants.
-        private static readonly int kUnitBufferSize = 65536;
 
         // member variables.
         private string host_url_;

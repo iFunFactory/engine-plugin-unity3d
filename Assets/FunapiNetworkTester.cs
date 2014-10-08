@@ -40,7 +40,7 @@ public class FunapiNetworkTester : MonoBehaviour
             FunapiUdpTransport transport = new FunapiUdpTransport(kServerIp, 8013);
 
             // Please set the same encryption type as the encryption type of server.
-            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
 
             Connect(transport);
             SendEchoMessage();
@@ -48,7 +48,12 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
         {
-            Connect(new FunapiHttpTransport(kServerIp, 8018));
+            FunapiHttpTransport transport = new FunapiHttpTransport(kServerIp, 8018);
+
+            // Please set the same encryption type as the encryption type of server.
+            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+
+            Connect(transport);
             SendEchoMessage();
             Invoke("CheckConnection", 3f);
         }
