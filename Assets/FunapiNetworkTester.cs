@@ -40,7 +40,7 @@ public class FunapiNetworkTester : MonoBehaviour
             FunapiUdpTransport transport = new FunapiUdpTransport(kServerIp, 8013);
 
             // Please set the same encryption type as the encryption type of server.
-            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
 
             Connect(transport);
             SendEchoMessage();
@@ -51,7 +51,7 @@ public class FunapiNetworkTester : MonoBehaviour
             FunapiHttpTransport transport = new FunapiHttpTransport(kServerIp, 8018);
 
             // Please set the same encryption type as the encryption type of server.
-            transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
 
             Connect(transport);
             SendEchoMessage();
@@ -76,7 +76,7 @@ public class FunapiNetworkTester : MonoBehaviour
             DisConnect();
         }
 
-        GUI.enabled = (network_ != null && (network_.Connected || network_.SessionReliability));
+        GUI.enabled = (network_ != null && (network_.Connected || (session_id_ != "" && network_.SessionReliability)));
         if (GUI.Button(new Rect(30, 270, 240, 40), "Send 'Hello World'"))
         {
             SendEchoMessage();
@@ -90,6 +90,7 @@ public class FunapiNetworkTester : MonoBehaviour
         // You should pass an instance of FunapiTransport.
         network_ = new FunapiNetwork(transport, FunMsgType.kJson, false, this.OnSessionInitiated, this.OnSessionClosed);
         transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
+        transport_ = transport;
 
         // If you prefer use specific Json implementation other than Dictionary,
         // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
@@ -108,9 +109,15 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             Debug.Log("You should connect first.");
         }
+        else if (network_.SessionReliability)
+        {
+            if (transport_ != null)
+                transport_.Stop();
+        }
         else
         {
             network_.Stop();
+            network_ = null;
         }
     }
 
@@ -242,6 +249,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     // member variables.
     private FunapiNetwork network_ = null;
+    private FunapiTransport transport_ = null;
     private FunapiHttpDownloader downloader_ = null;
     private string session_id_ = "";
     private string message_ = "";

@@ -467,7 +467,7 @@ namespace Fun
                     encryption_str = encryption_header.Substring(0, index);
                     encryption_header = encryption_header.Substring(index + 1);
                 }
-                else
+                else if (encryption_header != " ") // for HTTP header's blank
                 {
                     encryption_str = encryption_header;
                 }
@@ -1647,6 +1647,8 @@ namespace Fun
 
             if (transport_.Started)
                 transport_.Stop();
+
+            CloseSession();
         }
 
         public bool Started
