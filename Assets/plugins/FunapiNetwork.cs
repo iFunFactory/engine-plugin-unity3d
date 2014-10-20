@@ -1371,6 +1371,8 @@ namespace Fun
 
             if (transport_.Started)
                 transport_.Stop();
+
+            CloseSession();
         }
 
         public bool Started
