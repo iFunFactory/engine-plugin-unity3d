@@ -48,6 +48,17 @@ public class FunapiNetworkTester : MonoBehaviour
             Invoke("CheckConnection", 3f);
         }
 
+        GUI.enabled = (network_ != null && network_.Connected);
+        if (GUI.Button(new Rect(30, 270, 240, 40), "Send 'Hello World'"))
+        {
+            SendEchoMessage();
+        }
+
+        if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
+        {
+            DisConnect();
+        }
+
         GUI.enabled = downloader_ == null;
         if (GUI.Button(new Rect(280, 30, 340, 40), "File Download (HTTP)"))
         {
@@ -59,18 +70,6 @@ public class FunapiNetworkTester : MonoBehaviour
 
         GUI.enabled = true;
         GUI.TextField(new Rect(280, 71, 480, 24), message_);
-
-        GUI.enabled = (network_ != null && network_.Connected);
-        if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
-        {
-            DisConnect();
-        }
-
-        GUI.enabled = (network_ != null && (network_.Connected || (session_id_ != "" && network_.SessionReliability)));
-        if (GUI.Button(new Rect(30, 270, 240, 40), "Send 'Hello World'"))
-        {
-            SendEchoMessage();
-        }
     }
 
     private void Connect (FunapiTransport transport)
