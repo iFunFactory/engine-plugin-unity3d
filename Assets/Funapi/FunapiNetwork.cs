@@ -1252,7 +1252,7 @@ namespace Fun
     public class FunapiHttpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https = false)
+        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https)
         {
             // Url
             if (https)
