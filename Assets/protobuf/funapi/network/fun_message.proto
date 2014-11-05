@@ -13,5 +13,7 @@ message FunMessage
 {
 	optional string sid = 1;
 	optional string msgtype = 2;
+	optional uint32 seq = 3;
+	optional uint32 ack = 4;
 	extensions 16 to max;
 }

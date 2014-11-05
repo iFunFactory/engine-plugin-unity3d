@@ -9,7 +9,7 @@ namespace Fun
     public class FacebookConnector : SocialNetwork
     {
         #region public implementation
-        public override void Init()
+        public override void Init (params object[] param)
         {
             Debug.Log("FacebookConnector Initialization.");
             FB.Init(OnInitComplete, isGameShown =>
