@@ -42,7 +42,7 @@ namespace Fun
         }
 
         // Start downloading
-        public void StartDownload (string hostname_or_ip, UInt16 port, string suffix_path, bool https = false)
+        public void StartDownload (string hostname_or_ip, UInt16 port, string suffix_path, bool https)
         {
             string url = "http://";
             if (https)
