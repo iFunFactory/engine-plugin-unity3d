@@ -31,7 +31,6 @@ public class FunapiNetworkTester : MonoBehaviour
             else
             {
                 Connect(new FunapiTcpTransport(kServerIp, 8012));
-                SendEchoMessage();
             }
             Invoke("CheckConnection", 3f);
         }
@@ -43,7 +42,6 @@ public class FunapiNetworkTester : MonoBehaviour
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
 
             Connect(transport);
-            SendEchoMessage();
             Invoke("CheckConnection", 3f);
         }
         if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
@@ -54,7 +52,6 @@ public class FunapiNetworkTester : MonoBehaviour
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
 
             Connect(transport);
-            SendEchoMessage();
             Invoke("CheckConnection", 3f);
         }
 
@@ -126,7 +123,7 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             Debug.Log("Failed to make a connection. Network instance was not generated.");
         }
-        else if (!network_.Connected || session_id_.Length <= 0)
+        else if (!network_.Connected)
         {
             Debug.Log("Failed to make a connection. Stopping the network module.");
             Debug.Log("Maybe the server is down? Otherwise check out the encryption type.");
@@ -185,13 +182,11 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnSessionInitiated(string session_id)
     {
-        session_id_ = session_id;
         Debug.Log("Session initiated. Session id:" + session_id);
     }
 
     private void OnSessionClosed()
     {
-        session_id_ = "";
         Debug.Log("Session closed");
     }
 
@@ -250,7 +245,6 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiNetwork network_ = null;
     private FunapiTransport transport_ = null;
     private FunapiHttpDownloader downloader_ = null;
-    private string session_id_ = "";
     private string message_ = "";
 
     // Another Funapi-specific features will go here...
