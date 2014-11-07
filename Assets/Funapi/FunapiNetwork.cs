@@ -786,7 +786,7 @@ namespace Fun
 
         public override bool Started
         {
-            get { return sock_ != null && sock_.Connected && state_ == State.kConnected; }
+            get { return sock_ != null && state_ == State.kConnected; }
         }
 
         public override bool IsDatagram()

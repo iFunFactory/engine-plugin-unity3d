@@ -31,7 +31,6 @@ public class FunapiNetworkTester : MonoBehaviour
             else
             {
                 Connect(new FunapiTcpTransport(kServerIp, 8012));
-                SendEchoMessage();
             }
             Invoke("CheckConnection", 3f);
         }
@@ -116,7 +115,7 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             Debug.Log("Failed to make a connection. Network instance was not generated.");
         }
-        else if (!network_.Connected || session_id_.Length <= 0)
+        else if (!network_.Connected)
         {
             Debug.LogWarning("Maybe the server is down? Stopping the network module.");
 
@@ -174,13 +173,11 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnSessionInitiated(string session_id)
     {
-        session_id_ = session_id;
         Debug.Log("Session initiated. Session id:" + session_id);
     }
 
     private void OnSessionClosed()
     {
-        session_id_ = "";
         Debug.Log("Session closed");
     }
 
@@ -239,7 +236,6 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiNetwork network_ = null;
     private FunapiTransport transport_ = null;
     private FunapiHttpDownloader downloader_ = null;
-    private string session_id_ = "";
     private string message_ = "";
 
     // Another Funapi-specific features will go here...
