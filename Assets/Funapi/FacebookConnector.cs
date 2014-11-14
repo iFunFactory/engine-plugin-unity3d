@@ -52,7 +52,7 @@ namespace Fun
             if (FB.IsLoggedIn)
             {
                 Debug.Log("Already logged in.");
-                OnLoggedIn();
+                OnEventHandler(SnResultCode.kLoggedIn);
             }
             else if (try_login_)
             {
@@ -65,10 +65,12 @@ namespace Fun
             if (result.Error != null)
             {
                 Debug.LogError(result.Text);
+                OnEventHandler(SnResultCode.kLoginFailed);
             }
             else if (!FB.IsLoggedIn)
             {
                 Debug.Log("Login cancelled by Player.");
+                OnEventHandler(SnResultCode.kLoginFailed);
             }
             else
             {
@@ -81,7 +83,7 @@ namespace Fun
                 FB.API(start_query, Facebook.HttpMethod.GET, StartCallback);
                 RequestPicture(FB.UserId, GetPictureURL("me", 128, 128), MyPictureCallback);
 
-                OnLoggedIn();
+                OnEventHandler(SnResultCode.kLoggedIn);
             }
         }
 
@@ -91,6 +93,7 @@ namespace Fun
             if (result.Error != null)
             {
                 Debug.LogError(result.Text);
+                OnEventHandler(SnResultCode.kError);
                 return;
             }
 
@@ -102,6 +105,7 @@ namespace Fun
                 if (json == null)
                 {
                     Debug.LogError("StartCallback - json is null.");
+                    OnEventHandler(SnResultCode.kError);
                     return;
                 }
 
@@ -238,10 +242,12 @@ namespace Fun
             if (result.Error != null)
             {
                 Debug.LogError(result.Text);
+                OnEventHandler(SnResultCode.kPostFailed);
                 return;
             }
 
             Debug.Log("result: " + result.Text);
+            OnEventHandler(SnResultCode.kPosted);
         }
         #endregion
 

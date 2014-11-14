@@ -15,7 +15,7 @@ public class FacebookTester : MonoBehaviour
         if (GUI.Button(new Rect(30, 30, 240, 40), "Facebook login"))
         {
             facebook_ = GameObject.Find("SocialNetwork").GetComponent<FacebookConnector>();
-            facebook_.EventLoggedIn += new EventHandlerLoggedIn(OnLoggedIn);
+            facebook_.EventCallback += new SnEventHandler(OnEventHandler);
 
             facebook_.Init();
             facebook_.Login();
@@ -41,10 +41,19 @@ public class FacebookTester : MonoBehaviour
             GUI.DrawTexture(new Rect(285, 30, 128, 128), tex_);
     }
 
-    private void OnLoggedIn()
+    private void OnEventHandler (SnResultCode result)
     {
-        logged_in_ = true;
-        Debug.Log("Logged in. MyId: " + FB.UserId);
+        switch (result)
+        {
+        case SnResultCode.kLoggedIn:
+            logged_in_ = true;
+            Debug.Log("Logged in. MyId: " + facebook_.MyId);
+            break;
+
+        case SnResultCode.kError:
+            DebugUtils.Assert(false);
+            break;
+        }
     }
 
 

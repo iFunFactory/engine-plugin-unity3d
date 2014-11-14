@@ -12,7 +12,7 @@ public class TwitterTester : MonoBehaviour
     public void Awake()
     {
         twitter_ = GameObject.Find("SocialNetwork").GetComponent<TwitterConnector>();
-        twitter_.EventLoggedIn += new EventHandlerLoggedIn(OnLoggedIn);
+        twitter_.EventCallback += new SnEventHandler(OnEventHandler);
 
         // Please pass consumer key and consumer secret of the Twitter apps
         twitter_.Init("4RnU4YDXmu8vmwKW5Lgpej3Xc",
@@ -48,10 +48,19 @@ public class TwitterTester : MonoBehaviour
         }
     }
 
-    private void OnLoggedIn()
+    private void OnEventHandler (SnResultCode result)
     {
-        logged_in_ = true;
-        Debug.Log("Logged in. MyId: " + twitter_.MyId);
+        switch (result)
+        {
+        case SnResultCode.kLoggedIn:
+            logged_in_ = true;
+            Debug.Log("Logged in. MyId: " + twitter_.MyId);
+            break;
+
+        case SnResultCode.kError:
+            DebugUtils.Assert(false);
+            break;
+        }
     }
 
 
