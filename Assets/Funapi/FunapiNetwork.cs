@@ -956,7 +956,9 @@ namespace Fun
                         if (next_decoding_offset_ > 0)
                         {
                             Debug.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
-                            Buffer.BlockCopy(receive_buffer, next_decoding_offset_, receive_buffer, 0, received_size_ - next_decoding_offset_);
+                            byte[] new_buffer = new byte[receive_buffer.Length];
+                            Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                            receive_buffer = new_buffer;
                             received_size_ -= next_decoding_offset_;
                             next_decoding_offset_ = 0;
                         }
@@ -1651,6 +1653,31 @@ namespace Fun
             CloseSession();
         }
 
+        public void Update ()
+        {
+            lock(message_buffer_)
+            {
+                if (message_buffer_.Count <= 0)
+                    return;
+
+                Debug.Log("Update messages. count: " + message_buffer_.Count);
+
+                try
+                {
+                    foreach (ArraySegment<byte> buffer in message_buffer_)
+                    {
+                        ProcessMessage(buffer);
+                    }
+
+                    message_buffer_.Clear();
+                }
+                catch (Exception e)
+                {
+                    Debug.Log("Failure in Update: " + e.ToString());
+                }
+            }
+        }
+
         public bool Started
         {
             get
@@ -1813,12 +1840,20 @@ namespace Fun
             Debug.Log("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
 
+            lock(message_buffer_)
+            {
+                message_buffer_.Add(body);
+            }
+        }
+
+        private void ProcessMessage (ArraySegment<byte> buffer)
+        {
             string msg_type = "";
             string session_id = "";
 
             if (msg_type_ == FunMsgType.kJson)
             {
-                string str = Encoding.Default.GetString(body.Array, body.Offset, body.Count);
+                string str = Encoding.Default.GetString(buffer.Array, buffer.Offset, buffer.Count);
                 object json = transport_.JsonHelper.Deserialize(str);
                 Debug.Log("Parsed json: " + str);
 
@@ -1861,7 +1896,7 @@ namespace Fun
             }
             else if (msg_type_ == FunMsgType.kProtobuf)
             {
-                MemoryStream stream = new MemoryStream(body.Array, body.Offset, body.Count, false);
+                MemoryStream stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
                 FunMessage message = Serializer.Deserialize<FunMessage>(stream);
 
                 session_id = message.sid;
@@ -2076,6 +2111,7 @@ namespace Fun
         private OnSessionClosed on_session_closed_;
         private string session_id_ = "";
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
+        private List<ArraySegment<byte>> message_buffer_ = new List<ArraySegment<byte>>();
         private DateTime last_received_ = DateTime.Now;
 
         // reliability-releated member variables.

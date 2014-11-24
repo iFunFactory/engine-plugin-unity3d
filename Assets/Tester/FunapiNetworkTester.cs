@@ -18,6 +18,12 @@ using pbuf_echo;
 
 public class FunapiNetworkTester : MonoBehaviour
 {
+    public void Update()
+    {
+        if (network_ != null)
+            network_.Update();
+    }
+
     public void OnGUI()
     {
         // For debugging
@@ -137,16 +143,16 @@ public class FunapiNetworkTester : MonoBehaviour
         }
     }
 
-	private void CheckDownloadConnection ()
-	{
-		if (downloader_ != null && !downloader_.Connected)
-		{
-			Debug.Log("Maybe the server is down? Stopping Download.");
+    private void CheckDownloadConnection ()
+    {
+        if (downloader_ != null && !downloader_.Connected)
+        {
+            Debug.Log("Maybe the server is down? Stopping Download.");
 
-			downloader_.Stop();
-			downloader_ = null;
-		}
-	}
+            downloader_.Stop();
+            downloader_ = null;
+        }
+    }
 
     private void SendEchoMessage ()
     {
