@@ -5,6 +5,7 @@
 // consent of iFunFactory Inc.
 
 #define DEBUG
+#define DEBUG_LOG
 
 using System;
 using System.Diagnostics;
@@ -15,12 +16,48 @@ namespace Fun
     public class DebugUtils
     {
         [Conditional("DEBUG")]
-        public static void Assert(bool condition)
+        public static void Assert (bool condition)
         {
             if (!condition)
             {
                 throw new Exception();
             }
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void Log (object message)
+        {
+            UnityEngine.Debug.Log(message);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void Log (object message, UnityEngine.Object context)
+        {
+            UnityEngine.Debug.Log(message, context);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void LogError (object message)
+        {
+            UnityEngine.Debug.LogError(message);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void LogError (object message, UnityEngine.Object context)
+        {
+            UnityEngine.Debug.LogError(message, context);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void LogWarning (object message)
+        {
+            UnityEngine.Debug.LogWarning(message);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void LogWarning (object message, UnityEngine.Object context)
+        {
+            UnityEngine.Debug.LogWarning(message, context);
         }
     }
 }
