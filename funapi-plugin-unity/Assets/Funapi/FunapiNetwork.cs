@@ -188,6 +188,7 @@ namespace Fun
 
         // Funapi Version
         protected static readonly int kCurrentFunapiProtocolVersion = 1;
+        protected static readonly int kCurrentPluginVersion = 41;
 
         protected State state_ = State.kDisconnected;
         protected Mutex mutex_ = new Mutex();
@@ -288,6 +289,11 @@ namespace Fun
             {
                 string header = "";
                 header += kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
+				if (first_sending)
+				{
+					header += kPluginVersionHeaderField + kHeaderFieldDelimeter + kCurrentPluginVersion + kHeaderDelimeter;
+					first_sending = false;
+				}
                 header += kLengthHeaderField + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
                 header += kHeaderDelimeter;
 
@@ -436,6 +442,7 @@ namespace Fun
         protected static readonly string kHeaderDelimeter = "\n";
 		protected static readonly string kHeaderFieldDelimeter = ":";
 		protected static readonly string kVersionHeaderField = "VER";
+		protected static readonly string kPluginVersionHeaderField = "PVER";
 		protected static readonly string kLengthHeaderField = "LEN";
 
         // for speed-up.
@@ -443,6 +450,7 @@ namespace Fun
         private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
         // State-related.
+        private bool first_sending = true;
         protected bool header_decoded_ = false;
         protected int received_size_ = 0;
         protected int next_decoding_offset_ = 0;
