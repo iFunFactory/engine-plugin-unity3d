@@ -323,6 +323,39 @@ namespace Fun
             }
         }
 
+        // Checks buffer space before starting another async receive.
+        protected void CheckReceiveBuffer()
+        {
+            int remaining_size = receive_buffer.Length - received_size_;
+
+            if (remaining_size <= 0)
+            {
+                byte[] new_buffer = null;
+
+                if (remaining_size == 0 && next_decoding_offset_ > 0)
+                    new_buffer = new byte[receive_buffer.Length];
+                else
+                    new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
+
+                // If there are space can be collected, compact it first.
+                // Otherwise, increase the receiving buffer size.
+                if (next_decoding_offset_ > 0)
+                {
+                    DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
+                    Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                    receive_buffer = new_buffer;
+                    received_size_ -= next_decoding_offset_;
+                    next_decoding_offset_ = 0;
+                }
+                else
+                {
+                    DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
+                    Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
+                    receive_buffer = new_buffer;
+                }
+            }
+        }
+
         protected bool EncryptThenSendMessage()
         {
             DebugUtils.Assert(state_ == State.kConnected);
@@ -926,28 +959,8 @@ namespace Fun
 
                     if (nRead > 0)
                     {
-                        // Checks buffer space before starting another async receive.
-                        if (receive_buffer.Length - received_size_ == 0)
-                        {
-                            // If there are space can be collected, compact it first.
-                            // Otherwise, increase the receiving buffer size.
-                            if (next_decoding_offset_ > 0)
-                            {
-                                DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
-                                byte[] new_buffer = new byte[receive_buffer.Length];
-                                Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
-                                receive_buffer = new_buffer;
-                                received_size_ -= next_decoding_offset_;
-                                next_decoding_offset_ = 0;
-                            }
-                            else
-                            {
-                                DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
-                                byte[] new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
-                                Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
-                                receive_buffer = new_buffer;
-                            }
-                        }
+                        // Checks buffer space
+                        CheckReceiveBuffer();
 
                         // Starts another async receive
                         ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer, received_size_, receive_buffer.Length - received_size_);
@@ -1163,13 +1176,13 @@ namespace Fun
 
                     if (nRead > 0)
                     {
-                        // Prepares a next message.
+                        // Resets buffer
+                        receive_buffer = new byte[kUnitBufferSize];
                         received_size_ = 0;
                         next_decoding_offset_ = 0;
-                        header_fields_.Clear();
 
                         // Starts another async receive
-                        sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
+                        sock_.BeginReceiveFrom(receive_buffer, received_size_, receive_buffer.Length - received_size_, SocketFlags.None,
                                                ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
                         DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
@@ -1428,7 +1441,7 @@ namespace Fun
 
                     lock (receive_buffer)
                     {
-                        // header
+                        // Header
                         byte[] header = state.response.Headers.ToByteArray();
                         string str_header = Encoding.Default.GetString(header, 0, header.Length);
                         str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter);
@@ -1437,16 +1450,14 @@ namespace Fun
                         str_header = str_header.Replace("\r", "");
                         header = Encoding.ASCII.GetBytes(str_header);
 
-                        // copy to buffer
-                        int length = header.Length + state.read_offset;
-                        if (length > receive_buffer.Length)
-                            receive_buffer = new byte[length];
+                        // Checks buffer space
+                        int offset = received_size_;
+                        received_size_ += header.Length + state.read_offset;
+                        CheckReceiveBuffer();
 
-                        Buffer.BlockCopy(header, 0, receive_buffer, 0, header.Length);
-                        Buffer.BlockCopy(state.read_data, 0, receive_buffer, header.Length, state.read_offset);
-
-                        received_size_ = length;
-                        next_decoding_offset_ = 0;
+                        // Copy to buffer
+                        Buffer.BlockCopy(header, 0, receive_buffer, offset, header.Length);
+                        Buffer.BlockCopy(state.read_data, 0, receive_buffer, offset + header.Length, state.read_offset);
 
                         // Decoding a message
                         if (TryToDecodeHeader())
