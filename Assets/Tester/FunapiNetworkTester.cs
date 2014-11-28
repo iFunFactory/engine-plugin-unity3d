@@ -170,7 +170,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 // Please refer to comments inside Connect() function.
                 Dictionary<string, object> example = new Dictionary<string, object>();
                 example["message"] = "hello world";
-                network_.SendMessage("echo", example);
+                network_.SendMessage("echo", example, EncryptionType.kDefaultEncryption);
             }
             else if (network_.MsgType == FunMsgType.kProtobuf)
             {
@@ -181,7 +181,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 echo.message = "hello proto";
                 Extensible.AppendValue<PbufEchoMessage>(example, 16, echo);
 
-                network_.SendMessage(example);
+                network_.SendMessage(example, EncryptionType.kDefaultEncryption);
             }
         }
     }

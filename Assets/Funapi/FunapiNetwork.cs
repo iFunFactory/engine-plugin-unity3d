@@ -1542,6 +1542,7 @@ namespace Fun
     {
         #region Handler delegate definition
         public delegate void MessageHandler(string msg_type, object body);
+        public delegate void WaitEventHandler(string msg_type);
         public delegate void OnSessionInitiated(string session_id);
         public delegate void OnSessionClosed();
         public delegate void OnTransportClosed();
@@ -1599,23 +1600,53 @@ namespace Fun
         {
             lock (message_buffer_)
             {
-                if (message_buffer_.Count <= 0)
-                    return;
-
-                DebugUtils.Log("Update messages. count: " + message_buffer_.Count);
-
-                try
+                if (message_buffer_.Count > 0)
                 {
-                    foreach (ArraySegment<byte> buffer in message_buffer_)
+                    DebugUtils.Log("Update messages. count: " + message_buffer_.Count);
+
+                    try
                     {
-                        ProcessMessage(buffer);
-                    }
+                        string msg_type;
+                        foreach (ArraySegment<byte> buffer in message_buffer_)
+                        {
+                            msg_type = ProcessMessage(buffer);
 
-                    message_buffer_.Clear();
+                            if (wait_messages.ContainsKey(msg_type))
+                            {
+                                wait_messages.Remove(msg_type);
+                            }
+                        }
+
+                        message_buffer_.Clear();
+                    }
+                    catch (Exception e)
+                    {
+                        DebugUtils.Log("Failure in Update: " + e.ToString());
+                    }
                 }
-                catch (Exception e)
+            }
+
+            if (wait_messages.Count > 0)
+            {
+                List<string> remove_list = new List<string>();
+
+                foreach (var item in wait_messages)
                 {
-                    DebugUtils.Log("Failure in Update: " + e.ToString());
+                    item.Value.wait_time -= Time.deltaTime;
+                    if (item.Value.wait_time <= 0f)
+                    {
+                        DebugUtils.Log("'" + item.Key + "' message waiting time has been exceeded.");
+                        remove_list.Add(item.Key);
+                        item.Value.callback(item.Key);
+                    }
+                }
+
+                if (remove_list.Count > 0)
+                {
+                    foreach (string key in remove_list)
+                    {
+                        wait_messages.Remove(key);
+                    }
                 }
             }
         }
@@ -1649,7 +1680,7 @@ namespace Fun
             get { return msg_type_; }
         }
 
-        public void SendMessage(FunMessage message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public void SendMessage(FunMessage message, EncryptionType encryption)
         {
             DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
 
@@ -1683,7 +1714,20 @@ namespace Fun
             }
         }
 
-        public void SendMessage(string msg_type, object body, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public void SendMessage(FunMessage message, EncryptionType encryption,
+                                string wait_msg_type, float time, WaitEventHandler callback)
+        {
+            if (wait_messages.ContainsKey(message.msgtype))
+            {
+                DebugUtils.Log("ERROR: Dictionary has the same key already exists. key: " + message.msgtype);
+                DebugUtils.Assert(false);
+            }
+
+            wait_messages[wait_msg_type] = new WaitMessage(time, callback);
+            SendMessage(message, encryption);
+        }
+
+        public void SendMessage(string msg_type, object body, EncryptionType encryption)
         {
             DebugUtils.Assert (msg_type_ == FunMsgType.kJson);
 
@@ -1718,6 +1762,19 @@ namespace Fun
             {
                 transport_.SendMessage(body, encryption);
             }
+        }
+
+        public void SendMessage(string msg_type, object body, EncryptionType encryption,
+                                string wait_msg_type, float time, WaitEventHandler callback)
+        {
+            if (wait_messages.ContainsKey(msg_type))
+            {
+                DebugUtils.Log("ERROR: Dictionary has the same key already exists. key: " + msg_type);
+                DebugUtils.Assert(false);
+            }
+
+            wait_messages[wait_msg_type] =  new WaitMessage(time, callback);
+            SendMessage(msg_type, body, encryption);
         }
 
         public void RegisterHandler(string type, MessageHandler handler)
@@ -1788,7 +1845,7 @@ namespace Fun
             }
         }
 
-        private void ProcessMessage (ArraySegment<byte> buffer)
+        private string ProcessMessage (ArraySegment<byte> buffer)
         {
             string msg_type = "";
             string session_id = "";
@@ -1814,7 +1871,7 @@ namespace Fun
                         OnAckReceived(ack);
                         // Does not support piggybacking.
                         DebugUtils.Assert(!transport_.JsonHelper.HasField(json, kMsgTypeBodyField));
-                        return;
+                        return msg_type;
                     }
 
                     if (transport_.JsonHelper.HasField(json, kSeqNumberField))
@@ -1822,7 +1879,7 @@ namespace Fun
                         UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(json, kSeqNumberField);
                         if (!OnSeqReceived(seq))
                         {
-                            return;
+                            return msg_type;
                         }
                         transport_.JsonHelper.RemoveStringField(json, kSeqNumberField);
                     }
@@ -1850,14 +1907,14 @@ namespace Fun
                     {
                         OnAckReceived(message.ack);
                         // Does not support piggybacking.
-                        return;
+                        return msg_type;
                     }
 
                     if (message.seqSpecified)
                     {
                         if (!OnSeqReceived(message.seq))
                         {
-                            return;
+                            return msg_type;
                         }
                     }
                 }
@@ -1871,13 +1928,15 @@ namespace Fun
             {
                 DebugUtils.LogWarning("Invalid message type. type: " + msg_type_);
                 DebugUtils.Assert(false);
-                return;
+                return msg_type;
             }
 
             if (!message_handlers_.ContainsKey(msg_type))
             {
                 DebugUtils.Log("No handler for message '" + msg_type + "'. Ignoring.");
             }
+
+            return msg_type;
         }
 
         private bool SeqLess(UInt32 x, UInt32 y)
@@ -2034,6 +2093,18 @@ namespace Fun
             kWaitForAck
         }
 
+        class WaitMessage
+        {
+            public WaitMessage (float time, WaitEventHandler cb)
+            {
+                wait_time = time;
+                callback = cb;
+            }
+
+            public float wait_time;
+            public WaitEventHandler callback;
+        }
+
         State state_;
 
         // Funapi message-related constants.
@@ -2053,6 +2124,7 @@ namespace Fun
         private OnSessionClosed on_session_closed_;
         private string session_id_ = "";
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
+        private Dictionary<string, WaitMessage> wait_messages = new Dictionary<string, WaitMessage>();
         private List<ArraySegment<byte>> message_buffer_ = new List<ArraySegment<byte>>();
         private DateTime last_received_ = DateTime.Now;
 
