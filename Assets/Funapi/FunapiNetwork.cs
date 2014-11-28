@@ -29,6 +29,7 @@ namespace Fun
 
     // Event handler delegate
     public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
+    public delegate void ConnectTimeoutHandler();
     public delegate void StartedEventHandler();
     public delegate void StoppedEventHandler();
 
@@ -132,10 +133,10 @@ namespace Fun
         public abstract void SendMessage(FunMessage message, EncryptionType encryption);
 
         // Registered event handlers.
-        public event ReceivedEventHandler ReceivedCallback;
+        public event ConnectTimeoutHandler ConnectTimeoutCallback;
         public event StartedEventHandler StartedCallback;
         public event StoppedEventHandler StoppedCallback;
-        #endregion
+        public event ReceivedEventHandler ReceivedCallback;
 
         // Encoding/Decoding related
         public JsonAccessor JsonHelper
@@ -143,8 +144,18 @@ namespace Fun
             get { return json_accessor_; }
             set { json_accessor_ = value; }
         }
+        #endregion
 
         #region internal implementation
+        public virtual void Update ()
+        {
+        }
+
+        protected void OnConnectionTimeout ()
+        {
+            ConnectTimeoutCallback();
+        }
+
         protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
             ReceivedCallback(header, body);
@@ -176,6 +187,12 @@ namespace Fun
         public virtual bool IsRequestResponse()
         {
             return false;
+        }
+
+        public float ConnectTimeout
+        {
+            get;
+            set;
         }
 
         protected enum State
@@ -779,6 +796,19 @@ namespace Fun
         {
             return true;
         }
+
+        public override void Update ()
+        {
+            if (state_ == State.kConnecting && connect_timeout > 0f)
+            {
+                connect_timeout -= Time.deltaTime;
+                if (connect_timeout <= 0f)
+                {
+                    DebugUtils.Log("Connection waiting time has been exceeded.");
+                    OnConnectionTimeout();
+                }
+            }
+        }
         #endregion
 
         #region internal implementation
@@ -786,6 +816,7 @@ namespace Fun
         protected override void Init()
         {
             state_ = State.kConnecting;
+            connect_timeout = ConnectTimeout;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
@@ -994,6 +1025,7 @@ namespace Fun
 
         protected Socket sock_;
         private IPEndPoint connect_ep_;
+        private float connect_timeout = 0f;
         #endregion
     }
 
@@ -1557,9 +1589,10 @@ namespace Fun
             msg_type_ = type;
             on_session_initiated_ = on_session_initiated;
             on_session_closed_ = on_session_closed;
-            transport_.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+            transport_.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
             transport_.StartedCallback += new StartedEventHandler(OnTransportStarted);
             transport_.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
+            transport_.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
 
             if (session_reliability && transport.IsStream() && !transport.IsRequestResponse())
             {
@@ -1598,6 +1631,9 @@ namespace Fun
 
         public void Update ()
         {
+            if (transport_ != null)
+                transport_.Update();
+
             lock (message_buffer_)
             {
                 if (message_buffer_.Count > 0)
@@ -2044,6 +2080,11 @@ namespace Fun
 
                 state_ = State.kEstablished;
             }
+        }
+
+        private void OnConnectTimeout()
+        {
+            Stop();
         }
 
         private void OnTransportStarted()

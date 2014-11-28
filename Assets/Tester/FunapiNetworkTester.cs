@@ -92,6 +92,9 @@ public class FunapiNetworkTester : MonoBehaviour
         // You should pass an instance of FunapiTransport.
         network_ = new FunapiNetwork(transport, FunMsgType.kJson, false, this.OnSessionInitiated, this.OnSessionClosed);
         transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
+        // Timeout method only works with Tcp protocol.
+        transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
+        transport.ConnectTimeout = 3f;
         transport_ = transport;
 
         // If you prefer use specific Json implementation other than Dictionary,
@@ -193,12 +196,17 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnSessionClosed()
     {
-        Debug.Log("Session closed");
+        Debug.Log("Session closed.");
+    }
+
+    private void OnConnectTimeout()
+    {
+        Debug.Log("Transport Connection timed out.");
     }
 
     private void OnTransportClosed()
     {
-        Debug.Log("Transport closed");
+        Debug.Log("Transport closed.");
 
     }
 
