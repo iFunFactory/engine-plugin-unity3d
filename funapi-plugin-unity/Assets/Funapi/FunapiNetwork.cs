@@ -27,6 +27,18 @@ namespace Fun
         kProtobuf
     }
 
+    public enum ErrorCode
+    {
+        kNone,
+        kConnectFailed,
+        kSendFailed,
+        kReceiveFailed,
+        kEncryptionFailed,
+        kInvalidEncryption,
+        kUnknownEncryption,
+        kExceptionError
+    }
+
     // Event handler delegate
     public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
     public delegate void ConnectTimeoutHandler();
@@ -195,6 +207,17 @@ namespace Fun
             set;
         }
 
+        public ErrorCode LastErrorCode
+        {
+            get { return last_error_code_; }
+        }
+
+        public string LastErrorMessage
+        {
+            get { return last_error_message_; }
+        }
+
+
         protected enum State
         {
             kDisconnected = 0,
@@ -209,6 +232,8 @@ namespace Fun
 
         protected State state_ = State.kDisconnected;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
+        protected ErrorCode last_error_code_ = ErrorCode.kNone;
+        protected string last_error_message_ = "";
         #endregion
     }
 
@@ -236,6 +261,8 @@ namespace Fun
                 next_decoding_offset_ = 0;
                 header_fields_.Clear();
                 sending_.Clear();
+                last_error_code_ = ErrorCode.kNone;
+                last_error_message_ = "";
 
                 Init();
 
@@ -243,7 +270,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in Start: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in Start: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -260,6 +289,8 @@ namespace Fun
                 return;
 
             state_ = State.kDisconnected;
+            last_error_code_ = ErrorCode.kNone;
+            last_error_message_ = "";
 
             OnStopped();
         }
@@ -322,7 +353,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in SendMessage: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in SendMessage: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -470,7 +503,6 @@ namespace Fun
         }
         #endregion
 
-
         // Buffer-related constants.
         protected static readonly int kUnitBufferSize = 65536;
 
@@ -579,14 +611,18 @@ namespace Fun
             {
                 if (sock_ == null)
                 {
-                    DebugUtils.Log("Failed to connect.");
+                    last_error_code_ = ErrorCode.kConnectFailed;
+                    last_error_message_ = "Failed to connect.";
+                    DebugUtils.Log(last_error_message_);
                     return;
                 }
 
                 sock_.EndConnect(ar);
                 if (sock_.Connected == false)
                 {
-                    DebugUtils.Log("Failed to connect.");
+                    last_error_code_ = ErrorCode.kConnectFailed;
+                    last_error_message_ = "Failed to connect.";
+                    DebugUtils.Log(last_error_message_);
                     return;
                 }
                 DebugUtils.Log("Connected.");
@@ -604,7 +640,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in StartCb: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in StartCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -623,7 +661,12 @@ namespace Fun
             try
             {
                 if (sock_ == null)
+                {
+                    last_error_code_ = ErrorCode.kSendFailed;
+                    last_error_message_ = "sock is null.";
+                    DebugUtils.Log(last_error_message_);
                     return;
+                }
 
                 int nSent = sock_.EndSend(ar);
                 DebugUtils.Log("Sent " + nSent + "bytes");
@@ -657,6 +700,9 @@ namespace Fun
                         DebugUtils.Assert(nSent <= sending_[0].Count);
                         ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
                         sending_[0] = adjusted;
+
+                        last_error_code_ = ErrorCode.kNone;
+                        last_error_message_ = "";
                     }
 
                     if (sending_.Count > 0)
@@ -678,7 +724,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in SendBytesCb: " + e.ToString ());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -696,7 +744,12 @@ namespace Fun
             try
             {
                 if (sock_ == null)
+                {
+                    last_error_code_ = ErrorCode.kReceiveFailed;
+                    last_error_message_ = "sock is null.";
+                    DebugUtils.Log(last_error_message_);
                     return;
+                }
 
             	lock (receive_buffer)
                 {
@@ -737,6 +790,8 @@ namespace Fun
                         buffer.Add(residual);
                         sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
                         DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
+                        last_error_code_ = ErrorCode.kNone;
+                        last_error_message_ = "";
                     }
                     else
                     {
@@ -745,13 +800,18 @@ namespace Fun
                         {
                             DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
+                        last_error_code_ = ErrorCode.kReceiveFailed;
+                        last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
+                        DebugUtils.Log(last_error_message_);
                         failed = true;
                     }
                 }
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in ReceiveBytesCb: " + e.ToString ());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -860,7 +920,12 @@ namespace Fun
             try
             {
                 if (sock_ == null)
+                {
+                    last_error_code_ = ErrorCode.kSendFailed;
+                    last_error_message_ = "sock is null.";
+                    DebugUtils.Log(last_error_message_);
                     return;
+                }
 
             	lock (sending_)
                 {
@@ -896,11 +961,16 @@ namespace Fun
 
                     	WireSend(sending_);
                     }
+
+                    last_error_code_ = ErrorCode.kNone;
+                    last_error_message_ = "";
                 }
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in SendBytesCb: " + e.ToString ());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -918,7 +988,12 @@ namespace Fun
             try
             {
                 if (sock_ == null)
+                {
+                    last_error_code_ = ErrorCode.kReceiveFailed;
+                    last_error_message_ = "sock is null.";
+                    DebugUtils.Log(last_error_message_);
                     return;
+                }
 
             	lock (receive_buffer)
                 {
@@ -956,6 +1031,8 @@ namespace Fun
                                                ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
                         DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
+                        last_error_code_ = ErrorCode.kNone;
+                        last_error_message_ = "";
                     }
                     else
                     {
@@ -964,14 +1041,18 @@ namespace Fun
                         {
                             DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
-
+                        last_error_code_ = ErrorCode.kReceiveFailed;
+                        last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
+                        DebugUtils.Log(last_error_message_);
                         failed = true;
                     }
                 }
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in ReceiveBytesCb: " + e.ToString ());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1075,7 +1156,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in WireSend: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in WireSend: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1111,7 +1194,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in RequestStreamCb: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1155,7 +1240,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in ResponseCb: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in ResponseCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1236,6 +1323,9 @@ namespace Fun
                         state.stream.Close();
                         state.stream = null;
                         list_.Remove(state);
+
+                        last_error_code_ = ErrorCode.kNone;
+                        last_error_message_ = "";
                     }
 
                 	lock (sending_)
@@ -1260,7 +1350,9 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in ReadCb: " + e.ToString());
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in ReadCb: " + e.ToString();
+                DebugUtils.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1543,6 +1635,28 @@ namespace Fun
             DebugUtils.Log("New handler for message type '" + type + "'");
             message_handlers_[type] = handler;
         }
+
+        public ErrorCode last_error_code_
+        {
+            get
+            {
+                if (transport_ != null)
+                    return transport_.LastErrorCode;
+
+                return ErrorCode.kNone;
+            }
+        }
+
+        public string last_error_message_
+        {
+            get
+            {
+                if (transport_ != null)
+                    return transport_.LastErrorMessage;
+
+                return "";
+            }
+        }
         #endregion
 
         #region internal implementation
@@ -1636,7 +1750,7 @@ namespace Fun
                     }
 
                     if (transport_.JsonHelper.HasField(json, kSeqNumberField))
-                       {
+                    {
                         UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(json, kSeqNumberField);
                         if (!OnSeqReceived(seq))
                         {
@@ -1737,7 +1851,7 @@ namespace Fun
                 if (seq_recvd_ + 1 != seq)
                 {
                     DebugUtils.Log("Received wrong sequence number " + seq.ToString() +
-                              ".(" + (seq_recvd_ + 1).ToString() + " expected");
+                                   ".(" + (seq_recvd_ + 1).ToString() + " expected");
                     DebugUtils.Assert(false);
                     Stop();
                     return false;
