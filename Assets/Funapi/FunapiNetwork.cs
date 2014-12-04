@@ -234,7 +234,7 @@ namespace Fun
 
         // Funapi Version
         protected static readonly int kCurrentFunapiProtocolVersion = 1;
-        protected static readonly int kCurrentPluginVersion = 42;
+        protected static readonly int kCurrentPluginVersion = 43;
 
         protected State state_ = State.kDisconnected;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();

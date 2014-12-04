@@ -18,6 +18,12 @@ using pbuf_echo;
 
 public class FunapiNetworkTester : MonoBehaviour
 {
+    public void Start()
+    {
+        announcement.Init("http://127.0.0.1:8080");
+        announcement.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+    }
+
     public void Update()
     {
         if (network_ != null)
@@ -72,17 +78,23 @@ public class FunapiNetworkTester : MonoBehaviour
             DisConnect();
         }
 
-        GUI.enabled = downloader_ == null;
-        if (GUI.Button(new Rect(280, 30, 340, 40), "File Download (HTTP)"))
+        GUI.enabled = announcement != null;
+        if (GUI.Button(new Rect(280, 30, 240, 40), "Update Announcements"))
         {
-            downloader_ = new FunapiHttpDownloader(GetLocalResourcePath(), OnDownloadUpdate, OnDownloadFinished);
+            announcement.UpdateList();
+        }
+
+        GUI.enabled = downloader_ == null;
+        if (GUI.Button(new Rect(280, 90, 240, 40), "File Download (HTTP)"))
+        {
+            downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
             downloader_.StartDownload(kServerIp, 8020, "list", false);
             message_ = " start downloading..";
             Invoke("CheckDownloadConnection", 3f);
         }
 
         GUI.enabled = true;
-        GUI.TextField(new Rect(280, 71, 480, 24), message_);
+        GUI.TextField(new Rect(280, 131, 480, 24), message_);
     }
 
     private void Connect (FunapiTransport transport)
@@ -237,17 +249,24 @@ public class FunapiNetworkTester : MonoBehaviour
         message_ = " download completed. result:" + code;
     }
 
-    // Get a personal path.
-    private string GetLocalResourcePath()
+    private void OnAnnouncementResult (AnnounceResult result)
     {
-        if ((Application.platform == RuntimePlatform.Android) ||
-            (Application.platform == RuntimePlatform.IPhonePlayer))
+        Debug.Log("OnAnnouncementResult - result: " + result);
+        if (result != AnnounceResult.kSuccess)
+            return;
+
+        if (announcement.ListCount > 0)
         {
-            return Application.persistentDataPath;
-        }
-        else
-        {
-            return Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+            for (int i = 0; i < announcement.ListCount; ++i)
+            {
+                Dictionary<string, object> list = announcement.GetAnnouncement(i);
+                string buffer = "";
+
+                foreach (var item in list)
+                    buffer += item.Key + ": " + item.Value + "\n";
+
+                Debug.Log("announcement >> " + buffer);
+            }
         }
     }
 
@@ -259,6 +278,7 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiNetwork network_ = null;
     private FunapiTransport transport_ = null;
     private FunapiHttpDownloader downloader_ = null;
+    private FunapiAnnouncement announcement = new FunapiAnnouncement();
     private string message_ = "";
 
     // Another Funapi-specific features will go here...
