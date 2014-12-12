@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2013 iFunFactory Inc. All Rights Reserved.
+// Copyright (C) 2013-2014 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -156,6 +156,12 @@ namespace Fun
             get { return json_accessor_; }
             set { json_accessor_ = value; }
         }
+
+        // FunMessage serializer/deserializer
+        public FunMessageSerializer ProtobufHelper {
+            get { return serializer_; }
+            set { serializer_ = value; }
+        }
         #endregion
 
         #region internal implementation
@@ -232,6 +238,7 @@ namespace Fun
 
         protected State state_ = State.kDisconnected;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
+        protected FunMessageSerializer serializer_ = null;
         protected ErrorCode last_error_code_ = ErrorCode.kNone;
         protected string last_error_message_ = "";
         #endregion
@@ -309,7 +316,7 @@ namespace Fun
         public override void SendMessage (FunMessage message)
         {
             MemoryStream stream = new MemoryStream();
-            Serializer.Serialize(stream, message);
+            this.ProtobufHelper.Serialize (stream, message);
 
             byte[] body = new byte[stream.Length];
             stream.Seek(0, SeekOrigin.Begin);
@@ -1424,6 +1431,30 @@ namespace Fun
             first_receiving_ = true;
             send_queue_ = new System.Collections.Queue();
             rnd_ = new System.Random();
+
+            serializer_ = new FunMessageSerializer ();
+            transport_.ProtobufHelper = serializer_;
+
+            recv_type_ = typeof(FunMessage);
+        }
+
+        public FunMessage CreateFunMessage(object msg, string msg_type, int msg_index) {
+            FunMessage _msg = new FunMessage();
+            _msg.msgtype = msg_type;
+            Extensible.AppendValue(serializer_, _msg, msg_index, ProtoBuf.DataFormat.Default, msg);
+            return _msg;
+        }
+
+        public object GetMessage(FunMessage msg, Type msg_type, int msg_index) {
+            object _msg = null;
+            bool success = Extensible.TryGetValue(serializer_, msg_type, msg,
+                    msg_index, ProtoBuf.DataFormat.Default, true, out _msg);
+            if (!success) {
+                Debug.Log(String.Format("Failed to decode {0} {1}", msg_type, msg_index));
+                return null;
+            }
+
+            return _msg;
         }
 
         public void Start()
@@ -1771,7 +1802,7 @@ namespace Fun
             else if (msg_type_ == FunMsgType.kProtobuf)
             {
                 MemoryStream stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
-                FunMessage message = Serializer.Deserialize<FunMessage>(stream);
+                FunMessage message = (FunMessage)serializer_.Deserialize (stream, null, recv_type_);
 
                 session_id = message.sid;
                 PrepareSession(session_id);
@@ -1986,6 +2017,8 @@ namespace Fun
         }
 
         State state_;
+        FunMessageSerializer serializer_;
+        Type recv_type_;
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
