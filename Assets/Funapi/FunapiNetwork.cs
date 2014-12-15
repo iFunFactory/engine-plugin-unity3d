@@ -324,7 +324,7 @@ namespace Fun
         }
 
         // Sends a JSON message through a socket.
-        public override void SendMessage (object json_message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public override void SendMessage (object json_message, EncryptionType encryption)
         {
             string str = this.JsonHelper.Serialize(json_message);
             byte[] body = Encoding.Default.GetBytes(str);
@@ -334,7 +334,7 @@ namespace Fun
             SendMessage(body, encryption);
         }
 
-        public override void SendMessage (FunMessage message, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+        public override void SendMessage (FunMessage message, EncryptionType encryption)
         {
             MemoryStream stream = new MemoryStream();
             this.ProtobufHelper.Serialize (stream, message);
@@ -1848,6 +1848,11 @@ namespace Fun
             get { return msg_type_; }
         }
 
+        public void SendMessage(FunMessage message)
+        {
+            SendMessage(message, EncryptionType.kDefaultEncryption);
+        }
+
         public void SendMessage(FunMessage message, EncryptionType encryption)
         {
             DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
@@ -1882,6 +1887,12 @@ namespace Fun
             }
         }
 
+        public void SendMessage(FunMessage message,
+                                string wait_msg_type, float time, WaitEventHandler callback)
+        {
+            SendMessage(message, EncryptionType.kDefaultEncryption, wait_msg_type, time, callback);
+        }
+
         public void SendMessage(FunMessage message, EncryptionType encryption,
                                 string wait_msg_type, float time, WaitEventHandler callback)
         {
@@ -1893,6 +1904,11 @@ namespace Fun
 
             wait_messages[wait_msg_type] = new WaitMessage(time, callback);
             SendMessage(message, encryption);
+        }
+
+        public void SendMessage(string msg_type, object body)
+        {
+            SendMessage(msg_type, body, EncryptionType.kDefaultEncryption);
         }
 
         public void SendMessage(string msg_type, object body, EncryptionType encryption)
@@ -1930,6 +1946,12 @@ namespace Fun
             {
                 transport_.SendMessage(body, encryption);
             }
+        }
+
+        public void SendMessage(string msg_type, object body,
+                                string wait_msg_type, float time, WaitEventHandler callback)
+        {
+            SendMessage(msg_type, body, EncryptionType.kDefaultEncryption, wait_msg_type, time, callback);
         }
 
         public void SendMessage(string msg_type, object body, EncryptionType encryption,
