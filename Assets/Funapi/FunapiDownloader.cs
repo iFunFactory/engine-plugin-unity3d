@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2013 iFunFactory Inc. All Rights Reserved.
+﻿// Copyright (C) 2014 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -48,7 +48,7 @@ namespace Fun
             if (https)
                 url = "https://";
             url += hostname_or_ip + ":" + port;
-            url += "/v" + kCurrentFunapiProtocolVersion + "/";
+            url += "/v" + FunapiVersion.kProtocolVersion + "/";
             url += suffix_path;
 
             StartDownload(url);
@@ -60,11 +60,11 @@ namespace Fun
 
             try
             {
-                string ver = "/v" + kCurrentFunapiProtocolVersion + "/";
+                string ver = "/v" + FunapiVersion.kProtocolVersion + "/";
                 int index = url.IndexOf(ver);
                 if (index <= 0)
                 {
-					Debug.Log("Invalid request url : " + url);
+                    Debug.Log("Invalid request url : " + url);
                     DebugUtils.Assert(false);
                     return;
                 }
@@ -80,7 +80,7 @@ namespace Fun
                     return;
                 }
 
-				state_ = State.Start;
+                state_ = State.Start;
                 host_url_ = host_url;
                 Debug.Log("Start Download.");
 
@@ -96,13 +96,13 @@ namespace Fun
         {
             mutex_.WaitOne();
 
-			if (state_ == State.Start || state_ == State.Downloading)
-			{
-				web_client_.CancelAsync();
+            if (state_ == State.Start || state_ == State.Downloading)
+            {
+                web_client_.CancelAsync();
 
-				if (on_finished_ != null)
-					on_finished_(DownloadResult.FAILED);
-			}
+                if (on_finished_ != null)
+                    on_finished_(DownloadResult.FAILED);
+            }
 
             url_list_.Clear();
             download_list_.Clear();
@@ -110,10 +110,10 @@ namespace Fun
             mutex_.ReleaseMutex();
         }
 
-		public bool Connected
-		{
-			get { return state_ == State.Downloading || state_ == State.Completed; }
-		}
+        public bool Connected
+        {
+            get { return state_ == State.Downloading || state_ == State.Completed; }
+        }
         #endregion
 
         #region internal implementation
@@ -333,7 +333,7 @@ namespace Fun
         // Callback function for list of files
         private void DownloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
         {
-			mutex_.WaitOne();
+            mutex_.WaitOne();
 
             bool failed = false;
             try
@@ -419,7 +419,7 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-					Debug.Log("Exception Error: " + ar.Error);
+                    Debug.Log("Exception Error: " + ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
@@ -463,7 +463,7 @@ namespace Fun
         enum State
         {
             Ready,
-			Start,
+            Start,
             Downloading,
             Completed
         }
@@ -484,9 +484,6 @@ namespace Fun
 
         public delegate void OnUpdate (string path, long bytes_received, long total_bytes, int percentage);
         public delegate void OnFinished (DownloadResult code);
-
-        // Funapi Version
-        private static readonly int kCurrentFunapiProtocolVersion = 1;
 
         // Save file-related constants.
         private readonly string kSaveFile = "cached_files_list";

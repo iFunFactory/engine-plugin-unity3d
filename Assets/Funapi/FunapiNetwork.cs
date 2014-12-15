@@ -21,6 +21,14 @@ using funapi.network.fun_message;
 
 namespace Fun
 {
+    // Funapi version
+    public class FunapiVersion
+    {
+        public static readonly int kProtocolVersion = 1;
+        public static readonly int kPluginVersion = 44;
+    }
+
+    // Funapi message type
     public enum FunMsgType
     {
         kJson,
@@ -238,9 +246,6 @@ namespace Fun
             kIFunEngine1
         }
 
-        // Funapi Version
-        protected static readonly int kCurrentFunapiProtocolVersion = 1;
-        protected static readonly int kCurrentPluginVersion = 43;
 
         protected State state_ = State.kDisconnected;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
@@ -429,10 +434,10 @@ namespace Fun
                 }
 
                 string header = "";
-                header += kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
+                header += kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter;
                 if (first_sending)
                 {
-                    header += kPluginVersionHeaderField + kHeaderFieldDelimeter + kCurrentPluginVersion + kHeaderDelimeter;
+                    header += kPluginVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kPluginVersion + kHeaderDelimeter;
                     first_sending = false;
                 }
                 header += kLengthHeaderField + kHeaderFieldDelimeter + buffer.data.Count + kHeaderDelimeter;
@@ -530,7 +535,7 @@ namespace Fun
             // Header version
             DebugUtils.Assert(header_fields_.ContainsKey(kVersionHeaderField));
             int version = Convert.ToUInt16(header_fields_[kVersionHeaderField]);
-            DebugUtils.Assert(version == kCurrentFunapiProtocolVersion);
+            DebugUtils.Assert(version == FunapiVersion.kProtocolVersion);
 
             // Header length
             DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderField));
@@ -1363,7 +1368,7 @@ namespace Fun
             host_url_ += hostname_or_ip + ":" + port;
 
             // Version
-            host_url_ += "/v" + kCurrentFunapiProtocolVersion + "/";
+            host_url_ += "/v" + FunapiVersion.kProtocolVersion + "/";
         }
 
         public override void Stop()
@@ -1579,7 +1584,7 @@ namespace Fun
                         // Header
                         byte[] header = state.response.Headers.ToByteArray();
                         string str_header = Encoding.Default.GetString(header, 0, header.Length);
-                        str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter);
+                        str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
                         str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
                         str_header = str_header.Replace(kEncryptionHttpHeaderField, kEncryptionHeaderField);
                         str_header = str_header.Replace("\r", "");
