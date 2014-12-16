@@ -14,11 +14,16 @@ RUNTIME=v2.0.50727
 
 if [ -f /usr/include/funapi/network/fun_message.proto ]; then
   echo Generating Protocol C# files
-  protoc -I/usr/include /usr/include/funapi/network/fun_message.proto \
-    -o fun_message.bin
-  mono --runtime=${RUNTIME} \
-    protobuf-net/ProtoGen/protogen.exe \
-    -i:fun_message.bin -o:fun_message.cs -p:detectMissing
+  mkdir csharp-files/bin
+  protoc -I/usr/include proto-files/funapi/network/fun_message.proto -ocsharp-files/bin/fun_message.bin
+  protoc -Iproto-files proto-files/pbuf_echo.proto -ocsharp-files/bin/pbuf_echo.bin
+
+  mono --runtime=${RUNTIME} protobuf-net/ProtoGen/protogen.exe \
+                            -i:csharp-files/bin/fun_message.bin -o:csharp-files/fun_message.cs -:detectMissing
+  mono --runtime=${RUNTIME} protobuf-net/ProtoGen/protogen.exe \
+                            -i:csharp-files/bin/pbuf_echo.bin -o:csharp-files/pbuf_echo.cs -:detectMissing
+
+  rm -d -r csharp-files/bin
 fi
 
 echo Generating Protocol DLL
@@ -26,7 +31,7 @@ gmcs -target:library -unsafe+ \
     -sdk:2 \
     -out:${OUTPUT_ROOT}/messages.dll \
     /r:protobuf-net/unity/protobuf-net.dll \
-    fun_message.cs
+    csharp-files/*.cs
 
 echo Generating Serializer DLL
 mono --runtime=${RUNTIME} \
@@ -34,4 +39,3 @@ mono --runtime=${RUNTIME} \
     ${OUTPUT_ROOT}/messages.dll \
     -o:${OUTPUT_ROOT}/FunMessageSerializer.dll \
     -t:FunMessageSerializer
-
