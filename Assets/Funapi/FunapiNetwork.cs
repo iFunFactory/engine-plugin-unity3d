@@ -1727,18 +1727,21 @@ namespace Fun
             recv_type_ = typeof(FunMessage);
         }
 
-        public FunMessage CreateFunMessage(object msg, string msg_type, int msg_index) {
+        public FunMessage CreateFunMessage(object msg, string msg_type, int msg_index)
+        {
             FunMessage _msg = new FunMessage();
             _msg.msgtype = msg_type;
             Extensible.AppendValue(serializer_, _msg, msg_index, ProtoBuf.DataFormat.Default, msg);
             return _msg;
         }
 
-        public object GetMessage(FunMessage msg, Type msg_type, int msg_index) {
+        public object GetMessage(FunMessage msg, Type msg_type, int msg_index)
+        {
             object _msg = null;
             bool success = Extensible.TryGetValue(serializer_, msg_type, msg,
-                    msg_index, ProtoBuf.DataFormat.Default, true, out _msg);
-            if (!success) {
+                                                  msg_index, ProtoBuf.DataFormat.Default, true, out _msg);
+            if (!success)
+            {
                 Debug.Log(String.Format("Failed to decode {0} {1}", msg_type, msg_index));
                 return null;
             }

@@ -189,13 +189,9 @@ public class FunapiNetworkTester : MonoBehaviour
             }
             else if (network_.MsgType == FunMsgType.kProtobuf)
             {
-                FunMessage example = new FunMessage();
-                example.msgtype = "pbuf_echo";
-
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.message = "hello proto";
-                Extensible.AppendValue<PbufEchoMessage>(example, 16, echo);
-
+                FunMessage example = network_.CreateFunMessage(echo, "pbuf_echo", 16);
                 network_.SendMessage(example, EncryptionType.kDefaultEncryption);
             }
         }
@@ -233,7 +229,11 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         DebugUtils.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
-        PbufEchoMessage echo = Extensible.GetValue<PbufEchoMessage>(msg, 16);
+        object obj = network_.GetMessage(msg, typeof(PbufEchoMessage), 16);
+        if (obj == null)
+            return;
+
+        PbufEchoMessage echo = obj as PbufEchoMessage;
         Debug.Log("Received an echo message: " + echo.message);
     }
 
