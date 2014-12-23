@@ -188,10 +188,9 @@ namespace Fun
 
         // Funapi Version
         protected static readonly int kCurrentFunapiProtocolVersion = 1;
-        protected static readonly int kCurrentPluginVersion = 41;
+        protected static readonly int kCurrentPluginVersion = 42;
 
         protected State state_ = State.kDisconnected;
-        protected Mutex mutex_ = new Mutex();
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         #endregion
     }
@@ -210,9 +209,8 @@ namespace Fun
         // Starts a socket.
         public override void Start()
         {
-            mutex_.WaitOne();
-
             bool failed = false;
+
             try
             {
                 // Resets states.
@@ -230,10 +228,6 @@ namespace Fun
             {
                 DebugUtils.Log("Failure in Start: " + e.ToString());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
             }
 
             if (failed)
@@ -280,47 +274,39 @@ namespace Fun
         #region internal implementation
         private void SendMessage (byte[] body)
         {
-            mutex_.WaitOne();
-
             bool failed = false;
-            bool sendable = false;
 
             try
             {
-                string header = "";
-                header += kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
-				if (first_sending)
-				{
-					header += kPluginVersionHeaderField + kHeaderFieldDelimeter + kCurrentPluginVersion + kHeaderDelimeter;
-					first_sending = false;
-				}
-                header += kLengthHeaderField + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
-                header += kHeaderDelimeter;
-
-                pending_.Add(new ArraySegment<byte>(Encoding.ASCII.GetBytes(header)));
-                pending_.Add(new ArraySegment<byte>(body));
-
-                if (state_ == State.kConnected && sending_.Count == 0)
+            	lock (sending_)
                 {
-                    List<ArraySegment<byte>> tmp = sending_;
-                    sending_ = pending_;
-                    pending_ = tmp;
-                    sendable = true;
+                    string header = "";
+                    header += kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter;
+                	if (first_sending)
+                    {
+                    	header += kPluginVersionHeaderField + kHeaderFieldDelimeter + kCurrentPluginVersion + kHeaderDelimeter;
+                    	first_sending = false;
+                    }
+                    header += kLengthHeaderField + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
+                    header += kHeaderDelimeter;
+
+                    pending_.Add(new ArraySegment<byte>(Encoding.ASCII.GetBytes(header)));
+                    pending_.Add(new ArraySegment<byte>(body));
+
+                    if (state_ == State.kConnected && sending_.Count == 0)
+                    {
+                        List<ArraySegment<byte>> tmp = sending_;
+                        sending_ = pending_;
+                        pending_ = tmp;
+
+                    	WireSend(sending_);
+                    }
                 }
             }
             catch (Exception e)
             {
                 DebugUtils.Log("Failure in SendMessage: " + e.ToString());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
-
-            if (sendable)
-            {
-                WireSend(sending_);
             }
 
             if (failed)
@@ -440,10 +426,10 @@ namespace Fun
 
         // Funapi header-related constants.
         protected static readonly string kHeaderDelimeter = "\n";
-		protected static readonly string kHeaderFieldDelimeter = ":";
-		protected static readonly string kVersionHeaderField = "VER";
-		protected static readonly string kPluginVersionHeaderField = "PVER";
-		protected static readonly string kLengthHeaderField = "LEN";
+    	protected static readonly string kHeaderFieldDelimeter = ":";
+    	protected static readonly string kVersionHeaderField = "VER";
+    	protected static readonly string kPluginVersionHeaderField = "PVER";
+    	protected static readonly string kLengthHeaderField = "LEN";
 
         // for speed-up.
         private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(Encoding.ASCII.GetBytes(kHeaderDelimeter));
@@ -477,26 +463,17 @@ namespace Fun
         // Stops a socket.
         public override void Stop()
         {
-            mutex_.WaitOne();
+            if (state_ == State.kDisconnected)
+                return;
 
-            try
+            base.Stop();
+
+            if (sock_ != null)
             {
-                if (state_ == State.kDisconnected)
-                    return;
-
-                base.Stop();
-
-                if (sock_ != null)
-                {
-                    sock_.Close();
-                    sock_ = null;
-                }
+                sock_.Close();
+                sock_ = null;
             }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
-        }
+       }
 
         public override bool Started
         {
@@ -531,7 +508,6 @@ namespace Fun
 
         private void StartCb(IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("StartCb called.");
 
             bool failed = false;
@@ -553,20 +529,19 @@ namespace Fun
 
                 state_ = State.kConnected;
 
-                // Wait for message.
-                ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer, 0, receive_buffer.Length);
-                List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                buffer.Add(wrapped);
-                sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
+            	lock (receive_buffer)
+                {
+                    // Wait for message.
+                    ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer, 0, receive_buffer.Length);
+                    List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                    buffer.Add(wrapped);
+                    sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
+                }
             }
             catch (Exception e)
             {
                 DebugUtils.Log("Failure in StartCb: " + e.ToString());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
             }
 
             if (failed)
@@ -577,11 +552,9 @@ namespace Fun
 
         private void SendBytesCb(IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("SendBytesCb called.");
 
             bool failed = false;
-            bool sendable = false;
 
             try
             {
@@ -591,63 +564,58 @@ namespace Fun
                 int nSent = sock_.EndSend(ar);
                 DebugUtils.Log("Sent " + nSent + "bytes");
 
-                // Removes any segment fully sent.
-                while (nSent > 0)
+            	lock (sending_)
                 {
-                    if (sending_[0].Count > nSent)
+                    // Removes any segment fully sent.
+                    while (nSent > 0)
                     {
-                        // partial data
-                        DebugUtils.Log("Partially sent. Will resume.");
-                        break;
+                        if (sending_[0].Count > nSent)
+                        {
+                            // partial data
+                            DebugUtils.Log("Partially sent. Will resume.");
+                            break;
+                        }
+                        else
+                        {
+                            // fully sent.
+                            DebugUtils.Log("Discarding a fully sent message.");
+                            nSent -= sending_[0].Count;
+                            sending_.RemoveAt(0);
+                        }
                     }
-                    else
+
+                    // If the first segment has been sent partially, we need to reconstruct the first segment.
+                    if (nSent > 0)
                     {
-                        // fully sent.
-                        DebugUtils.Log("Discarding a fully sent message.");
-                        nSent -= sending_[0].Count;
-                        sending_.RemoveAt(0);
+                        DebugUtils.Assert(sending_.Count > 0);
+                        ArraySegment<byte> original = sending_[0];
+
+                        DebugUtils.Assert(nSent <= sending_[0].Count);
+                        ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
+                        sending_[0] = adjusted;
                     }
-                }
 
-                // If the first segment has been sent partially, we need to reconstruct the first segment.
-                if (nSent > 0)
-                {
-                    DebugUtils.Assert(sending_.Count > 0);
-                    ArraySegment<byte> original = sending_[0];
+                    if (sending_.Count > 0)
+                    {
+                        // If we have more segments to send, we process more.
+                        DebugUtils.Log("Retrying unsent messages.");
+                        WireSend(sending_);
+                    }
+                    else if (pending_.Count > 0)
+                    {
+                        // Otherwise, try to process pending messages.
+                        List<ArraySegment<byte>> tmp = sending_;
+                        sending_ = pending_;
+                        pending_ = tmp;
 
-                    DebugUtils.Assert(nSent <= sending_[0].Count);
-                    ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
-                    sending_[0] = adjusted;
-                }
-
-                if (sending_.Count > 0)
-                {
-                    // If we have more segments to send, we process more.
-                    DebugUtils.Log("Retrying unsent messages.");
-                    WireSend(sending_);
-                }
-                else if (pending_.Count > 0)
-                {
-                    // Otherwise, try to process pending messages.
-                    List<ArraySegment<byte>> tmp = sending_;
-                    sending_ = pending_;
-                    pending_ = tmp;
-                    sendable = true;
+                    	WireSend(sending_);
+                    }
                 }
             }
             catch (Exception e)
             {
                 DebugUtils.Log("Failure in SendBytesCb: " + e.ToString ());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
-
-            if (sendable)
-            {
-                WireSend(sending_);
             }
 
             if (failed)
@@ -658,7 +626,6 @@ namespace Fun
 
         private void ReceiveBytesCb(IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("ReceiveBytesCb called.");
 
             bool failed = false;
@@ -667,82 +634,81 @@ namespace Fun
                 if (sock_ == null)
                     return;
 
-                int nRead = sock_.EndReceive(ar);
-                if (nRead > 0)
+            	lock (receive_buffer)
                 {
-                    received_size_ += nRead;
-                    DebugUtils.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
-                }
-
-                // Try to decode as many messages as possible.
-                while (true)
-                {
-                    if (header_decoded_ == false)
+                    int nRead = sock_.EndReceive(ar);
+                    if (nRead > 0)
                     {
-                        if (TryToDecodeHeader() == false)
-                        {
-                            break;
-                        }
+                        received_size_ += nRead;
+                        DebugUtils.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
                     }
-                    if (header_decoded_)
-                    {
-                        if (TryToDecodeBody() == false)
-                        {
-                            break;
-                        }
-                    }
-                }
 
-                if (nRead > 0)
-                {
-                    // Checks buffer space before starting another async receive.
-                    if (receive_buffer.Length - received_size_ == 0)
+                    // Try to decode as many messages as possible.
+                    while (true)
                     {
-                        // If there are space can be collected, compact it first.
-                        // Otherwise, increase the receiving buffer size.
-                        if (next_decoding_offset_ > 0)
+                        if (header_decoded_ == false)
                         {
-                            DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
-                            byte[] new_buffer = new byte[receive_buffer.Length];
-                            Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
-                            receive_buffer = new_buffer;
-                            received_size_ -= next_decoding_offset_;
-                            next_decoding_offset_ = 0;
+                            if (TryToDecodeHeader() == false)
+                            {
+                                break;
+                            }
                         }
-                        else
+                        if (header_decoded_)
                         {
-                            DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
-                            byte[] new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
-                            Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
-                            receive_buffer = new_buffer;
+                            if (TryToDecodeBody() == false)
+                            {
+                                break;
+                            }
                         }
                     }
 
-                    // Starts another async receive
-                    ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer, received_size_, receive_buffer.Length - received_size_);
-                    List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                    buffer.Add(residual);
-                    sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                    DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
-                }
-                else
-                {
-                    DebugUtils.Log("Socket closed");
-                    if (received_size_ - next_decoding_offset_ > 0)
+                    if (nRead > 0)
                     {
-                        DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                        // Checks buffer space before starting another async receive.
+                        if (receive_buffer.Length - received_size_ == 0)
+                        {
+                            // If there are space can be collected, compact it first.
+                            // Otherwise, increase the receiving buffer size.
+                            if (next_decoding_offset_ > 0)
+                            {
+                                DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
+                                byte[] new_buffer = new byte[receive_buffer.Length];
+                                Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                                receive_buffer = new_buffer;
+                                received_size_ -= next_decoding_offset_;
+                                next_decoding_offset_ = 0;
+                            }
+                            else
+                            {
+                                DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
+                                byte[] new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
+                                Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
+                                receive_buffer = new_buffer;
+                            }
+                        }
+
+                        // Starts another async receive
+                        ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer, received_size_, receive_buffer.Length - received_size_);
+                        List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                        buffer.Add(residual);
+                        sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
+                        DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
                     }
-                    failed = true;
+                    else
+                    {
+                        DebugUtils.Log("Socket closed");
+                        if (received_size_ - next_decoding_offset_ > 0)
+                        {
+                            DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                        }
+                        failed = true;
+                    }
                 }
             }
             catch (Exception e)
             {
                 DebugUtils.Log("Failure in ReceiveBytesCb: " + e.ToString ());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
             }
 
             if (failed)
@@ -773,24 +739,15 @@ namespace Fun
         // Stops a socket.
         public override void Stop()
         {
-            mutex_.WaitOne();
+            if (state_ == State.kDisconnected)
+                return;
 
-            try
+            base.Stop();
+
+            if (sock_ != null)
             {
-                if (state_ == State.kDisconnected)
-                    return;
-
-                base.Stop();
-
-                if (sock_ != null)
-                {
-                    sock_.Close();
-                    sock_ = null;
-                }
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
+                sock_.Close();
+                sock_ = null;
             }
         }
 
@@ -851,62 +808,55 @@ namespace Fun
 
         private void SendBytesCb(IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("SendBytesCb called.");
 
             bool failed = false;
-            bool sendable = false;
 
             try
             {
                 if (sock_ == null)
                     return;
 
-                int nSent = sock_.EndSend(ar);
-                DebugUtils.Log("Sent " + nSent + "bytes");
+            	lock (sending_)
+                {
+                    int nSent = sock_.EndSend(ar);
+                    DebugUtils.Log("Sent " + nSent + "bytes");
 
-                // Removes header and body segment
-                int nToSend = 0;
-                for (int i = 0; i < 2; ++i)
-                {
-                    nToSend += sending_[0].Count;
-                    sending_.RemoveAt(0);
-                }
+                    // Removes header and body segment
+                    int nToSend = 0;
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        nToSend += sending_[0].Count;
+                        sending_.RemoveAt(0);
+                    }
 
-                if (nSent > 0 && nSent < nToSend)
-                {
-                    DebugUtils.LogWarning("Failed to transfer hole messages.");
-                    DebugUtils.Assert(false);
-                }
+                    if (nSent > 0 && nSent < nToSend)
+                    {
+                        DebugUtils.LogWarning("Failed to transfer hole messages.");
+                        DebugUtils.Assert(false);
+                    }
 
-                if (sending_.Count > 0)
-                {
-                    // If we have more segments to send, we process more.
-                    DebugUtils.Log("Retrying unsent messages.");
-                    WireSend(sending_);
-                }
-                else if (pending_.Count > 0)
-                {
-                    // Otherwise, try to process pending messages.
-                    List<ArraySegment<byte>> tmp = sending_;
-                    sending_ = pending_;
-                    pending_ = tmp;
-                    sendable = true;
+                    if (sending_.Count > 0)
+                    {
+                        // If we have more segments to send, we process more.
+                        DebugUtils.Log("Retrying unsent messages.");
+                        WireSend(sending_);
+                    }
+                    else if (pending_.Count > 0)
+                    {
+                        // Otherwise, try to process pending messages.
+                        List<ArraySegment<byte>> tmp = sending_;
+                        sending_ = pending_;
+                        pending_ = tmp;
+
+                    	WireSend(sending_);
+                    }
                 }
             }
             catch (Exception e)
             {
                 DebugUtils.Log("Failure in SendBytesCb: " + e.ToString ());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
-
-            if (sendable)
-            {
-                WireSend(sending_);
             }
 
             if (failed)
@@ -917,7 +867,6 @@ namespace Fun
 
         private void ReceiveBytesCb(IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("ReceiveBytesCb called.");
 
             bool failed = false;
@@ -926,60 +875,59 @@ namespace Fun
                 if (sock_ == null)
                     return;
 
-                int nRead = sock_.EndReceive(ar);
-                if (nRead > 0)
+            	lock (receive_buffer)
                 {
-                    received_size_ += nRead;
-                    DebugUtils.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
-                }
-
-                // Decoding a message
-                if (TryToDecodeHeader())
-                {
-                    if (TryToDecodeBody() == false)
+                    int nRead = sock_.EndReceive(ar);
+                    if (nRead > 0)
                     {
-                        DebugUtils.LogWarning("Failed to decode body.");
+                        received_size_ += nRead;
+                        DebugUtils.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+                    }
+
+                    // Decoding a message
+                    if (TryToDecodeHeader())
+                    {
+                        if (TryToDecodeBody() == false)
+                        {
+                            DebugUtils.LogWarning("Failed to decode body.");
+                            DebugUtils.Assert(false);
+                        }
+                    }
+                    else
+                    {
+                        DebugUtils.LogWarning("Failed to decode header.");
                         DebugUtils.Assert(false);
                     }
-                }
-                else
-                {
-                    DebugUtils.LogWarning("Failed to decode header.");
-                    DebugUtils.Assert(false);
-                }
 
-                if (nRead > 0)
-                {
-                    // Prepares a next message.
-                    received_size_ = 0;
-                    next_decoding_offset_ = 0;
-                    header_fields_.Clear();
-
-                    // Starts another async receive
-                    sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
-                                           ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
-
-                    DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
-                }
-                else
-                {
-                    DebugUtils.Log("Socket closed");
-                    if (received_size_ - next_decoding_offset_ > 0)
+                    if (nRead > 0)
                     {
-                        DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
-                    }
+                        // Prepares a next message.
+                        received_size_ = 0;
+                        next_decoding_offset_ = 0;
+                        header_fields_.Clear();
 
-                    failed = true;
+                        // Starts another async receive
+                        sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
+                                               ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+
+                        DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
+                    }
+                    else
+                    {
+                        DebugUtils.Log("Socket closed");
+                        if (received_size_ - next_decoding_offset_ > 0)
+                        {
+                            DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                        }
+
+                        failed = true;
+                    }
                 }
             }
             catch (Exception e)
             {
                 DebugUtils.Log("Failure in ReceiveBytesCb: " + e.ToString ());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
             }
 
             if (failed)
@@ -1016,33 +964,24 @@ namespace Fun
 
         public override void Stop()
         {
-            mutex_.WaitOne();
+            if (state_ == State.kDisconnected)
+                return;
 
-            try
+            base.Stop();
+
+            foreach (WebState state in list_)
             {
-                if (state_ == State.kDisconnected)
-                    return;
-
-                base.Stop();
-
-                foreach (WebState state in list_)
+                if (state.request != null)
                 {
-                    if (state.request != null)
-                    {
-                        state.aborted = true;
-                        state.request.Abort();
-                    }
-
-                    if (state.stream != null)
-                        state.stream.Close();
+                    state.aborted = true;
+                    state.request.Abort();
                 }
 
-                list_.Clear();
+                if (state.stream != null)
+                    state.stream.Close();
             }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
+
+            list_.Clear();
         }
 
         public override bool Started
@@ -1063,18 +1002,17 @@ namespace Fun
             state_ = State.kConnected;
         }
 
-		protected override void WireSend(List<ArraySegment<byte>> sending)
+    	protected override void WireSend(List<ArraySegment<byte>> sending)
         {
             DebugUtils.Assert(sending.Count >= 2);
             DebugUtils.Log("Send a Message.");
 
-            mutex_.WaitOne();
             bool failed = false;
             try
             {
                 DebugUtils.Log("Host Url: " + host_url_);
 
-				ArraySegment<byte> body = sending[1];
+            	ArraySegment<byte> body = sending[1];
 
                 // Request
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
@@ -1095,10 +1033,6 @@ namespace Fun
                 DebugUtils.Log("Failure in WireSend: " + e.ToString());
                 failed = true;
             }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
 
             if (failed)
             {
@@ -1108,7 +1042,6 @@ namespace Fun
 
         private void RequestStreamCb (IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("RequestStreamCb called.");
 
             bool failed = false;
@@ -1122,9 +1055,12 @@ namespace Fun
                 stream.Close();
                 DebugUtils.Log("Sent " + state.sending.Count + "bytes");
 
-                // Removes header and body segment
-                sending_.RemoveAt(0);
-                sending_.RemoveAt(0);
+            	lock (sending_)
+                {
+                    // Removes header and body segment
+                    sending_.RemoveAt(0);
+                    sending_.RemoveAt(0);
+                }
 
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
             }
@@ -1132,10 +1068,6 @@ namespace Fun
             {
                 DebugUtils.Log("Failure in RequestStreamCb: " + e.ToString());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
             }
 
             if (failed)
@@ -1146,7 +1078,6 @@ namespace Fun
 
         private void ResponseCb (IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("ResponseCb called.");
 
             bool failed = false;
@@ -1182,10 +1113,6 @@ namespace Fun
                 DebugUtils.Log("Failure in ResponseCb: " + e.ToString());
                 failed = true;
             }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
 
             if (failed)
             {
@@ -1195,11 +1122,10 @@ namespace Fun
 
         private void ReadCb (IAsyncResult ar)
         {
-            mutex_.WaitOne();
             DebugUtils.Log("ReadCb called.");
 
             bool failed = false;
-            bool sendable = false;
+
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1228,57 +1154,64 @@ namespace Fun
                         DebugUtils.Assert(false);
                     }
 
-                    // header
-                    byte[] header = state.response.Headers.ToByteArray();
-                    string str_header = Encoding.Default.GetString(header, 0, header.Length);
-                    str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter);
-                    str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
-                    str_header = str_header.Replace("\r", "");
-                    header = Encoding.ASCII.GetBytes(str_header);
-
-                    // copy to buffer
-                    int length = header.Length + state.read_offset;
-                    if (length > receive_buffer.Length)
-                        receive_buffer = new byte[length];
-
-                    Buffer.BlockCopy(header, 0, receive_buffer, 0, header.Length);
-                    Buffer.BlockCopy(state.read_data, 0, receive_buffer, header.Length, state.read_offset);
-
-                    received_size_ = length;
-                    next_decoding_offset_ = 0;
-
-                    // Decoding a message
-                    if (TryToDecodeHeader())
+                	lock (receive_buffer)
                     {
-                        if (TryToDecodeBody() == false)
+                        // header
+                        byte[] header = state.response.Headers.ToByteArray();
+                        string str_header = Encoding.Default.GetString(header, 0, header.Length);
+                        str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + kCurrentFunapiProtocolVersion + kHeaderDelimeter);
+                        str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
+                        str_header = str_header.Replace("\r", "");
+                        header = Encoding.ASCII.GetBytes(str_header);
+
+                        // copy to buffer
+                        int length = header.Length + state.read_offset;
+                        if (length > receive_buffer.Length)
+                            receive_buffer = new byte[length];
+
+                        Buffer.BlockCopy(header, 0, receive_buffer, 0, header.Length);
+                        Buffer.BlockCopy(state.read_data, 0, receive_buffer, header.Length, state.read_offset);
+
+                        received_size_ = length;
+                        next_decoding_offset_ = 0;
+
+                        // Decoding a message
+                        if (TryToDecodeHeader())
                         {
-                            DebugUtils.LogWarning("Failed to decode body.");
+                            if (TryToDecodeBody() == false)
+                            {
+                                DebugUtils.LogWarning("Failed to decode body.");
+                                DebugUtils.Assert(false);
+                            }
+                        }
+                        else
+                        {
+                            DebugUtils.LogWarning("Failed to decode header.");
                             DebugUtils.Assert(false);
                         }
-                    }
-                    else
-                    {
-                        DebugUtils.LogWarning("Failed to decode header.");
-                        DebugUtils.Assert(false);
+
+                        state.stream.Close();
+                        state.stream = null;
+                        list_.Remove(state);
                     }
 
-                    state.stream.Close();
-                    state.stream = null;
-                    list_.Remove(state);
+                	lock (sending_)
+                    {
+                        if (sending_.Count > 0)
+                        {
+                            // If we have more segments to send, we process more.
+                            DebugUtils.Log("Retrying unsent messages.");
+                            WireSend(sending_);
+                        }
+                        else if (pending_.Count > 0)
+                        {
+                            // Otherwise, try to process pending messages.
+                        	List<ArraySegment<byte>> tmp = sending_;
+                            sending_ = pending_;
+                            pending_ = tmp;
 
-                    if (sending_.Count > 0)
-                    {
-                        // If we have more segments to send, we process more.
-                        DebugUtils.Log("Retrying unsent messages.");
-                        WireSend(sending_);
-                    }
-                    else if (pending_.Count > 0)
-                    {
-                        // Otherwise, try to process pending messages.
-						List<ArraySegment<byte>> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-                        sendable = true;
+                        	WireSend(sending_);
+                        }
                     }
                 }
             }
@@ -1286,15 +1219,6 @@ namespace Fun
             {
                 DebugUtils.Log("Failure in ReadCb: " + e.ToString());
                 failed = true;
-            }
-            finally
-            {
-                mutex_.ReleaseMutex();
-            }
-
-            if (sendable)
-            {
-				WireSend(sending_);
             }
 
             if (failed)
@@ -1387,7 +1311,7 @@ namespace Fun
 
         public void Update ()
         {
-            lock(message_buffer_)
+            lock (message_buffer_)
             {
                 if (message_buffer_.Count <= 0)
                     return;
@@ -1572,7 +1496,7 @@ namespace Fun
             DebugUtils.Log("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
 
-            lock(message_buffer_)
+            lock (message_buffer_)
             {
                 message_buffer_.Add(body);
             }
