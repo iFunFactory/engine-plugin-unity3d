@@ -16,12 +16,11 @@ REM protobuf-net\ProtoGen\protogen -i:proto-files\pbuf_echo.proto -o:csharp-file
 
 echo Generating Protocol DLL
 call gmcs -target:library -unsafe+ ^
-	-out:%OUTPUT_ROOT%\DLL\messages.dll ^
-	/r:%OUTPUT_ROOT%\DLL\protobuf-net.dll ^
-	csharp-files\*.cs
+    -out:%OUTPUT_ROOT%\DLL\messages.dll ^
+    /r:%OUTPUT_ROOT%\DLL\protobuf-net.dll ^
+    csharp-files\*.cs
 
 echo Generating serializer DLL
 protobuf-net\Precompile\precompile %OUTPUT_ROOT%\messages.dll ^
-	-o:%OUTPUT_ROOT%\DLL\FunMessageSerializer.dll ^
-	-t:FunMessageSerializer
-
+    -o:%OUTPUT_ROOT%\DLL\FunMessageSerializer.dll ^
+    -t:FunMessageSerializer
