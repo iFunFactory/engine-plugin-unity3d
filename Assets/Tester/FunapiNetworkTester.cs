@@ -13,6 +13,7 @@ using UnityEngine;
 
 // Protobuf
 using funapi.network.fun_message;
+using funapi.network.maintenance;
 using pbuf_echo;
 
 
@@ -115,6 +116,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
         network_.RegisterHandler("echo", this.OnEcho);
         network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
+        network_.MaintenanceCallback += new FunapiNetwork.OnMessageHandler(OnMaintenanceMessage);
         network_.Start();
     }
 
@@ -267,6 +269,32 @@ public class FunapiNetworkTester : MonoBehaviour
 
                 Debug.Log("announcement >> " + buffer);
             }
+        }
+    }
+
+    private void OnMaintenanceMessage (object body)
+    {
+        if (network_.MsgType == FunMsgType.kJson)
+        {
+            DebugUtils.Assert(body is Dictionary<string, object>);
+            Dictionary<string, object> msg = body as Dictionary<string, object>;
+            Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
+                                    msg["date_start"], msg["date_end"], msg["messages"]));
+        }
+        else if (network_.MsgType == FunMsgType.kProtobuf)
+        {
+            FunMessage msg = body as FunMessage;
+            object obj = network_.GetMessage(msg, typeof(MaintenanceMessage), 15);
+            if (obj == null)
+                return;
+
+            MaintenanceMessage maintenance = obj as MaintenanceMessage;
+            Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
+                                    maintenance.date_start, maintenance.date_end, maintenance.messages));
+        }
+        else
+        {
+            DebugUtils.Assert(false);
         }
     }
 

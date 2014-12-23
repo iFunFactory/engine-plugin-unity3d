@@ -25,7 +25,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 44;
+        public static readonly int kPluginVersion = 46;
     }
 
     // Funapi message type
@@ -1691,6 +1691,7 @@ namespace Fun
         public delegate void OnSessionInitiated(string session_id);
         public delegate void OnSessionClosed();
         public delegate void OnTransportClosed();
+        public delegate void OnMessageHandler(object body);
         #endregion
 
         #region public interface
@@ -1753,6 +1754,7 @@ namespace Fun
         {
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
+            message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
             DebugUtils.Log("Starting a network module.");
             transport_.Start();
             started_ = true;
@@ -2309,9 +2311,15 @@ namespace Fun
 
             CloseSession();
         }
+
+        private void OnMaintenanceMessage(string msg_type, object body)
+        {
+            MaintenanceCallback(body);
+        }
         #endregion
 
-        enum State {
+        enum State
+        {
             kUnknown = 0,
             kEstablished,
             kTransportClosed,
@@ -2330,9 +2338,8 @@ namespace Fun
             public WaitEventHandler callback;
         }
 
-        State state_;
-        FunMessageSerializer serializer_;
-        Type recv_type_;
+        // Funapi message-related events.
+        public event OnMessageHandler MaintenanceCallback;
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
@@ -2342,8 +2349,12 @@ namespace Fun
         private static readonly string kAckNumberField = "_ack";
         private static readonly string kNewSessionMessageType = "_session_opened";
         private static readonly string kSessionClosedMessageType = "_session_closed";
+        private static readonly string kMaintenanceMessageType = "_maintenance";
 
         // member variables.
+        private State state_;
+        private FunMessageSerializer serializer_;
+        private Type recv_type_;
         private FunMsgType msg_type_;
         private bool started_ = false;
         private FunapiTransport transport_;

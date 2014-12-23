@@ -6,14 +6,20 @@
 
 
 //////////////////////////////////////////////////////////////////////////////
-// This protobuf message should be the outermost message.
+// Funapi maintenance messages
+
+import "funapi/network/fun_message.proto";
 
 
-message FunMessage
+message MaintenanceMessage
 {
-    optional string sid = 1;
-    optional string msgtype = 2;
-    optional uint32 seq = 3;
-    optional uint32 ack = 4;
-    extensions 15 to max;
+    optional string date_start = 1;
+    optional string date_end = 2;
+    optional string messages = 3;
+}
+
+
+extend FunMessage
+{
+    optional MaintenanceMessage pbuf_maintenance = 15;
 }
