@@ -124,6 +124,7 @@ namespace Fun
                         KeyValuePair<string, string> item = image_list[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
                         Debug.Log("Download url: " + item.Key);
+                        Debug.Log("Image path: " + item.Value);
                     }
                     else
                     {
@@ -156,6 +157,7 @@ namespace Fun
                         KeyValuePair<string, string> item = image_list[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
                         Debug.Log("Download url: " + item.Key);
+                        Debug.Log("Image path: " + item.Value);
                     }
                     else
                     {
