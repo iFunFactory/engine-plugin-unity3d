@@ -13,29 +13,29 @@ OUTPUT_ROOT=../Assets
 RUNTIME=v2.0.50727
 
 if [ -f /usr/include/funapi/network/fun_message.proto ]; then
-  echo Generating Protocol C# files
+  echo 'Generating Protocol C# files'
   mkdir csharp-files/bin
-  protoc -I/usr/include proto-files/funapi/network/fun_message.proto -ocsharp-files/bin/fun_message.bin
-  protoc -Iproto-files proto-files/pbuf_echo.proto -ocsharp-files/bin/pbuf_echo.bin
+  protoc -I"/usr/include" "proto-files/funapi/network/fun_message.proto" -o"csharp-files/bin/fun_message.bin"
+  protoc -I"proto-files" "proto-files/pbuf_echo.proto" -o"csharp-files/bin/pbuf_echo.bin"
 
-  mono --runtime=${RUNTIME} protobuf-net/ProtoGen/protogen.exe \
-                            -i:csharp-files/bin/fun_message.bin -o:csharp-files/fun_message.cs -:detectMissing
-  mono --runtime=${RUNTIME} protobuf-net/ProtoGen/protogen.exe \
-                            -i:csharp-files/bin/pbuf_echo.bin -o:csharp-files/pbuf_echo.cs -:detectMissing
+  mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
+                            -i:"csharp-files/bin/fun_message.bin" -o:"csharp-files/fun_message.cs" -:detectMissing
+  mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
+                            -i:"csharp-files/bin/pbuf_echo.bin" -o:"csharp-files/pbuf_echo.cs" -:detectMissing
 
-  rm -d -r csharp-files/bin
+  rm -rf "csharp-files/bin"
 fi
 
-echo Generating Protocol DLL
+echo 'Generating Protocol DLL'
 gmcs -target:library -unsafe+ \
     -sdk:2 \
-    -out:${OUTPUT_ROOT}/messages.dll \
-    /r:protobuf-net/unity/protobuf-net.dll \
-    csharp-files/*.cs
+    -out:"${OUTPUT_ROOT}/messages.dll" \
+    /r:"protobuf-net/unity/protobuf-net.dll" \
+    "csharp-files/*.cs"
 
-echo Generating Serializer DLL
+echo 'Generating Serializer DLL'
 mono --runtime=${RUNTIME} \
-    protobuf-net/Precompile/precompile.exe \
-    ${OUTPUT_ROOT}/messages.dll \
-    -o:${OUTPUT_ROOT}/FunMessageSerializer.dll \
-    -t:FunMessageSerializer
+    "protobuf-net/Precompile/precompile.exe" \
+    "${OUTPUT_ROOT}/messages.dll" \
+    -o:"${OUTPUT_ROOT}/FunMessageSerializer.dll" \
+    -t:"FunMessageSerializer"
