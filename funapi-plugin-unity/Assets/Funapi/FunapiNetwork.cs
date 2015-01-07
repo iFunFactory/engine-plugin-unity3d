@@ -332,7 +332,7 @@ namespace Fun
         public override void SendMessage (object json_message, EncryptionType encryption)
         {
             string str = this.JsonHelper.Serialize(json_message);
-            byte[] body = Encoding.Default.GetBytes(str);
+            byte[] body = Encoding.UTF8.GetBytes(str);
 
             DebugUtils.Log("JSON to send : " + str);
 
@@ -1431,7 +1431,7 @@ namespace Fun
                 request.ContentLength = body.data.Count;
 
                 // encryption type
-                string str_header = Encoding.Default.GetString(header.data.Array, header.data.Offset, header.data.Count);
+                string str_header = Encoding.ASCII.GetString(header.data.Array, header.data.Offset, header.data.Count);
                 int start_offset = str_header.IndexOf(kEncryptionHeaderField);
                 if (start_offset != -1)
                 {
@@ -1583,7 +1583,7 @@ namespace Fun
                     {
                         // Header
                         byte[] header = state.response.Headers.ToByteArray();
-                        string str_header = Encoding.Default.GetString(header, 0, header.Length);
+                        string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
                         str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
                         str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
                         str_header = str_header.Replace(kEncryptionHttpHeaderField, kEncryptionHeaderField);
@@ -2074,7 +2074,7 @@ namespace Fun
 
             if (msg_type_ == FunMsgType.kJson)
             {
-                string str = Encoding.Default.GetString(buffer.Array, buffer.Offset, buffer.Count);
+                string str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
                 object json = transport_.JsonHelper.Deserialize(str);
                 DebugUtils.Log("Parsed json: " + str);
 

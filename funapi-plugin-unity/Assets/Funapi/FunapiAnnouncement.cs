@@ -85,7 +85,7 @@ namespace Fun
                 else
                 {
                     // Parse json
-                    string data = Encoding.ASCII.GetString(ar.Result);
+                    string data = Encoding.UTF8.GetString(ar.Result);
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
                     if (json == null)
                     {
