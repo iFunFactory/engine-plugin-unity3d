@@ -465,6 +465,19 @@ namespace Fun
                 return false;
             }
 
+            lock (sending_)
+            {
+                if (pending_.Count > 0)
+                {
+                    DebugUtils.Log("Flushing pending messages.");
+                    List<ArraySegment<byte>> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+                    
+                    WireSend(sending_);
+                }
+            }
+
             if (body_length > 0)
             {
                 DebugUtils.Assert(state_ == State.kConnected);
