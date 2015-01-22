@@ -184,8 +184,8 @@ public class FunapiNetworkTester : MonoBehaviour
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.message = "hello proto";
-                FunMessage example = network_.CreateFunMessage(echo, "pbuf_echo", 16);
-                network_.SendMessage(example);
+                FunMessage example = network_.CreateFunMessage(echo, 16);
+                network_.SendMessage("pbuf_echo", example);
             }
         }
     }

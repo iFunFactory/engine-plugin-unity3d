@@ -1416,7 +1416,7 @@ namespace Fun
     {
         #region Handler delegate definition
         public delegate void MessageHandler(string msg_type, object body);
-        public delegate void WaitEventHandler(string msg_type);
+        public delegate void TimeoutHandler(string msg_type);
         public delegate void OnSessionInitiated(string session_id);
         public delegate void OnSessionClosed();
         public delegate void OnTransportClosed();
@@ -1457,10 +1457,9 @@ namespace Fun
             recv_type_ = typeof(FunMessage);
         }
 
-        public FunMessage CreateFunMessage(object msg, string msg_type, int msg_index)
+        public FunMessage CreateFunMessage(object msg, int msg_index)
         {
             FunMessage _msg = new FunMessage();
-            _msg.msgtype = msg_type;
             Extensible.AppendValue(serializer_, _msg, msg_index, ProtoBuf.DataFormat.Default, msg);
             return _msg;
         }
@@ -1500,6 +1499,7 @@ namespace Fun
             CloseSession();
         }
 
+        // Your update method inheriting MonoBehaviour should explicitly invoke this method.
         public void Update ()
         {
             if (transport_ != null)
@@ -1518,9 +1518,9 @@ namespace Fun
                         {
                             msg_type = ProcessMessage(buffer);
 
-                            if (wait_messages.ContainsKey(msg_type))
+                            if (expected_replies_.ContainsKey(msg_type))
                             {
-                                wait_messages.Remove(msg_type);
+                                expected_replies_.Remove(msg_type);
                             }
                         }
 
@@ -1533,11 +1533,11 @@ namespace Fun
                 }
             }
 
-            if (wait_messages.Count > 0)
+            if (expected_replies_.Count > 0)
             {
                 List<string> remove_list = new List<string>();
 
-                foreach (var item in wait_messages)
+                foreach (var item in expected_replies_)
                 {
                     item.Value.wait_time -= Time.deltaTime;
                     if (item.Value.wait_time <= 0f)
@@ -1552,7 +1552,7 @@ namespace Fun
                 {
                     foreach (string key in remove_list)
                     {
-                        wait_messages.Remove(key);
+                        expected_replies_.Remove(key);
                     }
                 }
             }
@@ -1587,7 +1587,7 @@ namespace Fun
             get { return msg_type_; }
         }
 
-        public void SendMessage(FunMessage message)
+        public void SendMessage(string msg_type, FunMessage message)
         {
             DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
 
@@ -1617,21 +1617,23 @@ namespace Fun
 
             if (state_ == State.kUnknown || state_ == State.kEstablished)
             {
+                message.msgtype = msg_type;
                 transport_.SendMessage(message);
             }
         }
 
-        public void SendMessage(FunMessage message,
-                                string wait_msg_type, float time, WaitEventHandler callback)
+        public void SendMessage(string msg_type, FunMessage message,
+                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
-            if (wait_messages.ContainsKey(message.msgtype))
+            if (expected_replies_.ContainsKey(message.msgtype))
             {
                 DebugUtils.Log("ERROR: Dictionary has the same key already exists. key: " + message.msgtype);
                 DebugUtils.Assert(false);
             }
 
-            wait_messages[wait_msg_type] = new WaitMessage(time, callback);
-            SendMessage(message);
+            expected_replies_[expected_reply_type] = new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
+
+            SendMessage(msg_type, message);
         }
 
         public void SendMessage(string msg_type, object body)
@@ -1671,16 +1673,17 @@ namespace Fun
             }
         }
 
-        public void SendMessage(string msg_type, object body, EncryptionType encryption,
-                                string wait_msg_type, float time, WaitEventHandler callback)
+        public void SendMessage(string msg_type, object body,
+                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
-            if (wait_messages.ContainsKey(msg_type))
+            if (expected_replies_.ContainsKey(msg_type))
             {
                 DebugUtils.Log("ERROR: Dictionary has the same key already exists. key: " + msg_type);
                 DebugUtils.Assert(false);
             }
 
-            wait_messages[wait_msg_type] =  new WaitMessage(time, callback);
+            expected_replies_[expected_reply_type] =  new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
+
             SendMessage(msg_type, body);
         }
 
@@ -2033,16 +2036,16 @@ namespace Fun
             kWaitForAck
         }
 
-        class WaitMessage
+        class ExpectedReplyMessage
         {
-            public WaitMessage (float time, WaitEventHandler cb)
+            public ExpectedReplyMessage (float t, TimeoutHandler cb)
             {
-                wait_time = time;
+                wait_time = t;
                 callback = cb;
             }
 
             public float wait_time;
-            public WaitEventHandler callback;
+            public TimeoutHandler callback;
         }
 
         // Funapi message-related events.
@@ -2069,7 +2072,7 @@ namespace Fun
         private OnSessionClosed on_session_closed_;
         private string session_id_ = "";
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
-        private Dictionary<string, WaitMessage> wait_messages = new Dictionary<string, WaitMessage>();
+        private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
         private List<ArraySegment<byte>> message_buffer_ = new List<ArraySegment<byte>>();
         private DateTime last_received_ = DateTime.Now;
 
