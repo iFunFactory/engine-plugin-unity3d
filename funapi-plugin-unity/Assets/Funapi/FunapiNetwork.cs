@@ -539,7 +539,7 @@ namespace Fun
 
             // Header length
             DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderField));
-            int body_length = Convert.ToUInt16(header_fields_[kLengthHeaderField]);
+            int body_length = Convert.ToInt32(header_fields_[kLengthHeaderField]);
             DebugUtils.Log("We need " + body_length + " bytes for a message body. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
 
             if (received_size_ - next_decoding_offset_ < body_length)
