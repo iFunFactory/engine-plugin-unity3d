@@ -831,13 +831,13 @@ namespace Fun
             if (state_ == State.kDisconnected)
                 return;
 
-            base.Stop();
-
             if (sock_ != null)
             {
                 sock_.Close();
                 sock_ = null;
             }
+
+            base.Stop();
         }
 
         public override bool Started
@@ -1130,13 +1130,13 @@ namespace Fun
             if (state_ == State.kDisconnected)
                 return;
 
-            base.Stop();
-
             if (sock_ != null)
             {
                 sock_.Close();
                 sock_ = null;
             }
+
+            base.Stop();
         }
 
         public override bool Started
@@ -1376,8 +1376,6 @@ namespace Fun
             if (state_ == State.kDisconnected)
                 return;
 
-            base.Stop();
-
             foreach (WebState state in list_)
             {
                 if (state.request != null)
@@ -1391,6 +1389,8 @@ namespace Fun
             }
 
             list_.Clear();
+
+            base.Stop();
         }
 
         public override bool Started
