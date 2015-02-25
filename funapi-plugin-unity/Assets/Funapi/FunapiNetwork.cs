@@ -1980,7 +1980,9 @@ namespace Fun
 
         private void OnConnectTimeout()
         {
-            Stop();
+            if (session_reliability_ == false) {
+                Stop();
+            }
         }
 
         private void OnTransportStarted()
