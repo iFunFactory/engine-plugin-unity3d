@@ -18,13 +18,13 @@ public class FacebookTester : MonoBehaviour
             facebook_.EventCallback += new SnEventHandler(OnEventHandler);
 
             facebook_.Init();
-            facebook_.Login();
+            facebook_.Login("user_friends,publish_actions");
         }
 
         GUI.enabled = logged_in_;
         if (GUI.Button(new Rect(30, 80, 240, 40), "Show friend's picture (random)"))
         {
-            SocialNetwork.UserInfo info = facebook_.GetFriendInfo(Random.Range(0, facebook_.GetFriendCount));
+            SocialNetwork.UserInfo info = facebook_.FindFriendInfo(Random.Range(0, facebook_.FriendsCount));
             if (info != null && info.picture != null)
             {
                 tex_ = info.picture;
@@ -58,7 +58,7 @@ public class FacebookTester : MonoBehaviour
 
 
     // member variables.
-    private SocialNetwork facebook_ = null;
+    private FacebookConnector facebook_ = null;
     private bool logged_in_ = false;
     private Texture2D tex_ = null;
 }

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2014 iFunFactory Inc. All Rights Reserved.
+﻿// Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -124,7 +124,6 @@ namespace Fun
                         KeyValuePair<string, string> item = image_list[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
                         Debug.Log("Download url: " + item.Key);
-                        Debug.Log("Image path: " + item.Value);
                     }
                     else
                     {
@@ -157,7 +156,6 @@ namespace Fun
                         KeyValuePair<string, string> item = image_list[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
                         Debug.Log("Download url: " + item.Key);
-                        Debug.Log("Image path: " + item.Value);
                     }
                     else
                     {

@@ -1,4 +1,10 @@
-﻿using System;
+﻿// Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
+//
+// This work is confidential and proprietary to iFunFactory Inc. and
+// must not be used, disclosed, copied, or distributed without the prior
+// consent of iFunFactory Inc.
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -18,8 +24,10 @@ namespace Fun
             });
         }
 
-        public override void Login()
+        public void Login (string scope)
         {
+            status_scope_ = scope;
+
             if (init_ == false)
             {
                 try_login_ = true;
@@ -27,12 +35,17 @@ namespace Fun
             }
 
             Debug.Log("Request login facebook.");
-            FB.Login("email,publish_actions", LoginCallback);
+            FB.Login(scope, LoginCallback);
         }
 
-        public override void Logout()
+        public void Logout()
         {
             FB.Logout();
+        }
+
+        public override void PostWithImage (string message, byte[] image)
+        {
+            StartCoroutine(PostWithImageEnumerator(message, image));
         }
 
         public override void PostWithScreenshot (string message)
@@ -56,7 +69,7 @@ namespace Fun
             }
             else if (try_login_)
             {
-                Login();
+                Login(status_scope_);
             }
         }
 
@@ -77,7 +90,8 @@ namespace Fun
                 Debug.Log("Login was successful!");
 
                 string start_query = "me?fields=id,name"
-                                   + ",friends.limit(100).fields(id,name,picture.width(128).height(128))";
+                    + ",friends.limit(100).fields(id,name,picture.width(128).height(128))"
+                    + ",invitable_friends.limit(100).fields(id,name,picture.width(128).height(128))";
 
                 // Reqest player info and profile picture
                 FB.API(start_query, Facebook.HttpMethod.GET, StartCallback);
@@ -116,32 +130,67 @@ namespace Fun
                 my_info_.name = json["name"] as string;
                 Debug.Log("my name: " + my_info_.name);
 
+                OnEventHandler(SnResultCode.kGetMyInfo);
+
                 // friends list
                 object friends = null;
-                if (json.TryGetValue("friends", out friends))
+                object invitable_friends = null;
+                json.TryGetValue("friends", out friends);
+                json.TryGetValue("invitable_friends", out invitable_friends);
+
+                if (friends != null || invitable_friends != null)
                 {
-                    friends_.Clear();
-
-                    List<object> list = ((Dictionary<string, object>)friends)["data"] as List<object>;
-                    foreach (object item in list)
+                    if (friends != null)
                     {
-                        Dictionary<string, object> info = item as Dictionary<string, object>;
-                        Dictionary<string, object> data = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
-                        DebugUtils.Assert(info["id"] is string);
-                        DebugUtils.Assert(info["name"] is string);
-                        DebugUtils.Assert(info["url"] is string);
+                        friends_.Clear();
 
-                        UserInfo user = new UserInfo();
-                        user.id = info["id"] as string;
-                        user.name = info["name"] as string;
-                        user.url = data["url"] as string;
+                        List<object> list = ((Dictionary<string, object>)friends)["data"] as List<object>;
+                        foreach (object item in list)
+                        {
+                            Dictionary<string, object> info = item as Dictionary<string, object>;
+                            Dictionary<string, object> data = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
+                            DebugUtils.Assert(info["id"] is string);
+                            DebugUtils.Assert(info["name"] is string);
+                            DebugUtils.Assert(data["url"] is string);
 
-                        friends_.Add(user);
-                        Debug.Log("> id:" + user.id + " name:" + user.name + " url:" + user.url);
+                            UserInfo user = new UserInfo();
+                            user.id = info["id"] as string;
+                            user.name = info["name"] as string;
+                            user.url = data["url"] as string;
+
+                            friends_.Add(user);
+                            Debug.Log("> id:" + user.id + " name:" + user.name + " url:" + user.url);
+                        }
+                    }
+
+                    if (invitable_friends != null)
+                    {
+                        invite_friends_.Clear();
+
+                        List<object> list = ((Dictionary<string, object>)invitable_friends)["data"] as List<object>;
+                        foreach (object item in list)
+                        {
+                            Dictionary<string, object> info = item as Dictionary<string, object>;
+                            Dictionary<string, object> data = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
+                            DebugUtils.Assert(info["id"] is string);
+                            DebugUtils.Assert(info["name"] is string);
+                            DebugUtils.Assert(data["url"] is string);
+
+                            string url = data["url"] as string;
+                            UserInfo user = new UserInfo();
+                            user.id = info["id"] as string;
+                            user.name = info["name"] as string;
+                            user.url = url;
+
+                            invite_friends_.Add(user);
+                            Debug.Log(">> id:" + user.id + " name:" + user.name + " url:" + user.url);
+                        }
                     }
 
                     if (friends_.Count > 0)
                         StartCoroutine(UpdateFriendsPictureEnumerator());
+
+                    OnEventHandler(SnResultCode.kGetFriendsList);
                 }
             }
             catch (Exception e)
@@ -186,6 +235,13 @@ namespace Fun
                 yield return www;
                 user.picture = www.texture;
             }
+
+            foreach (UserInfo user in invite_friends_)
+            {
+                WWW www = new WWW(user.url);
+                yield return www;
+                user.picture = www.texture;
+            }
         }
 
         private string GetPictureURL (string facebookID, int? width = null, int? height = null, string type = null)
@@ -218,6 +274,17 @@ namespace Fun
 
 
         // Post-related functions
+        IEnumerator PostWithImageEnumerator (string message, byte[] image)
+        {
+            yield return new WaitForEndOfFrame();
+
+            var wwwForm = new WWWForm();
+            wwwForm.AddBinaryData("image", image, "image.png");
+            wwwForm.AddField("message", message);
+
+            FB.API("me/photos", Facebook.HttpMethod.POST, PostCallback, wwwForm);
+        }
+
         IEnumerator PostWithScreenshotEnumerator (string message)
         {
             yield return new WaitForEndOfFrame();
@@ -258,5 +325,6 @@ namespace Fun
        // Member variables.
         private bool init_ = false;
         private bool try_login_ = false;
+        private string status_scope_ = "";
     }
 }

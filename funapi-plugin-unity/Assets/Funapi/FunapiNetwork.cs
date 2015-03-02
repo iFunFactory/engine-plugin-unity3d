@@ -1,4 +1,4 @@
-// Copyright (C) 2013-2014 iFunFactory Inc. All Rights Reserved.
+// Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -25,7 +25,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 48;
+        public static readonly int kPluginVersion = 53;
     }
 
     // Funapi message type
@@ -290,7 +290,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in Start: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -377,7 +377,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in SendMessage: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -896,7 +896,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kConnectFailed;
                     last_error_message_ = "Failed to connect.";
-                    DebugUtils.Log(last_error_message_);
+                    Debug.Log(last_error_message_);
                     return;
                 }
 
@@ -905,7 +905,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kConnectFailed;
                     last_error_message_ = "Failed to connect.";
-                    DebugUtils.Log(last_error_message_);
+                    Debug.Log(last_error_message_);
                     return;
                 }
                 DebugUtils.Log("Connected.");
@@ -925,7 +925,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in StartCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -946,7 +946,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    Debug.Log(last_error_message_);
                     return;
                 }
 
@@ -1009,7 +1009,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1030,7 +1030,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    Debug.Log(last_error_message_);
                     return;
                 }
 
@@ -1085,7 +1085,7 @@ namespace Fun
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
-                        DebugUtils.Log(last_error_message_);
+                        Debug.Log(last_error_message_);
                         failed = true;
                     }
                 }
@@ -1094,7 +1094,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1205,7 +1205,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    Debug.Log(last_error_message_);
                     return;
                 }
 
@@ -1253,7 +1253,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1274,7 +1274,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    Debug.Log(last_error_message_);
                     return;
                 }
 
@@ -1326,7 +1326,7 @@ namespace Fun
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
-                        DebugUtils.Log(last_error_message_);
+                        Debug.Log(last_error_message_);
                         failed = true;
                     }
                 }
@@ -1335,7 +1335,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1452,7 +1452,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1490,7 +1490,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1536,7 +1536,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 
@@ -1647,7 +1647,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                Debug.Log(last_error_message_);
                 failed = true;
             }
 

@@ -48,7 +48,7 @@ namespace Fun
             }
         }
 
-        public override void Login()
+        public void Login()
         {
             Debug.Log("Request token.");
             StartCoroutine(GetRequestToken());
@@ -59,7 +59,7 @@ namespace Fun
             StartCoroutine(GetAccessToken(oauth_verifier));
         }
 
-        public override void Logout()
+        public void Logout()
         {
         }
 
