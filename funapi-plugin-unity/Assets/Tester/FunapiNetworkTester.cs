@@ -185,16 +185,16 @@ public class FunapiNetworkTester : MonoBehaviour
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
                 // by changing JsonHelper member in FunapiTransport.
                 // Please refer to comments inside Connect() function.
-                Dictionary<string, object> example = new Dictionary<string, object>();
-                example["message"] = "hello world";
-                network_.SendMessage("echo", example, EncryptionType.kDefaultEncryption);
+                Dictionary<string, object> message = new Dictionary<string, object>();
+                message["message"] = "hello world";
+                network_.SendMessage("echo", message);
             }
             else if (network_.MsgType == FunMsgType.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.message = "hello proto";
-                FunMessage example = network_.CreateFunMessage(echo, 16);
-                network_.SendMessage("pbuf_echo", example, EncryptionType.kDefaultEncryption);
+                FunMessage message = network_.CreateFunMessage(echo, 16);
+                network_.SendMessage("pbuf_echo", message);
             }
         }
     }
