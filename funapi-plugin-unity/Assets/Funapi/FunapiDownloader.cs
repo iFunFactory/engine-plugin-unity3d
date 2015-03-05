@@ -42,14 +42,14 @@ namespace Fun
         }
 
         // Start downloading
-        public void StartDownload (string hostname_or_ip, UInt16 port, string suffix_path, bool https)
+        public void StartDownload (string hostname_or_ip, UInt16 port, string file_name, bool https)
         {
             string url = "http://";
             if (https)
                 url = "https://";
             url += hostname_or_ip + ":" + port;
             url += "/v" + FunapiVersion.kProtocolVersion + "/";
-            url += suffix_path;
+            url += file_name;
 
             StartDownload(url);
         }
