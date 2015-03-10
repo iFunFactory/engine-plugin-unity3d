@@ -1,5 +1,6 @@
 #!/bin/bash -e
 
+set +x
 set +e
 command -v gmcs
 if [ "$?" -ne "0" ]; then
@@ -14,16 +15,14 @@ RUNTIME=v2.0.50727
 
 if [ -f /usr/include/funapi/network/fun_message.proto ]; then
   echo 'Generating Protocol C# files'
-  mkdir csharp-files/bin
-  protoc -I"/usr/include" "proto-files/funapi/network/fun_message.proto" -o"csharp-files/bin/fun_message.bin"
-  protoc -I"proto-files" "proto-files/pbuf_echo.proto" -o"csharp-files/bin/pbuf_echo.bin"
+  protoc --include_imports \
+      -o messages.bin \
+      -I /usr/include -I proto-files \
+      /usr/include/funapi/network/fun_message.proto \
+      proto-files/pbuf_echo.proto
 
   mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
-                            -i:"csharp-files/bin/fun_message.bin" -o:"csharp-files/fun_message.cs" -:detectMissing
-  mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
-                            -i:"csharp-files/bin/pbuf_echo.bin" -o:"csharp-files/pbuf_echo.cs" -:detectMissing
-
-  rm -rf "csharp-files/bin"
+                            -i:"messages.bin" -o:"messages.cs" -p:detectMissing
 fi
 
 echo 'Generating Protocol DLL'
@@ -37,5 +36,6 @@ echo 'Generating Serializer DLL'
 mono --runtime=${RUNTIME} \
     "protobuf-net/Precompile/precompile.exe" \
     "${OUTPUT_ROOT}/messages.dll" \
+    -probe:"${OUTPUT_ROOT}" \
     -o:"${OUTPUT_ROOT}/FunMessageSerializer.dll" \
     -t:"FunMessageSerializer"
