@@ -12,7 +12,6 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
 using UnityEngine;
 
 // Protobuf
@@ -25,8 +24,16 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 53;
+        public static readonly int kPluginVersion = 56;
     }
+
+    // Funapi transport protocol
+    public enum TransportProtocol {
+        kDefault = 0,
+        kTcp,
+        kUdp,
+        kHttp
+    };
 
     // Funapi message type
     public enum FunMsgType
@@ -35,6 +42,7 @@ namespace Fun
         kProtobuf
     }
 
+    // Error code
     public enum ErrorCode
     {
         kNone,
@@ -48,10 +56,10 @@ namespace Fun
     }
 
     // Event handler delegate
-    public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
-    public delegate void ConnectTimeoutHandler();
-    public delegate void StartedEventHandler();
-    public delegate void StoppedEventHandler();
+    public delegate void ReceivedEventHandler(TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body);
+    public delegate void ConnectTimeoutHandler(TransportProtocol protocol);
+    public delegate void StartedEventHandler(TransportProtocol protocol);
+    public delegate void StoppedEventHandler(TransportProtocol protocol);
 
     // Container to hold json-related functions.
     public abstract class JsonAccessor
@@ -158,6 +166,12 @@ namespace Fun
         public event StoppedEventHandler StoppedCallback;
         public event ReceivedEventHandler ReceivedCallback;
 
+        // Transport protocol
+        public TransportProtocol protocol
+        {
+            get { return protocol_; }
+        }
+
         // Encoding/Decoding related
         public JsonAccessor JsonHelper
         {
@@ -179,25 +193,25 @@ namespace Fun
 
         protected void OnConnectionTimeout ()
         {
-            ConnectTimeoutCallback();
+            ConnectTimeoutCallback(protocol_);
         }
 
         protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
-            ReceivedCallback(header, body);
+            ReceivedCallback(protocol_, header, body);
         }
 
         protected void OnStarted ()
         {
             if (StartedCallback != null)
             {
-                StartedCallback();
+                StartedCallback(protocol_);
             }
         }
 
         protected void OnStopped ()
         {
-            StoppedCallback();
+            StoppedCallback(protocol_);
         }
 
         public virtual bool IsStream()
@@ -248,6 +262,7 @@ namespace Fun
 
 
         protected State state_ = State.kDisconnected;
+        protected TransportProtocol protocol_ = TransportProtocol.kDefault;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         protected FunMessageSerializer serializer_ = null;
         protected ErrorCode last_error_code_ = ErrorCode.kNone;
@@ -819,6 +834,7 @@ namespace Fun
         #region public interface
         public FunapiTcpTransport(string hostname_or_ip, UInt16 port)
         {
+            protocol_ = TransportProtocol.kTcp;
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
@@ -1117,6 +1133,7 @@ namespace Fun
         #region public interface
         public FunapiUdpTransport(string hostname_or_ip, UInt16 port)
         {
+            protocol_ = TransportProtocol.kUdp;
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
@@ -1359,12 +1376,10 @@ namespace Fun
         #region public interface
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https)
         {
-            // Url
-            if (https)
-                host_url_ = "https://";
-            else
-                host_url_ = "http://";
+            protocol_ = TransportProtocol.kHttp;
 
+            // Url
+            host_url_ = https ? "https://" : "http://";
             host_url_ += hostname_or_ip + ":" + port;
 
             // Version
@@ -1466,7 +1481,6 @@ namespace Fun
         {
             DebugUtils.Log("RequestStreamCb called.");
 
-            bool failed = false;
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1491,12 +1505,6 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                failed = true;
-            }
-
-            if (failed)
-            {
-                Stop();
             }
         }
 
@@ -1682,31 +1690,21 @@ namespace Fun
     }
 
 
+
     // Driver to use Funapi network plugin.
     public class FunapiNetwork
     {
-        #region Handler delegate definition
-        public delegate void MessageHandler(string msg_type, object body);
-        public delegate void TimeoutHandler(string msg_type);
-        public delegate void OnSessionInitiated(string session_id);
-        public delegate void OnSessionClosed();
-        public delegate void OnTransportClosed();
-        public delegate void OnMessageHandler(object body);
-        #endregion
-
         #region public interface
         public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
                              OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
         {
             state_ = State.kUnknown;
-            transport_ = transport;
             msg_type_ = type;
             on_session_initiated_ = on_session_initiated;
             on_session_closed_ = on_session_closed;
-            transport_.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
-            transport_.StartedCallback += new StartedEventHandler(OnTransportStarted);
-            transport_.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
-            transport_.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+
+            AttachTransport(transport);
+            SetProtocol(transport.protocol);
 
             if (session_reliability && transport.IsStream() && !transport.IsRequestResponse())
             {
@@ -1722,10 +1720,75 @@ namespace Fun
             send_queue_ = new System.Collections.Queue();
             rnd_ = new System.Random();
 
-            serializer_ = new FunMessageSerializer ();
-            transport_.ProtobufHelper = serializer_;
-
             recv_type_ = typeof(FunMessage);
+        }
+
+        // Set default protocol
+        public void SetProtocol (TransportProtocol protocol)
+        {
+            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
+
+            default_protocol_ = protocol;
+
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport != null)
+            {
+                default_transport_ = transport;
+            }
+        }
+
+        // Set message protocol
+        public void SetProtocol (TransportProtocol protocol, string msg_type)
+        {
+            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
+            message_protocols_[msg_type] = protocol;
+        }
+
+        public void AttachTransport (FunapiTransport transport)
+        {
+            DebugUtils.Assert(transport != null);
+
+            if (transports_.ContainsKey(transport.protocol))
+            {
+                Debug.LogWarning("AttachTransport - There's a transport of '" + transport.protocol +
+                                 "' type. It will be replaced with new transport.");
+            }
+
+            transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
+            transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
+            transport.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
+            transport.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+
+            serializer_ = new FunMessageSerializer ();
+            transport.ProtobufHelper = serializer_;
+
+            transports_[transport.protocol] = transport;
+
+            if (transport.protocol == default_protocol_)
+                default_transport_ = transport;
+        }
+
+        public void DetachTransport (TransportProtocol protocol)
+        {
+            if (transports_.ContainsKey(protocol))
+            {
+                if (protocol == default_protocol_)
+                {
+                    Debug.LogWarning("DetachTransport - You can't not detach a default transport.");
+                    return;
+                }
+
+                FunapiTransport transport = transports_[protocol];
+                if (transport != null && transport.Started)
+                    transport.Stop();
+
+                transports_.Remove(protocol);
+            }
+            else
+            {
+                Debug.LogWarning("DetachTransport - Can't find a transport of '" + protocol + "' type.");
+                DebugUtils.Assert(false);
+            }
         }
 
         public FunMessage CreateFunMessage(object msg, int msg_index)
@@ -1755,7 +1818,12 @@ namespace Fun
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
             DebugUtils.Log("Starting a network module.");
-            transport_.Start();
+
+            foreach (FunapiTransport transport in transports_.Values)
+            {
+                transport.Start();
+            }
+
             started_ = true;
         }
 
@@ -1764,17 +1832,29 @@ namespace Fun
             DebugUtils.Log("Stopping a network module.");
             started_ = false;
 
-            if (transport_.Started)
-                transport_.Stop();
-
+            StopTransport();
             CloseSession();
+        }
+
+        public void StopTransport()
+        {
+            foreach (FunapiTransport transport in transports_.Values)
+            {
+                if (transport.Started)
+                    transport.Stop();
+            }
+
+            transports_.Clear();
         }
 
         // Your update method inheriting MonoBehaviour should explicitly invoke this method.
         public void Update ()
         {
-            if (transport_ != null)
-                transport_.Update();
+            foreach (FunapiTransport transport in transports_.Values)
+            {
+                if (transport != null)
+                    transport.Update();
+            }
 
             lock (message_buffer_)
             {
@@ -1785,9 +1865,9 @@ namespace Fun
                     try
                     {
                         string msg_type;
-                        foreach (ArraySegment<byte> buffer in message_buffer_)
+                        foreach (KeyValuePair<TransportProtocol, ArraySegment<byte>> buffer in message_buffer_)
                         {
-                            msg_type = ProcessMessage(buffer);
+                            msg_type = ProcessMessage(buffer.Key, buffer.Value);
 
                             if (expected_replies_.ContainsKey(msg_type))
                             {
@@ -1831,26 +1911,17 @@ namespace Fun
 
         public bool Started
         {
-            get
-            {
-                return started_;
-            }
+            get { return started_; }
         }
 
         public bool Connected
         {
-            get
-            {
-                return transport_.Started;
-            }
+            get { return default_transport_ != null && default_transport_.Started; }
         }
 
         public bool SessionReliability
         {
-            get
-            {
-                return session_reliability_;
-            }
+            get { return session_reliability_; }
         }
 
         public FunMsgType MsgType
@@ -1858,14 +1929,24 @@ namespace Fun
             get { return msg_type_; }
         }
 
+
         public void SendMessage(string msg_type, FunMessage message)
         {
-            SendMessage(msg_type, message, EncryptionType.kDefaultEncryption);
+            SendMessage(msg_type, message, EncryptionType.kDefaultEncryption, GetProtocol(msg_type));
         }
 
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption)
         {
-            DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
+            SendMessage(msg_type, message, encryption, GetProtocol(msg_type));
+        }
+
+        public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption, TransportProtocol protocol)
+        {
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
+                return;
+
+            DebugUtils.Assert(msg_type_ == FunMsgType.kProtobuf);
 
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
@@ -1880,7 +1961,7 @@ namespace Fun
                 message.sid = session_id_;
             }
 
-            if (session_reliability_)
+            if (protocol == TransportProtocol.kTcp && session_reliability_)
             {
                 if (session_id_ == null || session_id_.Length == 0)
                 {
@@ -1894,17 +1975,25 @@ namespace Fun
             if (state_ == State.kUnknown || state_ == State.kEstablished)
             {
                 message.msgtype = msg_type;
-                transport_.SendMessage(message, encryption);
+                transport.SendMessage(message, encryption);
             }
         }
 
         public void SendMessage(string msg_type, FunMessage message,
                                 string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
-            SendMessage(msg_type, message, EncryptionType.kDefaultEncryption, expected_reply_type, expected_reply_time, onReplyMissed);
+            SendMessage(msg_type, message, EncryptionType.kDefaultEncryption, GetProtocol(msg_type),
+                        expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption,
+                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+        {
+            SendMessage(msg_type, message, encryption, GetProtocol(msg_type),
+                        expected_reply_type, expected_reply_time, onReplyMissed);
+        }
+
+        public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption, TransportProtocol protocol,
                                 string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
             if (expected_replies_.ContainsKey(message.msgtype))
@@ -1915,17 +2004,26 @@ namespace Fun
 
             expected_replies_[expected_reply_type] = new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
 
-            SendMessage(msg_type, message, encryption);
+            SendMessage(msg_type, message, encryption, protocol);
         }
 
         public void SendMessage(string msg_type, object body)
         {
-            SendMessage(msg_type, body, EncryptionType.kDefaultEncryption);
+            SendMessage(msg_type, body, EncryptionType.kDefaultEncryption, GetProtocol(msg_type));
         }
 
         public void SendMessage(string msg_type, object body, EncryptionType encryption)
         {
-            DebugUtils.Assert (msg_type_ == FunMsgType.kJson);
+            SendMessage(msg_type, body, encryption, GetProtocol(msg_type));
+        }
+
+        public void SendMessage(string msg_type, object body, EncryptionType encryption, TransportProtocol protocol)
+        {
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
+                return;
+
+            DebugUtils.Assert(msg_type_ == FunMsgType.kJson);
 
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
@@ -1935,38 +2033,46 @@ namespace Fun
             }
 
             // Encodes a messsage type.
-            transport_.JsonHelper.SetStringField(body, kMsgTypeBodyField, msg_type);
+            transport.JsonHelper.SetStringField(body, kMsgTypeBodyField, msg_type);
 
             // Encodes a session id, if any.
             if (session_id_ != null && session_id_.Length > 0)
             {
-                transport_.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+                transport.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
             }
 
-            if (session_reliability_)
+            if (protocol == TransportProtocol.kTcp && session_reliability_)
             {
                 if (session_id_ == null || session_id_.Length == 0)
                 {
                     seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
                 }
-                transport_.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
+                transport.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
                 ++seq_;
-                send_queue_.Enqueue(transport_.JsonHelper.Clone(body));
+                send_queue_.Enqueue(transport.JsonHelper.Clone(body));
             }
 
             if (state_ == State.kUnknown || state_ == State.kEstablished)
             {
-                transport_.SendMessage(body, encryption);
+                transport.SendMessage(body, encryption);
             }
         }
 
         public void SendMessage(string msg_type, object body,
                                 string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
-            SendMessage(msg_type, body, EncryptionType.kDefaultEncryption, expected_reply_type, expected_reply_time, onReplyMissed);
+            SendMessage(msg_type, body, EncryptionType.kDefaultEncryption, GetProtocol(msg_type),
+                        expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage(string msg_type, object body, EncryptionType encryption,
+                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+        {
+            SendMessage(msg_type, body, encryption, GetProtocol(msg_type),
+                        expected_reply_type, expected_reply_time, onReplyMissed);
+        }
+
+        public void SendMessage(string msg_type, object body, EncryptionType encryption, TransportProtocol protocol,
                                 string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
             if (expected_replies_.ContainsKey(msg_type))
@@ -1977,7 +2083,7 @@ namespace Fun
 
             expected_replies_[expected_reply_type] =  new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
 
-            SendMessage(msg_type, body, encryption);
+            SendMessage(msg_type, body, encryption, protocol);
         }
 
         public void RegisterHandler(string type, MessageHandler handler)
@@ -1986,12 +2092,25 @@ namespace Fun
             message_handlers_[type] = handler;
         }
 
+        public void RegisterHandlerWithProtocol(string type, TransportProtocol protocol, MessageHandler handler)
+        {
+            if (protocol == TransportProtocol.kDefault)
+            {
+                RegisterHandler(type, handler);
+                return;
+            }
+
+            DebugUtils.Log("New handler for and message type '" + type + "' of '" + protocol + "' protocol.");
+            message_protocols_[type] = protocol;
+            message_handlers_[type] = handler;
+        }
+
         public ErrorCode last_error_code_
         {
             get
             {
-                if (transport_ != null)
-                    return transport_.LastErrorCode;
+                if (default_transport_ != null)
+                    return default_transport_.LastErrorCode;
 
                 return ErrorCode.kNone;
             }
@@ -2001,8 +2120,8 @@ namespace Fun
         {
             get
             {
-                if (transport_ != null)
-                    return transport_.LastErrorMessage;
+                if (default_transport_ != null)
+                    return default_transport_.LastErrorMessage;
 
                 return "";
             }
@@ -2059,61 +2178,85 @@ namespace Fun
             }
         }
 
-        private void OnTransportReceived (Dictionary<string, string> header, ArraySegment<byte> body)
+        private TransportProtocol GetProtocol (string msg_type)
+        {
+            if (message_protocols_.ContainsKey(msg_type))
+                return message_protocols_[msg_type];
+
+            return default_protocol_;
+        }
+
+        private FunapiTransport GetTransport (TransportProtocol protocol)
+        {
+            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
+
+            if (transports_.ContainsKey(protocol))
+                return transports_[protocol];
+
+            DebugUtils.LogError("GetTransport - Can't find a transport of '" + protocol + "' type.");
+            DebugUtils.Assert(false);
+            return null;
+        }
+
+        private void OnTransportReceived (TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body)
         {
             DebugUtils.Log("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
 
             lock (message_buffer_)
             {
-                message_buffer_.Add(body);
+                message_buffer_.Add(new KeyValuePair<TransportProtocol, ArraySegment<byte>>(protocol, body));
             }
         }
 
-        private string ProcessMessage (ArraySegment<byte> buffer)
+        private string ProcessMessage (TransportProtocol protocol, ArraySegment<byte> buffer)
         {
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
+                return "";
+
             string msg_type = "";
             string session_id = "";
 
             if (msg_type_ == FunMsgType.kJson)
             {
                 string str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
-                object json = transport_.JsonHelper.Deserialize(str);
+                object json = transport.JsonHelper.Deserialize(str);
                 DebugUtils.Log("Parsed json: " + str);
 
-                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
-                string session_id_node = transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
+                DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
+                string session_id_node = transport.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
                 session_id = session_id_node;
-                transport_.JsonHelper.RemoveStringField(json, kSessionIdBodyField);
+                transport.JsonHelper.RemoveStringField(json, kSessionIdBodyField);
 
                 PrepareSession(session_id);
 
-                if (session_reliability_)
+                if (protocol == TransportProtocol.kTcp && session_reliability_)
                 {
-                    if (transport_.JsonHelper.HasField(json, kAckNumberField))
+                    if (transport.JsonHelper.HasField(json, kAckNumberField))
                     {
-                        UInt32 ack = (UInt32)transport_.JsonHelper.GetIntegerField(json, kAckNumberField);
+                        UInt32 ack = (UInt32)transport.JsonHelper.GetIntegerField(json, kAckNumberField);
                         OnAckReceived(ack);
                         // Does not support piggybacking.
-                        DebugUtils.Assert(!transport_.JsonHelper.HasField(json, kMsgTypeBodyField));
+                        DebugUtils.Assert(!transport.JsonHelper.HasField(json, kMsgTypeBodyField));
                         return msg_type;
                     }
 
-                    if (transport_.JsonHelper.HasField(json, kSeqNumberField))
+                    if (transport.JsonHelper.HasField(json, kSeqNumberField))
                     {
-                        UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(json, kSeqNumberField);
+                        UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(json, kSeqNumberField);
                         if (!OnSeqReceived(seq))
                         {
                             return msg_type;
                         }
-                        transport_.JsonHelper.RemoveStringField(json, kSeqNumberField);
+                        transport.JsonHelper.RemoveStringField(json, kSeqNumberField);
                     }
                 }
 
-                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
-                string msg_type_node = transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+                DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
+                string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
                 msg_type = msg_type_node;
-                transport_.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
+                transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
 
                 if (message_handlers_.ContainsKey(msg_type))
                     message_handlers_[msg_type](msg_type, json);
@@ -2126,7 +2269,7 @@ namespace Fun
                 session_id = message.sid;
                 PrepareSession(session_id);
 
-                if (session_reliability_)
+                if (protocol == TransportProtocol.kTcp && session_reliability_)
                 {
                     if (message.ackSpecified)
                     {
@@ -2174,19 +2317,23 @@ namespace Fun
         {
             DebugUtils.Assert(session_reliability_);
 
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+                return;
+
             if (msg_type_ == FunMsgType.kJson)
             {
-                object ack_msg = transport_.JsonHelper.Deserialize("{}");
-                transport_.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
-                transport_.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
-                transport_.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
+                object ack_msg = transport.JsonHelper.Deserialize("{}");
+                transport.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
+                transport.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
+                transport.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
             }
             else
             {
                 FunMessage ack_msg = new FunMessage();
                 ack_msg.sid = session_id_;
                 ack_msg.ack = ack;
-                transport_.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
+                transport.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
             }
         }
 
@@ -2217,13 +2364,17 @@ namespace Fun
         {
             DebugUtils.Assert (session_reliability_);
 
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+                return;
+
             while (send_queue_.Count > 0)
             {
                 UInt32 seq;
                 object last_msg = send_queue_.Peek();
                 if (msg_type_ == FunMsgType.kJson)
                 {
-                    seq = (UInt32)transport_.JsonHelper.GetIntegerField(last_msg, kSeqNumberField);
+                    seq = (UInt32)transport.JsonHelper.GetIntegerField(last_msg, kSeqNumberField);
                 }
                 else if (msg_type_ == FunMsgType.kProtobuf)
                 {
@@ -2251,15 +2402,15 @@ namespace Fun
                 {
                     if (msg_type_ == FunMsgType.kJson)
                     {
-                        UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(msg, kSeqNumberField);
+                        UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(msg, kSeqNumberField);
                         DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
-                        transport_.SendMessage(msg, EncryptionType.kDefaultEncryption);
+                        transport.SendMessage(msg, EncryptionType.kDefaultEncryption);
                     }
                     else if (msg_type_ == FunMsgType.kProtobuf)
                     {
                         UInt32 seq = (msg as FunMessage).seq;
                         DebugUtils.Assert(seq == ack || SeqLess (seq, ack));
-                        transport_.SendMessage(msg as FunMessage, EncryptionType.kDefaultEncryption);
+                        transport.SendMessage(msg as FunMessage, EncryptionType.kDefaultEncryption);
                     }
                     else
                     {
@@ -2271,17 +2422,16 @@ namespace Fun
             }
         }
 
-        private void OnConnectTimeout()
+        private void OnConnectTimeout (TransportProtocol protocol)
         {
-            if (session_reliability_ == false) {
+            if (protocol != TransportProtocol.kTcp || session_reliability_ == false) {
                 Stop();
             }
         }
 
-        private void OnTransportStarted()
+        private void OnTransportStarted (TransportProtocol protocol)
         {
-            if (!session_reliability_)
-            {
+            if (protocol != TransportProtocol.kTcp || session_reliability_ == false) {
                 return;
             }
 
@@ -2292,17 +2442,19 @@ namespace Fun
             }
         }
 
-        private void OnTransportStopped()
+        private void OnTransportStopped (TransportProtocol protocol)
         {
-            if (session_reliability_)
+            if (protocol == TransportProtocol.kTcp && session_reliability_)
             {
                 if (state_ == State.kEstablished || state_ == State.kWaitForAck)
                 {
                     state_ = State.kTransportClosed;
                 }
             }
-            DebugUtils.Log("Transport terminated. Stopping. You may restart again.");
+
+            DebugUtils.Log("Transport terminated. Stopping.");
         }
+        #endregion
 
         #region Funapi system message handlers
         private void OnNewSession(string msg_type, object body)
@@ -2323,6 +2475,17 @@ namespace Fun
         }
         #endregion
 
+
+        // Delegates
+        public delegate void MessageHandler(string msg_type, object body);
+        public delegate void TimeoutHandler(string msg_type);
+        public delegate void OnSessionInitiated(string session_id);
+        public delegate void OnSessionClosed();
+        public delegate void OnTransportClosed();
+        public delegate void OnMessageHandler(object body);
+
+
+        // States
         enum State
         {
             kUnknown = 0,
@@ -2331,6 +2494,7 @@ namespace Fun
             kWaitForAck
         }
 
+        // Callback timer for expected reply messages
         class ExpectedReplyMessage
         {
             public ExpectedReplyMessage (float t, TimeoutHandler cb)
@@ -2356,29 +2520,30 @@ namespace Fun
         private static readonly string kSessionClosedMessageType = "_session_closed";
         private static readonly string kMaintenanceMessageType = "_maintenance";
 
-        // member variables.
+        // Member variables.
         private State state_;
         private FunMessageSerializer serializer_;
         private Type recv_type_;
         private FunMsgType msg_type_;
         private bool started_ = false;
-        private FunapiTransport transport_;
+        private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
+        private FunapiTransport default_transport_ = null;
+        private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
         private OnSessionInitiated on_session_initiated_;
         private OnSessionClosed on_session_closed_;
         private string session_id_ = "";
+        private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
-        private List<ArraySegment<byte>> message_buffer_ = new List<ArraySegment<byte>>();
+        private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
         private DateTime last_received_ = DateTime.Now;
 
-        // reliability-releated member variables.
+        // Reliability-releated member variables.
         private bool session_reliability_;
         private UInt32 seq_;
         private UInt32 seq_recvd_;
         private bool first_receiving_;
         private System.Collections.Queue send_queue_;
         private System.Random rnd_;
-
-        #endregion
     }
 }  // namespace Fun
