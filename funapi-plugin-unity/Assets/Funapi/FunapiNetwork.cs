@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 56;
+        public static readonly int kPluginVersion = 57;
     }
 
     // Funapi transport protocol
@@ -373,11 +373,11 @@ namespace Fun
             bool failed = false;
             try
             {
-                lock (sending_)
+                lock (sending_lock_)
                 {
                     pending_.Add(new SendingBuffer(new ArraySegment<byte>(body), encryption));
 
-                    if (state_ == State.kConnected && sending_.Count == 0)
+                    if (Started && sending_.Count == 0)
                     {
                         List<SendingBuffer> tmp = sending_;
                         sending_ = pending_;
@@ -681,20 +681,8 @@ namespace Fun
                     state_ = State.kConnected;
                     DebugUtils.Log("Ready to receive.");
 
-                    // Starts to process if there any data already queue.
-                    lock (sending_)
-                    {
-                        if (pending_.Count > 0)
-                        {
-                            DebugUtils.Log("Flushing pending messages.");
-                            List<SendingBuffer> tmp = sending_;
-                            sending_ = pending_;
-                            pending_ = tmp;
-
-                            if (!EncryptThenSendMessage())
-                                return false;
-                        }
-                    }
+                    // Sends messages
+                    do_sending_ = true;
                 }
             }
 
@@ -815,9 +803,12 @@ namespace Fun
 
         // State-related.
         private bool first_sending = true;
+        protected bool do_sending_ = false;
         protected bool header_decoded_ = false;
         protected int received_size_ = 0;
         protected int next_decoding_offset_ = 0;
+        protected object sending_lock_ = new object();
+        protected object receive_lock_ = new object();
         protected byte[] receive_buffer = new byte[kUnitBufferSize];
         protected byte[] send_buffer_ = new byte[kUnitBufferSize];
         protected List<SendingBuffer> pending_ = new List<SendingBuffer>();
@@ -877,6 +868,28 @@ namespace Fun
                     OnConnectionTimeout();
                 }
             }
+
+            // Starts to process if there any data already queue.
+            if (do_sending_)
+            {
+                lock (sending_lock_)
+                {
+                    if (sending_.Count == 0)
+                    {
+                        do_sending_ = false;
+
+                        if (pending_.Count > 0)
+                        {
+                            DebugUtils.Log("Flushing pending messages.");
+                            List<SendingBuffer> tmp = sending_;
+                            sending_ = pending_;
+                            pending_ = tmp;
+
+                            EncryptThenSendMessage();
+                        }
+                    }
+                }
+            }
         }
         #endregion
 
@@ -928,7 +941,7 @@ namespace Fun
 
                 state_ = State.kEncryptionHandshaking;
 
-                lock (receive_buffer)
+                lock (receive_lock_)
                 {
                     // Wait for encryption handshaking message.
                     ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer, 0, receive_buffer.Length);
@@ -969,11 +982,13 @@ namespace Fun
                 int nSent = sock_.EndSend(ar);
                 DebugUtils.Log("Sent " + nSent + "bytes");
 
-                lock (sending_)
+                lock (sending_lock_)
                 {
                     // Removes any segment fully sent.
                     while (nSent > 0)
                     {
+                        DebugUtils.Assert(sending_.Count > 0);
+
                         if (sending_[0].data.Count > nSent)
                         {
                             // partial data
@@ -1050,7 +1065,7 @@ namespace Fun
                     return;
                 }
 
-                lock (receive_buffer)
+                lock (receive_lock_)
                 {
                     int nRead = sock_.EndReceive(ar);
                     if (nRead > 0)
@@ -1226,10 +1241,12 @@ namespace Fun
                     return;
                 }
 
-                lock (sending_)
+                lock (sending_lock_)
                 {
                     int nSent = sock_.EndSend(ar);
                     DebugUtils.Log("Sent " + nSent + "bytes");
+
+                    DebugUtils.Assert(sending_.Count >= 2);
 
                     // Removes header and body segment
                     int nToSend = 0;
@@ -1295,7 +1312,7 @@ namespace Fun
                     return;
                 }
 
-                lock (receive_buffer)
+                lock (receive_lock_)
                 {
                     int nRead = sock_.EndReceive(ar);
                     if (nRead > 0)
@@ -1491,8 +1508,10 @@ namespace Fun
                 stream.Close();
                 DebugUtils.Log("Sent " + state.sending.Count + "bytes");
 
-                lock (sending_)
+                lock (sending_lock_)
                 {
+                    DebugUtils.Assert(sending_.Count >= 2);
+
                     // Removes header and body segment
                     sending_.RemoveAt(0);
                     sending_.RemoveAt(0);
@@ -1587,7 +1606,7 @@ namespace Fun
                         DebugUtils.Assert(false);
                     }
 
-                    lock (receive_buffer)
+                    lock (receive_lock_)
                     {
                         // Header
                         byte[] header = state.response.Headers.ToByteArray();
@@ -1630,7 +1649,7 @@ namespace Fun
                         last_error_message_ = "";
                     }
 
-                    lock (sending_)
+                    lock (sending_lock_)
                     {
                         if (sending_.Count > 0)
                         {
@@ -1856,7 +1875,7 @@ namespace Fun
                     transport.Update();
             }
 
-            lock (message_buffer_)
+            lock (message_lock_)
             {
                 if (message_buffer_.Count > 0)
                 {
@@ -2203,7 +2222,7 @@ namespace Fun
             DebugUtils.Log("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
 
-            lock (message_buffer_)
+            lock (message_lock_)
             {
                 message_buffer_.Add(new KeyValuePair<TransportProtocol, ArraySegment<byte>>(protocol, body));
             }
@@ -2536,6 +2555,7 @@ namespace Fun
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
         private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
+        protected object message_lock_ = new object();
         private DateTime last_received_ = DateTime.Now;
 
         // Reliability-releated member variables.
