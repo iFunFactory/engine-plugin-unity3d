@@ -118,10 +118,10 @@ namespace Fun
 
                     Debug.Log("Announcement has been updated. total count: " + announce_list_.Count);
 
-                    if (image_list.Count > 0)
+                    if (image_list_.Count > 0)
                     {
                         // Request a file.
-                        KeyValuePair<string, string> item = image_list[0];
+                        KeyValuePair<string, string> item = image_list_[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
                         Debug.Log("Download url: " + item.Key);
                     }
@@ -150,10 +150,10 @@ namespace Fun
                 }
                 else
                 {
-                    image_list.RemoveAt(0);
-                    if (image_list.Count > 0)
+                    image_list_.RemoveAt(0);
+                    if (image_list_.Count > 0)
                     {
-                        KeyValuePair<string, string> item = image_list[0];
+                        KeyValuePair<string, string> item = image_list_[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
                         Debug.Log("Download url: " + item.Key);
                     }
@@ -191,13 +191,13 @@ namespace Fun
                         hash += n.ToString("x2");
 
                     if (hash != imgmd5)
-                        image_list.Add(new KeyValuePair<string, string>(url, path));
+                        image_list_.Add(new KeyValuePair<string, string>(url, path));
                 }
             }
             else
             {
                 url = host_url_ + kImagesUrl + url;
-                image_list.Add(new KeyValuePair<string, string>(url, path));
+                image_list_.Add(new KeyValuePair<string, string>(url, path));
             }
         }
         #endregion
@@ -216,7 +216,7 @@ namespace Fun
         private string local_path_ = "";
         private WebClient web_client_ = new WebClient();
         private List<Dictionary<string, object>> announce_list_ = new List<Dictionary<string, object>>();
-        private List<KeyValuePair<string, string>> image_list = new List<KeyValuePair<string, string>>();
+        private List<KeyValuePair<string, string>> image_list_ = new List<KeyValuePair<string, string>>();
 
         public event EventHandler ResultCallback;
     }

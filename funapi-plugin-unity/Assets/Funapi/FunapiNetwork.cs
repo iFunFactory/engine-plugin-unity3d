@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 57;
+        public static readonly int kPluginVersion = 58;
     }
 
     // Funapi transport protocol
@@ -450,10 +450,10 @@ namespace Fun
 
                 string header = "";
                 header += kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter;
-                if (first_sending)
+                if (first_sending_)
                 {
                     header += kPluginVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kPluginVersion + kHeaderDelimeter;
-                    first_sending = false;
+                    first_sending_ = false;
                 }
                 header += kLengthHeaderField + kHeaderFieldDelimeter + buffer.data.Count + kHeaderDelimeter;
                 if ((int)encryption != kNoneEncryption)
@@ -479,32 +479,32 @@ namespace Fun
         // Checks buffer space before starting another async receive.
         protected void CheckReceiveBuffer()
         {
-            int remaining_size = receive_buffer.Length - received_size_;
+            int remaining_size = receive_buffer_.Length - received_size_;
 
             if (remaining_size <= 0)
             {
                 byte[] new_buffer = null;
 
                 if (remaining_size == 0 && next_decoding_offset_ > 0)
-                    new_buffer = new byte[receive_buffer.Length];
+                    new_buffer = new byte[receive_buffer_.Length];
                 else
-                    new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
+                    new_buffer = new byte[receive_buffer_.Length + kUnitBufferSize];
 
                 // If there are space can be collected, compact it first.
                 // Otherwise, increase the receiving buffer size.
                 if (next_decoding_offset_ > 0)
                 {
                     DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
-                    Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
-                    receive_buffer = new_buffer;
+                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                    receive_buffer_ = new_buffer;
                     received_size_ -= next_decoding_offset_;
                     next_decoding_offset_ = 0;
                 }
                 else
                 {
-                    DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
-                    Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
-                    receive_buffer = new_buffer;
+                    DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer_.Length + kUnitBufferSize) + " bytes.");
+                    Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
+                    receive_buffer_ = new_buffer;
                 }
             }
         }
@@ -515,7 +515,7 @@ namespace Fun
 
             for (; next_decoding_offset_ < received_size_; )
             {
-                ArraySegment<byte> haystack = new ArraySegment<byte>(receive_buffer, next_decoding_offset_, received_size_ - next_decoding_offset_);
+                ArraySegment<byte> haystack = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, received_size_ - next_decoding_offset_);
                 int offset = BytePatternMatch(haystack, kHeaderDelimeterAsNeedle);
                 if (offset < 0)
                 {
@@ -523,7 +523,7 @@ namespace Fun
                     DebugUtils.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
-                string line = Encoding.ASCII.GetString(receive_buffer, next_decoding_offset_, offset - next_decoding_offset_);
+                string line = Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
                 next_decoding_offset_ = offset + 1;
 
                 if (line == "")
@@ -713,7 +713,7 @@ namespace Fun
                         return false;
                     }
 
-                    ArraySegment<byte> body_bytes = new ArraySegment<byte>(receive_buffer, next_decoding_offset_, body_length);
+                    ArraySegment<byte> body_bytes = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
                     DebugUtils.Assert(body_bytes.Count == body_length);
 
                     Int64 nSize = encryptor.Decrypt(body_bytes, body_bytes, encryption_header);
@@ -727,7 +727,7 @@ namespace Fun
                     DebugUtils.Assert(body_length == nSize);
                 }
 
-                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer, next_decoding_offset_, body_length);
+                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
                 next_decoding_offset_ += body_length;
 
                 // The network module eats the fields and invoke registered handler.
@@ -802,14 +802,14 @@ namespace Fun
         private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
         // State-related.
-        private bool first_sending = true;
+        private bool first_sending_ = true;
         protected bool do_sending_ = false;
         protected bool header_decoded_ = false;
         protected int received_size_ = 0;
         protected int next_decoding_offset_ = 0;
         protected object sending_lock_ = new object();
         protected object receive_lock_ = new object();
-        protected byte[] receive_buffer = new byte[kUnitBufferSize];
+        protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
         protected byte[] send_buffer_ = new byte[kUnitBufferSize];
         protected List<SendingBuffer> pending_ = new List<SendingBuffer>();
         protected List<SendingBuffer> sending_ = new List<SendingBuffer>();
@@ -859,10 +859,10 @@ namespace Fun
 
         public override void Update ()
         {
-            if (state_ == State.kConnecting && connect_timeout > 0f)
+            if (state_ == State.kConnecting && connect_timeout_ > 0f)
             {
-                connect_timeout -= Time.deltaTime;
-                if (connect_timeout <= 0f)
+                connect_timeout_ -= Time.deltaTime;
+                if (connect_timeout_ <= 0f)
                 {
                     DebugUtils.Log("Connection waiting time has been exceeded.");
                     OnConnectionTimeout();
@@ -898,7 +898,7 @@ namespace Fun
         protected override void Init()
         {
             state_ = State.kConnecting;
-            connect_timeout = ConnectTimeout;
+            connect_timeout_ = ConnectTimeout;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
@@ -944,7 +944,7 @@ namespace Fun
                 lock (receive_lock_)
                 {
                     // Wait for encryption handshaking message.
-                    ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer, 0, receive_buffer.Length);
+                    ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
                     List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                     buffer.Add(wrapped);
                     sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
@@ -1099,11 +1099,11 @@ namespace Fun
                         CheckReceiveBuffer();
 
                         // Starts another async receive
-                        ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer, received_size_, receive_buffer.Length - received_size_);
+                        ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer_, received_size_, receive_buffer_.Length - received_size_);
                         List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                         buffer.Add(residual);
                         sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                        DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
+                        DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer_.Length - received_size_) + " more bytes");
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
@@ -1112,7 +1112,7 @@ namespace Fun
                         DebugUtils.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                            DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
@@ -1137,7 +1137,7 @@ namespace Fun
 
         protected Socket sock_;
         private IPEndPoint connect_ep_;
-        private float connect_timeout = 0f;
+        private float connect_timeout_ = 0f;
         #endregion
     }
 
@@ -1188,7 +1188,7 @@ namespace Fun
         {
             state_ = State.kConnected;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
+            sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
         }
 
@@ -1339,15 +1339,15 @@ namespace Fun
                     if (nRead > 0)
                     {
                         // Resets buffer
-                        receive_buffer = new byte[kUnitBufferSize];
+                        receive_buffer_ = new byte[kUnitBufferSize];
                         received_size_ = 0;
                         next_decoding_offset_ = 0;
 
                         // Starts another async receive
-                        sock_.BeginReceiveFrom(receive_buffer, received_size_, receive_buffer.Length - received_size_, SocketFlags.None,
+                        sock_.BeginReceiveFrom(receive_buffer_, received_size_, receive_buffer_.Length - received_size_, SocketFlags.None,
                                                ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
-                        DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
+                        DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer_.Length + " more bytes");
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
@@ -1356,7 +1356,7 @@ namespace Fun
                         DebugUtils.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                            DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
@@ -1623,8 +1623,8 @@ namespace Fun
                         CheckReceiveBuffer();
 
                         // Copy to buffer
-                        Buffer.BlockCopy(header, 0, receive_buffer, offset, header.Length);
-                        Buffer.BlockCopy(state.read_data, 0, receive_buffer, offset + header.Length, state.read_offset);
+                        Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
+                        Buffer.BlockCopy(state.read_data, 0, receive_buffer_, offset + header.Length, state.read_offset);
 
                         // Decoding a message
                         if (TryToDecodeHeader())

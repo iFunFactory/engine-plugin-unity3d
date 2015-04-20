@@ -21,8 +21,8 @@ public class FunapiNetworkTester : MonoBehaviour
     public void Start()
     {
         string url = string.Format("http://{0}:8080", kServerIp);
-        announcement.Init(url);
-        announcement.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+        announcement_.Init(url);
+        announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
     }
 
     public void Update()
@@ -79,10 +79,10 @@ public class FunapiNetworkTester : MonoBehaviour
             DisConnect();
         }
 
-        GUI.enabled = announcement != null;
+        GUI.enabled = announcement_ != null;
         if (GUI.Button(new Rect(280, 30, 240, 40), "Update Announcements"))
         {
-            announcement.UpdateList();
+            announcement_.UpdateList();
         }
 
         GUI.enabled = downloader_ == null;
@@ -264,11 +264,11 @@ public class FunapiNetworkTester : MonoBehaviour
         if (result != AnnounceResult.kSuccess)
             return;
 
-        if (announcement.ListCount > 0)
+        if (announcement_.ListCount > 0)
         {
-            for (int i = 0; i < announcement.ListCount; ++i)
+            for (int i = 0; i < announcement_.ListCount; ++i)
             {
-                Dictionary<string, object> list = announcement.GetAnnouncement(i);
+                Dictionary<string, object> list = announcement_.GetAnnouncement(i);
                 string buffer = "";
 
                 foreach (var item in list)
@@ -312,7 +312,7 @@ public class FunapiNetworkTester : MonoBehaviour
     // member variables.
     private FunapiNetwork network_ = null;
     private FunapiHttpDownloader downloader_ = null;
-    private FunapiAnnouncement announcement = new FunapiAnnouncement();
+    private FunapiAnnouncement announcement_ = new FunapiAnnouncement();
     private string message_ = "";
 
     // Another Funapi-specific features will go here...
