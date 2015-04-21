@@ -60,6 +60,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
         {
             FunapiHttpTransport transport = new FunapiHttpTransport(kServerIp, 8018, false);
+            transport.RequestFailureCallback += new FunapiHttpTransport.OnRequestFailure(OnHttpRequestFailure);
 
             // Please set the same encryption type as the encryption type of server.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
@@ -303,6 +304,11 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             DebugUtils.Assert(false);
         }
+    }
+
+    private void OnHttpRequestFailure (string msg_type)
+    {
+        Debug.Log("OnHttpRequestFailure - msg_type: " + msg_type);
     }
 
 

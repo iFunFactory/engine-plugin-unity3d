@@ -56,7 +56,8 @@ namespace Fun
     }
 
     // Event handler delegate
-    public delegate void ReceivedEventHandler(TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body);
+    public delegate void ReceivedEventHandler(TransportProtocol protocol,
+                                              Dictionary<string, string> header, ArraySegment<byte> body);
     public delegate void ConnectTimeoutHandler(TransportProtocol protocol);
     public delegate void StartedEventHandler(TransportProtocol protocol);
     public delegate void StoppedEventHandler(TransportProtocol protocol);
@@ -157,7 +158,7 @@ namespace Fun
         public abstract bool Started { get; }
 
         // Send a message
-        public abstract void SendMessage(object json_message, EncryptionType encryption);
+        public abstract void SendMessage(string msgtype, object json_message, EncryptionType encryption);
         public abstract void SendMessage(FunMessage message, EncryptionType encryption);
 
         // Registered event handlers.
@@ -344,14 +345,14 @@ namespace Fun
         }
 
         // Sends a JSON message through a socket.
-        public override void SendMessage (object json_message, EncryptionType encryption)
+        public override void SendMessage (string msgtype, object json_message, EncryptionType encryption)
         {
             string str = this.JsonHelper.Serialize(json_message);
             byte[] body = Encoding.UTF8.GetBytes(str);
 
             DebugUtils.Log("JSON to send : " + str);
 
-            SendMessage(body, encryption);
+            SendMessage(msgtype, body, encryption);
         }
 
         public override void SendMessage (FunMessage message, EncryptionType encryption)
@@ -363,19 +364,19 @@ namespace Fun
             stream.Seek(0, SeekOrigin.Begin);
             stream.Read(body, 0, body.Length);
 
-            SendMessage(body, encryption);
+            SendMessage(message.msgtype, body, encryption);
         }
         #endregion
 
         #region internal implementation
-        private void SendMessage (byte[] body, EncryptionType encryption)
+        private void SendMessage (string msgtype, byte[] body, EncryptionType encryption)
         {
             bool failed = false;
             try
             {
                 lock (sending_lock_)
                 {
-                    pending_.Add(new SendingBuffer(new ArraySegment<byte>(body), encryption));
+                    pending_.Add(new SendingBuffer(msgtype, new ArraySegment<byte>(body), encryption));
 
                     if (Started && sending_.Count == 0)
                     {
@@ -465,13 +466,40 @@ namespace Fun
                 }
                 header += kHeaderDelimeter;
 
-                SendingBuffer header_buffer = new SendingBuffer(new ArraySegment<byte>(Encoding.ASCII.GetBytes(header)));
+                SendingBuffer header_buffer = new SendingBuffer(buffer.msgtype,
+                                                                new ArraySegment<byte>(Encoding.ASCII.GetBytes(header)),
+                                                                EncryptionType.kDefaultEncryption);
                 sending_.Insert(i, header_buffer);
 
                 DebugUtils.Log("Header to send: " + header + " body length: " + buffer.data.Count);
             }
 
             WireSend(sending_);
+
+            return true;
+        }
+
+        protected bool SendUnsentMessages ()
+        {
+            lock (sending_lock_)
+            {
+                if (sending_.Count > 0)
+                {
+                    // If we have more segments to send, we process more.
+                    DebugUtils.Log("Retrying unsent messages.");
+                    WireSend(sending_);
+                }
+                else if (pending_.Count > 0)
+                {
+                    // Otherwise, try to process pending messages.
+                    List<SendingBuffer> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+
+                    if (!EncryptThenSendMessage())
+                        return false;
+                }
+            }
 
             return true;
         }
@@ -769,14 +797,16 @@ namespace Fun
 
         protected class SendingBuffer
         {
-            public SendingBuffer (ArraySegment<byte> data, EncryptionType encryption = EncryptionType.kDefaultEncryption)
+            public SendingBuffer (string msgtype, ArraySegment<byte> data, EncryptionType encryption)
             {
                 this.encryption = encryption;
+                this.msgtype = msgtype;
                 this.data = data;
             }
 
-            public EncryptionType encryption;
+            public string msgtype;
             public ArraySegment<byte> data;
+            public EncryptionType encryption;
         }
 
 
@@ -1017,24 +1047,10 @@ namespace Fun
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
-
-                    if (sending_.Count > 0)
-                    {
-                        // If we have more segments to send, we process more.
-                        DebugUtils.Log("Retrying unsent messages.");
-                        WireSend(sending_);
-                    }
-                    else if (pending_.Count > 0)
-                    {
-                        // Otherwise, try to process pending messages.
-                        List<SendingBuffer> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-
-                        if (!EncryptThenSendMessage())
-                            failed = true;
-                    }
                 }
+
+                if (!SendUnsentMessages())
+                    failed = true;
             }
             catch (Exception e)
             {
@@ -1262,26 +1278,12 @@ namespace Fun
                         DebugUtils.Assert(false);
                     }
 
-                    if (sending_.Count > 0)
-                    {
-                        // If we have more segments to send, we process more.
-                        DebugUtils.Log("Retrying unsent messages.");
-                        WireSend(sending_);
-                    }
-                    else if (pending_.Count > 0)
-                    {
-                        // Otherwise, try to process pending messages.
-                        List<SendingBuffer> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-
-                        if (!EncryptThenSendMessage())
-                            failed = true;
-                    }
-
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
                 }
+
+                if (!SendUnsentMessages())
+                    failed = true;
             }
             catch (Exception e)
             {
@@ -1435,6 +1437,17 @@ namespace Fun
             return true;
         }
 
+        public override void Update ()
+        {
+            if (response_time_ <= 0f)
+                return;
+
+            response_time_ -= Time.deltaTime;
+            if (response_time_ <= 0f)
+            {
+                RequestFailure();
+            }
+        }
         #endregion
 
         #region internal implementation
@@ -1448,7 +1461,6 @@ namespace Fun
             DebugUtils.Assert(sending.Count >= 2);
             DebugUtils.Log("Send a Message.");
 
-            bool failed = false;
             try
             {
                 DebugUtils.Log("Host Url: " + host_url_);
@@ -1475,8 +1487,12 @@ namespace Fun
                 // Response
                 WebState state = new WebState();
                 state.request = request;
+                state.msgtype = body.msgtype;
                 state.sending = body.data;
                 list_.Add(state);
+
+                cur_request_ = state;
+                response_time_ = kResponseTimeout;
 
                 request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
             }
@@ -1485,12 +1501,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
                 Debug.Log(last_error_message_);
-                failed = true;
-            }
-
-            if (failed)
-            {
-                Stop();
+                RequestFailure();
             }
         }
 
@@ -1508,15 +1519,6 @@ namespace Fun
                 stream.Close();
                 DebugUtils.Log("Sent " + state.sending.Count + "bytes");
 
-                lock (sending_lock_)
-                {
-                    DebugUtils.Assert(sending_.Count >= 2);
-
-                    // Removes header and body segment
-                    sending_.RemoveAt(0);
-                    sending_.RemoveAt(0);
-                }
-
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
             }
             catch (Exception e)
@@ -1524,6 +1526,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
                 Debug.Log(last_error_message_);
+                RequestFailure();
             }
         }
 
@@ -1531,7 +1534,6 @@ namespace Fun
         {
             DebugUtils.Log("ResponseCb called.");
 
-            bool failed = false;
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1556,7 +1558,7 @@ namespace Fun
                 {
                     DebugUtils.Log("Failed response. status:" + response.StatusDescription);
                     DebugUtils.Assert(false);
-                    list_.Remove(state);
+                    RequestFailure();
                 }
             }
             catch (Exception e)
@@ -1564,12 +1566,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                failed = true;
-            }
-
-            if (failed)
-            {
-                Stop();
+                RequestFailure();
             }
         }
 
@@ -1577,7 +1574,6 @@ namespace Fun
         {
             DebugUtils.Log("ReadCb called.");
 
-            bool failed = false;
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1604,6 +1600,17 @@ namespace Fun
                     {
                         DebugUtils.LogWarning("Response instance is null.");
                         DebugUtils.Assert(false);
+                        RequestFailure();
+                        return;
+                    }
+
+                    lock (sending_lock_)
+                    {
+                        DebugUtils.Assert(sending_.Count >= 2);
+
+                        // Removes header and body segment
+                        sending_.RemoveAt(0);
+                        sending_.RemoveAt(0);
                     }
 
                     lock (receive_lock_)
@@ -1645,29 +1652,13 @@ namespace Fun
                         state.stream = null;
                         list_.Remove(state);
 
+                        cur_request_ = null;
+                        response_time_ = -1f;
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
 
-                    lock (sending_lock_)
-                    {
-                        if (sending_.Count > 0)
-                        {
-                            // If we have more segments to send, we process more.
-                            DebugUtils.Log("Retrying unsent messages.");
-                            WireSend(sending_);
-                        }
-                        else if (pending_.Count > 0)
-                        {
-                            // Otherwise, try to process pending messages.
-                            List<SendingBuffer> tmp = sending_;
-                            sending_ = pending_;
-                            pending_ = tmp;
-
-                            if (!EncryptThenSendMessage())
-                                failed = true;
-                        }
-                    }
+                    SendUnsentMessages();
                 }
             }
             catch (Exception e)
@@ -1675,13 +1666,44 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                failed = true;
+                RequestFailure();
+            }
+        }
+
+        private void RequestFailure ()
+        {
+            DebugUtils.Log("RequestFailure - state: " + state_);
+            if (state_ == State.kDisconnected || cur_request_ == null)
+                return;
+
+            WebState state = cur_request_;
+
+            cur_request_ = null;
+            response_time_ = -1f;
+
+            if (state.request != null)
+            {
+                state.aborted = true;
+                state.request.Abort();
             }
 
-            if (failed)
+            if (state.stream != null)
+                state.stream.Close();
+
+            list_.Remove(state);
+
+            lock (sending_lock_)
             {
-                Stop();
+                DebugUtils.Assert(sending_.Count >= 2);
+
+                // Removes header and body segment
+                sending_.RemoveAt(0);
+                sending_.RemoveAt(0);
             }
+
+            RequestFailureCallback(state.msgtype);
+
+            SendUnsentMessages();
         }
         #endregion
 
@@ -1689,6 +1711,13 @@ namespace Fun
         // Funapi header-related constants.
         private static readonly string kLengthHttpHeaderField = "content-length";
         private static readonly string kEncryptionHttpHeaderField = "X-iFun-Enc";
+
+        // waiting time for response
+        private static readonly float kResponseTimeout = 30f;    // seconds
+
+        // Delegates
+        public delegate void OnRequestFailure(string msg_type);
+        public event OnRequestFailure RequestFailureCallback;
 
         // Response-related.
         class WebState
@@ -1700,11 +1729,14 @@ namespace Fun
             public byte[] read_data = null;
             public int read_offset = 0;
             public bool aborted = false;
+            public string msgtype;
             public ArraySegment<byte> sending;
         }
 
         // member variables.
         private string host_url_;
+        private float response_time_ = -1f;
+        private WebState cur_request_ = null;
         private List<WebState> list_ = new List<WebState>();
     }
 
@@ -2073,7 +2105,7 @@ namespace Fun
 
             if (state_ == State.kUnknown || state_ == State.kEstablished)
             {
-                transport.SendMessage(body, encryption);
+                transport.SendMessage(msg_type, body, encryption);
             }
         }
 
@@ -2345,7 +2377,7 @@ namespace Fun
                 object ack_msg = transport.JsonHelper.Deserialize("{}");
                 transport.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
                 transport.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
-                transport.SendMessage(ack_msg, EncryptionType.kDefaultEncryption);
+                transport.SendMessage("", ack_msg, EncryptionType.kDefaultEncryption);
             }
             else
             {
@@ -2423,7 +2455,9 @@ namespace Fun
                     {
                         UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(msg, kSeqNumberField);
                         DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
-                        transport.SendMessage(msg, EncryptionType.kDefaultEncryption);
+
+                        string msgtype = transport.JsonHelper.GetStringField(msg, kMsgTypeBodyField) as string;
+                        transport.SendMessage(msgtype, msg, EncryptionType.kDefaultEncryption);
                     }
                     else if (msg_type_ == FunMsgType.kProtobuf)
                     {
