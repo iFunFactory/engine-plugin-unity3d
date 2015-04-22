@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 58;
+        public static readonly int kPluginVersion = 59;
     }
 
     // Funapi transport protocol
@@ -867,7 +867,7 @@ namespace Fun
     public class FunapiTcpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiTcpTransport(string hostname_or_ip, UInt16 port)
+        public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
         {
             protocol_ = TransportProtocol.kTcp;
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
@@ -1813,46 +1813,52 @@ namespace Fun
         {
             DebugUtils.Assert(transport != null);
 
-            if (transports_.ContainsKey(transport.protocol))
+            lock (transports_lock_)
             {
-                Debug.LogWarning("AttachTransport - There's a transport of '" + transport.protocol +
-                                 "' type. It will be replaced with new transport.");
+                if (transports_.ContainsKey(transport.protocol))
+                {
+                    Debug.LogWarning("AttachTransport - There's a transport of '" + transport.protocol +
+                                     "' type. It will be replaced with new transport.");
+                }
+
+                transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
+                transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
+                transport.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
+                transport.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+
+                serializer_ = new FunMessageSerializer ();
+                transport.ProtobufHelper = serializer_;
+
+                transports_[transport.protocol] = transport;
+
+                if (transport.protocol == default_protocol_)
+                    default_transport_ = transport;
             }
-
-            transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
-            transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
-            transport.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
-            transport.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
-
-            serializer_ = new FunMessageSerializer ();
-            transport.ProtobufHelper = serializer_;
-
-            transports_[transport.protocol] = transport;
-
-            if (transport.protocol == default_protocol_)
-                default_transport_ = transport;
         }
 
         public void DetachTransport (TransportProtocol protocol)
         {
-            if (transports_.ContainsKey(protocol))
+            lock (transports_lock_)
             {
-                if (protocol == default_protocol_)
+                if (transports_.ContainsKey(protocol))
                 {
-                    Debug.LogWarning("DetachTransport - You can't not detach a default transport.");
-                    return;
+                    if (protocol == default_protocol_)
+                    {
+                        Debug.LogWarning("DetachTransport - You can't not detach a default transport.");
+                        return;
+                    }
+
+                    FunapiTransport transport = transports_[protocol];
+                    if (transport != null && transport.Started)
+                        transport.Stop();
+
+                    transports_.Remove(protocol);
                 }
-
-                FunapiTransport transport = transports_[protocol];
-                if (transport != null && transport.Started)
-                    transport.Stop();
-
-                transports_.Remove(protocol);
-            }
-            else
-            {
-                Debug.LogWarning("DetachTransport - Can't find a transport of '" + protocol + "' type.");
-                DebugUtils.Assert(false);
+                else
+                {
+                    Debug.LogWarning("DetachTransport - Can't find a transport of '" + protocol + "' type.");
+                    DebugUtils.Assert(false);
+                }
             }
         }
 
@@ -1884,9 +1890,12 @@ namespace Fun
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
             DebugUtils.Log("Starting a network module.");
 
-            foreach (FunapiTransport transport in transports_.Values)
+            lock (transports_lock_)
             {
-                transport.Start();
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    transport.Start();
+                }
             }
 
             started_ = true;
@@ -1905,13 +1914,16 @@ namespace Fun
                 }
             }
 
-            foreach (FunapiTransport transport in transports_.Values)
+            lock (transports_lock_)
             {
-                if (transport.Started && transport.HaveUnsentMessages)
+                foreach (FunapiTransport transport in transports_.Values)
                 {
-                    DebugUtils.Log("Wait for sending messages.");
-                    wait_for_stop_ = true;
-                    return;
+                    if (transport.Started && transport.HaveUnsentMessages)
+                    {
+                        DebugUtils.Log("Wait for sending messages.");
+                        wait_for_stop_ = true;
+                        return;
+                    }
                 }
             }
 
@@ -1925,22 +1937,28 @@ namespace Fun
 
         public void StopTransport()
         {
-            foreach (FunapiTransport transport in transports_.Values)
+            lock (transports_lock_)
             {
-                if (transport.Started)
-                    transport.Stop();
-            }
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    if (transport.Started)
+                        transport.Stop();
+                }
 
-            transports_.Clear();
+                transports_.Clear();
+            }
         }
 
         // Your update method inheriting MonoBehaviour should explicitly invoke this method.
         public void Update ()
         {
-            foreach (FunapiTransport transport in transports_.Values)
+            lock (transports_lock_)
             {
-                if (transport != null)
-                    transport.Update();
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    if (transport != null)
+                        transport.Update();
+                }
             }
 
             lock (message_lock_)
@@ -2282,8 +2300,11 @@ namespace Fun
         {
             DebugUtils.Assert(protocol != TransportProtocol.kDefault);
 
-            if (transports_.ContainsKey(protocol))
-                return transports_[protocol];
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(protocol))
+                    return transports_[protocol];
+            }
 
             DebugUtils.LogError("GetTransport - Can't find a transport of '" + protocol + "' type.");
             DebugUtils.Assert(false);
@@ -2631,7 +2652,8 @@ namespace Fun
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
         private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
-        protected object message_lock_ = new object();
+        private object message_lock_ = new object();
+        private object transports_lock_ = new object();
         private DateTime last_received_ = DateTime.Now;
 
         // Reliability-releated member variables.
