@@ -157,6 +157,9 @@ namespace Fun
         // Check connection
         public abstract bool Started { get; }
 
+        // Check unsent messages
+        public abstract bool HaveUnsentMessages { get; }
+
         // Send a message
         public abstract void SendMessage(string msgtype, object json_message, EncryptionType encryption);
         public abstract void SendMessage(FunMessage message, EncryptionType encryption);
@@ -327,6 +330,17 @@ namespace Fun
             last_error_message_ = "";
 
             OnStopped();
+        }
+
+        public override bool HaveUnsentMessages
+        {
+            get
+            {
+                lock (sending_lock_)
+                {
+                    return sending_.Count > 0 || pending_.Count > 0;
+                }
+            }
         }
 
         public void SetEncryption (EncryptionType encryption)
@@ -1880,8 +1894,30 @@ namespace Fun
 
         public void Stop()
         {
+            DebugUtils.Log("FunapiNetwork Stop called.");
+            lock (message_lock_)
+            {
+                if (message_buffer_.Count > 0)
+                {
+                    DebugUtils.Log("Wait for processing messages.");
+                    wait_for_stop_ = true;
+                    return;
+                }
+            }
+
+            foreach (FunapiTransport transport in transports_.Values)
+            {
+                if (transport.Started && transport.HaveUnsentMessages)
+                {
+                    DebugUtils.Log("Wait for sending messages.");
+                    wait_for_stop_ = true;
+                    return;
+                }
+            }
+
             DebugUtils.Log("Stopping a network module.");
             started_ = false;
+            wait_for_stop_ = false;
 
             StopTransport();
             CloseSession();
@@ -1957,6 +1993,11 @@ namespace Fun
                         expected_replies_.Remove(key);
                     }
                 }
+            }
+
+            if (wait_for_stop_)
+            {
+                Stop();
             }
         }
 
@@ -2579,6 +2620,7 @@ namespace Fun
         private Type recv_type_;
         private FunMsgType msg_type_;
         private bool started_ = false;
+        private bool wait_for_stop_ = false;
         private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
         private FunapiTransport default_transport_ = null;
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
