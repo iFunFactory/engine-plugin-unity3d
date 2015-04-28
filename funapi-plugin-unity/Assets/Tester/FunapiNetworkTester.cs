@@ -6,7 +6,6 @@
 
 using Fun;
 using MiniJSON;
-using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -21,8 +20,9 @@ public class FunapiNetworkTester : MonoBehaviour
 {
     public void Start()
     {
-        announcement.Init("http://127.0.0.1:8080");
-        announcement.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+        string url = string.Format("http://{0}:8080", kServerIp);
+        announcement_.Init(url);
+        announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
     }
 
     public void Update()
@@ -43,20 +43,25 @@ public class FunapiNetworkTester : MonoBehaviour
             }
             else
             {
-                Connect(new FunapiTcpTransport(kServerIp, 8012));
+                FunapiTcpTransport transport = new FunapiTcpTransport(kServerIp, 8012);
+                //transport.DisableNagle = true;
+
+                Connect(transport);
             }
+
             Invoke("CheckConnection", 3f);
         }
         if (GUI.Button(new Rect(30, 90, 240, 40), "Connect (UDP)"))
         {
             Connect(new FunapiUdpTransport(kServerIp, 8013));
-            SendEchoMessage();
             Invoke("CheckConnection", 3f);
         }
         if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
         {
-            Connect(new FunapiHttpTransport(kServerIp, 8018, false));
-            SendEchoMessage();
+            FunapiHttpTransport transport = new FunapiHttpTransport(kServerIp, 8018, false);
+            transport.RequestFailureCallback += new FunapiHttpTransport.OnRequestFailure(OnHttpRequestFailure);
+
+            Connect(transport);
             Invoke("CheckConnection", 3f);
         }
 
@@ -71,10 +76,10 @@ public class FunapiNetworkTester : MonoBehaviour
             DisConnect();
         }
 
-        GUI.enabled = announcement != null;
+        GUI.enabled = announcement_ != null;
         if (GUI.Button(new Rect(280, 30, 240, 40), "Update Announcements"))
         {
-            announcement.UpdateList();
+            announcement_.UpdateList();
         }
 
         GUI.enabled = downloader_ == null;
@@ -96,19 +101,28 @@ public class FunapiNetworkTester : MonoBehaviour
 
         // You should pass an instance of FunapiTransport.
         network_ = new FunapiNetwork(transport, FunMsgType.kJson, false, this.OnSessionInitiated, this.OnSessionClosed);
+        network_.MaintenanceCallback += new FunapiNetwork.OnMessageHandler(OnMaintenanceMessage);
+
         transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
+
         // Timeout method only works with Tcp protocol.
         transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
         transport.ConnectTimeout = 3f;
-        transport_ = transport;
 
         // If you prefer use specific Json implementation other than Dictionary,
         // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
         // E.g., transport.JsonHelper = new YourJsonAccessorClass
 
+        // Test for multi-transport
+        //network_.AttachTransport(new FunapiTcpTransport(kServerIp, 8012));
+        //network_.AttachTransport(new FunapiUdpTransport(kServerIp, 8013));
+        //network_.AttachTransport(new FunapiHttpTransport(kServerIp, 8018, false));
+        //network_.SetProtocol(TransportProtocol.kTcp, "echo");
+        //network_.SetProtocol(TransportProtocol.kUdp, "pbuf_echo");
+
         network_.RegisterHandler("echo", this.OnEcho);
         network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
-        network_.MaintenanceCallback += new FunapiNetwork.OnMessageHandler(OnMaintenanceMessage);
+
         network_.Start();
     }
 
@@ -122,13 +136,11 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else if (network_.SessionReliability)
         {
-            if (transport_ != null)
-                transport_.Stop();
+            network_.StopTransport();
         }
         else
         {
             network_.Stop();
-            network_ = null;
         }
     }
 
@@ -143,7 +155,6 @@ public class FunapiNetworkTester : MonoBehaviour
             Debug.LogWarning("Maybe the server is down? Stopping the network module.");
 
             network_.Stop();
-            network_ = null;
         }
         else
         {
@@ -190,35 +201,34 @@ public class FunapiNetworkTester : MonoBehaviour
         }
     }
 
-    private void OnSessionInitiated(string session_id)
+    private void OnSessionInitiated (string session_id)
     {
         Debug.Log("Session initiated. Session id:" + session_id);
     }
 
-    private void OnSessionClosed()
+    private void OnSessionClosed ()
     {
         Debug.Log("Session closed.");
     }
 
-    private void OnConnectTimeout()
+    private void OnConnectTimeout (TransportProtocol protocol)
     {
-        Debug.Log("Transport Connection timed out.");
+        Debug.Log(protocol + " Transport Connection timed out.");
     }
 
-    private void OnTransportClosed()
+    private void OnTransportClosed (TransportProtocol protocol)
     {
-        Debug.Log("Transport closed.");
-
+        Debug.Log(protocol + " Transport closed.");
     }
 
-    private void OnEcho(string msg_type, object body)
+    private void OnEcho (string msg_type, object body)
     {
         DebugUtils.Assert(body is Dictionary<string, object>);
         string strJson = Json.Serialize(body as Dictionary<string, object>);
         Debug.Log("Received an echo message: " + strJson);
     }
 
-    private void OnEchoWithProtobuf(string msg_type, object body)
+    private void OnEchoWithProtobuf (string msg_type, object body)
     {
         DebugUtils.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
@@ -248,11 +258,11 @@ public class FunapiNetworkTester : MonoBehaviour
         if (result != AnnounceResult.kSuccess)
             return;
 
-        if (announcement.ListCount > 0)
+        if (announcement_.ListCount > 0)
         {
-            for (int i = 0; i < announcement.ListCount; ++i)
+            for (int i = 0; i < announcement_.ListCount; ++i)
             {
-                Dictionary<string, object> list = announcement.GetAnnouncement(i);
+                Dictionary<string, object> list = announcement_.GetAnnouncement(i);
                 string buffer = "";
 
                 foreach (var item in list)
@@ -289,15 +299,19 @@ public class FunapiNetworkTester : MonoBehaviour
         }
     }
 
+    private void OnHttpRequestFailure (string msg_type)
+    {
+        Debug.Log("OnHttpRequestFailure - msg_type: " + msg_type);
+    }
+
 
     // Please change this address for test.
     private const string kServerIp = "127.0.0.1";
 
     // member variables.
     private FunapiNetwork network_ = null;
-    private FunapiTransport transport_ = null;
     private FunapiHttpDownloader downloader_ = null;
-    private FunapiAnnouncement announcement = new FunapiAnnouncement();
+    private FunapiAnnouncement announcement_ = new FunapiAnnouncement();
     private string message_ = "";
 
     // Another Funapi-specific features will go here...

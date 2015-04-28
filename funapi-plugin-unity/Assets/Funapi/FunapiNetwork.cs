@@ -12,7 +12,6 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
 using UnityEngine;
 
 // Protobuf
@@ -25,8 +24,16 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 55;
+        public static readonly int kPluginVersion = 60;
     }
+
+    // Funapi transport protocol
+    public enum TransportProtocol {
+        kDefault = 0,
+        kTcp,
+        kUdp,
+        kHttp
+    };
 
     // Funapi message type
     public enum FunMsgType
@@ -35,6 +42,7 @@ namespace Fun
         kProtobuf
     }
 
+    // Error code
     public enum ErrorCode
     {
         kNone,
@@ -48,10 +56,11 @@ namespace Fun
     }
 
     // Event handler delegate
-    public delegate void ReceivedEventHandler(Dictionary<string, string> header, ArraySegment<byte> body);
-    public delegate void ConnectTimeoutHandler();
-    public delegate void StartedEventHandler();
-    public delegate void StoppedEventHandler();
+    public delegate void ReceivedEventHandler(TransportProtocol protocol,
+                                              Dictionary<string, string> header, ArraySegment<byte> body);
+    public delegate void ConnectTimeoutHandler(TransportProtocol protocol);
+    public delegate void StartedEventHandler(TransportProtocol protocol);
+    public delegate void StoppedEventHandler(TransportProtocol protocol);
 
     // Container to hold json-related functions.
     public abstract class JsonAccessor
@@ -148,8 +157,13 @@ namespace Fun
         // Check connection
         public abstract bool Started { get; }
 
+        public virtual void Update () {}
+
+        // Check unsent messages
+        public abstract bool HaveUnsentMessages { get; }
+
         // Send a message
-        public abstract void SendMessage(object json_message);
+        public abstract void SendMessage(string msgtype, object json_message);
         public abstract void SendMessage(FunMessage message);
 
         // Registered event handlers.
@@ -157,6 +171,22 @@ namespace Fun
         public event StartedEventHandler StartedCallback;
         public event StoppedEventHandler StoppedCallback;
         public event ReceivedEventHandler ReceivedCallback;
+
+        // Transport protocol
+        public TransportProtocol protocol
+        {
+            get { return protocol_; }
+        }
+
+        public State state
+        {
+            get { return state_; }
+        }
+
+        internal void SetState (State s)
+        {
+            state_ = s;
+        }
 
         // Encoding/Decoding related
         public JsonAccessor JsonHelper
@@ -173,31 +203,27 @@ namespace Fun
         #endregion
 
         #region internal implementation
-        public virtual void Update ()
-        {
-        }
-
         protected void OnConnectionTimeout ()
         {
-            ConnectTimeoutCallback();
+            ConnectTimeoutCallback(protocol_);
         }
 
         protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
-            ReceivedCallback(header, body);
+            ReceivedCallback(protocol_, header, body);
         }
 
         protected void OnStarted ()
         {
             if (StartedCallback != null)
             {
-                StartedCallback();
+                StartedCallback(protocol_);
             }
         }
 
         protected void OnStopped ()
         {
-            StoppedCallback();
+            StoppedCallback(protocol_);
         }
 
         public virtual bool IsStream()
@@ -217,8 +243,7 @@ namespace Fun
 
         public float ConnectTimeout
         {
-            get;
-            set;
+            get; set;
         }
 
         public ErrorCode LastErrorCode
@@ -232,16 +257,19 @@ namespace Fun
         }
 
 
-        protected enum State
+        public enum State
         {
-            kDisconnected = 0,
+            kUnknown = 0,
             kConnecting,
-            kConnected
+            kConnected,
+            kWaitForAck,
+            kClosed
         };
 
 
 
-        protected State state_ = State.kDisconnected;
+        protected State state_ = State.kUnknown;
+        protected TransportProtocol protocol_ = TransportProtocol.kDefault;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         protected FunMessageSerializer serializer_ = null;
         protected ErrorCode last_error_code_ = ErrorCode.kNone;
@@ -257,7 +285,7 @@ namespace Fun
         protected abstract void Init();
 
         // Sends a packet.
-        protected abstract void WireSend (List<ArraySegment<byte>> sending);
+        protected abstract void WireSend (List<SendingBuffer> sending);
 
         #region public interface
         // Starts a socket.
@@ -277,8 +305,6 @@ namespace Fun
                 last_error_message_ = "";
 
                 Init();
-
-                OnStarted();
             }
             catch (Exception e)
             {
@@ -297,25 +323,36 @@ namespace Fun
         // Stops a socket.
         public override void Stop()
         {
-            if (state_ == State.kDisconnected)
+            if (state_ == State.kUnknown)
                 return;
 
-            state_ = State.kDisconnected;
+            state_ = State.kUnknown;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
             OnStopped();
         }
 
+        public override bool HaveUnsentMessages
+        {
+            get
+            {
+                lock (sending_lock_)
+                {
+                    return sending_.Count > 0 || pending_.Count > 0;
+                }
+            }
+        }
+
         // Sends a JSON message through a socket.
-        public override void SendMessage (object json_message)
+        public override void SendMessage (string msgtype, object json_message)
         {
             string str = this.JsonHelper.Serialize(json_message);
-            byte[] body = Encoding.Default.GetBytes(str);
+            byte[] body = Encoding.UTF8.GetBytes(str);
 
             DebugUtils.Log("JSON to send : " + str);
 
-            SendMessage(body);
+            SendMessage(msgtype, body);
         }
 
         public override void SendMessage (FunMessage message)
@@ -327,35 +364,35 @@ namespace Fun
             stream.Seek(0, SeekOrigin.Begin);
             stream.Read(body, 0, body.Length);
 
-            SendMessage(body);
+            SendMessage(message.msgtype, body);
         }
         #endregion
 
         #region internal implementation
-        private void SendMessage (byte[] body)
+        private void SendMessage (string msgtype, byte[] body)
         {
             bool failed = false;
 
             try
             {
-            	lock (sending_)
+                lock (sending_lock_)
                 {
                     string header = "";
                     header += kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter;
-                	if (first_sending)
+                	if (first_sending_)
                     {
                         header += kPluginVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kPluginVersion + kHeaderDelimeter;
-                    	first_sending = false;
+                    	first_sending_ = false;
                     }
                     header += kLengthHeaderField + kHeaderFieldDelimeter + body.Length + kHeaderDelimeter;
                     header += kHeaderDelimeter;
 
-                    pending_.Add(new ArraySegment<byte>(Encoding.ASCII.GetBytes(header)));
-                    pending_.Add(new ArraySegment<byte>(body));
+                    pending_.Add(new SendingBuffer(msgtype, new ArraySegment<byte>(Encoding.ASCII.GetBytes(header))));
+                    pending_.Add(new SendingBuffer(msgtype, new ArraySegment<byte>(body)));
 
-                    if (state_ == State.kConnected && sending_.Count == 0)
+                    if (Started && sending_.Count == 0)
                     {
-                        List<ArraySegment<byte>> tmp = sending_;
+                        List<SendingBuffer> tmp = sending_;
                         sending_ = pending_;
                         pending_ = tmp;
 
@@ -377,35 +414,59 @@ namespace Fun
             }
         }
 
+        protected bool SendUnsentMessages ()
+        {
+            lock (sending_lock_)
+            {
+                if (sending_.Count > 0)
+                {
+                    // If we have more segments to send, we process more.
+                    Debug.Log("Retrying unsent messages.");
+                    WireSend(sending_);
+                }
+                else if (pending_.Count > 0)
+                {
+                    // Otherwise, try to process pending messages.
+                    List<SendingBuffer> tmp = sending_;
+                    sending_ = pending_;
+                    pending_ = tmp;
+
+                    WireSend(sending_);
+                }
+            }
+
+            return true;
+        }
+
         // Checks buffer space before starting another async receive.
         protected void CheckReceiveBuffer()
         {
-            int remaining_size = receive_buffer.Length - received_size_;
+            int remaining_size = receive_buffer_.Length - received_size_;
 
             if (remaining_size <= 0)
             {
                 byte[] new_buffer = null;
 
                 if (remaining_size == 0 && next_decoding_offset_ > 0)
-                    new_buffer = new byte[receive_buffer.Length];
+                    new_buffer = new byte[receive_buffer_.Length];
                 else
-                    new_buffer = new byte[receive_buffer.Length + kUnitBufferSize];
+                    new_buffer = new byte[receive_buffer_.Length + kUnitBufferSize];
 
                 // If there are space can be collected, compact it first.
                 // Otherwise, increase the receiving buffer size.
                 if (next_decoding_offset_ > 0)
                 {
                     DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
-                    Buffer.BlockCopy(receive_buffer, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
-                    receive_buffer = new_buffer;
+                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                    receive_buffer_ = new_buffer;
                     received_size_ -= next_decoding_offset_;
                     next_decoding_offset_ = 0;
                 }
                 else
                 {
-                    DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer.Length + kUnitBufferSize) + " bytes.");
-                    Buffer.BlockCopy(receive_buffer, 0, new_buffer, 0, received_size_);
-                    receive_buffer = new_buffer;
+                    DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer_.Length + kUnitBufferSize) + " bytes.");
+                    Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
+                    receive_buffer_ = new_buffer;
                 }
             }
         }
@@ -416,7 +477,7 @@ namespace Fun
 
             for (; next_decoding_offset_ < received_size_; )
             {
-                ArraySegment<byte> haystack = new ArraySegment<byte>(receive_buffer, next_decoding_offset_, received_size_ - next_decoding_offset_);
+                ArraySegment<byte> haystack = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, received_size_ - next_decoding_offset_);
                 int offset = BytePatternMatch(haystack, kHeaderDelimeterAsNeedle);
                 if (offset < 0)
                 {
@@ -424,7 +485,7 @@ namespace Fun
                     DebugUtils.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
-                string line = Encoding.ASCII.GetString(receive_buffer, next_decoding_offset_, offset - next_decoding_offset_);
+                string line = Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
                 next_decoding_offset_ = offset + 1;
 
                 if (line == "")
@@ -465,19 +526,6 @@ namespace Fun
                 return false;
             }
 
-            lock (sending_)
-            {
-                if (pending_.Count > 0)
-                {
-                    DebugUtils.Log("Flushing pending messages.");
-                    List<ArraySegment<byte>> tmp = sending_;
-                    sending_ = pending_;
-                    pending_ = tmp;
-                    
-                    WireSend(sending_);
-                }
-            }
-
             if (body_length > 0)
             {
                 DebugUtils.Assert(state_ == State.kConnected);
@@ -488,7 +536,7 @@ namespace Fun
                     return false;
                 }
 
-                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer, next_decoding_offset_, body_length);
+                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
                 next_decoding_offset_ += body_length;
 
                 // The network module eats the fields and invoke registered handler.
@@ -528,6 +576,20 @@ namespace Fun
         }
         #endregion
 
+
+        protected class SendingBuffer
+        {
+            public SendingBuffer (string msgtype, ArraySegment<byte> data)
+            {
+                this.msgtype = msgtype;
+                this.data = data;
+            }
+
+            public string msgtype;
+            public ArraySegment<byte> data;
+        }
+
+
         // Buffer-related constants.
         protected static readonly int kUnitBufferSize = 65536;
 
@@ -543,14 +605,16 @@ namespace Fun
         private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
         // State-related.
-        private bool first_sending = true;
+        private bool first_sending_ = true;
         protected bool header_decoded_ = false;
         protected int received_size_ = 0;
         protected int next_decoding_offset_ = 0;
-        protected byte[] receive_buffer = new byte[kUnitBufferSize];
+        protected object sending_lock_ = new object();
+        protected object receive_lock_ = new object();
+        protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
         protected byte[] send_buffer_ = new byte[kUnitBufferSize];
-        protected List<ArraySegment<byte>> pending_ = new List<ArraySegment<byte>>();
-        protected List<ArraySegment<byte>> sending_ = new List<ArraySegment<byte>>();
+        protected List<SendingBuffer> pending_ = new List<SendingBuffer>();
+        protected List<SendingBuffer> sending_ = new List<SendingBuffer>();
         protected Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
     }
 
@@ -559,8 +623,11 @@ namespace Fun
     public class FunapiTcpTransport : FunapiDecodedTransport
     {
         #region public interface
-        public FunapiTcpTransport(string hostname_or_ip, UInt16 port)
+        public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
         {
+            protocol_ = TransportProtocol.kTcp;
+            DisableNagle = false;
+
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
@@ -570,7 +637,7 @@ namespace Fun
         // Stops a socket.
         public override void Stop()
         {
-            if (state_ == State.kDisconnected)
+            if (state_ == State.kUnknown)
                 return;
 
             if (sock_ != null)
@@ -584,7 +651,11 @@ namespace Fun
 
         public override bool Started
         {
-            get { return sock_ != null && sock_.Connected && state_ == State.kConnected; }
+            get
+            {
+                return sock_ != null && sock_.Connected &&
+                       (state_ == State.kConnected || state_ == State.kWaitForAck);
+            }
         }
 
         public override bool IsStream()
@@ -592,12 +663,17 @@ namespace Fun
             return true;
         }
 
+        public bool DisableNagle
+        {
+            get; set;
+        }
+
         public override void Update ()
         {
-            if (state_ == State.kConnecting && connect_timeout > 0f)
+            if (state_ == State.kConnecting && connect_timeout_ > 0f)
             {
-                connect_timeout -= Time.deltaTime;
-                if (connect_timeout <= 0f)
+                connect_timeout_ -= Time.deltaTime;
+                if (connect_timeout_ <= 0f)
                 {
                     DebugUtils.Log("Connection waiting time has been exceeded.");
                     OnConnectionTimeout();
@@ -611,17 +687,20 @@ namespace Fun
         protected override void Init()
         {
             state_ = State.kConnecting;
-            connect_timeout = ConnectTimeout;
+            connect_timeout_ = ConnectTimeout;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            if (DisableNagle)
+                sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
 
-        protected override void WireSend(List<ArraySegment<byte>> sending)
+        protected override void WireSend(List<SendingBuffer> sending)
         {
             List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
-            foreach (ArraySegment<byte> buffer in sending)
+            foreach (SendingBuffer buffer in sending)
             {
-                list.Add(buffer);
+                list.Add(buffer.data);
             }
 
             sock_.BeginSend(list, 0, new AsyncCallback(this.SendBytesCb), this);
@@ -650,14 +729,16 @@ namespace Fun
                     DebugUtils.Log(last_error_message_);
                     return;
                 }
-                DebugUtils.Log("Connected.");
+                Debug.Log("Connected.");
 
                 state_ = State.kConnected;
 
-            	lock (receive_buffer)
+                OnStarted();
+
+                lock (receive_lock_)
                 {
-                    // Wait for message.
-                    ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer, 0, receive_buffer.Length);
+                    // Wait for encryption handshaking message.
+                    ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
                     List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                     buffer.Add(wrapped);
                     sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
@@ -696,12 +777,14 @@ namespace Fun
                 int nSent = sock_.EndSend(ar);
                 DebugUtils.Log("Sent " + nSent + "bytes");
 
-            	lock (sending_)
+                lock (sending_lock_)
                 {
                     // Removes any segment fully sent.
                     while (nSent > 0)
                     {
-                        if (sending_[0].Count > nSent)
+                        DebugUtils.Assert(sending_.Count > 0);
+
+                        if (sending_[0].data.Count > nSent)
                         {
                             // partial data
                             DebugUtils.Log("Partially sent. Will resume.");
@@ -711,7 +794,7 @@ namespace Fun
                         {
                             // fully sent.
                             DebugUtils.Log("Discarding a fully sent message.");
-                            nSent -= sending_[0].Count;
+                            nSent -= sending_[0].data.Count;
                             sending_.RemoveAt(0);
                         }
                     }
@@ -720,32 +803,19 @@ namespace Fun
                     if (nSent > 0)
                     {
                         DebugUtils.Assert(sending_.Count > 0);
-                        ArraySegment<byte> original = sending_[0];
+                        ArraySegment<byte> original = sending_[0].data;
 
-                        DebugUtils.Assert(nSent <= sending_[0].Count);
+                        DebugUtils.Assert(nSent <= sending_[0].data.Count);
                         ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
-                        sending_[0] = adjusted;
+                        sending_[0].data = adjusted;
 
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
-
-                    if (sending_.Count > 0)
-                    {
-                        // If we have more segments to send, we process more.
-                        DebugUtils.Log("Retrying unsent messages.");
-                        WireSend(sending_);
-                    }
-                    else if (pending_.Count > 0)
-                    {
-                        // Otherwise, try to process pending messages.
-                        List<ArraySegment<byte>> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-
-                    	WireSend(sending_);
-                    }
                 }
+
+                if (!SendUnsentMessages())
+                    failed = true;
             }
             catch (Exception e)
             {
@@ -776,7 +846,7 @@ namespace Fun
                     return;
                 }
 
-            	lock (receive_buffer)
+                lock (receive_lock_)
                 {
                     int nRead = sock_.EndReceive(ar);
                     if (nRead > 0)
@@ -810,11 +880,11 @@ namespace Fun
                         CheckReceiveBuffer();
 
                         // Starts another async receive
-                        ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer, received_size_, receive_buffer.Length - received_size_);
+                        ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer_, received_size_, receive_buffer_.Length - received_size_);
                         List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                         buffer.Add(residual);
                         sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                        DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer.Length - received_size_) + " more bytes");
+                        DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer_.Length - received_size_) + " more bytes");
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
@@ -823,7 +893,7 @@ namespace Fun
                         DebugUtils.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                            DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
@@ -848,7 +918,7 @@ namespace Fun
 
         protected Socket sock_;
         private IPEndPoint connect_ep_;
-        private float connect_timeout = 0f;
+        private float connect_timeout_ = 0f;
         #endregion
     }
 
@@ -859,6 +929,7 @@ namespace Fun
         #region public interface
         public FunapiUdpTransport(string hostname_or_ip, UInt16 port)
         {
+            protocol_ = TransportProtocol.kUdp;
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
@@ -869,7 +940,7 @@ namespace Fun
         // Stops a socket.
         public override void Stop()
         {
-            if (state_ == State.kDisconnected)
+            if (state_ == State.kUnknown)
                 return;
 
             if (sock_ != null)
@@ -898,16 +969,18 @@ namespace Fun
         {
             state_ = State.kConnected;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            sock_.BeginReceiveFrom(receive_buffer, 0, receive_buffer.Length, SocketFlags.None,
+            sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+
+            OnStarted();
         }
 
         // Send a packet.
-        protected override void WireSend(List<ArraySegment<byte>> sending)
+        protected override void WireSend(List<SendingBuffer> sending)
         {
             DebugUtils.Assert(sending.Count >= 2);
 
-            int length = sending[0].Count + sending[1].Count;
+            int length = sending[0].data.Count + sending[1].data.Count;
             if (length > send_buffer_.Length)
             {
                 send_buffer_ = new byte[length];
@@ -918,16 +991,16 @@ namespace Fun
             // one header + one body
             for (int i = 0; i < 2; ++i)
             {
-                ArraySegment<byte> item = sending[i];
-                Buffer.BlockCopy(item.Array, 0, send_buffer_, offset, item.Count);
-                offset += item.Count;
+                SendingBuffer item = sending[i];
+                Buffer.BlockCopy(item.data.Array, 0, send_buffer_, offset, item.data.Count);
+                offset += item.data.Count;
             }
 
             if (offset > 0)
             {
                 if (offset > kUnitBufferSize)
                 {
-                    DebugUtils.LogWarning("Message is greater than 64KB. It will be truncated.");
+                    Debug.Log("Message is greater than 64KB. It will be truncated.");
                     DebugUtils.Assert(false);
                 }
 
@@ -952,44 +1025,33 @@ namespace Fun
                     return;
                 }
 
-            	lock (sending_)
+                lock (sending_lock_)
                 {
                     int nSent = sock_.EndSend(ar);
                     DebugUtils.Log("Sent " + nSent + "bytes");
+
+                    DebugUtils.Assert(sending_.Count >= 2);
 
                     // Removes header and body segment
                     int nToSend = 0;
                     for (int i = 0; i < 2; ++i)
                     {
-                        nToSend += sending_[0].Count;
+                        nToSend += sending_[0].data.Count;
                         sending_.RemoveAt(0);
                     }
 
                     if (nSent > 0 && nSent < nToSend)
                     {
-                        DebugUtils.LogWarning("Failed to transfer hole messages.");
+                        Debug.Log("Failed to transfer udp messages.");
                         DebugUtils.Assert(false);
-                    }
-
-                    if (sending_.Count > 0)
-                    {
-                        // If we have more segments to send, we process more.
-                        DebugUtils.Log("Retrying unsent messages.");
-                        WireSend(sending_);
-                    }
-                    else if (pending_.Count > 0)
-                    {
-                        // Otherwise, try to process pending messages.
-                        List<ArraySegment<byte>> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-
-                    	WireSend(sending_);
                     }
 
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
                 }
+
+                if (!SendUnsentMessages())
+                    failed = true;
             }
             catch (Exception e)
             {
@@ -1020,7 +1082,7 @@ namespace Fun
                     return;
                 }
 
-            	lock (receive_buffer)
+                lock (receive_lock_)
                 {
                     int nRead = sock_.EndReceive(ar);
                     if (nRead > 0)
@@ -1047,15 +1109,15 @@ namespace Fun
                     if (nRead > 0)
                     {
                         // Resets buffer
-                        receive_buffer = new byte[kUnitBufferSize];
+                        receive_buffer_ = new byte[kUnitBufferSize];
                         received_size_ = 0;
                         next_decoding_offset_ = 0;
 
                         // Starts another async receive
-                        sock_.BeginReceiveFrom(receive_buffer, received_size_, receive_buffer.Length - received_size_, SocketFlags.None,
+                        sock_.BeginReceiveFrom(receive_buffer_, received_size_, receive_buffer_.Length - received_size_, SocketFlags.None,
                                                ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
-                        DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer.Length + " more bytes");
+                        DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer_.Length + " more bytes");
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
@@ -1064,7 +1126,7 @@ namespace Fun
                         DebugUtils.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has " + (receive_buffer.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                            DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
@@ -1101,12 +1163,10 @@ namespace Fun
         #region public interface
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https)
         {
-            // Url
-            if (https)
-                host_url_ = "https://";
-            else
-                host_url_ = "http://";
+            protocol_ = TransportProtocol.kHttp;
 
+            // Url
+            host_url_ = https ? "https://" : "http://";
             host_url_ += hostname_or_ip + ":" + port;
 
             // Version
@@ -1115,7 +1175,7 @@ namespace Fun
 
         public override void Stop()
         {
-            if (state_ == State.kDisconnected)
+            if (state_ == State.kUnknown)
                 return;
 
             foreach (WebState state in list_)
@@ -1145,37 +1205,53 @@ namespace Fun
             return true;
         }
 
+        public override void Update ()
+        {
+            if (response_time_ <= 0f)
+                return;
+
+            response_time_ -= Time.deltaTime;
+            if (response_time_ <= 0f)
+            {
+                RequestFailure();
+            }
+        }
         #endregion
 
         #region internal implementation
         protected override void Init()
         {
             state_ = State.kConnected;
+
+            OnStarted();
         }
 
-    	protected override void WireSend(List<ArraySegment<byte>> sending)
+        protected override void WireSend(List<SendingBuffer> sending)
         {
             DebugUtils.Assert(sending.Count >= 2);
             DebugUtils.Log("Send a Message.");
 
-            bool failed = false;
             try
             {
                 DebugUtils.Log("Host Url: " + host_url_);
 
-            	ArraySegment<byte> body = sending[1];
+                SendingBuffer body = sending[1];
 
                 // Request
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
                 request.Method = "POST";
                 request.ContentType = "application/x-www-form-urlencoded";
-                request.ContentLength = body.Count;
+                request.ContentLength = body.data.Count;
 
                 // Response
                 WebState state = new WebState();
                 state.request = request;
-                state.sending = body;
+                state.msgtype = body.msgtype;
+                state.sending = body.data;
                 list_.Add(state);
+
+                cur_request_ = state;
+                response_time_ = kResponseTimeout;
 
                 request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
             }
@@ -1183,13 +1259,8 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
-                failed = true;
-            }
-
-            if (failed)
-            {
-                Stop();
+                Debug.Log(last_error_message_);
+                RequestFailure();
             }
         }
 
@@ -1197,7 +1268,6 @@ namespace Fun
         {
             DebugUtils.Log("RequestStreamCb called.");
 
-            bool failed = false;
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1208,26 +1278,14 @@ namespace Fun
                 stream.Close();
                 DebugUtils.Log("Sent " + state.sending.Count + "bytes");
 
-            	lock (sending_)
-                {
-                    // Removes header and body segment
-                    sending_.RemoveAt(0);
-                    sending_.RemoveAt(0);
-                }
-
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
-                failed = true;
-            }
-
-            if (failed)
-            {
-                Stop();
+                Debug.Log(last_error_message_);
+                RequestFailure();
             }
         }
 
@@ -1235,7 +1293,6 @@ namespace Fun
         {
             DebugUtils.Log("ResponseCb called.");
 
-            bool failed = false;
             try
             {
                 WebState state = (WebState)ar.AsyncState;
@@ -1260,28 +1317,21 @@ namespace Fun
                 {
                     DebugUtils.Log("Failed response. status:" + response.StatusDescription);
                     DebugUtils.Assert(false);
-                    list_.Remove(state);
+                    RequestFailure();
                 }
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
-                failed = true;
-            }
-
-            if (failed)
-            {
-                Stop();
+                Debug.Log(last_error_message_);
+                RequestFailure();
             }
         }
 
         private void ReadCb (IAsyncResult ar)
         {
             DebugUtils.Log("ReadCb called.");
-
-            bool failed = false;
 
             try
             {
@@ -1309,13 +1359,24 @@ namespace Fun
                     {
                         DebugUtils.LogWarning("Response instance is null.");
                         DebugUtils.Assert(false);
+                        RequestFailure();
+                        return;
                     }
 
-                	lock (receive_buffer)
+                    lock (sending_lock_)
+                    {
+                        DebugUtils.Assert(sending_.Count >= 2);
+
+                        // Removes header and body segment
+                        sending_.RemoveAt(0);
+                        sending_.RemoveAt(0);
+                    }
+
+                    lock (receive_lock_)
                     {
                         // Header
                         byte[] header = state.response.Headers.ToByteArray();
-                        string str_header = Encoding.Default.GetString(header, 0, header.Length);
+                        string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
                         str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
                         str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
                         str_header = str_header.Replace("\r", "");
@@ -1327,8 +1388,8 @@ namespace Fun
                         CheckReceiveBuffer();
 
                         // Copy to buffer
-                        Buffer.BlockCopy(header, 0, receive_buffer, offset, header.Length);
-                        Buffer.BlockCopy(state.read_data, 0, receive_buffer, offset + header.Length, state.read_offset);
+                        Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
+                        Buffer.BlockCopy(state.read_data, 0, receive_buffer_, offset + header.Length, state.read_offset);
 
                         // Decoding a message
                         if (TryToDecodeHeader())
@@ -1349,48 +1410,74 @@ namespace Fun
                         state.stream = null;
                         list_.Remove(state);
 
+                        cur_request_ = null;
+                        response_time_ = -1f;
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
 
-                	lock (sending_)
-                    {
-                        if (sending_.Count > 0)
-                        {
-                            // If we have more segments to send, we process more.
-                            DebugUtils.Log("Retrying unsent messages.");
-                            WireSend(sending_);
-                        }
-                        else if (pending_.Count > 0)
-                        {
-                            // Otherwise, try to process pending messages.
-                        	List<ArraySegment<byte>> tmp = sending_;
-                            sending_ = pending_;
-                            pending_ = tmp;
-
-                        	WireSend(sending_);
-                        }
-                    }
+                    SendUnsentMessages();
                 }
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
-                failed = true;
+                Debug.Log(last_error_message_);
+                RequestFailure();
+            }
+        }
+
+        private void RequestFailure ()
+        {
+            DebugUtils.Log("RequestFailure - state: " + state_);
+            if (state_ == State.kUnknown || cur_request_ == null)
+            {
+                RequestFailureCallback("");
+                return;
             }
 
-            if (failed)
+            WebState state = cur_request_;
+
+            cur_request_ = null;
+            response_time_ = -1f;
+
+            if (state.request != null)
             {
-                Stop();
+                state.aborted = true;
+                state.request.Abort();
             }
+
+            if (state.stream != null)
+                state.stream.Close();
+
+            list_.Remove(state);
+
+            lock (sending_lock_)
+            {
+                DebugUtils.Assert(sending_.Count >= 2);
+
+                // Removes header and body segment
+                sending_.RemoveAt(0);
+                sending_.RemoveAt(0);
+            }
+
+            RequestFailureCallback(state.msgtype);
+
+            SendUnsentMessages();
         }
         #endregion
 
 
         // Funapi header-related constants.
         private static readonly string kLengthHttpHeaderField = "content-length";
+
+        // waiting time for response
+        private static readonly float kResponseTimeout = 30f;    // seconds
+
+        // Delegates
+        public delegate void OnRequestFailure(string msg_type);
+        public event OnRequestFailure RequestFailureCallback;
 
         // Response-related.
         class WebState
@@ -1402,59 +1489,120 @@ namespace Fun
             public byte[] read_data = null;
             public int read_offset = 0;
             public bool aborted = false;
+            public string msgtype;
             public ArraySegment<byte> sending;
         }
 
         // member variables.
         private string host_url_;
+        private float response_time_ = -1f;
+        private WebState cur_request_ = null;
         private List<WebState> list_ = new List<WebState>();
     }
+
 
 
     // Driver to use Funapi network plugin.
     public class FunapiNetwork
     {
-        #region Handler delegate definition
-        public delegate void MessageHandler(string msg_type, object body);
-        public delegate void TimeoutHandler(string msg_type);
-        public delegate void OnSessionInitiated(string session_id);
-        public delegate void OnSessionClosed();
-        public delegate void OnTransportClosed();
-        public delegate void OnMessageHandler(object body);
-        #endregion
-
         #region public interface
         public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
                              OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
         {
-            state_ = State.kUnknown;
-            transport_ = transport;
             msg_type_ = type;
+            recv_type_ = typeof(FunMessage);
             on_session_initiated_ = on_session_initiated;
             on_session_closed_ = on_session_closed;
-            transport_.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
-            transport_.StartedCallback += new StartedEventHandler(OnTransportStarted);
-            transport_.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
-            transport_.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
 
-            if (session_reliability && transport.IsStream() && !transport.IsRequestResponse())
-            {
-                session_reliability_ = true;
-            }
-            else
-            {
-                session_reliability_ = false;
-            }
-            seq_ = 0;
+            AttachTransport(transport);
+            SetProtocol(transport.protocol);
+
             seq_recvd_ = 0;
             first_receiving_ = true;
+            session_reliability_ = session_reliability;
             send_queue_ = new System.Collections.Queue();
-            rnd_ = new System.Random();
+            unsent_queue_ = new System.Collections.Queue();
+            seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+        }
 
-            serializer_ = new FunMessageSerializer ();
-            transport_.ProtobufHelper = serializer_;
+        // Set default protocol
+        public void SetProtocol (TransportProtocol protocol)
+        {
+            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
 
-            recv_type_ = typeof(FunMessage);
+            default_protocol_ = protocol;
+
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport != null)
+            {
+                default_transport_ = transport;
+            }
+        }
+
+        // Set message protocol
+        public void SetProtocol (TransportProtocol protocol, string msg_type)
+        {
+            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
+            message_protocols_[msg_type] = protocol;
+        }
+
+        public void AttachTransport (FunapiTransport transport)
+        {
+            DebugUtils.Assert(transport != null);
+
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(transport.protocol))
+                {
+                    Debug.LogWarning("AttachTransport - transport of '" + transport.protocol +
+                                     "' type already exists. You should call DetachTransport first.");
+                    return;
+                }
+
+                transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
+                transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
+                transport.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
+                transport.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
+
+                serializer_ = new FunMessageSerializer ();
+                transport.ProtobufHelper = serializer_;
+
+                transports_[transport.protocol] = transport;
+
+                if (transport.protocol == default_protocol_)
+                    default_transport_ = transport;
+
+                if (started_)
+                {
+                    transport.Start();
+                }
+            }
+        }
+
+        public void DetachTransport (TransportProtocol protocol)
+        {
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(protocol))
+                {
+                    if (protocol == default_protocol_)
+                    {
+                        Debug.LogWarning("DetachTransport - You can't not detach a default transport.");
+                        return;
+                    }
+
+                    FunapiTransport transport = transports_[protocol];
+                    if (transport != null && transport.Started)
+                        transport.Stop();
+
+                    transports_.Remove(protocol);
+                }
+                else
+                {
+                    Debug.LogWarning("DetachTransport - Can't find a transport of '" + protocol + "' type.");
+                    DebugUtils.Assert(false);
+                }
+            }
         }
 
         public FunMessage CreateFunMessage(object msg, int msg_index)
@@ -1483,29 +1631,75 @@ namespace Fun
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
-            DebugUtils.Log("Starting a network module.");
-            transport_.Start();
+            Debug.Log("Starting a network module.");
+
+            lock (transports_lock_)
+            {
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    transport.Start();
+                }
+            }
+
             started_ = true;
         }
 
         public void Stop()
         {
-            DebugUtils.Log("Stopping a network module.");
-            started_ = false;
+            // Waits for unsent messages.
+            lock (transports_lock_)
+            {
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    if (transport.Started && transport.HaveUnsentMessages)
+                    {
+                        wait_for_stop_ = true;
+                        return;
+                    }
+                }
+            }
 
-            if (transport_.Started)
-                transport_.Stop();
+            Debug.Log("Stopping a network module.");
+            started_ = false;
+            wait_for_stop_ = false;
+
+            StopTransport();
+            transports_.Clear();
 
             CloseSession();
+        }
+
+        public void StopTransport()
+        {
+            lock (transports_lock_)
+            {
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    if (transport.Started)
+                        transport.Stop();
+                }
+            }
         }
 
         // Your update method inheriting MonoBehaviour should explicitly invoke this method.
         public void Update ()
         {
-            if (transport_ != null)
-                transport_.Update();
+            lock (transports_lock_)
+            {
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    if (transport != null)
+                        transport.Update();
+                }
+            }
 
-            lock (message_buffer_)
+            if (wait_for_stop_)
+            {
+                Stop();
+                return;
+            }
+
+            lock (message_lock_)
             {
                 if (message_buffer_.Count > 0)
                 {
@@ -1514,9 +1708,9 @@ namespace Fun
                     try
                     {
                         string msg_type;
-                        foreach (ArraySegment<byte> buffer in message_buffer_)
+                        foreach (KeyValuePair<TransportProtocol, ArraySegment<byte>> buffer in message_buffer_)
                         {
-                            msg_type = ProcessMessage(buffer);
+                            msg_type = ProcessMessage(buffer.Key, buffer.Value);
 
                             if (expected_replies_.ContainsKey(msg_type))
                             {
@@ -1528,7 +1722,7 @@ namespace Fun
                     }
                     catch (Exception e)
                     {
-                        DebugUtils.Log("Failure in Update: " + e.ToString());
+                        Debug.Log("Failure in Update: " + e.ToString());
                     }
                 }
             }
@@ -1542,7 +1736,7 @@ namespace Fun
                     item.Value.wait_time -= Time.deltaTime;
                     if (item.Value.wait_time <= 0f)
                     {
-                        DebugUtils.Log("'" + item.Key + "' message waiting time has been exceeded.");
+                        Debug.Log("'" + item.Key + "' message waiting time has been exceeded.");
                         remove_list.Add(item.Key);
                         item.Value.callback(item.Key);
                     }
@@ -1560,26 +1754,17 @@ namespace Fun
 
         public bool Started
         {
-            get
-            {
-                return started_;
-            }
+            get { return started_; }
         }
 
         public bool Connected
         {
-            get
-            {
-                return transport_.Started;
-            }
+            get { return default_transport_ != null && default_transport_.Started; }
         }
 
         public bool SessionReliability
         {
-            get
-            {
-                return session_reliability_;
-            }
+            get { return session_reliability_; }
         }
 
         public FunMsgType MsgType
@@ -1587,9 +1772,16 @@ namespace Fun
             get { return msg_type_; }
         }
 
+
         public void SendMessage(string msg_type, FunMessage message)
         {
-            DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
+            SendMessage(msg_type, message, GetProtocol(msg_type));
+        }
+
+        public void SendMessage(string msg_type, FunMessage message, TransportProtocol protocol)
+        {
+            DebugUtils.Assert(msg_type_ == FunMsgType.kProtobuf);
+            bool transport_reliability = (protocol == TransportProtocol.kTcp && session_reliability_);
 
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
@@ -1598,31 +1790,48 @@ namespace Fun
                 session_id_ = "";
             }
 
+            message.msgtype = msg_type;
+
             // Encodes a session id, if any.
             if (session_id_ != null && session_id_.Length > 0)
             {
                 message.sid = session_id_;
             }
 
-            if (session_reliability_)
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport != null &&
+                (transport_reliability == false || unsent_queue_.Count <= 0) &&
+                (transport.state == FunapiTransport.State.kConnected || session_established_))
             {
-                if (session_id_ == null || session_id_.Length == 0)
+                if (transport_reliability)
                 {
-                    seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
-                }
-                message.seq = seq_;
-                ++seq_;
-                send_queue_.Enqueue(message);
-            }
+                    message.seq = seq_;
+                    ++seq_;
 
-            if (state_ == State.kUnknown || state_ == State.kEstablished)
+                    send_queue_.Enqueue(message);
+                }
+
+                transport.SendMessage(message);
+            }
+            else if (transport_reliability)
             {
-                message.msgtype = msg_type;
-                transport_.SendMessage(message);
+                unsent_queue_.Enqueue(message);
+                Debug.Log("SendMessage - '" + msg_type + "' message queued.");
+            }
+            else
+            {
+                Debug.Log("SendMessage - '" + msg_type + "' message skipped.");
             }
         }
 
         public void SendMessage(string msg_type, FunMessage message,
+                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+        {
+            SendMessage(msg_type, message, GetProtocol(msg_type),
+                        expected_reply_type, expected_reply_time, onReplyMissed);
+        }
+
+        public void SendMessage(string msg_type, FunMessage message, TransportProtocol protocol,
                                 string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
             if (expected_replies_.ContainsKey(message.msgtype))
@@ -1633,12 +1842,18 @@ namespace Fun
 
             expected_replies_[expected_reply_type] = new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
 
-            SendMessage(msg_type, message);
+            SendMessage(msg_type, message, protocol);
         }
 
         public void SendMessage(string msg_type, object body)
         {
-            DebugUtils.Assert (msg_type_ == FunMsgType.kJson);
+            SendMessage(msg_type, body, GetProtocol(msg_type));
+        }
+
+        public void SendMessage(string msg_type, object body, TransportProtocol protocol)
+        {
+            DebugUtils.Assert(msg_type_ == FunMsgType.kJson);
+            bool transport_reliability = (protocol == TransportProtocol.kTcp && session_reliability_);
 
             // Invalidates session id if it is too stale.
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
@@ -1647,33 +1862,49 @@ namespace Fun
                 session_id_ = "";
             }
 
-            // Encodes a messsage type.
-            transport_.JsonHelper.SetStringField(body, kMsgTypeBodyField, msg_type);
+            // Encodes a messsage type
+            json_helper_.SetStringField(body, kMsgTypeBodyField, msg_type);
 
             // Encodes a session id, if any.
             if (session_id_ != null && session_id_.Length > 0)
             {
-                transport_.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+                json_helper_.SetStringField(body, kSessionIdBodyField, session_id_);
             }
 
-            if (session_reliability_)
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport != null &&
+                (transport_reliability == false || unsent_queue_.Count <= 0) &&
+                (transport.state == FunapiTransport.State.kConnected || session_established_))
             {
-                if (session_id_ == null || session_id_.Length == 0)
+                if (transport_reliability)
                 {
-                    seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
-                }
-                transport_.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
-                ++seq_;
-                send_queue_.Enqueue(transport_.JsonHelper.Clone(body));
-            }
+                    transport.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
+                    ++seq_;
 
-            if (state_ == State.kUnknown || state_ == State.kEstablished)
+                    send_queue_.Enqueue(json_helper_.Clone(body));
+                }
+
+                transport.SendMessage(msg_type, body);
+            }
+            else if (transport_reliability)
             {
-                transport_.SendMessage(body);
+                unsent_queue_.Enqueue(json_helper_.Clone(body));
+                Debug.Log("SendMessage - '" + msg_type + "' message queued.");
+            }
+            else
+            {
+                Debug.Log("SendMessage - '" + msg_type + "' message skipped.");
             }
         }
 
         public void SendMessage(string msg_type, object body,
+                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+        {
+            SendMessage(msg_type, body, GetProtocol(msg_type),
+                        expected_reply_type, expected_reply_time, onReplyMissed);
+        }
+
+        public void SendMessage(string msg_type, object body, TransportProtocol protocol,
                                 string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
         {
             if (expected_replies_.ContainsKey(msg_type))
@@ -1684,7 +1915,49 @@ namespace Fun
 
             expected_replies_[expected_reply_type] =  new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
 
-            SendMessage(msg_type, body);
+            SendMessage(msg_type, body, protocol);
+        }
+
+        private void SendUnsentMessages()
+        {
+            DebugUtils.Assert(session_reliability_);
+
+            if (unsent_queue_.Count <= 0)
+                return;
+
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+                return;
+
+            foreach (object msg in unsent_queue_)
+            {
+                if (msg_type_ == FunMsgType.kJson)
+                {
+                    string msgtype = transport.JsonHelper.GetStringField(msg, kMsgTypeBodyField) as string;
+                    if (session_id_ != null && session_id_.Length > 0)
+                        transport.JsonHelper.SetStringField(msg, kSessionIdBodyField, session_id_);
+                    transport.JsonHelper.SetIntegerField(msg, kSeqNumberField, seq_);
+                    ++seq_;
+
+                    transport.SendMessage(msgtype, msg);
+                }
+                else if (msg_type_ == FunMsgType.kProtobuf)
+                {
+                    FunMessage message = msg as FunMessage;
+                    if (session_id_ != null && session_id_.Length > 0)
+                        message.sid = session_id_;
+                    message.seq = seq_;
+                    ++seq_;
+
+                    transport.SendMessage(message);
+                }
+                else
+                {
+                    DebugUtils.Assert(false);
+                }
+            }
+
+            unsent_queue_.Clear();
         }
 
         public void RegisterHandler(string type, MessageHandler handler)
@@ -1693,12 +1966,25 @@ namespace Fun
             message_handlers_[type] = handler;
         }
 
+        public void RegisterHandlerWithProtocol(string type, TransportProtocol protocol, MessageHandler handler)
+        {
+            if (protocol == TransportProtocol.kDefault)
+            {
+                RegisterHandler(type, handler);
+                return;
+            }
+
+            DebugUtils.Log("New handler for and message type '" + type + "' of '" + protocol + "' protocol.");
+            message_protocols_[type] = protocol;
+            message_handlers_[type] = handler;
+        }
+
         public ErrorCode last_error_code_
         {
             get
             {
-                if (transport_ != null)
-                    return transport_.LastErrorCode;
+                if (default_transport_ != null)
+                    return default_transport_.LastErrorCode;
 
                 return ErrorCode.kNone;
             }
@@ -1708,8 +1994,8 @@ namespace Fun
         {
             get
             {
-                if (transport_ != null)
-                    return transport_.LastErrorMessage;
+                if (default_transport_ != null)
+                    return default_transport_.LastErrorMessage;
 
                 return "";
             }
@@ -1738,10 +2024,16 @@ namespace Fun
         {
             DebugUtils.Assert(session_id_.Length == 0);
             session_id_ = session_id;
-            state_ = State.kEstablished;
+            session_established_ = true;
             if (on_session_initiated_ != null)
             {
                 on_session_initiated_(session_id_);
+            }
+
+            if (session_reliability_)
+            {
+                if (unsent_queue_.Count > 0)
+                    SendUnsentMessages();
             }
         }
 
@@ -1751,13 +2043,13 @@ namespace Fun
                 return;
 
             session_id_ = "";
-            state_ = State.kUnknown;
+            session_established_ = false;
             if (session_reliability_)
             {
-                seq_ = 0;
                 seq_recvd_ = 0;
                 first_receiving_ = true;
                 send_queue_.Clear();
+                seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
             }
 
             if (on_session_closed_ != null)
@@ -1766,61 +2058,86 @@ namespace Fun
             }
         }
 
-        private void OnTransportReceived (Dictionary<string, string> header, ArraySegment<byte> body)
+        private TransportProtocol GetProtocol (string msg_type)
+        {
+            if (message_protocols_.ContainsKey(msg_type))
+                return message_protocols_[msg_type];
+
+            return default_protocol_;
+        }
+
+        private FunapiTransport GetTransport (TransportProtocol protocol)
+        {
+            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
+
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(protocol))
+                    return transports_[protocol];
+            }
+
+            return null;
+        }
+
+        private void OnTransportReceived (TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body)
         {
             DebugUtils.Log("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
 
-            lock (message_buffer_)
+            lock (message_lock_)
             {
-                message_buffer_.Add(body);
+                message_buffer_.Add(new KeyValuePair<TransportProtocol, ArraySegment<byte>>(protocol, body));
             }
         }
 
-        private string ProcessMessage (ArraySegment<byte> buffer)
+        private string ProcessMessage (TransportProtocol protocol, ArraySegment<byte> buffer)
         {
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
+                return "";
+
             string msg_type = "";
             string session_id = "";
 
             if (msg_type_ == FunMsgType.kJson)
             {
-                string str = Encoding.Default.GetString(buffer.Array, buffer.Offset, buffer.Count);
-                object json = transport_.JsonHelper.Deserialize(str);
+                string str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
+                object json = transport.JsonHelper.Deserialize(str);
                 DebugUtils.Log("Parsed json: " + str);
 
-                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
-                string session_id_node = transport_.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
+                DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
+                string session_id_node = transport.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
                 session_id = session_id_node;
-                transport_.JsonHelper.RemoveStringField(json, kSessionIdBodyField);
+                transport.JsonHelper.RemoveStringField(json, kSessionIdBodyField);
 
                 PrepareSession(session_id);
 
-                if (session_reliability_)
+                if (protocol == TransportProtocol.kTcp && session_reliability_)
                 {
-                    if (transport_.JsonHelper.HasField(json, kAckNumberField))
+                    if (transport.JsonHelper.HasField(json, kAckNumberField))
                     {
-                        UInt32 ack = (UInt32)transport_.JsonHelper.GetIntegerField(json, kAckNumberField);
+                        UInt32 ack = (UInt32)transport.JsonHelper.GetIntegerField(json, kAckNumberField);
                         OnAckReceived(ack);
                         // Does not support piggybacking.
-                        DebugUtils.Assert(!transport_.JsonHelper.HasField(json, kMsgTypeBodyField));
+                        DebugUtils.Assert(!transport.JsonHelper.HasField(json, kMsgTypeBodyField));
                         return msg_type;
                     }
 
-                    if (transport_.JsonHelper.HasField(json, kSeqNumberField))
+                    if (transport.JsonHelper.HasField(json, kSeqNumberField))
                     {
-                        UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(json, kSeqNumberField);
+                        UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(json, kSeqNumberField);
                         if (!OnSeqReceived(seq))
                         {
                             return msg_type;
                         }
-                        transport_.JsonHelper.RemoveStringField(json, kSeqNumberField);
+                        transport.JsonHelper.RemoveStringField(json, kSeqNumberField);
                     }
                 }
 
-                DebugUtils.Assert(transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
-                string msg_type_node = transport_.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+                DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) is string);
+                string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
                 msg_type = msg_type_node;
-                transport_.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
+                transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
 
                 if (message_handlers_.ContainsKey(msg_type))
                     message_handlers_[msg_type](msg_type, json);
@@ -1831,9 +2148,10 @@ namespace Fun
                 FunMessage message = (FunMessage)serializer_.Deserialize (stream, null, recv_type_);
 
                 session_id = message.sid;
+
                 PrepareSession(session_id);
 
-                if (session_reliability_)
+                if (protocol == TransportProtocol.kTcp && session_reliability_)
                 {
                     if (message.ackSpecified)
                     {
@@ -1858,14 +2176,14 @@ namespace Fun
             }
             else
             {
-                DebugUtils.LogWarning("Invalid message type. type: " + msg_type_);
+                Debug.Log("Invalid message type. type: " + msg_type_);
                 DebugUtils.Assert(false);
                 return msg_type;
             }
 
             if (!message_handlers_.ContainsKey(msg_type))
             {
-                DebugUtils.Log("No handler for message '" + msg_type + "'. Ignoring.");
+                Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
             }
 
             return msg_type;
@@ -1881,19 +2199,53 @@ namespace Fun
         {
             DebugUtils.Assert(session_reliability_);
 
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+                return;
+
             if (msg_type_ == FunMsgType.kJson)
             {
-                object ack_msg = transport_.JsonHelper.Deserialize("{}");
-                transport_.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
-                transport_.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
-                transport_.SendMessage(ack_msg);
+                object ack_msg = transport.JsonHelper.Deserialize("{}");
+                transport.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
+                transport.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
+                transport.SendMessage("", ack_msg);
             }
             else
             {
                 FunMessage ack_msg = new FunMessage();
                 ack_msg.sid = session_id_;
                 ack_msg.ack = ack;
-                transport_.SendMessage(ack_msg);
+                transport.SendMessage(ack_msg);
+            }
+        }
+
+        private void SendNull()
+        {
+            DebugUtils.Assert(session_reliability_);
+
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+                return;
+
+            if (msg_type_ == FunMsgType.kJson)
+            {
+                object ack_msg = transport.JsonHelper.Deserialize("{}");
+                if (session_id_ != null && session_id_.Length > 0)
+                    transport.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
+                transport.JsonHelper.SetIntegerField(ack_msg, kSeqNumberField, seq_);
+                ++seq_;
+
+                transport.SendMessage("", ack_msg);
+            }
+            else
+            {
+                FunMessage ack_msg = new FunMessage();
+                if (session_id_ != null && session_id_.Length > 0)
+                    ack_msg.sid = session_id_;
+                ack_msg.seq = seq_;
+                ++seq_;
+
+                transport.SendMessage(ack_msg);
             }
         }
 
@@ -1922,7 +2274,14 @@ namespace Fun
 
         private void OnAckReceived(UInt32 ack)
         {
-            DebugUtils.Assert (session_reliability_);
+            DebugUtils.Assert(session_reliability_);
+
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+            {
+                Debug.LogError("OnAckReceived - transport is null.");
+                return;
+            }
 
             while (send_queue_.Count > 0)
             {
@@ -1930,7 +2289,7 @@ namespace Fun
                 object last_msg = send_queue_.Peek();
                 if (msg_type_ == FunMsgType.kJson)
                 {
-                    seq = (UInt32)transport_.JsonHelper.GetIntegerField(last_msg, kSeqNumberField);
+                    seq = (UInt32)transport.JsonHelper.GetIntegerField(last_msg, kSeqNumberField);
                 }
                 else if (msg_type_ == FunMsgType.kProtobuf)
                 {
@@ -1952,21 +2311,23 @@ namespace Fun
                 }
             }
 
-            if (state_ == State.kWaitForAck)
+            if (transport.state == FunapiTransport.State.kWaitForAck)
             {
                 foreach (object msg in send_queue_)
                 {
                     if (msg_type_ == FunMsgType.kJson)
                     {
-                        UInt32 seq = (UInt32)transport_.JsonHelper.GetIntegerField(msg, kSeqNumberField);
+                        UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(msg, kSeqNumberField);
                         DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
-                        transport_.SendMessage(msg);
+
+                        string msgtype = transport.JsonHelper.GetStringField(msg, kMsgTypeBodyField) as string;
+                        transport.SendMessage(msgtype, msg);
                     }
                     else if (msg_type_ == FunMsgType.kProtobuf)
                     {
                         UInt32 seq = (msg as FunMessage).seq;
                         DebugUtils.Assert(seq == ack || SeqLess (seq, ack));
-                        transport_.SendMessage(msg as FunMessage);
+                        transport.SendMessage(msg as FunMessage);
                     }
                     else
                     {
@@ -1974,42 +2335,55 @@ namespace Fun
                     }
                 }
 
-                state_ = State.kEstablished;
+                session_established_ = true;
             }
         }
 
-        private void OnConnectTimeout()
+        private void OnConnectTimeout (TransportProtocol protocol)
         {
-            if (session_reliability_ == false) {
-                Stop();
+            if (protocol != TransportProtocol.kTcp || session_reliability_ == false)
+            {
+                FunapiTransport transport = GetTransport(protocol);
+                if (transport != null)
+                    transport.Stop();
             }
         }
 
-        private void OnTransportStarted()
+        private void OnTransportStarted (TransportProtocol protocol)
         {
-            if (!session_reliability_)
+            if (protocol == TransportProtocol.kTcp && session_reliability_)
             {
-                return;
-            }
-
-            if (state_ == State.kTransportClosed)
-            {
-                state_ = State.kWaitForAck;
-                SendAck(seq_recvd_ + 1);
-            }
-        }
-
-        private void OnTransportStopped()
-        {
-            if (session_reliability_)
-            {
-                if (state_ == State.kEstablished || state_ == State.kWaitForAck)
+                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+                if (transport != null)
                 {
-                    state_ = State.kTransportClosed;
+                    if (transport.state == FunapiTransport.State.kClosed)
+                    {
+                        transport.SetState(FunapiTransport.State.kWaitForAck);
+                        SendAck(seq_recvd_ + 1);
+                    }
+                    else if (unsent_queue_.Count > 0)
+                    {
+                        SendNull();
+                    }
                 }
             }
-            DebugUtils.Log("Transport terminated. Stopping. You may restart again.");
         }
+
+        private void OnTransportStopped (TransportProtocol protocol)
+        {
+            if (protocol == TransportProtocol.kTcp && session_reliability_)
+            {
+                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+                if (transport != null &&
+                    (session_established_ || transport.state == FunapiTransport.State.kWaitForAck))
+                {
+                    transport.SetState(FunapiTransport.State.kClosed);
+                }
+            }
+
+            Debug.Log("'" + protocol + "' Transport terminated. Stopping.");
+        }
+        #endregion
 
         #region Funapi system message handlers
         private void OnNewSession(string msg_type, object body)
@@ -2019,7 +2393,7 @@ namespace Fun
 
         private void OnSessionTimedout(string msg_type, object body)
         {
-            DebugUtils.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
+            Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
 
             CloseSession();
         }
@@ -2030,14 +2404,17 @@ namespace Fun
         }
         #endregion
 
-        enum State
-        {
-            kUnknown = 0,
-            kEstablished,
-            kTransportClosed,
-            kWaitForAck
-        }
 
+        // Delegates
+        public delegate void MessageHandler(string msg_type, object body);
+        public delegate void TimeoutHandler(string msg_type);
+        public delegate void OnSessionInitiated(string session_id);
+        public delegate void OnSessionClosed();
+        public delegate void OnTransportClosed();
+        public delegate void OnMessageHandler(object body);
+
+
+        // Callback timer for expected reply messages
         class ExpectedReplyMessage
         {
             public ExpectedReplyMessage (float t, TimeoutHandler cb)
@@ -2063,29 +2440,35 @@ namespace Fun
         private static readonly string kSessionClosedMessageType = "_session_closed";
         private static readonly string kMaintenanceMessageType = "_maintenance";
 
-        // member variables.
-        private State state_;
-        private FunMessageSerializer serializer_;
+        // Member variables.
         private Type recv_type_;
         private FunMsgType msg_type_;
         private bool started_ = false;
-        private FunapiTransport transport_;
+        private bool wait_for_stop_ = false;
+        private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
+        private FunMessageSerializer serializer_;
+        private FunapiTransport default_transport_ = null;
+        private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
         private OnSessionInitiated on_session_initiated_;
         private OnSessionClosed on_session_closed_;
         private string session_id_ = "";
+        private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
         private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
         private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
-        private List<ArraySegment<byte>> message_buffer_ = new List<ArraySegment<byte>>();
+        private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
+        private object message_lock_ = new object();
+        private object transports_lock_ = new object();
         private DateTime last_received_ = DateTime.Now;
+        private JsonAccessor json_helper_ = new DictionaryJsonAccessor();
 
-        // reliability-releated member variables.
+        // Reliability-releated member variables.
         private bool session_reliability_;
         private UInt32 seq_;
         private UInt32 seq_recvd_;
         private bool first_receiving_;
+        private bool session_established_ = false;
         private System.Collections.Queue send_queue_;
-        private System.Random rnd_;
-
-        #endregion
+        private System.Collections.Queue unsent_queue_;
+        private System.Random rnd_ = new System.Random();
     }
 }  // namespace Fun
