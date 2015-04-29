@@ -870,6 +870,8 @@ namespace Fun
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
         {
             protocol_ = TransportProtocol.kTcp;
+            DisableNagle = false;
+
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
@@ -899,6 +901,11 @@ namespace Fun
         public override bool IsStream()
         {
             return true;
+        }
+
+        public bool DisableNagle
+        {
+            get; set;
         }
 
         public override void Update ()
@@ -944,6 +951,9 @@ namespace Fun
             state_ = State.kConnecting;
             connect_timeout_ = ConnectTimeout;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            if (DisableNagle)
+                sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
 

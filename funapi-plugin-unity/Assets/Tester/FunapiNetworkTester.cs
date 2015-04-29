@@ -43,7 +43,10 @@ public class FunapiNetworkTester : MonoBehaviour
             }
             else
             {
-                Connect(new FunapiTcpTransport(kServerIp, 8012));
+                FunapiTcpTransport transport = new FunapiTcpTransport(kServerIp, 8012);
+                //transport.DisableNagle = true;
+
+                Connect(transport);
             }
             Invoke("CheckConnection", 3f);
         }
