@@ -1925,15 +1925,7 @@ namespace Fun
 
         public void Stop()
         {
-            lock (message_lock_)
-            {
-                if (message_buffer_.Count > 0)
-                {
-                    wait_for_stop_ = true;
-                    return;
-                }
-            }
-
+            // Waits for unsent messages.
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
@@ -1978,6 +1970,12 @@ namespace Fun
                     if (transport != null)
                         transport.Update();
                 }
+            }
+
+            if (wait_for_stop_)
+            {
+                Stop();
+                return;
             }
 
             lock (message_lock_)
@@ -2030,11 +2028,6 @@ namespace Fun
                         expected_replies_.Remove(key);
                     }
                 }
-            }
-
-            if (wait_for_stop_)
-            {
-                Stop();
             }
         }
 

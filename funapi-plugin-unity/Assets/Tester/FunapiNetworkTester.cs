@@ -148,7 +148,6 @@ public class FunapiNetworkTester : MonoBehaviour
         else
         {
             network_.Stop();
-            network_ = null;
         }
     }
 
@@ -164,7 +163,6 @@ public class FunapiNetworkTester : MonoBehaviour
             Debug.Log("Maybe the server is down? Otherwise check out the encryption type.");
 
             network_.Stop();
-            network_ = null;
         }
         else
         {
@@ -219,6 +217,7 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnSessionClosed ()
     {
         Debug.Log("Session closed.");
+        network_ = null;
     }
 
     private void OnConnectTimeout (TransportProtocol protocol)
