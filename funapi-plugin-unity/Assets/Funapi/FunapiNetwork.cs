@@ -311,8 +311,6 @@ namespace Fun
                 last_error_message_ = "";
 
                 Init();
-
-                OnStarted();
             }
             catch (Exception e)
             {
@@ -731,6 +729,8 @@ namespace Fun
                     // Makes a state transition.
                     state_ = State.kConnected;
                     Debug.Log("Ready to receive.");
+
+                    OnStarted();
 
                     // Sends messages
                     do_sending_ = true;
@@ -1243,6 +1243,8 @@ namespace Fun
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+
+            OnStarted();
         }
 
         // Send a packet.
@@ -1491,6 +1493,8 @@ namespace Fun
         protected override void Init()
         {
             state_ = State.kConnected;
+
+            OnStarted();
         }
 
         protected override void WireSend(List<SendingBuffer> sending)
@@ -1834,8 +1838,9 @@ namespace Fun
             {
                 if (transports_.ContainsKey(transport.protocol))
                 {
-                    Debug.LogWarning("AttachTransport - There's a transport of '" + transport.protocol +
-                                     "' type. It will be replaced with new transport.");
+                    Debug.LogWarning("AttachTransport - transport of '" + transport.protocol +
+                                     "' type already exists. You should call DetachTransport first.");
+                    return;
                 }
 
                 transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
