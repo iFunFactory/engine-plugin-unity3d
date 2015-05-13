@@ -137,12 +137,15 @@ public class FunapiNetworkTester : MonoBehaviour
                                          with_session_reliability_,
                                          OnSessionInitiated, OnSessionClosed);
 
-            network_.MaintenanceCallback += new FunapiNetwork.OnMessageHandler(OnMaintenanceMessage);
+            network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
+            network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
+            network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
 
             network_.RegisterHandler("echo", this.OnEcho);
             network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
 
-            //network_.SetProtocol(TransportProtocol.kTcp, "echo");
+            //network_.SetMessageProtocol(TransportProtocol.kTcp, "echo");
+            //network_.SetMessageProtocol(TransportProtocol.kUdp, "pbuf_echo");
         }
         else
         {
@@ -152,7 +155,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 network_.AttachTransport(transport);
             }
 
-            network_.SetProtocol(protocol);
+            network_.SetDefaultProtocol(protocol);
         }
 
         network_.Start();
@@ -305,7 +308,7 @@ public class FunapiNetworkTester : MonoBehaviour
         }
     }
 
-    private void OnMaintenanceMessage (object body)
+    private void OnMaintenanceMessage (string msg_type, object body)
     {
         if (network_.MsgType == FunMsgType.kJson)
         {
