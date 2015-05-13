@@ -34,63 +34,42 @@ public class FunapiNetworkTester : MonoBehaviour
     public void OnGUI()
     {
         // For debugging
+        with_protobuf_ = GUI.Toggle(new Rect(30, 0, 300, 20), with_protobuf_, " google protocol buffer");
+        with_session_reliability_ = GUI.Toggle(new Rect(30, 30, 300, 20), with_session_reliability_, " session reliability");
+
         GUI.enabled = (network_ == null ||  !network_.Connected);
-        if (GUI.Button(new Rect(30, 30, 240, 40), "Connect (TCP)"))
+        if (GUI.Button(new Rect(30, 70, 240, 40), "Connect (TCP)"))
         {
-            if (network_ != null && network_.SessionReliability)
-            {
-                network_.Start();
-            }
-            else
-            {
-                FunapiTcpTransport transport = new FunapiTcpTransport(kServerIp, 8012);
-                //transport.DisableNagle = true;
-
-                Connect(transport);
-            }
-            Invoke("CheckConnection", 3f);
+            Connect(TransportProtocol.kTcp);
         }
-        if (GUI.Button(new Rect(30, 90, 240, 40), "Connect (UDP)"))
+        if (GUI.Button(new Rect(30, 130, 240, 40), "Connect (UDP)"))
         {
-            FunapiUdpTransport transport = new FunapiUdpTransport(kServerIp, 8013);
-
-            // Please set the same encryption type as the encryption type of server.
-            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-
-            Connect(transport);
-            Invoke("CheckConnection", 3f);
+            Connect(TransportProtocol.kUdp);
         }
-        if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
+        if (GUI.Button(new Rect(30, 190, 240, 40), "Connect (HTTP)"))
         {
-            FunapiHttpTransport transport = new FunapiHttpTransport(kServerIp, 8018, false);
-            transport.RequestFailureCallback += new FunapiHttpTransport.OnRequestFailure(OnHttpRequestFailure);
-
-            // Please set the same encryption type as the encryption type of server.
-            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-
-            Connect(transport);
-            Invoke("CheckConnection", 3f);
+            Connect(TransportProtocol.kHttp);
         }
 
         GUI.enabled = (network_ != null && network_.Connected);
-        if (GUI.Button(new Rect(30, 270, 240, 40), "Send 'Hello World'"))
+        if (GUI.Button(new Rect(30, 310, 240, 40), "Send 'Hello World'"))
         {
             SendEchoMessage();
         }
 
-        if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
+        if (GUI.Button(new Rect(30, 250, 240, 40), "Disconnect"))
         {
             DisConnect();
         }
 
         GUI.enabled = announcement_ != null;
-        if (GUI.Button(new Rect(280, 30, 240, 40), "Update Announcements"))
+        if (GUI.Button(new Rect(280, 70, 240, 40), "Update Announcements"))
         {
             announcement_.UpdateList();
         }
 
         GUI.enabled = downloader_ == null;
-        if (GUI.Button(new Rect(280, 90, 240, 40), "File Download (HTTP)"))
+        if (GUI.Button(new Rect(280, 130, 240, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
             downloader_.StartDownload(kServerIp, 8020, "list", false);
@@ -99,36 +78,82 @@ public class FunapiNetworkTester : MonoBehaviour
         }
 
         GUI.enabled = true;
-        GUI.TextField(new Rect(280, 131, 480, 24), message_);
+        GUI.TextField(new Rect(280, 191, 480, 24), message_);
     }
 
-    private void Connect (FunapiTransport transport)
+
+    private FunapiTransport GetNewTransport (TransportProtocol protocol)
     {
-        Debug.Log("Creating a network instance.");
+        FunapiTransport transport = null;
 
-        // You should pass an instance of FunapiTransport.
-        network_ = new FunapiNetwork(transport, FunMsgType.kJson, false, this.OnSessionInitiated, this.OnSessionClosed);
-        network_.MaintenanceCallback += new FunapiNetwork.OnMessageHandler(OnMaintenanceMessage);
+        if (protocol == TransportProtocol.kTcp)
+        {
+            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012));
+            //transport.DisableNagle = true;
+        }
+        else if (protocol == TransportProtocol.kUdp)
+        {
+            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013));
 
-        transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
+            // Please set the same encryption type as the encryption type of server.
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+        }
+        else if (protocol == TransportProtocol.kHttp)
+        {
+            FunapiHttpTransport http_transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false);
+            http_transport.RequestFailureCallback += new FunapiHttpTransport.OnRequestFailure(OnHttpRequestFailure);
+            transport = http_transport;
 
-        // Timeout method only works with Tcp protocol.
-        transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
-        transport.ConnectTimeout = 3f;
+            // Please set the same encryption type as the encryption type of server.
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+        }
 
-        // If you prefer use specific Json implementation other than Dictionary,
-        // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
-        // E.g., transport.JsonHelper = new YourJsonAccessorClass
+        if (transport != null)
+        {
+            transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
 
-        // Test for multi-transport
-        //network_.AttachTransport(new FunapiTcpTransport(kServerIp, 8012));
-        //network_.AttachTransport(new FunapiUdpTransport(kServerIp, 8013));
-        //network_.AttachTransport(new FunapiHttpTransport(kServerIp, 8018, false));
-        //network_.SetProtocol(TransportProtocol.kTcp, "echo");
-        //network_.SetProtocol(TransportProtocol.kUdp, "pbuf_echo");
+            // Timeout method only works with Tcp protocol.
+            transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
+            transport.ConnectTimeout = 3f;
 
-        network_.RegisterHandler("echo", this.OnEcho);
-        network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
+            // If you prefer use specific Json implementation other than Dictionary,
+            // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
+            // E.g., transport.JsonHelper = new YourJsonAccessorClass
+        }
+
+        return transport;
+    }
+
+    private void Connect (TransportProtocol protocol)
+    {
+        Debug.Log("-------- Connect --------");
+
+        FunMsgType msg_type = with_protobuf_ ? FunMsgType.kProtobuf : FunMsgType.kJson;
+        if (network_ == null || !network_.SessionReliability || network_.MsgType != msg_type)
+        {
+            FunapiTransport transport = GetNewTransport(protocol);
+
+            network_ = new FunapiNetwork(transport, msg_type,
+                                         with_session_reliability_,
+                                         OnSessionInitiated, OnSessionClosed);
+
+            network_.MaintenanceCallback += new FunapiNetwork.OnMessageHandler(OnMaintenanceMessage);
+
+            network_.RegisterHandler("echo", this.OnEcho);
+            network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
+
+            //network_.SetProtocol(TransportProtocol.kTcp, "echo");
+        }
+        else
+        {
+            if (!network_.HasTransport(protocol))
+            {
+                FunapiTransport transport = GetNewTransport(protocol);
+                network_.AttachTransport(transport);
+            }
+
+            network_.SetProtocol(protocol);
+        }
 
         network_.Start();
     }
@@ -321,6 +346,8 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiNetwork network_ = null;
     private FunapiHttpDownloader downloader_ = null;
     private FunapiAnnouncement announcement_ = new FunapiAnnouncement();
+    private bool with_protobuf_ = false;
+    private bool with_session_reliability_ = false;
     private string message_ = "";
 
     // Another Funapi-specific features will go here...
