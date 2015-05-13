@@ -157,6 +157,7 @@ namespace Fun
         // Check connection
         public abstract bool Started { get; }
 
+        // Update
         public virtual void Update () {}
 
         // Check unsent messages
@@ -1824,16 +1825,16 @@ namespace Fun
     {
         #region public interface
         public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
-                             OnSessionInitiated on_session_initiated, OnSessionClosed on_session_closed)
+                             SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
         {
             state_ = State.kUnknown;
             msg_type_ = type;
             recv_type_ = typeof(FunMessage);
-            on_session_initiated_ = on_session_initiated;
-            on_session_closed_ = on_session_closed;
+            OnSessionInitiated += new SessionInitHandler(on_session_initiated);
+            OnSessionClosed += new SessionCloseHandler(on_session_closed);
 
             AttachTransport(transport);
-            SetProtocol(transport.protocol);
+            SetDefaultProtocol(transport.protocol);
 
             seq_recvd_ = 0;
             first_receiving_ = true;
@@ -1846,7 +1847,7 @@ namespace Fun
         }
 
         // Set default protocol
-        public void SetProtocol (TransportProtocol protocol)
+        public void SetDefaultProtocol (TransportProtocol protocol)
         {
             DebugUtils.Assert(protocol != TransportProtocol.kDefault);
 
@@ -1861,7 +1862,7 @@ namespace Fun
         }
 
         // Set message protocol
-        public void SetProtocol (TransportProtocol protocol, string msg_type)
+        public void SetMessageProtocol (TransportProtocol protocol, string msg_type)
         {
             DebugUtils.Assert(protocol != TransportProtocol.kDefault);
             message_protocols_[msg_type] = protocol;
@@ -1889,6 +1890,9 @@ namespace Fun
                 transport.ProtobufHelper = serializer_;
 
                 transports_[transport.protocol] = transport;
+
+                if (default_protocol_ == TransportProtocol.kDefault)
+                    default_protocol_ = transport.protocol;
 
                 if (transport.protocol == default_protocol_)
                     default_transport_ = transport;
@@ -2168,21 +2172,21 @@ namespace Fun
         }
 
         public void SendMessage(string msg_type, FunMessage message,
-                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+                                string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             SendMessage(msg_type, message, EncryptionType.kDefaultEncryption, GetProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption,
-                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+                                string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             SendMessage(msg_type, message, encryption, GetProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption, TransportProtocol protocol,
-                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+                                string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             if (expected_replies_.ContainsKey(message.msgtype))
             {
@@ -2259,21 +2263,21 @@ namespace Fun
         }
 
         public void SendMessage(string msg_type, object body,
-                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+                                string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             SendMessage(msg_type, body, EncryptionType.kDefaultEncryption, GetProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage(string msg_type, object body, EncryptionType encryption,
-                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+                                string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             SendMessage(msg_type, body, encryption, GetProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage(string msg_type, object body, EncryptionType encryption, TransportProtocol protocol,
-                                string expected_reply_type, float expected_reply_time, TimeoutHandler onReplyMissed)
+                                string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             if (expected_replies_.ContainsKey(msg_type))
             {
@@ -2341,13 +2345,13 @@ namespace Fun
             unsent_queue_.Clear();
         }
 
-        public void RegisterHandler(string type, MessageHandler handler)
+        public void RegisterHandler(string type, MessageEventHandler handler)
         {
             DebugUtils.Log("New handler for message type '" + type + "'");
             message_handlers_[type] = handler;
         }
 
-        public void RegisterHandlerWithProtocol(string type, TransportProtocol protocol, MessageHandler handler)
+        public void RegisterHandlerWithProtocol(string type, TransportProtocol protocol, MessageEventHandler handler)
         {
             if (protocol == TransportProtocol.kDefault)
             {
@@ -2408,10 +2412,7 @@ namespace Fun
             state_ = State.kEstablished;
             session_id_ = session_id;
 
-            if (on_session_initiated_ != null)
-            {
-                on_session_initiated_(session_id_);
-            }
+            OnSessionInitiated(session_id_);
 
             if (unsent_queue_.Count > 0)
             {
@@ -2435,10 +2436,7 @@ namespace Fun
                 seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
             }
 
-            if (on_session_closed_ != null)
-            {
-                on_session_closed_();
-            }
+            OnSessionClosed();
         }
 
         private TransportProtocol GetProtocol (string msg_type)
@@ -2781,7 +2779,7 @@ namespace Fun
 
         private void OnMaintenanceMessage(string msg_type, object body)
         {
-            MaintenanceCallback(body);
+            MaintenanceCallback(msg_type, body);
         }
         #endregion
 
@@ -2798,12 +2796,10 @@ namespace Fun
         };
 
         // Delegates
-        public delegate void MessageHandler(string msg_type, object body);
-        public delegate void TimeoutHandler(string msg_type);
-        public delegate void OnSessionInitiated(string session_id);
-        public delegate void OnSessionClosed();
-        public delegate void OnTransportClosed();
-        public delegate void OnMessageHandler(object body);
+        public delegate void MessageEventHandler(string msg_type, object body);
+        public delegate void TimeoutEventHandler(string msg_type);
+        public delegate void SessionInitHandler(string session_id);
+        public delegate void SessionCloseHandler();
 
         // Unsent queue-releated class
         class UnsentMessage
@@ -2821,18 +2817,20 @@ namespace Fun
         // Callback timer for expected reply messages
         class ExpectedReplyMessage
         {
-            public ExpectedReplyMessage (float time, TimeoutHandler cb)
+            public ExpectedReplyMessage (float time, TimeoutEventHandler cb)
             {
                 wait_time = time;
                 callback = cb;
             }
 
             public float wait_time;
-            public TimeoutHandler callback;
+            public TimeoutEventHandler callback;
         }
 
         // Funapi message-related events.
-        public event OnMessageHandler MaintenanceCallback;
+        public event SessionInitHandler OnSessionInitiated;
+        public event SessionCloseHandler OnSessionClosed;
+        public event MessageEventHandler MaintenanceCallback;
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
@@ -2852,11 +2850,9 @@ namespace Fun
         private FunMessageSerializer serializer_;
         private FunapiTransport default_transport_ = null;
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
-        private OnSessionInitiated on_session_initiated_;
-        private OnSessionClosed on_session_closed_;
         private string session_id_ = "";
         private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
-        private Dictionary<string, MessageHandler> message_handlers_ = new Dictionary<string, MessageHandler>();
+        private Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
         private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
         private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
         private object message_lock_ = new object();
