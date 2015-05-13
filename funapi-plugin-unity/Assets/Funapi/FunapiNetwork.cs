@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 62;
+        public static readonly int kPluginVersion = 63;
     }
 
     // Funapi transport protocol
@@ -226,19 +226,19 @@ namespace Fun
             StoppedCallback(protocol_);
         }
 
-        public virtual bool IsStream()
+        public virtual bool IsStream
         {
-            return false;
+            get { return false; }
         }
 
-        public virtual bool IsDatagram()
+        public virtual bool IsDatagram
         {
-            return false;
+            get { return false; }
         }
 
-        public virtual bool IsRequestResponse()
+        public virtual bool IsRequestResponse
         {
-            return false;
+            get { return false; }
         }
 
         public float ConnectTimeout
@@ -272,6 +272,7 @@ namespace Fun
         }
 
 
+        // member variables.
         protected State state_ = State.kUnknown;
         protected TransportProtocol protocol_ = TransportProtocol.kDefault;
         protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
@@ -289,7 +290,7 @@ namespace Fun
         protected abstract void Init();
 
         // Sends a packet.
-        protected abstract void WireSend (List<SendingBuffer> sending);
+        protected abstract void WireSend();
 
         #region public interface
         // Starts a socket.
@@ -493,7 +494,7 @@ namespace Fun
                 DebugUtils.Log("Header to send: " + header + " body length: " + buffer.data.Count);
             }
 
-            WireSend(sending_);
+            WireSend();
 
             return true;
         }
@@ -506,7 +507,7 @@ namespace Fun
                 {
                     // If we have more segments to send, we process more.
                     Debug.Log("Retrying unsent messages.");
-                    WireSend(sending_);
+                    WireSend();
                 }
                 else if (pending_.Count > 0)
                 {
@@ -908,9 +909,9 @@ namespace Fun
             }
         }
 
-        public override bool IsStream()
+        public override bool IsStream
         {
-            return true;
+            get { return true; }
         }
 
         public bool DisableNagle
@@ -967,12 +968,15 @@ namespace Fun
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
 
-        protected override void WireSend(List<SendingBuffer> sending)
+        protected override void WireSend()
         {
             List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
-            foreach (SendingBuffer buffer in sending)
+            lock (sending_lock_)
             {
-                list.Add(buffer.data);
+                foreach (SendingBuffer buffer in sending_)
+                {
+                    list.Add(buffer.data);
+                }
             }
 
             sock_.BeginSend(list, 0, new AsyncCallback(this.SendBytesCb), this);
@@ -1013,6 +1017,10 @@ namespace Fun
                     buffer.Add(wrapped);
                     sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
                 }
+            }
+            catch (ObjectDisposedException e)
+            {
+                Debug.Log("BeginConnect operation has been Cancelled.\n" + e.ToString());
             }
             catch (Exception e)
             {
@@ -1087,10 +1095,14 @@ namespace Fun
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
-                }
 
-                if (!SendUnsentMessages())
-                    failed = true;
+                    if (!SendUnsentMessages())
+                        failed = true;
+                }
+            }
+            catch (ObjectDisposedException e)
+            {
+                Debug.Log("BeginSend operation has been Cancelled.\n" + e.ToString());
             }
             catch (Exception e)
             {
@@ -1177,6 +1189,10 @@ namespace Fun
                     }
                 }
             }
+            catch (ObjectDisposedException e)
+            {
+                Debug.Log("BeginReceive operation has been Cancelled.\n" + e.ToString());
+            }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kExceptionError;
@@ -1232,9 +1248,9 @@ namespace Fun
             get { return sock_ != null && state_ == State.kConnected; }
         }
 
-        public override bool IsDatagram()
+        public override bool IsDatagram
         {
-            return true;
+            get { return true; }
         }
         #endregion
 
@@ -1251,24 +1267,27 @@ namespace Fun
         }
 
         // Send a packet.
-        protected override void WireSend(List<SendingBuffer> sending)
+        protected override void WireSend()
         {
-            DebugUtils.Assert(sending.Count >= 2);
-
-            int length = sending[0].data.Count + sending[1].data.Count;
-            if (length > send_buffer_.Length)
-            {
-                send_buffer_ = new byte[length];
-            }
-
             int offset = 0;
 
-            // one header + one body
-            for (int i = 0; i < 2; ++i)
+            lock (sending_lock_)
             {
-                ArraySegment<byte> item = sending[i].data;
-                Buffer.BlockCopy(item.Array, 0, send_buffer_, offset, item.Count);
-                offset += item.Count;
+                DebugUtils.Assert(sending_.Count >= 2);
+
+                int length = sending_[0].data.Count + sending_[1].data.Count;
+                if (length > send_buffer_.Length)
+                {
+                    send_buffer_ = new byte[length];
+                }
+
+                // one header + one body
+                for (int i = 0; i < 2; ++i)
+                {
+                    ArraySegment<byte> item = sending_[i].data;
+                    Buffer.BlockCopy(item.Array, 0, send_buffer_, offset, item.Count);
+                    offset += item.Count;
+                }
             }
 
             if (offset > 0)
@@ -1322,10 +1341,14 @@ namespace Fun
 
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
-                }
 
-                if (!SendUnsentMessages())
-                    failed = true;
+                    if (!SendUnsentMessages())
+                        failed = true;
+                }
+            }
+            catch (ObjectDisposedException e)
+            {
+                Debug.Log("BeginSendTo operation has been Cancelled.\n" + e.ToString());
             }
             catch (Exception e)
             {
@@ -1409,6 +1432,10 @@ namespace Fun
                     }
                 }
             }
+            catch (ObjectDisposedException e)
+            {
+                Debug.Log("BeginReceiveFrom operation has been Cancelled.\n" + e.ToString());
+            }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kExceptionError;
@@ -1474,9 +1501,9 @@ namespace Fun
             get { return state_ == State.kConnected; }
         }
 
-        public override bool IsRequestResponse()
+        public override bool IsRequestResponse
         {
-            return true;
+            get { return true; }
         }
 
         public override void Update ()
@@ -1500,45 +1527,48 @@ namespace Fun
             OnStarted();
         }
 
-        protected override void WireSend(List<SendingBuffer> sending)
+        protected override void WireSend()
         {
-            DebugUtils.Assert(sending.Count >= 2);
             DebugUtils.Log("Send a Message.");
 
             try
             {
-                DebugUtils.Log("Host Url: " + host_url_);
-
-                SendingBuffer header = sending[0];
-                SendingBuffer body = sending[1];
-
-                // Request
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-                request.Method = "POST";
-                request.ContentType = "application/x-www-form-urlencoded";
-                request.ContentLength = body.data.Count;
-
-                // encryption type
-                string str_header = Encoding.ASCII.GetString(header.data.Array, header.data.Offset, header.data.Count);
-                int start_offset = str_header.IndexOf(kEncryptionHeaderField);
-                if (start_offset != -1)
+                lock (sending_lock_)
                 {
-                    start_offset += kEncryptionHeaderField.Length + 1;
-                    int end_offset = str_header.IndexOf(kHeaderDelimeter, start_offset);
-                    request.Headers[kEncryptionHttpHeaderField] = str_header.Substring(start_offset, end_offset - start_offset);
+                    DebugUtils.Assert(sending_.Count >= 2);
+                    DebugUtils.Log("Host Url: " + host_url_);
+
+                    SendingBuffer header = sending_[0];
+                    SendingBuffer body = sending_[1];
+
+                    // Request
+                    HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
+                    request.Method = "POST";
+                    request.ContentType = "application/x-www-form-urlencoded";
+                    request.ContentLength = body.data.Count;
+
+                    // encryption type
+                    string str_header = Encoding.ASCII.GetString(header.data.Array, header.data.Offset, header.data.Count);
+                    int start_offset = str_header.IndexOf(kEncryptionHeaderField);
+                    if (start_offset != -1)
+                    {
+                        start_offset += kEncryptionHeaderField.Length + 1;
+                        int end_offset = str_header.IndexOf(kHeaderDelimeter, start_offset);
+                        request.Headers[kEncryptionHttpHeaderField] = str_header.Substring(start_offset, end_offset - start_offset);
+                    }
+
+                    // Response
+                    WebState state = new WebState();
+                    state.request = request;
+                    state.msgtype = body.msgtype;
+                    state.sending = body.data;
+                    list_.Add(state);
+
+                    cur_request_ = state;
+                    response_time_ = kResponseTimeout;
+
+                    request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
                 }
-
-                // Response
-                WebState state = new WebState();
-                state.request = request;
-                state.msgtype = body.msgtype;
-                state.sending = body.data;
-                list_.Add(state);
-
-                cur_request_ = state;
-                response_time_ = kResponseTimeout;
-
-                request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
             }
             catch (Exception e)
             {
@@ -1655,54 +1685,54 @@ namespace Fun
                         // Removes header and body segment
                         sending_.RemoveAt(0);
                         sending_.RemoveAt(0);
-                    }
 
-                    lock (receive_lock_)
-                    {
-                        // Header
-                        byte[] header = state.response.Headers.ToByteArray();
-                        string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
-                        str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
-                        str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
-                        str_header = str_header.Replace(kEncryptionHttpHeaderField, kEncryptionHeaderField);
-                        str_header = str_header.Replace("\r", "");
-                        header = Encoding.ASCII.GetBytes(str_header);
-
-                        // Checks buffer space
-                        int offset = received_size_;
-                        received_size_ += header.Length + state.read_offset;
-                        CheckReceiveBuffer();
-
-                        // Copy to buffer
-                        Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
-                        Buffer.BlockCopy(state.read_data, 0, receive_buffer_, offset + header.Length, state.read_offset);
-
-                        // Decoding a message
-                        if (TryToDecodeHeader())
+                        lock (receive_lock_)
                         {
-                            if (TryToDecodeBody() == false)
+                            // Header
+                            byte[] header = state.response.Headers.ToByteArray();
+                            string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
+                            str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
+                            str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
+                            str_header = str_header.Replace(kEncryptionHttpHeaderField, kEncryptionHeaderField);
+                            str_header = str_header.Replace("\r", "");
+                            header = Encoding.ASCII.GetBytes(str_header);
+
+                            // Checks buffer space
+                            int offset = received_size_;
+                            received_size_ += header.Length + state.read_offset;
+                            CheckReceiveBuffer();
+
+                            // Copy to buffer
+                            Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
+                            Buffer.BlockCopy(state.read_data, 0, receive_buffer_, offset + header.Length, state.read_offset);
+
+                            // Decoding a message
+                            if (TryToDecodeHeader())
                             {
-                                DebugUtils.LogWarning("Failed to decode body.");
+                                if (TryToDecodeBody() == false)
+                                {
+                                    DebugUtils.LogWarning("Failed to decode body.");
+                                    DebugUtils.Assert(false);
+                                }
+                            }
+                            else
+                            {
+                                DebugUtils.LogWarning("Failed to decode header.");
                                 DebugUtils.Assert(false);
                             }
-                        }
-                        else
-                        {
-                            DebugUtils.LogWarning("Failed to decode header.");
-                            DebugUtils.Assert(false);
+
+                            state.stream.Close();
+                            state.stream = null;
+                            list_.Remove(state);
+
+                            cur_request_ = null;
+                            response_time_ = -1f;
+                            last_error_code_ = ErrorCode.kNone;
+                            last_error_message_ = "";
                         }
 
-                        state.stream.Close();
-                        state.stream = null;
-                        list_.Remove(state);
-
-                        cur_request_ = null;
-                        response_time_ = -1f;
-                        last_error_code_ = ErrorCode.kNone;
-                        last_error_message_ = "";
+                        SendUnsentMessages();
                     }
-
-                    SendUnsentMessages();
                 }
             }
             catch (Exception e)
@@ -1746,11 +1776,11 @@ namespace Fun
                 // Removes header and body segment
                 sending_.RemoveAt(0);
                 sending_.RemoveAt(0);
+
+                RequestFailureCallback(state.msgtype);
+
+                SendUnsentMessages();
             }
-
-            RequestFailureCallback(state.msgtype);
-
-            SendUnsentMessages();
         }
         #endregion
 
