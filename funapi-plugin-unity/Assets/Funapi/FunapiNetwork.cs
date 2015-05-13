@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 63;
+        public static readonly int kPluginVersion = 64;
     }
 
     // Funapi transport protocol
@@ -148,83 +148,15 @@ namespace Fun
     public abstract class FunapiTransport
     {
         #region public interface
-        // Start connecting
-        public abstract void Start();
+        public FunapiTransport()
+        {
+            state = State.kUnknown;
+            protocol = TransportProtocol.kDefault;
+        }
 
-        // Disconnection
-        public abstract void Stop();
-
-        // Check connection
-        public abstract bool Started { get; }
-
-        // Update
-        public virtual void Update () {}
-
-        // Check unsent messages
-        public abstract bool HaveUnsentMessages { get; }
-
-        // Send a message
-        public abstract void SendMessage(string msgtype, object json_message);
-        public abstract void SendMessage(FunMessage message);
-
-        // Registered event handlers.
-        public event ConnectTimeoutHandler ConnectTimeoutCallback;
-        public event StartedEventHandler StartedCallback;
-        public event StoppedEventHandler StoppedCallback;
-        public event ReceivedEventHandler ReceivedCallback;
-
-        // Transport protocol
         public TransportProtocol protocol
         {
-            get { return protocol_; }
-        }
-
-        public State state
-        {
-            get { return state_; }
-        }
-
-        internal void SetState (State s)
-        {
-            state_ = s;
-        }
-
-        // Encoding/Decoding related
-        public JsonAccessor JsonHelper
-        {
-            get { return json_accessor_; }
-            set { json_accessor_ = value; }
-        }
-
-        // FunMessage serializer/deserializer
-        public FunMessageSerializer ProtobufHelper {
-            get { return serializer_; }
-            set { serializer_ = value; }
-        }
-        #endregion
-
-        #region internal implementation
-        protected void OnConnectionTimeout ()
-        {
-            ConnectTimeoutCallback(protocol_);
-        }
-
-        protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
-        {
-            ReceivedCallback(protocol_, header, body);
-        }
-
-        protected void OnStarted ()
-        {
-            if (StartedCallback != null)
-            {
-                StartedCallback(protocol_);
-            }
-        }
-
-        protected void OnStopped ()
-        {
-            StoppedCallback(protocol_);
+            get; set;
         }
 
         public virtual bool IsStream
@@ -257,24 +189,88 @@ namespace Fun
             get { return last_error_message_; }
         }
 
+        // Encoding/Decoding related
+        public JsonAccessor JsonHelper
+        {
+            get { return json_accessor_; }
+            set { json_accessor_ = value; }
+        }
 
-        public enum State
+        // FunMessage serializer/deserializer
+        public FunMessageSerializer ProtobufHelper {
+            get { return serializer_; }
+            set { serializer_ = value; }
+        }
+        #endregion
+
+        #region internal implementation
+        // Start connecting
+        internal abstract void Start();
+
+        // Disconnection
+        internal abstract void Stop();
+
+        // Check connection
+        internal abstract bool Started { get; }
+
+        // Update
+        internal virtual void Update () {}
+
+        // Check unsent messages
+        internal abstract bool HasUnsentMessages { get; }
+
+        // Send a message
+        internal abstract void SendMessage(string msgtype, object json_message);
+        internal abstract void SendMessage(FunMessage message);
+
+        internal State state
+        {
+            get; set;
+        }
+
+        internal void OnConnectionTimeout ()
+        {
+            ConnectTimeoutCallback(protocol);
+        }
+
+        internal void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
+        {
+            ReceivedCallback(protocol, header, body);
+        }
+
+        internal void OnStarted ()
+        {
+            if (StartedCallback != null)
+            {
+                StartedCallback(protocol);
+            }
+        }
+
+        internal void OnStopped ()
+        {
+            StoppedCallback(protocol);
+        }
+        #endregion
+
+
+        internal enum State
         {
             kUnknown = 0,
             kConnecting,
             kConnected
         };
 
-
+        // Event handlers
+        public event ConnectTimeoutHandler ConnectTimeoutCallback;
+        public event StartedEventHandler StartedCallback;
+        public event StoppedEventHandler StoppedCallback;
+        internal event ReceivedEventHandler ReceivedCallback;
 
         // member variables.
-        protected State state_ = State.kUnknown;
-        protected TransportProtocol protocol_ = TransportProtocol.kDefault;
-        protected JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
-        protected FunMessageSerializer serializer_ = null;
-        protected ErrorCode last_error_code_ = ErrorCode.kNone;
-        protected string last_error_message_ = "";
-        #endregion
+        internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
+        internal FunMessageSerializer serializer_ = null;
+        internal ErrorCode last_error_code_ = ErrorCode.kNone;
+        internal string last_error_message_ = "";
     }
 
 
@@ -282,14 +278,14 @@ namespace Fun
     public abstract class FunapiDecodedTransport : FunapiTransport
     {
         // Create a socket.
-        protected abstract void Init();
+        internal abstract void Init();
 
         // Sends a packet.
-        protected abstract void WireSend();
+        internal abstract void WireSend();
 
         #region public interface
         // Starts a socket.
-        public override void Start()
+        internal override void Start()
         {
             bool failed = false;
 
@@ -321,19 +317,19 @@ namespace Fun
         }
 
         // Stops a socket.
-        public override void Stop()
+        internal override void Stop()
         {
-            if (state_ == State.kUnknown)
+            if (state == State.kUnknown)
                 return;
 
-            state_ = State.kUnknown;
+            state = State.kUnknown;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
             OnStopped();
         }
 
-        public override bool HaveUnsentMessages
+        internal override bool HasUnsentMessages
         {
             get
             {
@@ -345,7 +341,7 @@ namespace Fun
         }
 
         // Sends a JSON message through a socket.
-        public override void SendMessage (string msgtype, object json_message)
+        internal override void SendMessage (string msgtype, object json_message)
         {
             string str = this.JsonHelper.Serialize(json_message);
             byte[] body = Encoding.UTF8.GetBytes(str);
@@ -355,7 +351,7 @@ namespace Fun
             SendMessage(msgtype, body);
         }
 
-        public override void SendMessage (FunMessage message)
+        internal override void SendMessage (FunMessage message)
         {
             MemoryStream stream = new MemoryStream();
             this.ProtobufHelper.Serialize (stream, message);
@@ -414,7 +410,7 @@ namespace Fun
             }
         }
 
-        protected bool SendUnsentMessages ()
+        internal bool SendUnsentMessages ()
         {
             lock (sending_lock_)
             {
@@ -439,7 +435,7 @@ namespace Fun
         }
 
         // Checks buffer space before starting another async receive.
-        protected void CheckReceiveBuffer()
+        internal void CheckReceiveBuffer()
         {
             int remaining_size = receive_buffer_.Length - received_size_;
 
@@ -471,7 +467,7 @@ namespace Fun
             }
         }
 
-        protected bool TryToDecodeHeader()
+        internal bool TryToDecodeHeader()
         {
             DebugUtils.Log("Trying to decode header fields.");
 
@@ -507,7 +503,7 @@ namespace Fun
             return false;
         }
 
-        protected bool TryToDecodeBody()
+        internal bool TryToDecodeBody()
         {
             // Header version
             DebugUtils.Assert(header_fields_.ContainsKey(kVersionHeaderField));
@@ -528,9 +524,9 @@ namespace Fun
 
             if (body_length > 0)
             {
-                DebugUtils.Assert(state_ == State.kConnected);
+                DebugUtils.Assert(state == State.kConnected);
 
-                if (state_ != State.kConnected)
+                if (state != State.kConnected)
                 {
                     DebugUtils.Log("Unexpected message.");
                     return false;
@@ -576,8 +572,7 @@ namespace Fun
         }
         #endregion
 
-
-        protected class SendingBuffer
+        internal class SendingBuffer
         {
             public SendingBuffer (string msgtype, ArraySegment<byte> data)
             {
@@ -591,14 +586,14 @@ namespace Fun
 
 
         // Buffer-related constants.
-        protected static readonly int kUnitBufferSize = 65536;
+        internal static readonly int kUnitBufferSize = 65536;
 
         // Funapi header-related constants.
-        protected static readonly string kHeaderDelimeter = "\n";
-    	protected static readonly string kHeaderFieldDelimeter = ":";
-    	protected static readonly string kVersionHeaderField = "VER";
-    	protected static readonly string kPluginVersionHeaderField = "PVER";
-    	protected static readonly string kLengthHeaderField = "LEN";
+        internal static readonly string kHeaderDelimeter = "\n";
+        internal static readonly string kHeaderFieldDelimeter = ":";
+        internal static readonly string kVersionHeaderField = "VER";
+        internal static readonly string kPluginVersionHeaderField = "PVER";
+        internal static readonly string kLengthHeaderField = "LEN";
 
         // for speed-up.
         private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(Encoding.ASCII.GetBytes(kHeaderDelimeter));
@@ -606,16 +601,16 @@ namespace Fun
 
         // State-related.
         private bool first_sending_ = true;
-        protected bool header_decoded_ = false;
-        protected int received_size_ = 0;
-        protected int next_decoding_offset_ = 0;
-        protected object sending_lock_ = new object();
-        protected object receive_lock_ = new object();
-        protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
-        protected byte[] send_buffer_ = new byte[kUnitBufferSize];
-        protected List<SendingBuffer> pending_ = new List<SendingBuffer>();
-        protected List<SendingBuffer> sending_ = new List<SendingBuffer>();
-        protected Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
+        internal bool header_decoded_ = false;
+        internal int received_size_ = 0;
+        internal int next_decoding_offset_ = 0;
+        internal object sending_lock_ = new object();
+        internal object receive_lock_ = new object();
+        internal byte[] receive_buffer_ = new byte[kUnitBufferSize];
+        internal byte[] send_buffer_ = new byte[kUnitBufferSize];
+        internal List<SendingBuffer> pending_ = new List<SendingBuffer>();
+        internal List<SendingBuffer> sending_ = new List<SendingBuffer>();
+        internal Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
     }
 
 
@@ -625,7 +620,7 @@ namespace Fun
         #region public interface
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
         {
-            protocol_ = TransportProtocol.kTcp;
+            protocol = TransportProtocol.kTcp;
             DisableNagle = false;
 
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
@@ -635,9 +630,9 @@ namespace Fun
         }
 
         // Stops a socket.
-        public override void Stop()
+        internal override void Stop()
         {
-            if (state_ == State.kUnknown)
+            if (state == State.kUnknown)
                 return;
 
             if (sock_ != null)
@@ -649,11 +644,11 @@ namespace Fun
             base.Stop();
         }
 
-        public override bool Started
+        internal override bool Started
         {
             get
             {
-                return sock_ != null && sock_.Connected && state_ == State.kConnected;
+                return sock_ != null && sock_.Connected && state == State.kConnected;
             }
         }
 
@@ -667,9 +662,9 @@ namespace Fun
             get; set;
         }
 
-        public override void Update ()
+        internal override void Update ()
         {
-            if (state_ == State.kConnecting && connect_timeout_ > 0f)
+            if (state == State.kConnecting && connect_timeout_ > 0f)
             {
                 connect_timeout_ -= Time.deltaTime;
                 if (connect_timeout_ <= 0f)
@@ -683,9 +678,9 @@ namespace Fun
 
         #region internal implementation
         // Create a socket.
-        protected override void Init()
+        internal override void Init()
         {
-            state_ = State.kConnecting;
+            state = State.kConnecting;
             connect_timeout_ = ConnectTimeout;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             if (DisableNagle)
@@ -694,7 +689,7 @@ namespace Fun
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
 
-        protected override void WireSend()
+        internal override void WireSend()
         {
             List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
             lock (sending_lock_)
@@ -733,7 +728,7 @@ namespace Fun
                 }
                 Debug.Log("Connected.");
 
-                state_ = State.kConnected;
+                state = State.kConnected;
 
                 OnStarted();
 
@@ -936,7 +931,7 @@ namespace Fun
             }
         }
 
-        protected Socket sock_;
+        internal Socket sock_;
         private IPEndPoint connect_ep_;
         private float connect_timeout_ = 0f;
         #endregion
@@ -949,7 +944,7 @@ namespace Fun
         #region public interface
         public FunapiUdpTransport(string hostname_or_ip, UInt16 port)
         {
-            protocol_ = TransportProtocol.kUdp;
+            protocol = TransportProtocol.kUdp;
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
@@ -958,9 +953,9 @@ namespace Fun
         }
 
         // Stops a socket.
-        public override void Stop()
+        internal override void Stop()
         {
-            if (state_ == State.kUnknown)
+            if (state == State.kUnknown)
                 return;
 
             if (sock_ != null)
@@ -972,9 +967,9 @@ namespace Fun
             base.Stop();
         }
 
-        public override bool Started
+        internal override bool Started
         {
-            get { return sock_ != null && state_ == State.kConnected; }
+            get { return sock_ != null && state == State.kConnected; }
         }
 
         public override bool IsDatagram
@@ -985,9 +980,9 @@ namespace Fun
 
         #region internal implementation
         // Create a socket.
-        protected override void Init()
+        internal override void Init()
         {
-            state_ = State.kConnected;
+            state = State.kConnected;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
@@ -996,7 +991,7 @@ namespace Fun
         }
 
         // Send a packet.
-        protected override void WireSend()
+        internal override void WireSend()
         {
             int offset = 0;
 
@@ -1181,7 +1176,7 @@ namespace Fun
         }
 
 
-        protected Socket sock_;
+        internal Socket sock_;
         private IPEndPoint send_ep_;
         private EndPoint receive_ep_;
         #endregion
@@ -1194,7 +1189,7 @@ namespace Fun
         #region public interface
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https)
         {
-            protocol_ = TransportProtocol.kHttp;
+            protocol = TransportProtocol.kHttp;
 
             // Url
             host_url_ = https ? "https://" : "http://";
@@ -1204,21 +1199,21 @@ namespace Fun
             host_url_ += "/v" + FunapiVersion.kProtocolVersion + "/";
         }
 
-        public override void Stop()
+        internal override void Stop()
         {
-            if (state_ == State.kUnknown)
+            if (state == State.kUnknown)
                 return;
 
-            foreach (WebState state in list_)
+            foreach (WebState ws in list_)
             {
-                if (state.request != null)
+                if (ws.request != null)
                 {
-                    state.aborted = true;
-                    state.request.Abort();
+                    ws.aborted = true;
+                    ws.request.Abort();
                 }
 
-                if (state.stream != null)
-                    state.stream.Close();
+                if (ws.stream != null)
+                    ws.stream.Close();
             }
 
             list_.Clear();
@@ -1226,9 +1221,9 @@ namespace Fun
             base.Stop();
         }
 
-        public override bool Started
+        internal override bool Started
         {
-            get { return state_ == State.kConnected; }
+            get { return state == State.kConnected; }
         }
 
         public override bool IsRequestResponse
@@ -1236,7 +1231,7 @@ namespace Fun
             get { return true; }
         }
 
-        public override void Update ()
+        internal override void Update ()
         {
             if (response_time_ <= 0f)
                 return;
@@ -1250,14 +1245,14 @@ namespace Fun
         #endregion
 
         #region internal implementation
-        protected override void Init()
+        internal override void Init()
         {
-            state_ = State.kConnected;
+            state = State.kConnected;
 
             OnStarted();
         }
 
-        protected override void WireSend()
+        internal override void WireSend()
         {
             DebugUtils.Log("Send a Message.");
 
@@ -1277,16 +1272,16 @@ namespace Fun
                     request.ContentLength = body.data.Count;
 
                     // Response
-                    WebState state = new WebState();
-                    state.request = request;
-                    state.msgtype = body.msgtype;
-                    state.sending = body.data;
-                    list_.Add(state);
+                    WebState ws = new WebState();
+                    ws.request = request;
+                    ws.msgtype = body.msgtype;
+                    ws.sending = body.data;
+                    list_.Add(ws);
 
-                    cur_request_ = state;
+                    cur_request_ = ws;
                     response_time_ = kResponseTimeout;
 
-                    request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), state);
+                    request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), ws);
                 }
             }
             catch (Exception e)
@@ -1304,15 +1299,15 @@ namespace Fun
 
             try
             {
-                WebState state = (WebState)ar.AsyncState;
-                HttpWebRequest request = state.request;
+                WebState ws = (WebState)ar.AsyncState;
+                HttpWebRequest request = ws.request;
 
                 Stream stream = request.EndGetRequestStream(ar);
-                stream.Write(state.sending.Array, 0, state.sending.Count);
+                stream.Write(ws.sending.Array, 0, ws.sending.Count);
                 stream.Close();
-                DebugUtils.Log("Sent " + state.sending.Count + "bytes");
+                DebugUtils.Log("Sent " + ws.sending.Count + "bytes");
 
-                request.BeginGetResponse(new AsyncCallback(ResponseCb), state);
+                request.BeginGetResponse(new AsyncCallback(ResponseCb), ws);
             }
             catch (Exception e)
             {
@@ -1329,23 +1324,23 @@ namespace Fun
 
             try
             {
-                WebState state = (WebState)ar.AsyncState;
-                if (state.aborted)
+                WebState ws = (WebState)ar.AsyncState;
+                if (ws.aborted)
                     return;
 
-                HttpWebResponse response = (HttpWebResponse)state.request.EndGetResponse(ar);
-                state.request = null;
-                state.response = response;
+                HttpWebResponse response = (HttpWebResponse)ws.request.EndGetResponse(ar);
+                ws.request = null;
+                ws.response = response;
 
                 if (response.StatusCode == HttpStatusCode.OK)
                 {
                     Stream stream = response.GetResponseStream();
-                    state.stream = stream;
-                    state.buffer = new byte[kUnitBufferSize];
-                    state.read_data = new byte[kUnitBufferSize];
-                    state.read_offset = 0;
+                    ws.stream = stream;
+                    ws.buffer = new byte[kUnitBufferSize];
+                    ws.read_data = new byte[kUnitBufferSize];
+                    ws.read_offset = 0;
 
-                    stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
+                    stream.BeginRead(ws.buffer, 0, ws.buffer.Length, new AsyncCallback(ReadCb), ws);
                 }
                 else
                 {
@@ -1369,27 +1364,27 @@ namespace Fun
 
             try
             {
-                WebState state = (WebState)ar.AsyncState;
-                int nRead = state.stream.EndRead(ar);
+                WebState ws = (WebState)ar.AsyncState;
+                int nRead = ws.stream.EndRead(ar);
 
                 if (nRead > 0)
                 {
                     DebugUtils.Log("We need more bytes for response. Waiting.");
-                    if (state.read_offset + nRead > state.read_data.Length)
+                    if (ws.read_offset + nRead > ws.read_data.Length)
                     {
-                        byte[] temp = new byte[state.read_data.Length + kUnitBufferSize];
-                        Buffer.BlockCopy(state.read_data, 0, temp, 0, state.read_offset);
-                        state.read_data = temp;
+                        byte[] temp = new byte[ws.read_data.Length + kUnitBufferSize];
+                        Buffer.BlockCopy(ws.read_data, 0, temp, 0, ws.read_offset);
+                        ws.read_data = temp;
                     }
 
-                    Buffer.BlockCopy(state.buffer, 0, state.read_data, state.read_offset, nRead);
-                    state.read_offset += nRead;
+                    Buffer.BlockCopy(ws.buffer, 0, ws.read_data, ws.read_offset, nRead);
+                    ws.read_offset += nRead;
 
-                    state.stream.BeginRead(state.buffer, 0, state.buffer.Length, new AsyncCallback(ReadCb), state);
+                    ws.stream.BeginRead(ws.buffer, 0, ws.buffer.Length, new AsyncCallback(ReadCb), ws);
                 }
                 else
                 {
-                    if (state.response == null)
+                    if (ws.response == null)
                     {
                         DebugUtils.LogWarning("Response instance is null.");
                         DebugUtils.Assert(false);
@@ -1408,7 +1403,7 @@ namespace Fun
                         lock (receive_lock_)
                         {
                             // Header
-                            byte[] header = state.response.Headers.ToByteArray();
+                            byte[] header = ws.response.Headers.ToByteArray();
                             string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
                             str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
                             str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
@@ -1417,12 +1412,12 @@ namespace Fun
 
                             // Checks buffer space
                             int offset = received_size_;
-                            received_size_ += header.Length + state.read_offset;
+                            received_size_ += header.Length + ws.read_offset;
                             CheckReceiveBuffer();
 
                             // Copy to buffer
                             Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
-                            Buffer.BlockCopy(state.read_data, 0, receive_buffer_, offset + header.Length, state.read_offset);
+                            Buffer.BlockCopy(ws.read_data, 0, receive_buffer_, offset + header.Length, ws.read_offset);
 
                             // Decoding a message
                             if (TryToDecodeHeader())
@@ -1439,9 +1434,9 @@ namespace Fun
                                 DebugUtils.Assert(false);
                             }
 
-                            state.stream.Close();
-                            state.stream = null;
-                            list_.Remove(state);
+                            ws.stream.Close();
+                            ws.stream = null;
+                            list_.Remove(ws);
 
                             cur_request_ = null;
                             response_time_ = -1f;
@@ -1464,28 +1459,28 @@ namespace Fun
 
         private void RequestFailure ()
         {
-            DebugUtils.Log("RequestFailure - state: " + state_);
-            if (state_ == State.kUnknown || cur_request_ == null)
+            DebugUtils.Log("RequestFailure - state: " + state);
+            if (state == State.kUnknown || cur_request_ == null)
             {
                 RequestFailureCallback("");
                 return;
             }
 
-            WebState state = cur_request_;
+            WebState ws = cur_request_;
 
             cur_request_ = null;
             response_time_ = -1f;
 
-            if (state.request != null)
+            if (ws.request != null)
             {
-                state.aborted = true;
-                state.request.Abort();
+                ws.aborted = true;
+                ws.request.Abort();
             }
 
-            if (state.stream != null)
-                state.stream.Close();
+            if (ws.stream != null)
+                ws.stream.Close();
 
-            list_.Remove(state);
+            list_.Remove(ws);
 
             lock (sending_lock_)
             {
@@ -1495,7 +1490,7 @@ namespace Fun
                 sending_.RemoveAt(0);
                 sending_.RemoveAt(0);
 
-                RequestFailureCallback(state.msgtype);
+                RequestFailureCallback(ws.msgtype);
 
                 SendUnsentMessages();
             }
@@ -1535,22 +1530,15 @@ namespace Fun
     }
 
 
-
     // Driver to use Funapi network plugin.
     public class FunapiNetwork
     {
         #region public interface
-        public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
-                             SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
+        public FunapiNetwork(FunMsgType type, bool session_reliability)
         {
             state_ = State.kUnknown;
             msg_type_ = type;
             recv_type_ = typeof(FunMessage);
-            OnSessionInitiated += new SessionInitHandler(on_session_initiated);
-            OnSessionClosed += new SessionCloseHandler(on_session_closed);
-
-            AttachTransport(transport);
-            SetDefaultProtocol(transport.protocol);
 
             seq_recvd_ = 0;
             first_receiving_ = true;
@@ -1562,6 +1550,18 @@ namespace Fun
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
         }
 
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(FunMsgType, bool)' instead.")]
+        public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
+                             SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
+            : this(type, session_reliability)
+        {
+            OnSessionInitiated += new SessionInitHandler(on_session_initiated);
+            OnSessionClosed += new SessionCloseHandler(on_session_closed);
+
+            AttachTransport(transport);
+            SetDefaultProtocol(transport.protocol);
+        }
+
         // Set default protocol
         public void SetDefaultProtocol (TransportProtocol protocol)
         {
@@ -1569,12 +1569,11 @@ namespace Fun
 
             default_protocol_ = protocol;
             Debug.Log("SetProtocol - default protocol is '" + protocol + "'.");
+        }
 
-            FunapiTransport transport = GetTransport(protocol);
-            if (transport != null)
-            {
-                default_transport_ = transport;
-            }
+        public TransportProtocol GetDefaultProtocol()
+        {
+            return default_protocol_;
         }
 
         // Set message protocol
@@ -1582,6 +1581,14 @@ namespace Fun
         {
             DebugUtils.Assert(protocol != TransportProtocol.kDefault);
             message_protocols_[msg_type] = protocol;
+        }
+
+        public TransportProtocol GetMessageProtocol (string msg_type)
+        {
+            if (message_protocols_.ContainsKey(msg_type))
+                return message_protocols_[msg_type];
+
+            return default_protocol_;
         }
 
         public void AttachTransport (FunapiTransport transport)
@@ -1609,9 +1616,6 @@ namespace Fun
 
                 if (default_protocol_ == TransportProtocol.kDefault)
                     default_protocol_ = transport.protocol;
-
-                if (transport.protocol == default_protocol_)
-                    default_transport_ = transport;
 
                 if (Started)
                 {
@@ -1643,16 +1647,24 @@ namespace Fun
                 }
                 else
                 {
-                    Debug.LogWarning("DetachTransport - Can't find a transport of '" + protocol + "' type.");
-                    DebugUtils.Assert(false);
+                    Debug.Log("DetachTransport - Can't find a transport of '" + protocol + "' type.");
                 }
             }
         }
 
+        public FunapiTransport GetTransport (TransportProtocol protocol)
+        {
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(protocol))
+                    return transports_[protocol];
+            }
+
+            return null;
+        }
+
         public bool HasTransport (TransportProtocol protocol)
         {
-            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
-
             lock (transports_lock_)
             {
                 if (transports_.ContainsKey(protocol))
@@ -1704,25 +1716,27 @@ namespace Fun
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
-                    if (transport.Started && transport.HaveUnsentMessages)
+                    if (transport.Started && transport.HasUnsentMessages)
                     {
-                        state_ = State.WaitForStop;
+                        state_ = State.kWaitForStop;
                         return;
                     }
                 }
             }
 
-            Debug.Log("Stopping a network module.");
-            state_ = State.kUnknown;
-
             StopTransport();
             transports_.Clear();
 
             CloseSession();
+
+            Debug.Log("Stopping a network module.");
+            state_ = State.kUnknown;
         }
 
         public void StopTransport()
         {
+            state_ = State.kStopped;
+
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
@@ -1745,7 +1759,7 @@ namespace Fun
                 }
             }
 
-            if (state_ == State.WaitForStop)
+            if (state_ == State.kWaitForStop)
             {
                 Stop();
                 return;
@@ -1811,7 +1825,7 @@ namespace Fun
 
         public bool Connected
         {
-            get { return default_transport_ != null && default_transport_.Started; }
+            get { return state_ == State.kEstablished; }
         }
 
         public bool SessionReliability
@@ -1827,7 +1841,7 @@ namespace Fun
 
         public void SendMessage(string msg_type, FunMessage message)
         {
-            SendMessage(msg_type, message, GetProtocol(msg_type));
+            SendMessage(msg_type, message, GetMessageProtocol(msg_type));
         }
 
         public void SendMessage(string msg_type, FunMessage message, TransportProtocol protocol)
@@ -1845,7 +1859,7 @@ namespace Fun
             message.msgtype = msg_type;
 
             // Encodes a session id, if any.
-            if (session_id_ != null && session_id_.Length > 0)
+            if (session_id_.Length > 0)
             {
                 message.sid = session_id_;
             }
@@ -1885,7 +1899,7 @@ namespace Fun
         public void SendMessage(string msg_type, FunMessage message,
                                 string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
-            SendMessage(msg_type, message, GetProtocol(msg_type),
+            SendMessage(msg_type, message, GetMessageProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
@@ -1905,7 +1919,7 @@ namespace Fun
 
         public void SendMessage(string msg_type, object body)
         {
-            SendMessage(msg_type, body, GetProtocol(msg_type));
+            SendMessage(msg_type, body, GetMessageProtocol(msg_type));
         }
 
         public void SendMessage(string msg_type, object body, TransportProtocol protocol)
@@ -1924,7 +1938,7 @@ namespace Fun
             json_helper_.SetStringField(body, kMsgTypeBodyField, msg_type);
 
             // Encodes a session id, if any.
-            if (session_id_ != null && session_id_.Length > 0)
+            if (session_id_.Length > 0)
             {
                 json_helper_.SetStringField(body, kSessionIdBodyField, session_id_);
             }
@@ -1964,7 +1978,7 @@ namespace Fun
         public void SendMessage(string msg_type, object body,
                                 string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
-            SendMessage(msg_type, body, GetProtocol(msg_type),
+            SendMessage(msg_type, body, GetMessageProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
@@ -2003,7 +2017,7 @@ namespace Fun
                 {
                     object json = msg.message;
                     string msgtype = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
-                    if (session_id_ != null && session_id_.Length > 0)
+                    if (session_id_.Length > 0)
                         transport.JsonHelper.SetStringField(json, kSessionIdBodyField, session_id_);
 
                     transport.SendMessage(msgtype, msg);
@@ -2011,7 +2025,7 @@ namespace Fun
                 else if (msg_type_ == FunMsgType.kProtobuf)
                 {
                     FunMessage message = msg.message as FunMessage;
-                    if (session_id_ != null && session_id_.Length > 0)
+                    if (session_id_.Length > 0)
                         message.sid = session_id_;
 
                     if (session_reliability_ && transport.protocol == TransportProtocol.kTcp)
@@ -2050,26 +2064,22 @@ namespace Fun
             message_handlers_[type] = handler;
         }
 
-        public ErrorCode last_error_code_
+        public ErrorCode LastErrorCode (TransportProtocol protocol)
         {
-            get
-            {
-                if (default_transport_ != null)
-                    return default_transport_.LastErrorCode;
-
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
                 return ErrorCode.kNone;
-            }
+
+            return transport.LastErrorCode;
         }
 
-        public string last_error_message_
+        public string LastErrorMessage (TransportProtocol protocol)
         {
-            get
-            {
-                if (default_transport_ != null)
-                    return default_transport_.LastErrorMessage;
-
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
                 return "";
-            }
+
+            return transport.LastErrorMessage;
         }
         #endregion
 
@@ -2123,27 +2133,6 @@ namespace Fun
             }
 
             OnSessionClosed();
-        }
-
-        private TransportProtocol GetProtocol (string msg_type)
-        {
-            if (message_protocols_.ContainsKey(msg_type))
-                return message_protocols_[msg_type];
-
-            return default_protocol_;
-        }
-
-        private FunapiTransport GetTransport (TransportProtocol protocol)
-        {
-            DebugUtils.Assert(protocol != TransportProtocol.kDefault);
-
-            lock (transports_lock_)
-            {
-                if (transports_.ContainsKey(protocol))
-                    return transports_[protocol];
-            }
-
-            return null;
         }
 
         private void OnTransportReceived (TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body)
@@ -2423,7 +2412,7 @@ namespace Fun
             DebugUtils.Assert(transport != null);
             Debug.Log("'" + protocol + "' Transport started.");
 
-            if (session_id_ != null && session_id_.Length > 0)
+            if (session_id_.Length > 0)
             {
                 if (session_reliability_ && protocol == TransportProtocol.kTcp && seq_recvd_ != 0)
                 {
@@ -2478,7 +2467,8 @@ namespace Fun
             kWaitForAck,
             kWaitForSession,
             kEstablished,
-            WaitForStop
+            kWaitForStop,
+            kStopped
         };
 
         // Delegates
@@ -2534,7 +2524,6 @@ namespace Fun
         private FunMsgType msg_type_;
         private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
         private FunMessageSerializer serializer_;
-        private FunapiTransport default_transport_ = null;
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
         private string session_id_ = "";
         private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();

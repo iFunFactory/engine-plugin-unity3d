@@ -131,11 +131,7 @@ public class FunapiNetworkTester : MonoBehaviour
         FunMsgType msg_type = with_protobuf_ ? FunMsgType.kProtobuf : FunMsgType.kJson;
         if (network_ == null || !network_.SessionReliability || network_.MsgType != msg_type)
         {
-            FunapiTransport transport = GetNewTransport(protocol);
-
-            network_ = new FunapiNetwork(transport, msg_type,
-                                         with_session_reliability_,
-                                         OnSessionInitiated, OnSessionClosed);
+            network_ = new FunapiNetwork(msg_type, with_session_reliability_);
 
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
@@ -146,6 +142,9 @@ public class FunapiNetworkTester : MonoBehaviour
 
             //network_.SetMessageProtocol(TransportProtocol.kTcp, "echo");
             //network_.SetMessageProtocol(TransportProtocol.kUdp, "pbuf_echo");
+
+            FunapiTransport transport = GetNewTransport(protocol);
+            network_.AttachTransport(transport);
         }
         else
         {
