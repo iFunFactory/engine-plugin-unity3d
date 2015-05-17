@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 64;
+        public static readonly int kPluginVersion = 65;
     }
 
     // Funapi transport protocol
@@ -230,12 +230,18 @@ namespace Fun
 
         internal void OnConnectionTimeout ()
         {
-            ConnectTimeoutCallback(protocol);
+            if (ConnectTimeoutCallback != null)
+            {
+                ConnectTimeoutCallback(protocol);
+            }
         }
 
         internal void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
-            ReceivedCallback(protocol, header, body);
+            if (ReceivedCallback != null)
+            {
+                ReceivedCallback(protocol, header, body);
+            }
         }
 
         internal void OnStarted ()
@@ -248,7 +254,10 @@ namespace Fun
 
         internal void OnStopped ()
         {
-            StoppedCallback(protocol);
+            if (StoppedCallback != null)
+            {
+                StoppedCallback(protocol);
+            }
         }
         #endregion
 
@@ -1462,7 +1471,7 @@ namespace Fun
             DebugUtils.Log("RequestFailure - state: " + state);
             if (state == State.kUnknown || cur_request_ == null)
             {
-                RequestFailureCallback("");
+                OnRequestFailureCallback("");
                 return;
             }
 
@@ -1490,9 +1499,17 @@ namespace Fun
                 sending_.RemoveAt(0);
                 sending_.RemoveAt(0);
 
-                RequestFailureCallback(ws.msgtype);
+                OnRequestFailureCallback(ws.msgtype);
 
                 SendUnsentMessages();
+            }
+        }
+
+        private void OnRequestFailureCallback (string msg_type)
+        {
+            if (RequestFailureCallback != null)
+            {
+                RequestFailureCallback(msg_type);
             }
         }
         #endregion
@@ -1505,8 +1522,8 @@ namespace Fun
         private static readonly float kResponseTimeout = 30f;    // seconds
 
         // Delegates
-        public delegate void OnRequestFailure(string msg_type);
-        public event OnRequestFailure RequestFailureCallback;
+        public delegate void RequestFailureHandler(string msg_type);
+        public event RequestFailureHandler RequestFailureCallback;
 
         // Response-related.
         class WebState
@@ -1881,7 +1898,7 @@ namespace Fun
             else if (transport_reliability ||
                      (transport != null && transport.state == FunapiTransport.State.kConnected))
             {
-                unsent_queue_.Enqueue(new UnsentMessage(message, protocol));
+                unsent_queue_.Enqueue(new UnsentMessage(msg_type, message, protocol));
                 Debug.Log("SendMessage - '" + msg_type + "' message queued.");
             }
             else
@@ -1934,25 +1951,25 @@ namespace Fun
                 session_id_ = "";
             }
 
-            // Encodes a messsage type
-            json_helper_.SetStringField(body, kMsgTypeBodyField, msg_type);
-
-            // Encodes a session id, if any.
-            if (session_id_.Length > 0)
-            {
-                json_helper_.SetStringField(body, kSessionIdBodyField, session_id_);
-            }
-
             FunapiTransport transport = GetTransport(protocol);
             if (transport != null && state_ == State.kEstablished &&
                 (transport_reliability == false || unsent_queue_.Count <= 0))
             {
+                // Encodes a messsage type
+                transport.JsonHelper.SetStringField(body, kMsgTypeBodyField, msg_type);
+
+                // Encodes a session id, if any.
+                if (session_id_.Length > 0)
+                {
+                    transport.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+                }
+
                 if (transport_reliability)
                 {
                     transport.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
                     ++seq_;
 
-                    send_queue_.Enqueue(json_helper_.Clone(body));
+                    send_queue_.Enqueue(transport.JsonHelper.Clone(body));
                 }
 
                 transport.SendMessage(msg_type, body);
@@ -1960,7 +1977,11 @@ namespace Fun
             else if (transport_reliability ||
                      (transport != null && transport.state == FunapiTransport.State.kConnected))
             {
-                unsent_queue_.Enqueue(new UnsentMessage(json_helper_.Clone(body), protocol));
+                if (transport == null)
+                    unsent_queue_.Enqueue(new UnsentMessage(msg_type, body, protocol));
+                else
+                    unsent_queue_.Enqueue(new UnsentMessage(msg_type, transport.JsonHelper.Clone(body), protocol));
+
                 Debug.Log("SendMessage - '" + msg_type + "' message queued.");
             }
             else
@@ -2016,11 +2037,20 @@ namespace Fun
                 if (msg_type_ == FunMsgType.kJson)
                 {
                     object json = msg.message;
-                    string msgtype = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+
+                    // Encodes a messsage type
+                    transport.JsonHelper.SetStringField(json, kMsgTypeBodyField, msg.msgtype);
+
                     if (session_id_.Length > 0)
                         transport.JsonHelper.SetStringField(json, kSessionIdBodyField, session_id_);
 
-                    transport.SendMessage(msgtype, msg);
+                    if (session_reliability_ && transport.protocol == TransportProtocol.kTcp)
+                    {
+                        transport.JsonHelper.SetIntegerField(json, kSeqNumberField, seq_);
+                        ++seq_;
+                    }
+
+                    transport.SendMessage(msg.msgtype, json);
                 }
                 else if (msg_type_ == FunMsgType.kProtobuf)
                 {
@@ -2108,7 +2138,10 @@ namespace Fun
             state_ = State.kEstablished;
             session_id_ = session_id;
 
-            OnSessionInitiated(session_id_);
+            if (OnSessionInitiated != null)
+            {
+                OnSessionInitiated(session_id_);
+            }
 
             if (unsent_queue_.Count > 0)
             {
@@ -2132,7 +2165,10 @@ namespace Fun
                 seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
             }
 
-            OnSessionClosed();
+            if (OnSessionClosed != null)
+            {
+                OnSessionClosed();
+            }
         }
 
         private void OnTransportReceived (TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body)
@@ -2454,7 +2490,10 @@ namespace Fun
 
         private void OnMaintenanceMessage(string msg_type, object body)
         {
-            MaintenanceCallback(msg_type, body);
+            if (MaintenanceCallback != null)
+            {
+                MaintenanceCallback(msg_type, body);
+            }
         }
         #endregion
 
@@ -2480,12 +2519,14 @@ namespace Fun
         // Unsent queue-releated class
         class UnsentMessage
         {
-            public UnsentMessage(object message, TransportProtocol protocol)
+            public UnsentMessage(string msgtype, object message, TransportProtocol protocol)
             {
+                this.msgtype = msgtype;
                 this.message = message;
                 this.protocol = protocol;
             }
 
+            public string msgtype;
             public object message;
             public TransportProtocol protocol;
         }
@@ -2533,7 +2574,6 @@ namespace Fun
         private object message_lock_ = new object();
         private object transports_lock_ = new object();
         private DateTime last_received_ = DateTime.Now;
-        private JsonAccessor json_helper_ = new DictionaryJsonAccessor();
 
         // Reliability-releated member variables.
         private bool session_reliability_;

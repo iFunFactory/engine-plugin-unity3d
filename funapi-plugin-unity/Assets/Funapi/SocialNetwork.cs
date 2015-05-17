@@ -60,7 +60,10 @@ namespace Fun
         protected void OnEventHandler (SnResultCode result)
         {
             Debug.Log("OnEventHandler - result: " + result);
-            EventCallback(result);
+            if (EventCallback != null)
+            {
+                EventCallback(result);
+            }
         }
         #endregion
 

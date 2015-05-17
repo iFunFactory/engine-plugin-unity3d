@@ -101,7 +101,7 @@ public class FunapiNetworkTester : MonoBehaviour
         else if (protocol == TransportProtocol.kHttp)
         {
             FunapiHttpTransport http_transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false);
-            http_transport.RequestFailureCallback += new FunapiHttpTransport.OnRequestFailure(OnHttpRequestFailure);
+            http_transport.RequestFailureCallback += new FunapiHttpTransport.RequestFailureHandler(OnHttpRequestFailure);
             transport = http_transport;
 
             // Please set the same encryption type as the encryption type of server.

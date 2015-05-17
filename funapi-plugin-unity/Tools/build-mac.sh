@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
-OUTPUT_ROOT=../Assets
-UNITY_MONO=/Applications/Unity/Unity.app/Contents/Frameworks/Mono
+OUTPUT_ROOT=${OUTPUT_ROOT:-../Assets}
+UNITY_MONO=${UNITY_MONO:-/Applications/Unity/Unity.app/Contents/Frameworks/Mono}
 export MONO_PATH=${UNITY_MONO}/lib/mono/2.0
 
 
