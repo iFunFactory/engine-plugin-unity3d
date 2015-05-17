@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 64;
+        public static readonly int kPluginVersion = 65;
     }
 
     // Funapi transport protocol
@@ -2172,7 +2172,7 @@ namespace Fun
             else if (transport_reliability ||
                      (transport != null && transport.state == FunapiTransport.State.kConnected))
             {
-                unsent_queue_.Enqueue(new UnsentMessage(message, protocol));
+                unsent_queue_.Enqueue(new UnsentMessage(msg_type, message, protocol));
                 Debug.Log("SendMessage - '" + msg_type + "' message queued.");
             }
             else
@@ -2237,25 +2237,25 @@ namespace Fun
                 session_id_ = "";
             }
 
-            // Encodes a messsage type
-            json_helper_.SetStringField(body, kMsgTypeBodyField, msg_type);
-
-            // Encodes a session id, if any.
-            if (session_id_.Length > 0)
-            {
-                json_helper_.SetStringField(body, kSessionIdBodyField, session_id_);
-            }
-
             FunapiTransport transport = GetTransport(protocol);
             if (transport != null && state_ == State.kEstablished &&
                 (transport_reliability == false || unsent_queue_.Count <= 0))
             {
+                // Encodes a messsage type
+                transport.JsonHelper.SetStringField(body, kMsgTypeBodyField, msg_type);
+
+                // Encodes a session id, if any.
+                if (session_id_.Length > 0)
+                {
+                    transport.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+                }
+
                 if (transport_reliability)
                 {
                     transport.JsonHelper.SetIntegerField(body, kSeqNumberField, seq_);
                     ++seq_;
 
-                    send_queue_.Enqueue(json_helper_.Clone(body));
+                    send_queue_.Enqueue(transport.JsonHelper.Clone(body));
                 }
 
                 transport.SendMessage(msg_type, body, encryption);
@@ -2263,7 +2263,11 @@ namespace Fun
             else if (transport_reliability ||
                      (transport != null && transport.state == FunapiTransport.State.kConnected))
             {
-                unsent_queue_.Enqueue(new UnsentMessage(json_helper_.Clone(body), protocol));
+                if (transport == null)
+                    unsent_queue_.Enqueue(new UnsentMessage(msg_type, body, protocol));
+                else
+                    unsent_queue_.Enqueue(new UnsentMessage(msg_type, transport.JsonHelper.Clone(body), protocol));
+
                 Debug.Log("SendMessage - '" + msg_type + "' message queued.");
             }
             else
@@ -2326,7 +2330,10 @@ namespace Fun
                 if (msg_type_ == FunMsgType.kJson)
                 {
                     object json = msg.message;
-                    string msgtype = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+
+                    // Encodes a messsage type
+                    transport.JsonHelper.SetStringField(json, kMsgTypeBodyField, msg.msgtype);
+
                     if (session_id_.Length > 0)
                         transport.JsonHelper.SetStringField(json, kSessionIdBodyField, session_id_);
 
@@ -2336,7 +2343,7 @@ namespace Fun
                         ++seq_;
                     }
 
-                    transport.SendMessage(msgtype, json, EncryptionType.kDefaultEncryption);
+                    transport.SendMessage(msg.msgtype, json, EncryptionType.kDefaultEncryption);
                 }
                 else if (msg_type_ == FunMsgType.kProtobuf)
                 {
@@ -2796,12 +2803,14 @@ namespace Fun
         // Unsent queue-releated class
         class UnsentMessage
         {
-            public UnsentMessage(object message, TransportProtocol protocol)
+            public UnsentMessage(string msgtype, object message, TransportProtocol protocol)
             {
+                this.msgtype = msgtype;
                 this.message = message;
                 this.protocol = protocol;
             }
 
+            public string msgtype;
             public object message;
             public TransportProtocol protocol;
         }
@@ -2849,7 +2858,6 @@ namespace Fun
         private object message_lock_ = new object();
         private object transports_lock_ = new object();
         private DateTime last_received_ = DateTime.Now;
-        private JsonAccessor json_helper_ = new DictionaryJsonAccessor();
 
         // Reliability-releated member variables.
         private bool session_reliability_;
