@@ -6,6 +6,7 @@
 
 using Fun;
 using MiniJSON;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -13,15 +14,17 @@ using UnityEngine;
 // Protobuf
 using funapi.network.fun_message;
 using funapi.network.maintenance;
+using funapi.service.multicast_message;
 using pbuf_echo;
+using pbuf_multicast;
 
 
 public class FunapiNetworkTester : MonoBehaviour
 {
     public void Start()
     {
-        string url = string.Format("http://{0}:8080", kServerIp);
-        announcement_.Init(url);
+        announcement_url_ = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
+        announcement_.Init(announcement_url_);
         announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
     }
 
@@ -29,56 +32,155 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         if (network_ != null)
             network_.Update();
+
+        if (multicast_ != null)
+            multicast_.Update ();
+
+        if (chat_ != null)
+            chat_.Update ();
     }
 
     public void OnGUI()
     {
-        // For debugging
+        //----------------------------------------------------------------------------
+        // FunapiNetwork test
+        //----------------------------------------------------------------------------
         with_protobuf_ = GUI.Toggle(new Rect(30, 0, 300, 20), with_protobuf_, " google protocol buffer");
-        with_session_reliability_ = GUI.Toggle(new Rect(30, 30, 300, 20), with_session_reliability_, " session reliability");
+        with_session_reliability_ = GUI.Toggle(new Rect(30, 20, 300, 20), with_session_reliability_, " session reliability");
+        GUI.Label(new Rect(30, 40, 300, 20), "server : " + kServerIp);
 
-        GUI.enabled = (network_ == null ||  !network_.Connected);
-        if (GUI.Button(new Rect(30, 70, 240, 40), "Connect (TCP)"))
+        GUI.enabled = (network_ == null || !network_.Connected);
+        if (GUI.Button(new Rect(30, 60, 240, 40), "Connect (TCP)"))
         {
             Connect(TransportProtocol.kTcp);
         }
-        if (GUI.Button(new Rect(30, 130, 240, 40), "Connect (UDP)"))
+        if (GUI.Button(new Rect(30, 110, 240, 40), "Connect (UDP)"))
         {
             Connect(TransportProtocol.kUdp);
         }
-        if (GUI.Button(new Rect(30, 190, 240, 40), "Connect (HTTP)"))
+        if (GUI.Button(new Rect(30, 160, 240, 40), "Connect (HTTP)"))
         {
             Connect(TransportProtocol.kHttp);
         }
 
         GUI.enabled = (network_ != null && network_.Connected);
-        if (GUI.Button(new Rect(30, 310, 240, 40), "Send 'Hello World'"))
-        {
-            SendEchoMessage();
-        }
-
-        if (GUI.Button(new Rect(30, 250, 240, 40), "Disconnect"))
+        if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
         {
             DisConnect();
         }
 
+        if (GUI.Button(new Rect(30, 260, 240, 40), "Send 'Hello World'"))
+        {
+            SendEchoMessage();
+        }
+
+        //----------------------------------------------------------------------------
+        // Announcements test
+        //----------------------------------------------------------------------------
         GUI.enabled = announcement_ != null;
-        if (GUI.Button(new Rect(280, 70, 240, 40), "Update Announcements"))
+        GUI.Label(new Rect(30, 320, 300, 20), "server : " + announcement_url_);
+        if (GUI.Button(new Rect(30, 340, 240, 40), "Update Announcements"))
         {
             announcement_.UpdateList();
         }
 
+        //----------------------------------------------------------------------------
+        // Resource download test
+        //----------------------------------------------------------------------------
         GUI.enabled = downloader_ == null;
-        if (GUI.Button(new Rect(280, 130, 240, 40), "File Download (HTTP)"))
+        GUI.Label(new Rect(30, 390, 300, 20), "server : " + kDownloadServerIp + ":" + kDownloadServerPort);
+        if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
-            downloader_.StartDownload(kServerIp, 8020, "list", false);
-            message_ = " start downloading..";
+            downloader_.StartDownload(kDownloadServerIp, kDownloadServerPort, "list", false);
+            Debug.Log("Start downloading..");
             Invoke("CheckDownloadConnection", 3f);
         }
 
-        GUI.enabled = true;
-        GUI.TextField(new Rect(280, 191, 480, 24), message_);
+        //----------------------------------------------------------------------------
+        // FunapiMulticasting test
+        //----------------------------------------------------------------------------
+        GUI.enabled = (multicast_ == null || !multicast_.Connected);
+        GUI.Label(new Rect(280, 40, 300, 20), "server : " + kMulticastServerIp);
+        string multicast_title = "Multicast (Protobuf) connect";
+        if (GUI.Button(new Rect(280, 60, 240, 40), multicast_title))
+        {
+            if (multicast_ == null)
+                multicast_ = new FunapiMulticastClient(FunMsgType.kProtobuf);
+
+            multicast_.Connect(kMulticastServerIp, kMulticastPbufPort);
+            Debug.Log("Connecting to the multicast server..");
+        }
+
+        GUI.enabled = (multicast_ != null && multicast_.Connected && !multicast_.InChannel(kMulticastTestChannel));
+        multicast_title = "Multicast (Protobuf) join";
+        if (GUI.Button(new Rect(280, 110, 240, 40), multicast_title))
+        {
+            multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelSignalled);
+            Debug.Log("Joining the multicast channel '" + kMulticastTestChannel + "'");
+        }
+
+        GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
+        multicast_title = "Multicast (Protobuf) send";
+        if (GUI.Button(new Rect(280, 160, 240, 40), multicast_title))
+        {
+            PbufHelloMessage hello_msg = new PbufHelloMessage();
+            hello_msg.message = "multicast test";
+
+            FunMulticastMessage mcast_msg = new FunMulticastMessage();
+            mcast_msg.channel = kMulticastTestChannel;
+            mcast_msg.bounce = true;
+
+            Extensible.AppendValue(mcast_msg, 8, hello_msg);
+
+            multicast_.SendToChannel(mcast_msg);
+
+            Debug.Log("Sending a message to the multicast channel '" + kMulticastTestChannel + "'");
+        }
+
+        GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
+        multicast_title = "Multicast (Protobuf) leave";
+        if (GUI.Button(new Rect(280, 210, 240, 40), multicast_title))
+        {
+            multicast_.LeaveChannel(kMulticastTestChannel);
+            Debug.Log("Leaving the multicast channel '" + kMulticastTestChannel + "'");
+        }
+
+        GUI.enabled = (chat_ == null || !chat_.Connected);
+        string chat_title = "Chat (Protobuf) connect";
+        if (GUI.Button(new Rect(280, 260, 240, 40), chat_title))
+        {
+            if (chat_ == null)
+                chat_ = new FunapiChatClient();
+
+            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunMsgType.kProtobuf);
+            Debug.Log("Connecting to the chat server..");
+        }
+
+        GUI.enabled = (chat_ != null && chat_.Connected && !chat_.InChannel(kChatTestChannel));
+        chat_title = "Chat (Protobuf) join";
+        if (GUI.Button(new Rect(280, 310, 240, 40), chat_title))
+        {
+            chat_.JoinChannel(kChatTestChannel, kChatUserName, OnChatChannelReceived);
+            Debug.Log("Joining the chat channel '" + kChatTestChannel + "'");
+        }
+
+        GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
+        chat_title = "Chat (Protobuf) send";
+        if (GUI.Button(new Rect(280, 360, 240, 40), chat_title))
+        {
+            chat_.SendText(kChatTestChannel, "hello world");
+
+            Debug.Log("Sending a message to the chat channel '" + kChatTestChannel + "'");
+        }
+
+        GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
+        chat_title = "Chat (Protobuf) leave";
+        if (GUI.Button(new Rect(280, 410, 240, 40), chat_title))
+        {
+            chat_.LeaveChannel(kChatTestChannel);
+            Debug.Log("Leaving the chat channel '" + kChatTestChannel + "'");
+        }
     }
 
 
@@ -276,14 +378,13 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
-        message_ = " downloading - path:" + path + " / received:" + bytes_received + " / total:" + total_bytes + " / " + percentage + "%";
-        Debug.Log(message_);
+        Debug.Log("Downloading - path:" + path + " / received:" + bytes_received + " / total:" + total_bytes + " / " + percentage + "%");
     }
 
     private void OnDownloadFinished (DownloadResult code)
     {
         downloader_ = null;
-        message_ = " download completed. result:" + code;
+        Debug.Log("Download completed. result:" + code);
     }
 
     private void OnAnnouncementResult (AnnounceResult result)
@@ -339,16 +440,40 @@ public class FunapiNetworkTester : MonoBehaviour
     }
 
 
+    private void OnMulticastChannelSignalled(string channel_id, object body)
+    {
+        DebugUtils.Assert (body is FunMulticastMessage);
+        FunMulticastMessage mcast_msg = body as FunMulticastMessage;
+        DebugUtils.Assert (mcast_msg.channel == kMulticastTestChannel);
+        PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, 8);
+        DebugUtils.Assert (hello_msg.message != "");
+        Debug.Log ("Received a multicast message from a channel " + channel_id);
+    }
+
+    private void OnChatChannelReceived(string chat_channel, string sender, string text)
+    {
+        Debug.Log ("Received a chat channel message. Channel=" + chat_channel + ", sender=" + sender + ", text=" + text);
+    }
+
     // Please change this address for test.
     private const string kServerIp = "127.0.0.1";
+    private const string kAnnouncementIp = "127.0.0.1";
+    private const UInt16 kAnnouncementPort = 8080;
+    private const string kDownloadServerIp = "127.0.0.1";
+    private const UInt16 kDownloadServerPort = 8020;
+    private const string kMulticastServerIp = "127.0.0.1";
+    private const UInt16 kMulticastPbufPort = 8013;
+    private const string kMulticastTestChannel = "test_channel";
+    private const string kChatTestChannel = "chat_channel";
+    private const string kChatUserName = "my_name";
 
     // member variables.
     private FunapiNetwork network_ = null;
     private FunapiHttpDownloader downloader_ = null;
     private FunapiAnnouncement announcement_ = new FunapiAnnouncement();
+    private FunapiMulticastClient multicast_ = null;
+    private FunapiChatClient chat_ = null;
     private bool with_protobuf_ = false;
     private bool with_session_reliability_ = false;
-    private string message_ = "";
-
-    // Another Funapi-specific features will go here...
+    private string announcement_url_ = "";
 }

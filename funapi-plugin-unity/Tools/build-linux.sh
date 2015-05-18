@@ -19,7 +19,8 @@ if [ -f /usr/include/funapi/network/fun_message.proto ]; then
       -o messages.bin \
       -I /usr/include -I proto-files \
       /usr/include/funapi/network/fun_message.proto \
-      proto-files/pbuf_echo.proto
+      proto-files/pbuf_echo.proto \
+      proto-files/pbuf_multicast.proto
 
   mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
                             -i:"messages.bin" -o:"messages.cs" -p:detectMissing
