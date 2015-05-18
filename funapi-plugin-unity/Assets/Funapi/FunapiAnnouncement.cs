@@ -49,7 +49,7 @@ namespace Fun
             if (string.IsNullOrEmpty(host_url_))
             {
                 Debug.Log("url is null or empty.");
-                ResultCallback(AnnounceResult.kInvalidUrl);
+                OnResultCallback(AnnounceResult.kInvalidUrl);
                 return;
             }
 
@@ -79,7 +79,7 @@ namespace Fun
                 if (ar.Error != null)
                 {
                     Debug.Log("Exception Error: " + ar.Error);
-                    ResultCallback(AnnounceResult.kExceptionError);
+                    OnResultCallback(AnnounceResult.kExceptionError);
                     DebugUtils.Assert(false);
                 }
                 else
@@ -90,7 +90,7 @@ namespace Fun
                     if (json == null)
                     {
                         Debug.Log("Deserialize json failed. json: " + data);
-                        ResultCallback(AnnounceResult.kInvalidJson);
+                        OnResultCallback(AnnounceResult.kInvalidJson);
                         return;
                     }
 
@@ -99,7 +99,7 @@ namespace Fun
                     if (list == null || list.Count <= 0)
                     {
                         Debug.Log("Invalid announcement list. list: " + list);
-                        ResultCallback(AnnounceResult.kListIsNullOrEmpty);
+                        OnResultCallback(AnnounceResult.kListIsNullOrEmpty);
                         return;
                     }
 
@@ -127,14 +127,14 @@ namespace Fun
                     }
                     else
                     {
-                        ResultCallback(AnnounceResult.kSuccess);
+                        OnResultCallback(AnnounceResult.kSuccess);
                     }
                 }
             }
             catch (Exception e)
             {
                 Debug.Log("Failure in DownloadDataCompleteCb: " + e.ToString());
-                ResultCallback(AnnounceResult.kExceptionError);
+                OnResultCallback(AnnounceResult.kExceptionError);
             }
         }
 
@@ -145,7 +145,7 @@ namespace Fun
                 if (ar.Error != null)
                 {
                     Debug.Log("Exception Error: " + ar.Error);
-                    ResultCallback(AnnounceResult.kExceptionError);
+                    OnResultCallback(AnnounceResult.kExceptionError);
                     DebugUtils.Assert(false);
                 }
                 else
@@ -160,14 +160,14 @@ namespace Fun
                     else
                     {
                         Debug.Log("Download file completed.");
-                        ResultCallback(AnnounceResult.kSuccess);
+                        OnResultCallback(AnnounceResult.kSuccess);
                     }
                 }
             }
             catch (Exception e)
             {
                 Debug.Log("Failure in DownloadFileCompleteCb: " + e.ToString());
-                ResultCallback(AnnounceResult.kExceptionError);
+                OnResultCallback(AnnounceResult.kExceptionError);
             }
         }
 
@@ -198,6 +198,14 @@ namespace Fun
             {
                 url = host_url_ + kImagesUrl + url;
                 image_list_.Add(new KeyValuePair<string, string>(url, path));
+            }
+        }
+
+        private void OnResultCallback (AnnounceResult result)
+        {
+            if (ResultCallback != null)
+            {
+                ResultCallback(result);
             }
         }
         #endregion
