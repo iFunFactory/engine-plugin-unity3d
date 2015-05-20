@@ -6,20 +6,24 @@ SRVPATH=proto-files/funapi/service
 PROTOPATH=proto-files
 PROTOGEN_EXE=protobuf-net/ProtoGen/protogen.exe
 
+RUNTIME=v2.0.50727
+
 echo 'Generating .bin files'
 mkdir -p "${OUTPUT}/bin"
-protoc -I"${PROTOPATH}/" "${FUNPATH}/fun_message.proto" -o"${OUTPUT}/bin/fun_message.bin"
-protoc -I"${PROTOPATH}/" "${FUNPATH}/maintenance.proto" -o"${OUTPUT}/bin/maintenance.bin"
-protoc -I"${PROTOPATH}/" "${SRVPATH}/multicast_message.proto" -o"${OUTPUT}/bin/multicast_message.bin"
-protoc -I"${PROTOPATH}/" "${PROTOPATH}/pbuf_echo.proto" -o"${OUTPUT}/bin/pbuf_echo.bin"
-protoc -I"${PROTOPATH}/" "${PROTOPATH}/pbuf_multicast.proto" -o"${OUTPUT}/bin/pbuf_multicast.bin"
+protoc --include_imports \
+    -o "${OUTPUT}/bin/messages.bin" \
+    -I "${PROTOPATH}" \
+    "${FUNPATH}/fun_message.proto" \
+    "${FUNPATH}/maintenance.proto" \
+    "${SRVPATH}/multicast_message.proto" \
+    "${PROTOPATH}/pbuf_echo.proto" \
+    "${PROTOPATH}/pbuf_multicast.proto"
 
 echo 'Generating .cs files'
-mono "${PROTOGEN_EXE}" -i:"${OUTPUT}/bin/fun_message.bin" -o:"${OUTPUT}/fun_message.cs" -p:detectMissing
-mono "${PROTOGEN_EXE}" -i:"${OUTPUT}/bin/maintenance.bin" -o:"${OUTPUT}/maintenance.cs"
-mono "${PROTOGEN_EXE}" -i:"${OUTPUT}/bin/multicast_message.bin" -o:"${OUTPUT}/multicast_message.cs"
-mono "${PROTOGEN_EXE}" -i:"${OUTPUT}/bin/pbuf_echo.bin" -o:"${OUTPUT}/pbuf_echo.cs"
-mono "${PROTOGEN_EXE}" -i:"${OUTPUT}/bin/pbuf_multicast.bin" -o:"${OUTPUT}/pbuf_multicast.cs"
+mono --runtime=${RUNTIME} ${PROTOGEN_EXE} \
+    -i:${OUTPUT}/bin/messages.bin \
+    -o:${OUTPUT}/messages.cs \
+    -p:detectMissing
 
 echo 'Deleting .bin files'
 rm -rf "${OUTPUT}/bin"

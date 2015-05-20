@@ -330,7 +330,7 @@ public class FunapiNetworkTester : MonoBehaviour
             else if (network_.MsgType == FunMsgType.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
-                echo.message = "hello proto";
+                echo.msg = "hello proto";
                 FunMessage message = network_.CreateFunMessage(echo, 16);
                 network_.SendMessage("pbuf_echo", message);
             }
@@ -373,7 +373,7 @@ public class FunapiNetworkTester : MonoBehaviour
             return;
 
         PbufEchoMessage echo = obj as PbufEchoMessage;
-        Debug.Log("Received an echo message: " + echo.message);
+        Debug.Log("Received an echo message: " + echo.msg);
     }
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
