@@ -49,7 +49,7 @@ public class FunapiNetworkTester : MonoBehaviour
         with_session_reliability_ = GUI.Toggle(new Rect(30, 20, 300, 20), with_session_reliability_, " session reliability");
         GUI.Label(new Rect(30, 40, 300, 20), "server : " + kServerIp);
 
-        GUI.enabled = (network_ == null || !network_.Connected);
+        GUI.enabled = (network_ == null || !network_.Started);
         if (GUI.Button(new Rect(30, 60, 240, 40), "Connect (TCP)"))
         {
             Connect(TransportProtocol.kTcp);
