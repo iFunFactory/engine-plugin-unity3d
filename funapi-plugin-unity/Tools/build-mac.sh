@@ -9,7 +9,7 @@ echo 'Generating Protocol DLL'
 "${UNITY_MONO}/bin/gmcs" -target:library -unsafe+ \
     -out:"${OUTPUT_ROOT}/messages.dll" \
     /r:"protobuf-net/unity/protobuf-net.dll" \
-    "csharp-files/*.cs"
+    "csharp-files/messages.cs"
 
 echo 'Generating Serializer DLL'
 "${UNITY_MONO}/bin/mono" "protobuf-net/Precompile/precompile.exe" \

@@ -13,25 +13,28 @@ set -e
 OUTPUT_ROOT=../Assets
 RUNTIME=v2.0.50727
 
-if [ -f /usr/include/funapi/network/fun_message.proto ]; then
-  echo 'Generating Protocol C# files'
-  protoc --include_imports \
-      -o messages.bin \
-      -I /usr/include -I proto-files \
-      /usr/include/funapi/network/fun_message.proto \
-      proto-files/pbuf_echo.proto \
-      proto-files/pbuf_multicast.proto
+echo "Generating Protocol C# files"
+protoc --include_imports \
+    -o messages.bin \
+    -I proto-files \
+    proto-files/funapi/network/fun_message.proto \
+    proto-files/funapi/network/maintenance.proto \
+    proto-files/funapi/service/multicast_message.proto \
+    proto-files/pbuf_echo.proto \
+    proto-files/pbuf_multicast.proto
 
-  mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
-                            -i:"messages.bin" -o:"messages.cs" -p:detectMissing
-fi
+mkdir -p csharp-files
+mono --runtime=${RUNTIME} "protobuf-net/ProtoGen/protogen.exe" \
+    -i:"messages.bin" \
+    -o:"csharp-files/messages.cs" \
+    -p:detectMissing
 
 echo 'Generating Protocol DLL'
 gmcs -target:library -unsafe+ \
     -sdk:2 \
     -out:"${OUTPUT_ROOT}/messages.dll" \
     /r:"protobuf-net/unity/protobuf-net.dll" \
-    "csharp-files/*.cs"
+    csharp-files/messages.cs
 
 echo 'Generating Serializer DLL'
 mono --runtime=${RUNTIME} \

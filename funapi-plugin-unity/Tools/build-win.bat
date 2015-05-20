@@ -12,7 +12,7 @@ set PATH=%PATH%;"%UNITY_MONO%\Mono\bin"
 
 REM To generate .cs file, remove REM in following 3 lines.
 REM echo Generating C# protocol files
-REM protobuf-net\ProtoGen\protoc.exe -I proto-files --include_imports -I proto-files -o messages.bin proto-files\funapi-network\fun_message.proto proto-files\pbuf-echo.proto
+REM protobuf-net\ProtoGen\protoc.exe -I proto-files --include_imports -o messages.bin proto-files\funapi\network\fun_message.proto proto-files\funapi\network\maintenance.proto proto-files\funapi\service\multicast_message.proto proto-files\pbuf-echo.proto proto-files\pbuf-multicast.proto
 REM protobuf-net\ProtoGen\protogen.exe -i:messages.bin -o:messages.cs -p:detectMissing
 
 echo Generating Protocol DLL

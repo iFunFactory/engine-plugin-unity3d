@@ -13,7 +13,8 @@ import "funapi/network/fun_message.proto";
 
 message PbufEchoMessage
 {
-	optional string message = 1;
+	required string msg = 1;
+	optional int64 timestamp = 2;
 }
 
 message PbufAnotherMessage
