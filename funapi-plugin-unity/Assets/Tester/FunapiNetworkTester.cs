@@ -1,4 +1,6 @@
-﻿// Copyright (C) 2013 iFunFactory Inc. All Rights Reserved.
+﻿// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+//
+// Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -11,12 +13,13 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Protobuf
+// Protobuf (engine)
 using funapi.network.fun_message;
-using funapi.network.maintenance;
+using funapi.management.maintenance_message;
 using funapi.service.multicast_message;
-using pbuf_echo;
-using pbuf_multicast;
+// Protobuf (user defined)
+using test_messages;
+using test_multicast;
 
 
 public class FunapiNetworkTester : MonoBehaviour
@@ -131,7 +134,7 @@ public class FunapiNetworkTester : MonoBehaviour
             mcast_msg.channel = kMulticastTestChannel;
             mcast_msg.bounce = true;
 
-            Extensible.AppendValue(mcast_msg, 8, hello_msg);
+            Extensible.AppendValue(mcast_msg, (int)MulticastMessageType.pbuf_hello, hello_msg);
 
             multicast_.SendToChannel(mcast_msg);
 
@@ -333,8 +336,8 @@ public class FunapiNetworkTester : MonoBehaviour
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = "hello proto";
-                FunMessage message = network_.CreateFunMessage(echo, 16);
-                network_.SendMessage("pbuf_echo", message);
+                FunMessage message = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
+                network_.SendMessage(MessageType.pbuf_echo, message);
             }
         }
     }
@@ -375,7 +378,7 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         DebugUtils.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
-        object obj = network_.GetMessage(msg, typeof(PbufEchoMessage), 16);
+        object obj = network_.GetMessage(msg, MessageType.pbuf_echo);
         if (obj == null)
             return;
 
@@ -427,7 +430,7 @@ public class FunapiNetworkTester : MonoBehaviour
         else if (network_.MsgType == FunMsgType.kProtobuf)
         {
             FunMessage msg = body as FunMessage;
-            object obj = network_.GetMessage(msg, typeof(MaintenanceMessage), 15);
+            object obj = network_.GetMessage(msg, MessageType.pbuf_maintenance);
             if (obj == null)
                 return;
 
