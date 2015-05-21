@@ -238,6 +238,7 @@ public class FunapiNetworkTester : MonoBehaviour
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
             network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
+            network_.StoppedAllTransportCallback += new FunapiNetwork.NotifyHandler(OnStoppedAllTransport);
 
             network_.RegisterHandler("echo", this.OnEcho);
             network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
@@ -272,7 +273,7 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else if (network_.SessionReliability)
         {
-            network_.StopTransport();
+            network_.StopTransportAll();
         }
         else
         {
@@ -434,6 +435,11 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             DebugUtils.Assert(false);
         }
+    }
+
+    private void OnStoppedAllTransport()
+    {
+        Debug.Log("OnStoppedAllTransport called.");
     }
 
     private void OnHttpRequestFailure (string msg_type)
