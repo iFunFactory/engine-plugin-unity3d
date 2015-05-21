@@ -2,27 +2,47 @@
 
 set OUTPUT_ROOT=..\Assets
 
-if exist "C:\Program Files\Unity\Editor\Data\Mono\bin\gmcs.bat" ^
-set UNITY_MONO=C:\Program Files\Unity\Editor\Data
+set CSC_EXE=%SYSTEMROOT%\Microsoft.Net\Framework\v2.0.50727\csc.exe
+set PROTOC_EXE=protobuf-net\ProtoGen\protoc.exe
+set PROTOGEN_EXE=protobuf-net\ProtoGen\ProtoGen.exe
+set PRECOMPILE_EXE=protobuf-net\Precompile\precompile.exe
 
-if exist "C:\Program Files (x86)\Unity\Editor\Data\Mono\bin\gmcs.bat" ^
-set UNITY_MONO=C:\Program Files (x86)\Unity\Editor\Data
 
-set PATH=%PATH%;"%UNITY_MONO%\Mono\bin"
+setlocal enabledelayedexpansion
+set INCLUDE_PATH=proto-files
 
-REM To generate .cs file, remove REM in following 3 lines.
-REM echo Generating C# protocol files
-REM protobuf-net\ProtoGen\protoc.exe -I proto-files --include_imports -o messages.bin proto-files\funapi\network\fun_message.proto proto-files\funapi\network\maintenance.proto proto-files\funapi\service\multicast_message.proto proto-files\pbuf-echo.proto proto-files\pbuf-multicast.proto
-REM protobuf-net\ProtoGen\protogen.exe -i:messages.bin -o:messages.cs -p:detectMissing
+for %%x in (%*) do (
+   if exist %%x (
+     for %%F in (%%x) do set dirname=%%~dpF
+     set INCLUDE_PATH=!INCLUDE_PATH!:"%dirname:~0,-1%"
+   ) else (
+      echo File %%x does not exist
+      exit /b 1
+   )
+)
 
-echo Generating Protocol DLL
-call gmcs -target:library -unsafe+ ^
-    -out:%OUTPUT_ROOT%\DLL\messages.dll ^
-    /r:%OUTPUT_ROOT%\DLL\protobuf-net.dll ^
-    messages.cs
+set FINAL_INC_PATH=!INCLUDE_PATH!
+echo %FINAL_INC_PATH%
 
-echo Generating serializer DLL
-protobuf-net\Precompile\precompile %OUTPUT_ROOT%\messages.dll ^
-    -probe:%OUTPUT_ROOT%\DLL\ ^
-    -o:%OUTPUT_ROOT%\DLL\FunMessageSerializer.dll ^
+echo Generating Protocol C# files
+%PROTOC_EXE% -I proto-files ^
+    --include_imports ^
+    -o messages.bin ^
+    proto-files\funapi\network\fun_message.proto ^
+    proto-files\funapi\network\maintenance.proto ^
+    proto-files\funapi\service\multicast_message.proto ^
+    %*
+
+%PROTOGEN_EXE% -i:messages.bin -o:messages.cs -p:detectMissing
+
+echo Building protocol dll
+%CSC_EXE% /target:library /unsafe /out:%OUTPUT_ROOT%\messages.dll ^
+    /r:protobuf-net/unity/protobuf-net.dll messages.cs
+
+echo Generating Serializer dll
+%PRECOMPILE_EXE% %OUTPUT_ROOT%\messages.dll ^
+    -probe:%OUTPUT_ROOT% ^
+    -o:%OUTPUT_ROOT%\FunMessageSerializer.dll ^
     -t:FunMessageSerializer
+
+endlocal
