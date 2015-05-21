@@ -1,3 +1,5 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+//
 // Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
@@ -16,6 +18,7 @@ using UnityEngine;
 
 // Protobuf
 using funapi.network.fun_message;
+using funapi.service.multicast_message;
 
 
 namespace Fun
@@ -2278,6 +2281,7 @@ namespace Fun
             get { return msg_type_; }
         }
 
+        [System.Obsolete("This will be deprecated in September 2015. Use 'CreateFunMessage(object, MessageType)' instead.")]
         public FunMessage CreateFunMessage(object msg, int msg_index)
         {
             FunMessage _msg = new FunMessage();
@@ -2285,6 +2289,14 @@ namespace Fun
             return _msg;
         }
 
+        public FunMessage CreateFunMessage(object msg, MessageType msg_type)
+        {
+            FunMessage _msg = new FunMessage();
+            Extensible.AppendValue(serializer_, _msg, (int)msg_type, ProtoBuf.DataFormat.Default, msg);
+            return _msg;
+        }
+
+        [System.Obsolete("This will be deprecated in September 2015. Use 'GetMessage(FunMessage, MessageType)' instead.")]
         public object GetMessage(FunMessage msg, Type msg_type, int msg_index)
         {
             object _msg = null;
@@ -2299,14 +2311,47 @@ namespace Fun
             return _msg;
         }
 
+        public object GetMessage(FunMessage msg, MessageType msg_type)
+        {
+            object _msg = null;
+            bool success = Extensible.TryGetValue(
+                    serializer_, MessageTable.GetType(msg_type), msg, (int)msg_type,
+                    ProtoBuf.DataFormat.Default, true, out _msg);
+            if (!success)
+            {
+                Debug.Log(String.Format("Failed to decode {0} {1}",
+                            MessageTable.GetType(msg_type), (int)msg_type));
+                return null;
+            }
+            return _msg;
+        }
+
         public void SendMessage(string msg_type, FunMessage message)
         {
             SendMessage(msg_type, message, EncryptionType.kDefaultEncryption, GetMessageProtocol(msg_type));
         }
 
+        public void SendMessage(MessageType msg_type, FunMessage message)
+        {
+            string _msg_type = MessageTable.Lookup(msg_type);
+            SendMessage(_msg_type, message, EncryptionType.kDefaultEncryption, GetMessageProtocol(_msg_type));
+        }
+
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption)
         {
             SendMessage(msg_type, message, encryption, GetMessageProtocol(msg_type));
+        }
+
+        public void SendMessage(MessageType msg_type, FunMessage message, EncryptionType encryption)
+        {
+            string _msg_type = MessageTable.Lookup(msg_type);
+            SendMessage(_msg_type, message, encryption, GetMessageProtocol(_msg_type));
+        }
+
+        public void SendMessage(MessageType msg_type, FunMessage message, EncryptionType encryption, TransportProtocol protocol)
+        {
+            string _msg_type = MessageTable.Lookup(msg_type);
+            SendMessage(_msg_type, message, encryption, protocol);
         }
 
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption, TransportProtocol protocol)
