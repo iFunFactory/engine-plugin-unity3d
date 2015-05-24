@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 72;
+        public static readonly int kPluginVersion = 73;
     }
 
     // Funapi transport protocol
@@ -2195,9 +2195,20 @@ namespace Fun
                     {
                         msg_type = ProcessMessage(buffer.Key, buffer.Value);
 
-                        if (expected_replies_.ContainsKey(msg_type))
+                        lock (expected_reply_lock)
                         {
-                            expected_replies_.Remove(msg_type);
+                            if (expected_replies_.ContainsKey(msg_type))
+                            {
+                                List<ExpectedReplyMessage> list = expected_replies_[msg_type];
+                                if (list.Count > 0)
+                                {
+                                    list.RemoveAt(0);
+                                    Debug.Log("Deletes expected reply message - " + msg_type);
+                                }
+
+                                if (list.Count <= 0)
+                                    expected_replies_.Remove(msg_type);
+                            }
                         }
                     }
 
@@ -2205,26 +2216,31 @@ namespace Fun
                 }
             }
 
-            if (expected_replies_.Count > 0)
+            lock (expected_reply_lock)
             {
-                List<string> remove_list = new List<string>();
-
-                foreach (var item in expected_replies_)
+                if (expected_replies_.Count > 0)
                 {
-                    item.Value.wait_time -= Time.deltaTime;
-                    if (item.Value.wait_time <= 0f)
+                    foreach (var item in expected_replies_)
                     {
-                        Debug.Log("'" + item.Key + "' message waiting time has been exceeded.");
-                        remove_list.Add(item.Key);
-                        item.Value.callback(item.Key);
-                    }
-                }
+                        int remove_count = 0;
+                        foreach (ExpectedReplyMessage exp in item.Value)
+                        {
+                            exp.wait_time -= Time.deltaTime;
+                            if (exp.wait_time <= 0f)
+                            {
+                                Debug.Log("'" + exp.msgtype + "' message waiting time has been exceeded.");
+                                exp.callback(exp.msgtype);
+                                ++remove_count;
+                            }
+                        }
 
-                if (remove_list.Count > 0)
-                {
-                    foreach (string key in remove_list)
-                    {
-                        expected_replies_.Remove(key);
+                        if (remove_count > 0)
+                        {
+                            if (item.Value.Count <= remove_count)
+                                expected_replies_.Remove(item.Key);
+                            else
+                                item.Value.RemoveRange(0, remove_count);
+                        }
                     }
                 }
             }
@@ -2367,13 +2383,16 @@ namespace Fun
         public void SendMessage(string msg_type, FunMessage message, EncryptionType encryption, TransportProtocol protocol,
                                 string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
-            if (expected_replies_.ContainsKey(message.msgtype))
+            lock (expected_reply_lock)
             {
-                DebugUtils.Log("ERROR: Dictionary has the same key already exists. key: " + message.msgtype);
-                DebugUtils.Assert(false);
-            }
+                if (!expected_replies_.ContainsKey(msg_type))
+                {
+                    expected_replies_[msg_type] = new List<ExpectedReplyMessage>();
+                }
 
-            expected_replies_[expected_reply_type] = new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
+                expected_replies_[msg_type].Add(new ExpectedReplyMessage(expected_reply_type, expected_reply_time, onReplyMissed));
+                Debug.Log("Adds expected reply message - " + expected_reply_type);
+            }
 
             SendMessage(msg_type, message, encryption, protocol);
         }
@@ -2467,13 +2486,16 @@ namespace Fun
         public void SendMessage(string msg_type, object body, EncryptionType encryption, TransportProtocol protocol,
                                 string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
-            if (expected_replies_.ContainsKey(msg_type))
+            lock (expected_reply_lock)
             {
-                DebugUtils.Log("ERROR: Dictionary has the same key already exists. key: " + msg_type);
-                DebugUtils.Assert(false);
-            }
+                if (!expected_replies_.ContainsKey(msg_type))
+                {
+                    expected_replies_[msg_type] = new List<ExpectedReplyMessage>();
+                }
 
-            expected_replies_[expected_reply_type] =  new ExpectedReplyMessage(expected_reply_time, onReplyMissed);
+                expected_replies_[msg_type].Add(new ExpectedReplyMessage(expected_reply_type, expected_reply_time, onReplyMissed));
+                Debug.Log("Adds expected reply message - " + expected_reply_type);
+            }
 
             SendMessage(msg_type, body, encryption, protocol);
         }
@@ -3130,12 +3152,14 @@ namespace Fun
         // Callback timer for expected reply messages
         class ExpectedReplyMessage
         {
-            public ExpectedReplyMessage (float time, TimeoutEventHandler cb)
+            public ExpectedReplyMessage (string type, float time, TimeoutEventHandler cb)
             {
+                msgtype = type;
                 wait_time = time;
                 callback = cb;
             }
 
+            public string msgtype;
             public float wait_time;
             public TimeoutEventHandler callback;
         }
@@ -3166,11 +3190,12 @@ namespace Fun
         private string session_id_ = "";
         private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
         private Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
-        private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
+        private Dictionary<string, List<ExpectedReplyMessage>> expected_replies_ = new Dictionary<string, List<ExpectedReplyMessage>>();
         private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
         private object state_lock_ = new object();
         private object message_lock_ = new object();
         private object transports_lock_ = new object();
+        private object expected_reply_lock = new object();
         private DateTime last_received_ = DateTime.Now;
 
         // Reliability-releated member variables.
