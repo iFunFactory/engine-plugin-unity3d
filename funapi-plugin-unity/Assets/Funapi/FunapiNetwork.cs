@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 71;
+        public static readonly int kPluginVersion = 72;
     }
 
     // Funapi transport protocol
@@ -246,6 +246,8 @@ namespace Fun
 
         internal void OnStarted ()
         {
+            state = State.kEstablished;
+
             if (StartedCallback != null)
             {
                 StartedCallback(protocol);
@@ -1760,10 +1762,13 @@ namespace Fun
 
             Debug.Log("Starting " + transport.protocol + " transport.");
 
-            if (state_ == State.kUnknown)
+            lock (state_lock_)
             {
-                Start();
-                return;
+                if (state_ == State.kUnknown)
+                {
+                    Start();
+                    return;
+                }
             }
 
             transport.Start();
@@ -1781,14 +1786,17 @@ namespace Fun
 
             Debug.Log("Stopping " + transport.protocol + " transport.");
 
-            if (state_ == State.kWaitForSession &&
-                transport.state == FunapiTransport.State.kWaitForSessionResponse)
+            lock (state_lock_)
             {
-                FunapiTransport other = FindOtherTransport(transport.protocol);
-                if (other != null)
+                if (state_ == State.kWaitForSession &&
+                    transport.state == FunapiTransport.State.kWaitForSessionResponse)
                 {
-                    other.state = FunapiTransport.State.kWaitForSessionResponse;
-                    SendEmptyMessage(other.protocol);
+                    FunapiTransport other = FindOtherTransport(transport.protocol);
+                    if (other != null)
+                    {
+                        other.state = FunapiTransport.State.kWaitForSessionResponse;
+                        SendEmptyMessage(other.protocol);
+                    }
                 }
             }
 
@@ -1806,7 +1814,10 @@ namespace Fun
 
         public void StopTransportAll()
         {
-            state_ = State.kStopped;
+            lock (state_lock_)
+            {
+                state_ = State.kStopped;
+            }
 
             lock (transports_lock_)
             {
@@ -1822,8 +1833,12 @@ namespace Fun
         // Starts FunapiNetwork
         public void Start()
         {
-            state_ = State.kStarted;
             Debug.Log("Starting a network module.");
+
+            lock (state_lock_)
+            {
+                state_ = State.kStarted;
+            }
 
             lock (transports_lock_)
             {
@@ -1844,8 +1859,11 @@ namespace Fun
                 {
                     if (transport.Started && transport.HasUnsentMessages)
                     {
-                        state_ = State.kWaitForStop;
-                        return;
+                        lock (state_lock_)
+                        {
+                            state_ = State.kWaitForStop;
+                            return;
+                        }
                     }
                 }
             }
@@ -1855,8 +1873,12 @@ namespace Fun
 
             CloseSession();
 
+            lock (state_lock_)
+            {
+                state_ = State.kUnknown;
+            }
+
             Debug.Log("Stopping a network module.");
-            state_ = State.kUnknown;
         }
 
         // Your update method inheriting MonoBehaviour should explicitly invoke this method.
@@ -1871,10 +1893,13 @@ namespace Fun
                 }
             }
 
-            if (state_ == State.kWaitForStop)
+            lock (state_lock_)
             {
-                Stop();
-                return;
+                if (state_ == State.kWaitForStop)
+                {
+                    Stop();
+                    return;
+                }
             }
 
             lock (message_lock_)
@@ -1925,12 +1950,24 @@ namespace Fun
 
         public bool Started
         {
-            get { return state_ != State.kUnknown && state_ != State.kStopped; }
+            get
+            {
+                lock (state_lock_)
+                {
+                    return state_ != State.kUnknown && state_ != State.kStopped;
+                }
+            }
         }
 
         public bool Connected
         {
-            get { return state_ == State.kConnected; }
+            get
+            {
+                lock (state_lock_)
+                {
+                    return state_ == State.kConnected;
+                }
+            }
         }
 
         public bool SessionReliability
@@ -2214,7 +2251,11 @@ namespace Fun
         {
             DebugUtils.Assert(session_id_.Length == 0);
 
-            state_ = State.kConnected;
+            lock (state_lock_)
+            {
+                state_ = State.kConnected;
+            }
+
             session_id_ = session_id;
 
             lock (transports_lock_)
@@ -2224,7 +2265,6 @@ namespace Fun
                     if (transport.state == FunapiTransport.State.kWaitForSession ||
                         transport.state == FunapiTransport.State.kWaitForSessionResponse)
                     {
-                        transport.state = FunapiTransport.State.kEstablished;
                         transport.OnStarted();
                     }
                 }
@@ -2246,7 +2286,11 @@ namespace Fun
             if (session_id_.Length == 0)
                 return;
 
-            state_ = State.kUnknown;
+            lock (state_lock_)
+            {
+                state_ = State.kUnknown;
+            }
+
             session_id_ = "";
 
             if (session_reliability_)
@@ -2396,7 +2440,6 @@ namespace Fun
             {
                 if (session_id_.Length > 0 && transport.state == FunapiTransport.State.kWaitForAck)
                 {
-                    transport.state = FunapiTransport.State.kEstablished;
                     transport.OnStarted();
 
                     if (unsent_queue_.Count > 0)
@@ -2622,7 +2665,6 @@ namespace Fun
                     }
                 }
 
-                transport.state = FunapiTransport.State.kEstablished;
                 transport.OnStarted();
 
                 if (unsent_queue_.Count > 0)
@@ -2646,37 +2688,39 @@ namespace Fun
             DebugUtils.Assert(transport != null);
             Debug.Log("'" + protocol + "' Transport started.");
 
-            if (session_id_.Length > 0)
+            lock (state_lock_)
             {
-                state_ = State.kConnected;
-
-                if (session_reliability_ && protocol == TransportProtocol.kTcp && seq_recvd_ != 0)
+                if (session_id_.Length > 0)
                 {
-                    transport.state = FunapiTransport.State.kWaitForAck;
-                    SendAck(seq_recvd_ + 1);
-                }
-                else
-                {
-                    transport.state = FunapiTransport.State.kEstablished;
-                    transport.OnStarted();
+                    state_ = State.kConnected;
 
-                    if (unsent_queue_.Count > 0)
+                    if (session_reliability_ && protocol == TransportProtocol.kTcp && seq_recvd_ != 0)
                     {
-                        SendUnsentMessages();
+                        transport.state = FunapiTransport.State.kWaitForAck;
+                        SendAck(seq_recvd_ + 1);
+                    }
+                    else
+                    {
+                        transport.OnStarted();
+
+                        if (unsent_queue_.Count > 0)
+                        {
+                            SendUnsentMessages();
+                        }
                     }
                 }
-            }
-            else if (state_ == State.kStarted)
-            {
-                state_ = State.kWaitForSession;
-                transport.state = FunapiTransport.State.kWaitForSessionResponse;
+                else if (state_ == State.kStarted)
+                {
+                    state_ = State.kWaitForSession;
+                    transport.state = FunapiTransport.State.kWaitForSessionResponse;
 
-                // To get a session id
-                SendEmptyMessage(protocol);
-            }
-            else if (state_ == State.kWaitForSession)
-            {
-                transport.state = FunapiTransport.State.kWaitForSession;
+                    // To get a session id
+                    SendEmptyMessage(protocol);
+                }
+                else if (state_ == State.kWaitForSession)
+                {
+                    transport.state = FunapiTransport.State.kWaitForSession;
+                }
             }
         }
 
@@ -2686,24 +2730,27 @@ namespace Fun
             DebugUtils.Assert(transport != null);
             Debug.Log("'" + protocol + "' Transport Stopped.");
 
-            if (state_ != State.kStopped)
+            lock (state_lock_)
             {
-                lock (transports_lock_)
+                if (state_ != State.kStopped)
                 {
-                    bool all_stopped = true;
-                    foreach (FunapiTransport t in transports_.Values)
+                    lock (transports_lock_)
                     {
-                        if (t.Started)
+                        bool all_stopped = true;
+                        foreach (FunapiTransport t in transports_.Values)
                         {
-                            all_stopped = false;
-                            break;
+                            if (t.Started)
+                            {
+                                all_stopped = false;
+                                break;
+                            }
                         }
-                    }
 
-                    if (all_stopped)
-                    {
-                        state_ = State.kStopped;
-                        OnStoppedAllTransportCallback();
+                        if (all_stopped)
+                        {
+                            state_ = State.kStopped;
+                            OnStoppedAllTransportCallback();
+                        }
                     }
                 }
             }
@@ -2815,6 +2862,7 @@ namespace Fun
         private Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
         private Dictionary<string, ExpectedReplyMessage> expected_replies_ = new Dictionary<string, ExpectedReplyMessage>();
         private List<KeyValuePair<TransportProtocol, ArraySegment<byte>>> message_buffer_ = new List<KeyValuePair<TransportProtocol, ArraySegment<byte>>>();
+        private object state_lock_ = new object();
         private object message_lock_ = new object();
         private object transports_lock_ = new object();
         private DateTime last_received_ = DateTime.Now;
