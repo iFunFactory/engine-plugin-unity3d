@@ -24,7 +24,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 70;
+        public static readonly int kPluginVersion = 71;
     }
 
     // Funapi transport protocol
@@ -252,6 +252,14 @@ namespace Fun
             }
         }
 
+        internal void OnStartedInternal ()
+        {
+            if (StartedInternalCallback != null)
+            {
+                StartedInternalCallback(protocol);
+            }
+        }
+
         internal void OnStopped ()
         {
             if (StoppedCallback != null)
@@ -277,6 +285,7 @@ namespace Fun
         public event ConnectTimeoutHandler ConnectTimeoutCallback;
         public event StartedEventHandler StartedCallback;
         public event StoppedEventHandler StoppedCallback;
+        internal event StartedEventHandler StartedInternalCallback;
         internal event ReceivedEventHandler ReceivedCallback;
 
         // member variables.
@@ -296,7 +305,6 @@ namespace Fun
         // Sends a packet.
         internal abstract void WireSend();
 
-        #region public interface
         // Starts a socket.
         internal override void Start()
         {
@@ -339,7 +347,23 @@ namespace Fun
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
-            OnStopped();
+            AddToEventQueue(OnStopped);
+        }
+
+        internal override void Update ()
+        {
+            lock (event_lock_)
+            {
+                if (event_queue_.Count > 0)
+                {
+                    foreach (DelegateEventHandler func in event_queue_)
+                    {
+                        func();
+                    }
+                }
+
+                event_queue_.Clear();
+            }
         }
 
         internal override bool HasUnsentMessages
@@ -350,6 +374,20 @@ namespace Fun
                 {
                     return sending_.Count > 0 || pending_.Count > 0;
                 }
+            }
+        }
+
+        internal void AddToEventQueue (DelegateEventHandler handler)
+        {
+            if (handler == null)
+            {
+                Debug.Log("AddToEventQueue - handler is null.");
+                return;
+            }
+
+            lock (event_lock_)
+            {
+                event_queue_.Add(handler);
             }
         }
 
@@ -375,9 +413,7 @@ namespace Fun
 
             SendMessage(message.msgtype, body);
         }
-        #endregion
 
-        #region internal implementation
         private void SendMessage (string msgtype, byte[] body)
         {
             bool failed = false;
@@ -581,7 +617,7 @@ namespace Fun
 
             return -1;
         }
-        #endregion
+
 
         internal class SendingBuffer
         {
@@ -595,6 +631,8 @@ namespace Fun
             public ArraySegment<byte> data;
         }
 
+
+        internal delegate void DelegateEventHandler();
 
         // Buffer-related constants.
         internal static readonly int kUnitBufferSize = 65536;
@@ -617,11 +655,13 @@ namespace Fun
         internal int next_decoding_offset_ = 0;
         internal object sending_lock_ = new object();
         internal object receive_lock_ = new object();
+        internal object event_lock_ = new object();
         internal byte[] receive_buffer_ = new byte[kUnitBufferSize];
         internal byte[] send_buffer_ = new byte[kUnitBufferSize];
         internal List<SendingBuffer> pending_ = new List<SendingBuffer>();
         internal List<SendingBuffer> sending_ = new List<SendingBuffer>();
         internal Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
+        internal List<DelegateEventHandler> event_queue_ = new List<DelegateEventHandler>();
     }
 
 
@@ -675,6 +715,8 @@ namespace Fun
 
         internal override void Update ()
         {
+            base.Update();
+
             if (state == State.kConnecting && connect_timeout_ > 0f)
             {
                 connect_timeout_ -= Time.deltaTime;
@@ -741,7 +783,7 @@ namespace Fun
 
                 state = State.kConnected;
 
-                OnStarted();
+                OnStartedInternal();
 
                 lock (receive_lock_)
                 {
@@ -998,7 +1040,7 @@ namespace Fun
             sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
-            OnStarted();
+            OnStartedInternal();
         }
 
         // Send a packet.
@@ -1244,13 +1286,15 @@ namespace Fun
 
         internal override void Update ()
         {
-            if (response_time_ <= 0f)
-                return;
+            base.Update();
 
-            response_time_ -= Time.deltaTime;
-            if (response_time_ <= 0f)
+            if (response_time_ > 0f)
             {
-                RequestFailure();
+                response_time_ -= Time.deltaTime;
+                if (response_time_ <= 0f)
+                {
+                    RequestFailure();
+                }
             }
         }
         #endregion
@@ -1260,7 +1304,7 @@ namespace Fun
         {
             state = State.kConnected;
 
-            OnStarted();
+            OnStartedInternal();
         }
 
         internal override void WireSend()
@@ -1300,7 +1344,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
                 Debug.Log(last_error_message_);
-                RequestFailure();
+                AddToEventQueue(RequestFailure);
             }
         }
 
@@ -1325,7 +1369,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                RequestFailure();
+                AddToEventQueue(RequestFailure);
             }
         }
 
@@ -1357,7 +1401,7 @@ namespace Fun
                 {
                     DebugUtils.Log("Failed response. status:" + response.StatusDescription);
                     DebugUtils.Assert(false);
-                    RequestFailure();
+                    AddToEventQueue(RequestFailure);
                 }
             }
             catch (Exception e)
@@ -1365,7 +1409,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                RequestFailure();
+                AddToEventQueue(RequestFailure);
             }
         }
 
@@ -1399,8 +1443,52 @@ namespace Fun
                     {
                         DebugUtils.LogWarning("Response instance is null.");
                         DebugUtils.Assert(false);
-                        RequestFailure();
+                        AddToEventQueue(RequestFailure);
                         return;
+                    }
+
+                    lock (receive_lock_)
+                    {
+                        // Header
+                        byte[] header = ws.response.Headers.ToByteArray();
+                        string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
+                        str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
+                        str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
+                        str_header = str_header.Replace("\r", "");
+                        header = Encoding.ASCII.GetBytes(str_header);
+
+                        // Checks buffer space
+                        int offset = received_size_;
+                        received_size_ += header.Length + ws.read_offset;
+                        CheckReceiveBuffer();
+
+                        // Copy to buffer
+                        Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
+                        Buffer.BlockCopy(ws.read_data, 0, receive_buffer_, offset + header.Length, ws.read_offset);
+
+                        // Decoding a message
+                        if (TryToDecodeHeader())
+                        {
+                            if (TryToDecodeBody() == false)
+                            {
+                                DebugUtils.LogWarning("Failed to decode body.");
+                                DebugUtils.Assert(false);
+                            }
+                        }
+                        else
+                        {
+                            DebugUtils.LogWarning("Failed to decode header.");
+                            DebugUtils.Assert(false);
+                        }
+
+                        ws.stream.Close();
+                        ws.stream = null;
+                        list_.Remove(ws);
+
+                        cur_request_ = null;
+                        response_time_ = -1f;
+                        last_error_code_ = ErrorCode.kNone;
+                        last_error_message_ = "";
                     }
 
                     lock (sending_lock_)
@@ -1411,50 +1499,6 @@ namespace Fun
                         sending_.RemoveAt(0);
                         sending_.RemoveAt(0);
 
-                        lock (receive_lock_)
-                        {
-                            // Header
-                            byte[] header = ws.response.Headers.ToByteArray();
-                            string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
-                            str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
-                            str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
-                            str_header = str_header.Replace("\r", "");
-                            header = Encoding.ASCII.GetBytes(str_header);
-
-                            // Checks buffer space
-                            int offset = received_size_;
-                            received_size_ += header.Length + ws.read_offset;
-                            CheckReceiveBuffer();
-
-                            // Copy to buffer
-                            Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
-                            Buffer.BlockCopy(ws.read_data, 0, receive_buffer_, offset + header.Length, ws.read_offset);
-
-                            // Decoding a message
-                            if (TryToDecodeHeader())
-                            {
-                                if (TryToDecodeBody() == false)
-                                {
-                                    DebugUtils.LogWarning("Failed to decode body.");
-                                    DebugUtils.Assert(false);
-                                }
-                            }
-                            else
-                            {
-                                DebugUtils.LogWarning("Failed to decode header.");
-                                DebugUtils.Assert(false);
-                            }
-
-                            ws.stream.Close();
-                            ws.stream = null;
-                            list_.Remove(ws);
-
-                            cur_request_ = null;
-                            response_time_ = -1f;
-                            last_error_code_ = ErrorCode.kNone;
-                            last_error_message_ = "";
-                        }
-
                         SendUnsentMessages();
                     }
                 }
@@ -1464,7 +1508,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                RequestFailure();
+                AddToEventQueue(RequestFailure);
             }
         }
 
@@ -1624,7 +1668,7 @@ namespace Fun
                 }
 
                 transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
-                transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
+                transport.StartedInternalCallback += new StartedEventHandler(OnTransportStarted);
                 transport.StoppedCallback += new StoppedEventHandler(OnTransportStopped);
                 transport.ReceivedCallback += new ReceivedEventHandler(OnTransportReceived);
 
@@ -2181,6 +2225,7 @@ namespace Fun
                         transport.state == FunapiTransport.State.kWaitForSessionResponse)
                     {
                         transport.state = FunapiTransport.State.kEstablished;
+                        transport.OnStarted();
                     }
                 }
             }
@@ -2352,6 +2397,7 @@ namespace Fun
                 if (session_id_.Length > 0 && transport.state == FunapiTransport.State.kWaitForAck)
                 {
                     transport.state = FunapiTransport.State.kEstablished;
+                    transport.OnStarted();
 
                     if (unsent_queue_.Count > 0)
                     {
@@ -2577,6 +2623,7 @@ namespace Fun
                 }
 
                 transport.state = FunapiTransport.State.kEstablished;
+                transport.OnStarted();
 
                 if (unsent_queue_.Count > 0)
                 {
@@ -2611,6 +2658,7 @@ namespace Fun
                 else
                 {
                     transport.state = FunapiTransport.State.kEstablished;
+                    transport.OnStarted();
 
                     if (unsent_queue_.Count > 0)
                     {

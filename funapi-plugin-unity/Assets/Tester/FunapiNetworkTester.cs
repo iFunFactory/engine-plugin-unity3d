@@ -212,6 +212,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (transport != null)
         {
+            transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
             transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
 
             // Timeout method only works with Tcp protocol.
@@ -351,6 +352,11 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnConnectTimeout (TransportProtocol protocol)
     {
         Debug.Log(protocol + " Transport Connection timed out.");
+    }
+
+    private void OnTransportStarted (TransportProtocol protocol)
+    {
+        Debug.Log(protocol + " Transport started.");
     }
 
     private void OnTransportClosed (TransportProtocol protocol)
