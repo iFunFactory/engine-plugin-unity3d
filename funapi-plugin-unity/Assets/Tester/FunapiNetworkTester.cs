@@ -453,7 +453,6 @@ public class FunapiNetworkTester : MonoBehaviour
         Debug.Log("OnHttpRequestFailure - msg_type: " + msg_type);
     }
 
-
     private void OnMulticastChannelSignalled(string channel_id, object body)
     {
         DebugUtils.Assert (body is FunMulticastMessage);
