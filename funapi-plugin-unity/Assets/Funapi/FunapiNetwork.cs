@@ -14,7 +14,10 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 // Protobuf
 using funapi.network.fun_message;
@@ -23,6 +26,25 @@ using funapi.service.multicast_message;
 
 namespace Fun
 {
+#if NO_UNITY
+    class Debug {
+        public static void Log(object message) {
+            Console.WriteLine(message);
+        }
+
+        public static void LogWarning(object message) {
+            Console.WriteLine("Warning: " + message);
+        }
+
+        public static void LogError(object message) {
+            Console.WriteLine("Error: " + message);
+        }
+    }
+
+    class Time {
+        public const float deltaTime = 0.3f; // dummy delta time
+    }
+#endif
     // Funapi version
     public class FunapiVersion
     {

@@ -15,6 +15,34 @@ namespace Fun
     // Utility class
     public class DebugUtils
     {
+#if NO_UNITY
+        [Conditional("DEBUG")]
+        public static void Assert (bool condition)
+        {
+            if (!condition)
+            {
+                throw new Exception();
+            }
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void Log (object message)
+        {
+            Console.WriteLine(message);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void LogError (object message)
+        {
+            Console.WriteLine("Error: " + message);
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void LogWarning (object message)
+        {
+            Console.WriteLine("Warning: " + message);
+        }
+#else
         [Conditional("DEBUG")]
         public static void Assert (bool condition)
         {
@@ -59,5 +87,6 @@ namespace Fun
         {
             UnityEngine.Debug.LogWarning(message, context);
         }
+#endif
     }
 }

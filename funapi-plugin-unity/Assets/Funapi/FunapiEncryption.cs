@@ -4,9 +4,12 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using UnityEngine;
 using System;
 using System.Collections;
+
+#if !NO_UNITY
+using UnityEngine;
+#endif
 
 namespace Fun
 {
