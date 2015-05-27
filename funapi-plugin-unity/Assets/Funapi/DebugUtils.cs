@@ -10,8 +10,32 @@
 using System;
 using System.Diagnostics;
 
+
 namespace Fun
 {
+#if NO_UNITY
+    class Debug
+    {
+        public static void Log(object message) {
+            Console.WriteLine(message);
+        }
+
+        public static void LogWarning(object message) {
+            Console.WriteLine("Warning: " + message);
+        }
+
+        public static void LogError(object message) {
+            Console.WriteLine("Error: " + message);
+        }
+    }
+
+    class Time
+    {
+        public const float deltaTime = 0.3f; // dummy delta time
+    }
+#endif
+
+
     // Utility class
     public class DebugUtils
     {

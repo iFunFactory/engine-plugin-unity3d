@@ -205,9 +205,7 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else if (protocol == TransportProtocol.kHttp)
         {
-            FunapiHttpTransport http_transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false);
-            http_transport.RequestFailureCallback += new FunapiHttpTransport.RequestFailureHandler(OnHttpRequestFailure);
-            transport = http_transport;
+            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false);
 
             // Please set the same encryption type as the encryption type of server.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
@@ -215,11 +213,12 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (transport != null)
         {
-            transport.StartedCallback += new StartedEventHandler(OnTransportStarted);
-            transport.StoppedCallback += new StoppedEventHandler(OnTransportClosed);
+            transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
+            transport.StoppedCallback += new TransportEventHandler(OnTransportClosed);
+            transport.FailureCallback += new TransportEventHandler(OnTransportFailure);
 
             // Timeout method only works with Tcp protocol.
-            transport.ConnectTimeoutCallback += new ConnectTimeoutHandler(OnConnectTimeout);
+            transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
             transport.ConnectTimeout = 3f;
 
             // If you prefer use specific Json implementation other than Dictionary,
@@ -451,9 +450,9 @@ public class FunapiNetworkTester : MonoBehaviour
         Debug.Log("OnStoppedAllTransport called.");
     }
 
-    private void OnHttpRequestFailure (string msg_type)
+    private void OnTransportFailure (TransportProtocol protocol)
     {
-        Debug.Log("OnHttpRequestFailure - msg_type: " + msg_type);
+        Debug.Log("OnTransportFailure(" + protocol + ") - " + network_.LastErrorCode(protocol));
     }
 
     private void OnMulticastChannelSignalled(string channel_id, object body)
@@ -478,7 +477,7 @@ public class FunapiNetworkTester : MonoBehaviour
     private const string kDownloadServerIp = "127.0.0.1";
     private const UInt16 kDownloadServerPort = 8020;
     private const string kMulticastServerIp = "127.0.0.1";
-    private const UInt16 kMulticastPbufPort = 8013;
+    private const UInt16 kMulticastPbufPort = 8012;
     private const string kMulticastTestChannel = "test_channel";
     private const string kChatTestChannel = "chat_channel";
     private const string kChatUserName = "my_name";
