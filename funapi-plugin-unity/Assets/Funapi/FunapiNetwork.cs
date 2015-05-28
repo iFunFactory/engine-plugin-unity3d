@@ -178,7 +178,7 @@ namespace Fun
         internal abstract bool Started { get; }
 
         // Update
-        internal virtual void Update () {}
+        internal virtual void Update() {}
 
         // Check unsent messages
         internal abstract bool HasUnsentMessages { get; }
@@ -274,6 +274,8 @@ namespace Fun
         internal event TransportMessageHandler MessageFailureCallback;
 
         // member variables.
+        internal string host_addr_ = "";
+        internal UInt16 host_port_ = 0;
         internal FunMsgType msg_type_ = FunMsgType.kNone;
         internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         internal FunMessageSerializer serializer_ = null;
@@ -672,10 +674,7 @@ namespace Fun
             DisableNagle = false;
             msg_type_ = type;
 
-            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
-            DebugUtils.Assert(host_info.AddressList.Length == 1);
-            IPAddress address = host_info.AddressList[0];
-            connect_ep_ = new IPEndPoint(address, port);
+            SetAddress(hostname_or_ip, port);
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiTcpTransport(..., FunMsgType type)' instead.")]
@@ -744,6 +743,42 @@ namespace Fun
                 sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
+        }
+
+        internal void SetAddress (string hostname_or_ip, UInt16 port)
+        {
+            if (host_addr_ == hostname_or_ip && host_port_ == port)
+                return;
+
+            host_addr_ = hostname_or_ip;
+            host_port_ = port;
+
+            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
+            DebugUtils.Assert(host_info.AddressList.Length == 1);
+            IPAddress address = host_info.AddressList[0];
+            connect_ep_ = new IPEndPoint(address, port);
+        }
+
+        internal void Redirect(string hostname_or_ip, UInt16 port)
+        {
+            if (host_addr_ == hostname_or_ip && host_port_ == port)
+            {
+                Debug.Log("Redirect Tcp [" + hostname_or_ip + ":" + port + "] - The same address is already connected.");
+                return;
+            }
+
+            if (Started)
+            {
+                Stop();
+            }
+
+            AddToEventQueue(
+                delegate
+                {
+                    SetAddress(hostname_or_ip, port);
+                    Start();
+                }
+            );
         }
 
         internal override void WireSend()
@@ -984,11 +1019,7 @@ namespace Fun
             protocol = TransportProtocol.kUdp;
             msg_type_ = type;
 
-            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
-            DebugUtils.Assert(host_info.AddressList.Length == 1);
-            IPAddress address = host_info.AddressList[0];
-            send_ep_ = new IPEndPoint(address, port);
-            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, port);
+            SetAddress(hostname_or_ip, port);
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiUdpTransport(..., FunMsgType type)' instead.")]
@@ -1033,6 +1064,43 @@ namespace Fun
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
             OnStartedInternal();
+        }
+
+        internal void SetAddress (string hostname_or_ip, UInt16 port)
+        {
+            if (host_addr_ == hostname_or_ip && host_port_ == port)
+                return;
+
+            host_addr_ = hostname_or_ip;
+            host_port_ = port;
+
+            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
+            DebugUtils.Assert(host_info.AddressList.Length == 1);
+            IPAddress address = host_info.AddressList[0];
+            send_ep_ = new IPEndPoint(address, port);
+            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, port);
+        }
+
+        internal void Redirect(string hostname_or_ip, UInt16 port)
+        {
+            if (host_addr_ == hostname_or_ip && host_port_ == port)
+            {
+                Debug.Log("Redirect Udp [" + hostname_or_ip + ":" + port + "] - The same address is already connected.");
+                return;
+            }
+
+            if (Started)
+            {
+                Stop();
+            }
+
+            AddToEventQueue(
+                delegate
+                {
+                    SetAddress(hostname_or_ip, port);
+                    Start();
+                }
+            );
         }
 
         // Send a packet.
@@ -1223,12 +1291,7 @@ namespace Fun
             protocol = TransportProtocol.kHttp;
             msg_type_ = type;
 
-            // Url
-            host_url_ = https ? "https://" : "http://";
-            host_url_ += hostname_or_ip + ":" + port;
-
-            // Version
-            host_url_ += "/v" + FunapiVersion.kProtocolVersion + "/";
+            SetAddress(hostname_or_ip, port, https);
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiHttpTransport(..., FunMsgType type)' instead.")]
@@ -1290,6 +1353,44 @@ namespace Fun
             state = State.kConnected;
 
             OnStartedInternal();
+        }
+
+        internal void SetAddress (string hostname_or_ip, UInt16 port, bool https)
+        {
+            if (host_addr_ == hostname_or_ip && host_port_ == port)
+                return;
+
+            host_addr_ = hostname_or_ip;
+            host_port_ = port;
+
+            // Url
+            host_url_ = https ? "https://" : "http://";
+            host_url_ += hostname_or_ip + ":" + port;
+
+            // Version
+            host_url_ += "/v" + FunapiVersion.kProtocolVersion + "/";
+        }
+
+        internal void Redirect(string hostname_or_ip, UInt16 port, bool https = false)
+        {
+            if (host_addr_ == hostname_or_ip && host_port_ == port)
+            {
+                Debug.Log("Redirect Http [" + hostname_or_ip + ":" + port + "] - The same address is already connected.");
+                return;
+            }
+
+            if (Started)
+            {
+                Stop();
+            }
+
+            AddToEventQueue(
+                delegate
+                {
+                    SetAddress(hostname_or_ip, port, https);
+                    Start();
+                }
+            );
         }
 
         internal override void WireSend()
@@ -1576,10 +1677,8 @@ namespace Fun
             state_ = State.kUnknown;
             recv_type_ = typeof(FunMessage);
 
-            seq_recvd_ = 0;
-            first_receiving_ = true;
             session_reliability_ = session_reliability;
-            seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+            InitSession();
 
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
@@ -1708,6 +1807,46 @@ namespace Fun
                     Debug.Log("DetachTransport - Can't find a transport of '" + protocol + "' type.");
                 }
             }
+        }
+
+        public void Redirect (TransportProtocol protocol, string hostname_or_ip, UInt16 port, bool keep_session_id = false)
+        {
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
+            {
+                Debug.LogWarning("Redirect - Can't find a " + protocol + " transport.");
+                return;
+            }
+
+            if (!keep_session_id)
+            {
+                InitSession();
+            }
+
+            if (protocol == TransportProtocol.kTcp)
+            {
+                ((FunapiTcpTransport)transport).Redirect(hostname_or_ip, port);
+            }
+            else if (protocol == TransportProtocol.kUdp)
+            {
+                ((FunapiUdpTransport)transport).Redirect(hostname_or_ip, port);
+            }
+            else if (protocol == TransportProtocol.kHttp)
+            {
+                ((FunapiHttpTransport)transport).Redirect(hostname_or_ip, port);
+            }
+        }
+
+        public void RedirectHttps (string hostname_or_ip, UInt16 port)
+        {
+            FunapiTransport transport = GetTransport(TransportProtocol.kHttp);
+            if (transport == null)
+            {
+                Debug.LogWarning("RedirectHttps - Can't find a Http transport.");
+                return;
+            }
+
+            ((FunapiHttpTransport)transport).Redirect(hostname_or_ip, port, true);
         }
 
         public FunapiTransport GetTransport (TransportProtocol protocol)
@@ -2220,6 +2359,19 @@ namespace Fun
             return null;
         }
 
+        private void InitSession()
+        {
+            session_id_ = "";
+
+            if (session_reliability_)
+            {
+                seq_recvd_ = 0;
+                first_receiving_ = true;
+                send_queue_.Clear();
+                seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+            }
+        }
+
         private void PrepareSession(string session_id)
         {
             if (session_id_.Length == 0)
@@ -2273,23 +2425,15 @@ namespace Fun
 
         private void CloseSession()
         {
-            if (session_id_.Length == 0)
-                return;
-
             lock (state_lock_)
             {
                 state_ = State.kUnknown;
             }
 
-            session_id_ = "";
+            if (session_id_.Length == 0)
+                return;
 
-            if (session_reliability_)
-            {
-                seq_recvd_ = 0;
-                first_receiving_ = true;
-                send_queue_.Clear();
-                seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
-            }
+            InitSession();
 
             if (OnSessionClosed != null)
             {
@@ -2726,7 +2870,7 @@ namespace Fun
                         }
                     }
                 }
-                else if (state_ == State.kStarted)
+                else if (state_ == State.kStarted || state_ == State.kStopped)
                 {
                     state_ = State.kWaitForSession;
                     transport.state = FunapiTransport.State.kWaitForSessionResponse;
@@ -2877,9 +3021,9 @@ namespace Fun
 
         // Reliability-releated member variables.
         private bool session_reliability_;
-        private UInt32 seq_;
-        private UInt32 seq_recvd_;
-        private bool first_receiving_;
+        private UInt32 seq_ = 0;
+        private UInt32 seq_recvd_ = 0;
+        private bool first_receiving_ = false;
         private Queue<FunapiMessage> send_queue_ = new Queue<FunapiMessage>();
         private Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
         private System.Random rnd_ = new System.Random();
