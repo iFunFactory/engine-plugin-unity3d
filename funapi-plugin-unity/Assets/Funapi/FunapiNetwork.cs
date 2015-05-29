@@ -31,7 +31,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 75;
+        public static readonly int kPluginVersion = 76;
     }
 
     // Funapi transport protocol
@@ -2271,7 +2271,7 @@ namespace Fun
         public void SendMessage (MessageType msg_type, object message,
                                  EncryptionType encryption = EncryptionType.kDefaultEncryption,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
-                                 string expected_reply_type = "", float expected_reply_time = 0f,
+                                 string expected_reply_type = null, float expected_reply_time = 0f,
                                  TimeoutEventHandler onReplyMissed = null)
         {
             string _msg_type = MessageTable.Lookup(msg_type);
@@ -2296,7 +2296,7 @@ namespace Fun
         public void SendMessage (string msg_type, object message,
                                  EncryptionType encryption = EncryptionType.kDefaultEncryption,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
-                                 string expected_reply_type = "", float expected_reply_time = 0f,
+                                 string expected_reply_type = null, float expected_reply_time = 0f,
                                  TimeoutEventHandler onReplyMissed = null)
         {
             if (protocol == TransportProtocol.kDefault)
@@ -2541,19 +2541,38 @@ namespace Fun
             }
         }
 
-        private void AddExpectedReply (FunapiMessage fun_msg, string expected_reply_type,
-                                       float expected_reply_time, TimeoutEventHandler onReplyMissed)
+        private void AddExpectedReply (FunapiMessage fun_msg, string reply_type,
+                                       float reply_time, TimeoutEventHandler onReplyMissed)
         {
             lock (expected_reply_lock)
             {
-                if (!expected_replies_.ContainsKey(fun_msg.msg_type))
+                if (!expected_replies_.ContainsKey(reply_type))
                 {
-                    expected_replies_[fun_msg.msg_type] = new List<FunapiMessage>();
+                    expected_replies_[reply_type] = new List<FunapiMessage>();
                 }
 
-                fun_msg.SetReply(expected_reply_type, expected_reply_time, onReplyMissed);
-                expected_replies_[fun_msg.msg_type].Add(fun_msg);
-                Debug.Log("Adds expected reply message - " + expected_reply_type);
+                fun_msg.SetReply(reply_type, reply_time, onReplyMissed);
+                expected_replies_[reply_type].Add(fun_msg);
+                Debug.Log("Adds expected reply message - " + fun_msg.msg_type + " > " + reply_type);
+            }
+        }
+
+        private void DeleteExpectedReply (string reply_type)
+        {
+            lock (expected_reply_lock)
+            {
+                if (expected_replies_.ContainsKey(reply_type))
+                {
+                    List<FunapiMessage> list = expected_replies_[reply_type];
+                    if (list.Count > 0)
+                    {
+                        list.RemoveAt(0);
+                        Debug.Log("Deletes expected reply message - " + reply_type);
+                    }
+
+                    if (list.Count <= 0)
+                        expected_replies_.Remove(reply_type);
+                }
             }
         }
 
@@ -2692,25 +2711,6 @@ namespace Fun
                 }
 
                 Debug.Log("No handler for message '" + msg_type + "'. Ignoring.");
-            }
-        }
-
-        private void DeleteExpectedReply (string msg_type)
-        {
-            lock (expected_reply_lock)
-            {
-                if (expected_replies_.ContainsKey(msg_type))
-                {
-                    List<FunapiMessage> list = expected_replies_[msg_type];
-                    if (list.Count > 0)
-                    {
-                        list.RemoveAt(0);
-                        Debug.Log("Deletes expected reply message - " + msg_type);
-                    }
-
-                    if (list.Count <= 0)
-                        expected_replies_.Remove(msg_type);
-                }
             }
         }
 
