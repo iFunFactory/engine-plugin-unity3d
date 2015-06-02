@@ -32,7 +32,6 @@ namespace Fun
         {
             // Url
             host_url_ = url;
-            Debug.Log("Announcement host url : " + url);
 
             // Check resource directory
             local_path_ = FunapiUtils.GetLocalDataPath + kLocalPath;

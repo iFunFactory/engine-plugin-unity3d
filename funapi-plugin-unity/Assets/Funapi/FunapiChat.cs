@@ -157,8 +157,6 @@ namespace Fun
 		}
 
 
-		FunMsgType msg_type_;
-		OnChannelMessage callback_;
 		FunapiMulticastClient multicasting_;
 
 		private Dictionary<string, KeyValuePair<string, OnChannelMessage> > channel_info_ = new Dictionary<string, KeyValuePair<string, OnChannelMessage> > ();
