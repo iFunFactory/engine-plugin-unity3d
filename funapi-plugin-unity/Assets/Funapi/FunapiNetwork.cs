@@ -31,7 +31,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 76;
+        public static readonly int kPluginVersion = 77;
     }
 
     // Funapi transport protocol
@@ -46,6 +46,7 @@ namespace Fun
     // Funapi message type
     public enum FunMsgType
     {
+        kNone,
         kJson,
         kProtobuf
     }
@@ -121,6 +122,11 @@ namespace Fun
         public TransportProtocol protocol
         {
             get; set;
+        }
+
+        public FunMsgType MsgType
+        {
+            get { return msg_type_; }
         }
 
         public virtual bool IsStream
@@ -281,7 +287,7 @@ namespace Fun
         internal event TransportMessageHandler MessageFailureCallback;
 
         // member variables.
-        internal FunMsgType msg_type_;
+        internal FunMsgType msg_type_ = FunMsgType.kNone;
         internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         internal FunMessageSerializer serializer_ = null;
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
@@ -936,15 +942,22 @@ namespace Fun
     public class FunapiTcpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
+        public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunMsgType type)
         {
             protocol = TransportProtocol.kTcp;
             DisableNagle = false;
+            msg_type_ = type;
 
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
             connect_ep_ = new IPEndPoint(address, port);
+        }
+
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiTcpTransport(..., FunMsgType type)' instead.")]
+        public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
+            : this(hostname_or_ip, port, Fun.FunMsgType.kNone)
+        {
         }
 
         // Stops a socket.
@@ -1211,7 +1224,7 @@ namespace Fun
                             DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
-                        last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
+                        last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
                         AddToEventQueue(OnFailure);
                     }
@@ -1241,14 +1254,22 @@ namespace Fun
     public class FunapiUdpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiUdpTransport(string hostname_or_ip, UInt16 port)
+        public FunapiUdpTransport(string hostname_or_ip, UInt16 port, FunMsgType type)
         {
             protocol = TransportProtocol.kUdp;
+            msg_type_ = type;
+
             IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
             DebugUtils.Assert(host_info.AddressList.Length == 1);
             IPAddress address = host_info.AddressList[0];
             send_ep_ = new IPEndPoint(address, port);
             receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, port);
+        }
+
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiUdpTransport(..., FunMsgType type)' instead.")]
+        public FunapiUdpTransport (string hostname_or_ip, UInt16 port)
+            : this(hostname_or_ip, port, Fun.FunMsgType.kNone)
+        {
         }
 
         // Stops a socket.
@@ -1441,7 +1462,7 @@ namespace Fun
                             DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
                         }
                         last_error_code_ = ErrorCode.kReceiveFailed;
-                        last_error_message_ = "Can't not receive messages. Maybe the socket is closed.";
+                        last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
                         AddToEventQueue(OnFailure);
                     }
@@ -1472,9 +1493,10 @@ namespace Fun
     public class FunapiHttpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https)
+        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunMsgType type)
         {
             protocol = TransportProtocol.kHttp;
+            msg_type_ = type;
 
             // Url
             host_url_ = https ? "https://" : "http://";
@@ -1482,6 +1504,12 @@ namespace Fun
 
             // Version
             host_url_ += "/v" + FunapiVersion.kProtocolVersion + "/";
+        }
+
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiHttpTransport(..., FunMsgType type)' instead.")]
+        public FunapiHttpTransport (string hostname_or_ip, UInt16 port, bool https = false)
+            : this(hostname_or_ip, port, https, Fun.FunMsgType.kNone)
+        {
         }
 
         internal override void Stop()
@@ -1831,10 +1859,9 @@ namespace Fun
     public class FunapiNetwork
     {
         #region public interface
-        public FunapiNetwork(FunMsgType type, bool session_reliability)
+        public FunapiNetwork(bool session_reliability = false)
         {
             state_ = State.kUnknown;
-            msg_type_ = type;
             recv_type_ = typeof(FunMessage);
 
             seq_recvd_ = 0;
@@ -1847,7 +1874,14 @@ namespace Fun
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(FunMsgType, bool)' instead.")]
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
+        public FunapiNetwork(FunMsgType type, bool session_reliability)
+            : this(session_reliability)
+        {
+            msg_type_ = type;
+        }
+
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
         public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
                              SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
             : this(type, session_reliability)
@@ -1901,7 +1935,9 @@ namespace Fun
                     return;
                 }
 
-                transport.msg_type_ = msg_type_;
+                if (transport.msg_type_ == FunMsgType.kNone)
+                    transport.msg_type_ = msg_type_;
+
                 transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
                 transport.StartedInternalCallback += new TransportEventHandler(OnTransportStarted);
                 transport.StoppedCallback += new TransportEventHandler(OnTransportStopped);
@@ -2218,9 +2254,19 @@ namespace Fun
             get { return session_reliability_; }
         }
 
+        [System.Obsolete("This will be deprecated in September 2015. Use 'GetMsgType(TransportProtocol)' instead.")]
         public FunMsgType MsgType
         {
             get { return msg_type_; }
+        }
+
+        public FunMsgType GetMsgType (TransportProtocol protocol)
+        {
+            FunapiTransport transport = GetTransport(protocol);
+            if (transport == null)
+                return FunMsgType.kNone;
+
+            return transport.MsgType;
         }
 
         [System.Obsolete("This will be deprecated in September 2015. Use 'CreateFunMessage(object, MessageType)' instead.")]
@@ -2317,7 +2363,7 @@ namespace Fun
             {
                 FunapiMessage fun_msg = null;
 
-                if (msg_type_ == FunMsgType.kJson)
+                if (transport.msg_type_ == FunMsgType.kJson)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, transport.JsonHelper.Clone(message), encryption);
 
@@ -2343,7 +2389,7 @@ namespace Fun
                         Debug.Log(protocol + " send message - msgtype:" + msg_type);
                     }
                 }
-                else if (msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.msg_type_ == FunMsgType.kProtobuf)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
 
@@ -2380,14 +2426,14 @@ namespace Fun
             else if (transport_reliability ||
                      (transport != null && transport.state == FunapiTransport.State.kEstablished))
             {
-                if (msg_type_ == FunMsgType.kJson)
+                if (transport.msg_type_ == FunMsgType.kJson)
                 {
                     if (transport == null)
                         unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, encryption));
                     else
                         unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, transport.JsonHelper.Clone(message), encryption));
                 }
-                else if (msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.msg_type_ == FunMsgType.kProtobuf)
                 {
                     unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, encryption));
                 }
@@ -2585,7 +2631,7 @@ namespace Fun
             string msg_type = "";
             string session_id = "";
 
-            if (msg_type_ == FunMsgType.kJson)
+            if (transport.msg_type_ == FunMsgType.kJson)
             {
                 object json;
 
@@ -2643,7 +2689,7 @@ namespace Fun
                         message_handlers_[msg_type](msg_type, json);
                 }
             }
-            else if (msg_type_ == FunMsgType.kProtobuf)
+            else if (transport.msg_type_ == FunMsgType.kProtobuf)
             {
                 FunMessage message;
 
@@ -2693,7 +2739,7 @@ namespace Fun
             }
             else
             {
-                Debug.Log("Invalid message type. type: " + msg_type_);
+                Debug.Log("Invalid message type. type: " + transport.msg_type_);
                 DebugUtils.Assert(false);
                 return;
             }
@@ -2731,7 +2777,7 @@ namespace Fun
                     continue;
                 }
 
-                if (msg_type_ == FunMsgType.kJson)
+                if (transport.msg_type_ == FunMsgType.kJson)
                 {
                     object json = msg.message;
 
@@ -2753,7 +2799,7 @@ namespace Fun
                         Debug.Log(transport.protocol + " send unsent message - msgtype:" + msg.msg_type);
                     }
                 }
-                else if (msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.msg_type_ == FunMsgType.kProtobuf)
                 {
                     FunMessage pbuf = msg.message as FunMessage;
                     pbuf.msgtype = msg.msg_type;
@@ -2801,14 +2847,14 @@ namespace Fun
 
             Debug.Log(transport.protocol + " send ack message - ack:" + ack);
 
-            if (msg_type_ == FunMsgType.kJson)
+            if (transport.msg_type_ == FunMsgType.kJson)
             {
                 object ack_msg = transport.JsonHelper.Deserialize("{}");
                 transport.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
                 transport.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
-            else
+            else if (transport.msg_type_ == FunMsgType.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
                 ack_msg.sid = session_id_;
@@ -2828,12 +2874,12 @@ namespace Fun
 
             Debug.Log(transport.protocol + " send empty message");
 
-            if (msg_type_ == FunMsgType.kJson)
+            if (transport.msg_type_ == FunMsgType.kJson)
             {
                 object msg = transport.JsonHelper.Deserialize("{}");
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", msg));
             }
-            else
+            else if (transport.msg_type_ == FunMsgType.kProtobuf)
             {
                 FunMessage msg = new FunMessage();
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", msg));
@@ -2878,11 +2924,11 @@ namespace Fun
             {
                 UInt32 seq;
                 FunapiMessage last_msg = send_queue_.Peek();
-                if (msg_type_ == FunMsgType.kJson)
+                if (transport.msg_type_ == FunMsgType.kJson)
                 {
                     seq = (UInt32)transport.JsonHelper.GetIntegerField(last_msg.message, kSeqNumberField);
                 }
-                else if (msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.msg_type_ == FunMsgType.kProtobuf)
                 {
                     seq = (last_msg.message as FunMessage).seq;
                 }
@@ -2906,13 +2952,13 @@ namespace Fun
             {
                 foreach (FunapiMessage msg in send_queue_)
                 {
-                    if (msg_type_ == FunMsgType.kJson)
+                    if (transport.msg_type_ == FunMsgType.kJson)
                     {
                         UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
                         DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
                         transport.SendMessage(msg);
                     }
-                    else if (msg_type_ == FunMsgType.kProtobuf)
+                    else if (transport.msg_type_ == FunMsgType.kProtobuf)
                     {
                         UInt32 seq = (msg.message as FunMessage).seq;
                         DebugUtils.Assert(seq == ack || SeqLess (seq, ack));
@@ -3102,7 +3148,7 @@ namespace Fun
         // Member variables.
         private State state_;
         private Type recv_type_;
-        private FunMsgType msg_type_;
+        private FunMsgType msg_type_ = FunMsgType.kNone;
         private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
         private FunMessageSerializer serializer_;
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();

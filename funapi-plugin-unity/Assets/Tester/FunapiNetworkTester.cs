@@ -190,22 +190,23 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiTransport GetNewTransport (TransportProtocol protocol)
     {
         FunapiTransport transport = null;
+        FunMsgType msg_type = with_protobuf_ ? FunMsgType.kProtobuf : FunMsgType.kJson;
 
         if (protocol == TransportProtocol.kTcp)
         {
-            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012));
+            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), msg_type);
             //transport.DisableNagle = true;
         }
         else if (protocol == TransportProtocol.kUdp)
         {
-            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013));
+            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), msg_type);
 
             // Please set the same encryption type as the encryption type of server.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
         }
         else if (protocol == TransportProtocol.kHttp)
         {
-            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false);
+            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, msg_type);
 
             // Please set the same encryption type as the encryption type of server.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
@@ -233,10 +234,9 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         Debug.Log("-------- Connect --------");
 
-        FunMsgType msg_type = with_protobuf_ ? FunMsgType.kProtobuf : FunMsgType.kJson;
-        if (network_ == null || !network_.SessionReliability || network_.MsgType != msg_type)
+        if (network_ == null || !network_.SessionReliability)
         {
-            network_ = new FunapiNetwork(msg_type, with_session_reliability_);
+            network_ = new FunapiNetwork(with_session_reliability_);
 
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
@@ -322,7 +322,21 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else
         {
-            if (network_.MsgType == FunMsgType.kJson)
+            FunMsgType msgtype = network_.GetMsgType(network_.GetDefaultProtocol());
+            if (msgtype == FunMsgType.kNone)
+            {
+                Debug.Log("You should attach transport first.");
+                return;
+            }
+
+            if (msgtype == FunMsgType.kProtobuf)
+            {
+                PbufEchoMessage echo = new PbufEchoMessage();
+                echo.msg = "hello proto";
+                FunMessage message = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
+                network_.SendMessage(MessageType.pbuf_echo, message);
+            }
+            if (msgtype == FunMsgType.kJson)
             {
                 // In this example, we are using Dictionary<string, object>.
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
@@ -331,13 +345,6 @@ public class FunapiNetworkTester : MonoBehaviour
                 Dictionary<string, object> message = new Dictionary<string, object>();
                 message["message"] = "hello world";
                 network_.SendMessage("echo", message);
-            }
-            else if (network_.MsgType == FunMsgType.kProtobuf)
-            {
-                PbufEchoMessage echo = new PbufEchoMessage();
-                echo.msg = "hello proto";
-                FunMessage message = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
-                network_.SendMessage(MessageType.pbuf_echo, message);
             }
         }
     }
@@ -421,14 +428,14 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnMaintenanceMessage (string msg_type, object body)
     {
-        if (network_.MsgType == FunMsgType.kJson)
+        FunMsgType msgtype = network_.GetMsgType(network_.GetDefaultProtocol());
+        if (msgtype == FunMsgType.kNone)
         {
-            DebugUtils.Assert(body is Dictionary<string, object>);
-            Dictionary<string, object> msg = body as Dictionary<string, object>;
-            Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
-                                    msg["date_start"], msg["date_end"], msg["messages"]));
+            Debug.Log("Can't find a FunMsgType for maintenance message.");
+            return;
         }
-        else if (network_.MsgType == FunMsgType.kProtobuf)
+
+        if (msgtype == FunMsgType.kProtobuf)
         {
             FunMessage msg = body as FunMessage;
             object obj = network_.GetMessage(msg, MessageType.pbuf_maintenance);
@@ -439,9 +446,12 @@ public class FunapiNetworkTester : MonoBehaviour
             Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
                                     maintenance.date_start, maintenance.date_end, maintenance.messages));
         }
-        else
+        else if (msgtype == FunMsgType.kJson)
         {
-            DebugUtils.Assert(false);
+            DebugUtils.Assert(body is Dictionary<string, object>);
+            Dictionary<string, object> msg = body as Dictionary<string, object>;
+            Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
+                                    msg["date_start"], msg["date_end"], msg["messages"]));
         }
     }
 

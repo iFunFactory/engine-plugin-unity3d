@@ -42,9 +42,9 @@ namespace Fun
 
             lock (lock_)
             {
-                transport_ = new FunapiTcpTransport (hostname_or_ip, port);
+                transport_ = new FunapiTcpTransport (hostname_or_ip, port, msg_type_);
                 DebugUtils.Assert (transport_ != null);
-                network_ = new FunapiNetwork (msg_type_, false);
+                network_ = new FunapiNetwork ();
                 network_.AttachTransport (transport_);
                 network_.RegisterHandler(kMulticastMsgType, OnReceived);
                 need_to_start = true;
