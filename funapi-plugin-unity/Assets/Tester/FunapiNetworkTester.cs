@@ -95,9 +95,8 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
-            downloader_.StartDownload(kDownloadServerIp, kDownloadServerPort, "list", false);
+            downloader_.StartDownload(string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort));
             Debug.Log("Start downloading..");
-            Invoke("CheckDownloadConnection", 3f);
         }
 
         //----------------------------------------------------------------------------
