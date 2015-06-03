@@ -46,7 +46,7 @@ public class MD5Async
             foreach (byte n in request.md5.Hash)
                 md5hash += n.ToString("x2");
 
-            Debug.Log("MD5 >> " + stream.Name + " > " + md5hash);
+            Fun.DebugUtils.Log("MD5 >> " + stream.Name + " > " + md5hash);
 
             if (request.on_finish != null)
                 request.on_finish(md5hash);

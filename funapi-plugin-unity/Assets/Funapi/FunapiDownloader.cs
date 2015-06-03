@@ -26,6 +26,7 @@ namespace Fun
             target_path_ = target_path;
             if (target_path_[target_path_.Length - 1] != '/')
                 target_path_ += "/";
+            target_path_ += kRootPath + "/";
 
             on_update_ = on_update;
             on_finished_ = on_finished;
@@ -37,19 +38,17 @@ namespace Fun
             web_client_.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgressChangedCb);
             web_client_.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCompleteCb);
 
-            // Load file list
-            LoadHaveList();
+            // Check file list
+            CheckLocalFiles();
         }
 
         // Start downloading
-        public void StartDownload (string hostname_or_ip, UInt16 port, string file_name, bool https)
+        public void StartDownload (string hostname_or_ip, UInt16 port, bool https)
         {
             string url = "http://";
             if (https)
                 url = "https://";
             url += hostname_or_ip + ":" + port;
-            url += "/v" + FunapiVersion.kProtocolVersion + "/";
-            url += file_name;
 
             StartDownload(url);
         }
@@ -60,16 +59,9 @@ namespace Fun
 
             try
             {
-                string ver = "/v" + FunapiVersion.kProtocolVersion + "/";
-                int index = url.IndexOf(ver);
-                if (index <= 0)
-                {
-                    Debug.Log("Invalid request url : " + url);
-                    DebugUtils.Assert(false);
-                    return;
-                }
-
-                string host_url = url.Substring(0, index + ver.Length);
+                string host_url = url;
+                if (host_url[host_url.Length - 1] != '/')
+                    host_url += "/";
 
                 if (state_ == State.Downloading)
                 {
@@ -118,80 +110,52 @@ namespace Fun
 
         #region internal implementation
         // Load file's information.
-        private void LoadHaveList ()
+        private void CheckLocalFiles ()
         {
             try
             {
+                check_files_list_.Clear();
                 cached_files_list_.Clear();
 
-                string path = target_path_ + kSaveFile;
-                if (!File.Exists(path))
+                if (!Directory.Exists(target_path_))
                     return;
 
-                StreamReader stream = File.OpenText(path);
-                string data = stream.ReadToEnd();
-                stream.Close();
-
-                if (data.Length <= 0)
+                string[] files = Directory.GetFiles(target_path_, "*", SearchOption.AllDirectories);
+                if (files.Length > 0)
                 {
-                    Debug.Log("Failed to get a file list.");
-                    DebugUtils.Assert(false);
-                    return;
+                    foreach (string s in files)
+                    {
+                        check_files_list_.Add(s);
+                    }
+
+                    MD5Async.Compute(check_files_list_[0], OnCheckMd5Finish);
                 }
-
-                Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
-                List<object> list = json["data"] as List<object>;
-
-                foreach (Dictionary<string, object> node in list)
-                {
-                    DownloadFile info = new DownloadFile();
-                    info.path = node["path"] as string;
-                    info.md5 = node["md5"] as string;
-
-                    cached_files_list_.Add(info);
-                }
-
-                Debug.Log("Load file's information : " + cached_files_list_.Count);
             }
             catch (Exception e)
             {
-                Debug.Log("Failure in LoadHaveList: " + e.ToString());
+                Debug.Log("Failure in CheckLocalFiles: " + e.ToString());
             }
         }
 
-        // Save file's information.
-        private void SaveHaveList ()
+        private void OnCheckMd5Finish (string md5hash)
         {
-            try
+            DebugUtils.Assert(check_files_list_.Count > 0);
+            string path = check_files_list_[0];
+            path = path.Substring(target_path_.Length);
+
+            DownloadFile info = new DownloadFile();
+            info.path = path;
+            info.md5 = md5hash;
+            cached_files_list_.Add(info);
+
+            check_files_list_.RemoveAt(0);
+            if (check_files_list_.Count > 0)
             {
-                string data = "{ \"data\": [ ";
-                int index = 0;
-
-                foreach (DownloadFile item in cached_files_list_)
-                {
-                    data += "{ \"path\":\"" + item.path + "\", ";
-                    data += "\"md5\":\"" + item.md5 + "\" }";
-
-                    ++index;
-                    if (index < cached_files_list_.Count)
-                        data += ", ";
-                }
-
-                data += " ] }";
-                Debug.Log("SAVE DATA: " + data);
-
-                string path = target_path_ + kSaveFile;
-                FileStream file = File.Open(path, FileMode.Create);
-                StreamWriter stream = new StreamWriter(file);
-                stream.Write(data);
-                stream.Flush();
-                stream.Close();
-
-                Debug.Log("Save file's information : " + cached_files_list_.Count);
+                MD5Async.Compute(check_files_list_[0], OnCheckMd5Finish);
             }
-            catch (Exception e)
+            else
             {
-                Debug.Log("Failure in SaveHaveList: " + e.ToString());
+                Debug.Log("Check file's information : " + cached_files_list_.Count);
             }
         }
 
@@ -226,24 +190,12 @@ namespace Fun
             }
 
             // Check download files
-            DateTime list_file_time = File.GetLastWriteTime(target_path_ + kSaveFile);
-
             foreach (DownloadFile item in list)
             {
                 DownloadFile info = cached_files_list_.Find(i => i.path == item.path);
                 if (info != null)
                 {
-                    bool is_same = true;
-                    if (info.md5 != item.md5)
-                    {
-                        is_same = false;
-                    }
-                    else
-                    {
-                        DateTime time = File.GetLastWriteTime(target_path_ + info.path);
-                        if (time.Ticks > list_file_time.Ticks)
-                            is_same = false;
-                    }
+                    bool is_same = info.md5 == item.md5;
 
                     if (is_same)
                         remove_list.Add(item);
@@ -308,8 +260,6 @@ namespace Fun
 
                     if (on_finished_ != null)
                         on_finished_(DownloadResult.SUCCESS);
-
-                    SaveHaveList();
                 }
             }
             else
@@ -325,8 +275,12 @@ namespace Fun
                 if (!Directory.Exists(path))
                     Directory.CreateDirectory(path);
 
+                string file_path = target_path_ + cur_download_.path;
+                if (File.Exists(file_path))
+                    File.Delete(file_path);
+
                 // Request a file.
-                web_client_.DownloadFileAsync(new Uri(host_url_ + cur_download_.path), target_path_ + cur_download_.path);
+                web_client_.DownloadFileAsync(new Uri(host_url_ + cur_download_.path), file_path);
             }
         }
 
@@ -357,6 +311,17 @@ namespace Fun
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
 
                     Debug.Log("Json data >>  " + data);
+
+                    // Redirect url
+                    if (json.ContainsKey("url"))
+                    {
+                        string url = json["url"] as string;
+                        if (url[url.Length - 1] != '/')
+                            url += "/";
+
+                        host_url_ = url;
+                        Debug.Log("Download url : " + host_url_);
+                    }
 
                     List<object> list = json["data"] as List<object>;
                     if (list.Count <= 0)
@@ -486,12 +451,13 @@ namespace Fun
         public delegate void OnFinished (DownloadResult code);
 
         // Save file-related constants.
-        private readonly string kSaveFile = "cached_files_list";
+        private readonly string kRootPath = "client_data";
 
         // member variables.
         private Mutex mutex_ = new Mutex();
         private State state_ = State.Ready;
         private WebClient web_client_ = new WebClient();
+        private List<string> check_files_list_ = new List<string>();
         private List<DownloadUrl> url_list_ = new List<DownloadUrl>();
         private List<DownloadFile> download_list_ = new List<DownloadFile>();
         private List<DownloadFile> cached_files_list_ = new List<DownloadFile>();
