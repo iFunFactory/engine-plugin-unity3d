@@ -16,153 +16,153 @@ using funapi.service.multicast_message;
 
 namespace Fun
 {
-	public class FunapiChatClient
-	{
-		#region public interface
-		public delegate void OnChannelMessage(string channel_id, string sender, string text);
+    public class FunapiChatClient
+    {
+        #region public interface
+        public delegate void OnChannelMessage(string channel_id, string sender, string text);
 
-		public FunapiChatClient()
-		{
-		}
+        public FunapiChatClient()
+        {
+        }
 
-		public bool Connected
-		{
-			get { return multicasting_ != null && multicasting_.Connected; }
-		}
+        public bool Connected
+        {
+            get { return multicasting_ != null && multicasting_.Connected; }
+        }
 
-		public void Connect(string hostname_or_ip, ushort port, FunMsgType msg_type)
-		{
-			// TODO(dkmoon): currenlty only Protobuf is supported.
-			DebugUtils.Assert(msg_type == FunMsgType.kProtobuf);
+        public void Connect(string hostname_or_ip, ushort port, FunEncoding encoding)
+        {
+            // TODO(dkmoon): currenlty only Protobuf is supported.
+            DebugUtils.Assert(encoding == FunEncoding.kProtobuf);
 
-			// Discards previous instance, if any, and creates a brand new instance.
-			multicasting_ = new FunapiMulticastClient (msg_type);
-			multicasting_.Connect(hostname_or_ip, port);
-		}
+            // Discards previous instance, if any, and creates a brand new instance.
+            multicasting_ = new FunapiMulticastClient (encoding);
+            multicasting_.Connect(hostname_or_ip, port);
+        }
 
-		public bool JoinChannel(string chat_channel, string my_name, OnChannelMessage handler)
-		{
-			if (multicasting_ == null || !multicasting_.Connected)
-			{
-				return false;
-			}
+        public bool JoinChannel(string chat_channel, string my_name, OnChannelMessage handler)
+        {
+            if (multicasting_ == null || !multicasting_.Connected)
+            {
+                return false;
+            }
 
-			bool need_multicast_join = false;
-			lock (lock_)
-			{
-				KeyValuePair<string, OnChannelMessage> p;
-				if (!channel_info_.TryGetValue(chat_channel, out p))
-				{
-					p = new KeyValuePair<string, OnChannelMessage>(my_name, handler);
-					channel_info_.Add (chat_channel, p);
-					need_multicast_join = true;
-				}
-			}
-			if (need_multicast_join)
-			{
-				if (!multicasting_.JoinChannel(chat_channel, OnMulticastingReceived))
-				{
-					return false;
-				}
-			}
-			return true;
-		}
-
-
-		public bool LeaveChannel(string chat_channel)
-		{
-			if (multicasting_ == null || !multicasting_.Connected)
-			{
-				return false;
-			}
-
-			lock (lock_)
-			{
-				if (!channel_info_.ContainsKey(chat_channel))
-				{
-					Debug.Log("You are not in the chat channel: " + chat_channel);
-					return false;
-				}
-				channel_info_.Remove(chat_channel);
-			}
-			return multicasting_.LeaveChannel(chat_channel);
-		}
-
-		public bool InChannel(string chat_channel)
-		{
-			if (multicasting_ == null)
-			{
-				return false;
-			}
-			return multicasting_.InChannel (chat_channel);
-		}
-
-		public bool SendText(string chat_channel, string text)
-		{
-			if (multicasting_ == null || !multicasting_.Connected)
-			{
-				return false;
-			}
-
-			KeyValuePair<string, OnChannelMessage> p;
-			lock (lock_)
-			{
-				if (!channel_info_.TryGetValue(chat_channel, out p))
-				{
-					Debug.Log("You are not in the chat channel: " + chat_channel);
-					return false;
-				}
-			}
-
-			FunChatMessage chat_msg = new FunChatMessage ();
-			chat_msg.sender = p.Key;
-			chat_msg.text = text;
-
-			FunMulticastMessage mcast_msg = new FunMulticastMessage ();
-			mcast_msg.channel = chat_channel;
-			mcast_msg.bounce = true;
-			Extensible.AppendValue (mcast_msg, 8, chat_msg);
-
-			multicasting_.SendToChannel (mcast_msg);
-			return true;
-		}
-
-		/// <summary>
-		/// Please call this Update function inside your Unity3d Update.
-		/// </summary>
-		public void Update()
-		{
-			if (multicasting_ != null)
-				multicasting_.Update ();
-		}
-		#endregion
-
-		#region Funapi system message handlers
-		private void OnMulticastingReceived(string chat_channel, object data)
-		{
-			DebugUtils.Assert (data is FunMulticastMessage);
-			FunMulticastMessage mcast_msg = data as FunMulticastMessage;
-			FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage> (mcast_msg, 8);
-
-			KeyValuePair<string, OnChannelMessage> p;
-			lock (lock_)
-			{
-				if (!channel_info_.TryGetValue(chat_channel, out p))
-				{
-					Debug.Log("You are not in the chat channel: " + chat_channel);
-					return;
-				}
-			}
-			p.Value (chat_channel, chat_msg.sender, chat_msg.text);
-		}
+            bool need_multicast_join = false;
+            lock (lock_)
+            {
+                KeyValuePair<string, OnChannelMessage> p;
+                if (!channel_info_.TryGetValue(chat_channel, out p))
+                {
+                    p = new KeyValuePair<string, OnChannelMessage>(my_name, handler);
+                    channel_info_.Add (chat_channel, p);
+                    need_multicast_join = true;
+                }
+            }
+            if (need_multicast_join)
+            {
+                if (!multicasting_.JoinChannel(chat_channel, OnMulticastingReceived))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
 
-		FunapiMulticastClient multicasting_;
+        public bool LeaveChannel(string chat_channel)
+        {
+            if (multicasting_ == null || !multicasting_.Connected)
+            {
+                return false;
+            }
 
-		private Dictionary<string, KeyValuePair<string, OnChannelMessage> > channel_info_ = new Dictionary<string, KeyValuePair<string, OnChannelMessage> > ();
+            lock (lock_)
+            {
+                if (!channel_info_.ContainsKey(chat_channel))
+                {
+                    Debug.Log("You are not in the chat channel: " + chat_channel);
+                    return false;
+                }
+                channel_info_.Remove(chat_channel);
+            }
+            return multicasting_.LeaveChannel(chat_channel);
+        }
 
-		private object lock_ = new object();
-		#endregion
-	}
+        public bool InChannel(string chat_channel)
+        {
+            if (multicasting_ == null)
+            {
+                return false;
+            }
+            return multicasting_.InChannel (chat_channel);
+        }
+
+        public bool SendText(string chat_channel, string text)
+        {
+            if (multicasting_ == null || !multicasting_.Connected)
+            {
+                return false;
+            }
+
+            KeyValuePair<string, OnChannelMessage> p;
+            lock (lock_)
+            {
+                if (!channel_info_.TryGetValue(chat_channel, out p))
+                {
+                    Debug.Log("You are not in the chat channel: " + chat_channel);
+                    return false;
+                }
+            }
+
+            FunChatMessage chat_msg = new FunChatMessage ();
+            chat_msg.sender = p.Key;
+            chat_msg.text = text;
+
+            FunMulticastMessage mcast_msg = new FunMulticastMessage ();
+            mcast_msg.channel = chat_channel;
+            mcast_msg.bounce = true;
+            Extensible.AppendValue (mcast_msg, 8, chat_msg);
+
+            multicasting_.SendToChannel (mcast_msg);
+            return true;
+        }
+
+        /// <summary>
+        /// Please call this Update function inside your Unity3d Update.
+        /// </summary>
+        public void Update()
+        {
+            if (multicasting_ != null)
+                multicasting_.Update ();
+        }
+        #endregion
+
+        #region Funapi system message handlers
+        private void OnMulticastingReceived(string chat_channel, object data)
+        {
+            DebugUtils.Assert (data is FunMulticastMessage);
+            FunMulticastMessage mcast_msg = data as FunMulticastMessage;
+            FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage> (mcast_msg, 8);
+
+            KeyValuePair<string, OnChannelMessage> p;
+            lock (lock_)
+            {
+                if (!channel_info_.TryGetValue(chat_channel, out p))
+                {
+                    Debug.Log("You are not in the chat channel: " + chat_channel);
+                    return;
+                }
+            }
+            p.Value (chat_channel, chat_msg.sender, chat_msg.text);
+        }
+
+
+        FunapiMulticastClient multicasting_;
+
+        private Dictionary<string, KeyValuePair<string, OnChannelMessage> > channel_info_ = new Dictionary<string, KeyValuePair<string, OnChannelMessage> > ();
+
+        private object lock_ = new object();
+        #endregion
+    }
 
 }

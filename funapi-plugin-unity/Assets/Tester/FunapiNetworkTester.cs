@@ -108,7 +108,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 60, 240, 40), multicast_title))
         {
             if (multicast_ == null)
-                multicast_ = new FunapiMulticastClient(FunMsgType.kProtobuf);
+                multicast_ = new FunapiMulticastClient(FunEncoding.kProtobuf);
 
             multicast_.Connect(kMulticastServerIp, kMulticastPbufPort);
             Debug.Log("Connecting to the multicast server..");
@@ -155,7 +155,7 @@ public class FunapiNetworkTester : MonoBehaviour
             if (chat_ == null)
                 chat_ = new FunapiChatClient();
 
-            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunMsgType.kProtobuf);
+            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunEncoding.kProtobuf);
             Debug.Log("Connecting to the chat server..");
         }
 
@@ -189,23 +189,23 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiTransport GetNewTransport (TransportProtocol protocol)
     {
         FunapiTransport transport = null;
-        FunMsgType msg_type = with_protobuf_ ? FunMsgType.kProtobuf : FunMsgType.kJson;
+        FunEncoding encoding = with_protobuf_ ? FunEncoding.kProtobuf : FunEncoding.kJson;
 
         if (protocol == TransportProtocol.kTcp)
         {
-            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), msg_type);
+            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
             //transport.DisableNagle = true;
         }
         else if (protocol == TransportProtocol.kUdp)
         {
-            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), msg_type);
+            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), encoding);
 
             // Please set the same encryption type as the encryption type of server.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
         }
         else if (protocol == TransportProtocol.kHttp)
         {
-            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, msg_type);
+            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
 
             // Please set the same encryption type as the encryption type of server.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
@@ -321,21 +321,21 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else
         {
-            FunMsgType msgtype = network_.GetMsgType(network_.GetDefaultProtocol());
-            if (msgtype == FunMsgType.kNone)
+            FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
+            if (encoding == FunEncoding.kNone)
             {
                 Debug.Log("You should attach transport first.");
                 return;
             }
 
-            if (msgtype == FunMsgType.kProtobuf)
+            if (encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = "hello proto";
                 FunMessage message = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
                 network_.SendMessage(MessageType.pbuf_echo, message);
             }
-            if (msgtype == FunMsgType.kJson)
+            if (encoding == FunEncoding.kJson)
             {
                 // In this example, we are using Dictionary<string, object>.
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
@@ -427,14 +427,14 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnMaintenanceMessage (string msg_type, object body)
     {
-        FunMsgType msgtype = network_.GetMsgType(network_.GetDefaultProtocol());
-        if (msgtype == FunMsgType.kNone)
+        FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
+        if (encoding == FunEncoding.kNone)
         {
-            Debug.Log("Can't find a FunMsgType for maintenance message.");
+            Debug.Log("Can't find a FunEncoding type for maintenance message.");
             return;
         }
 
-        if (msgtype == FunMsgType.kProtobuf)
+        if (encoding == FunEncoding.kProtobuf)
         {
             FunMessage msg = body as FunMessage;
             object obj = network_.GetMessage(msg, MessageType.pbuf_maintenance);
@@ -445,7 +445,7 @@ public class FunapiNetworkTester : MonoBehaviour
             Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
                                     maintenance.date_start, maintenance.date_end, maintenance.messages));
         }
-        else if (msgtype == FunMsgType.kJson)
+        else if (encoding == FunEncoding.kJson)
         {
             DebugUtils.Assert(body is Dictionary<string, object>);
             Dictionary<string, object> msg = body as Dictionary<string, object>;

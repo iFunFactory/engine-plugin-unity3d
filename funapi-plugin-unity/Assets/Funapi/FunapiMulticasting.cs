@@ -21,9 +21,9 @@ namespace Fun
         #region public interface
         public delegate void ChannelReceiveHandler(string channel_id, object body);
 
-        public FunapiMulticastClient(FunMsgType msg_type)
+        public FunapiMulticastClient(FunEncoding encoding)
         {
-            msg_type_ = msg_type;
+            encoding_ = encoding;
         }
 
         public bool Started
@@ -42,7 +42,7 @@ namespace Fun
 
             lock (lock_)
             {
-                transport_ = new FunapiTcpTransport (hostname_or_ip, port, msg_type_);
+                transport_ = new FunapiTcpTransport (hostname_or_ip, port, encoding_);
                 DebugUtils.Assert (transport_ != null);
                 network_ = new FunapiNetwork ();
                 network_.AttachTransport (transport_);
@@ -135,7 +135,7 @@ namespace Fun
         /// </summary>
         public bool SendToChannel(FunMulticastMessage mcast_msg)
         {
-            DebugUtils.Assert (msg_type_ == FunMsgType.kProtobuf);
+            DebugUtils.Assert (encoding_ == FunEncoding.kProtobuf);
             DebugUtils.Assert (mcast_msg != null);
             DebugUtils.Assert (!mcast_msg.join);
             DebugUtils.Assert (!mcast_msg.leave);
@@ -169,7 +169,7 @@ namespace Fun
         /// And mcas_msg must have join and leave flags set.
         /// </summary>
         public bool SendToChannel(object json_msg) {
-            DebugUtils.Assert (msg_type_ == FunMsgType.kJson);
+            DebugUtils.Assert (encoding_ == FunEncoding.kJson);
             // TODO(dkmoon): Verifies the passed json_msg has required fields.
             network_.SendMessage (kMulticastMsgType, json_msg);
             return true;
@@ -208,7 +208,7 @@ namespace Fun
 
         private const string kMulticastMsgType = "_multicast";
 
-        private FunMsgType msg_type_;
+        private FunEncoding encoding_;
         private FunapiNetwork network_;
         private FunapiTcpTransport transport_;
         private Dictionary<string, ChannelReceiveHandler> channels_ = new Dictionary<string, ChannelReceiveHandler> ();

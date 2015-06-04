@@ -45,9 +45,9 @@ namespace Fun
             get; set;
         }
 
-        public FunMsgType MsgType
+        public FunEncoding encoding
         {
-            get { return msg_type_; }
+            get { return encoding_; }
         }
 
         public virtual bool IsStream
@@ -210,7 +210,7 @@ namespace Fun
         // member variables.
         internal string host_addr_ = "";
         internal UInt16 host_port_ = 0;
-        internal FunMsgType msg_type_ = FunMsgType.kNone;
+        internal FunEncoding encoding_ = FunEncoding.kNone;
         internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         internal FunMessageSerializer serializer_ = null;
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
@@ -340,7 +340,7 @@ namespace Fun
 
         internal override void SendMessage (FunapiMessage fun_msg)
         {
-            if (msg_type_ == FunMsgType.kJson)
+            if (encoding_ == FunEncoding.kJson)
             {
                 string str = this.JsonHelper.Serialize(fun_msg.message);
                 byte[] body = Encoding.UTF8.GetBytes(str);
@@ -349,7 +349,7 @@ namespace Fun
 
                 SendMessage(fun_msg, body);
             }
-            else if (msg_type_ == FunMsgType.kProtobuf)
+            else if (encoding_ == FunEncoding.kProtobuf)
             {
                 MemoryStream stream = new MemoryStream();
                 this.ProtobufHelper.Serialize (stream, fun_msg.message);
@@ -362,7 +362,7 @@ namespace Fun
             }
             else
             {
-                Debug.Log("SendMessage - Invalid FunMsgType. type: " + msg_type_);
+                Debug.Log("SendMessage - Invalid FunEncoding type: " + encoding_);
             }
         }
 
@@ -865,18 +865,18 @@ namespace Fun
     public class FunapiTcpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunMsgType type)
+        public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
             protocol = TransportProtocol.kTcp;
             DisableNagle = false;
-            msg_type_ = type;
+            encoding_ = type;
 
             SetAddress(hostname_or_ip, port);
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiTcpTransport(..., FunMsgType type)' instead.")]
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiTcpTransport(..., FunEncoding type)' instead.")]
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
-            : this(hostname_or_ip, port, Fun.FunMsgType.kNone)
+            : this(hostname_or_ip, port, Fun.FunEncoding.kNone)
         {
         }
 
@@ -1210,17 +1210,17 @@ namespace Fun
     public class FunapiUdpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiUdpTransport(string hostname_or_ip, UInt16 port, FunMsgType type)
+        public FunapiUdpTransport(string hostname_or_ip, UInt16 port, FunEncoding type)
         {
             protocol = TransportProtocol.kUdp;
-            msg_type_ = type;
+            encoding_ = type;
 
             SetAddress(hostname_or_ip, port);
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiUdpTransport(..., FunMsgType type)' instead.")]
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiUdpTransport(..., FunEncoding type)' instead.")]
         public FunapiUdpTransport (string hostname_or_ip, UInt16 port)
-            : this(hostname_or_ip, port, Fun.FunMsgType.kNone)
+            : this(hostname_or_ip, port, Fun.FunEncoding.kNone)
         {
         }
 
@@ -1482,17 +1482,17 @@ namespace Fun
     public class FunapiHttpTransport : FunapiEncryptedTransport
     {
         #region public interface
-        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunMsgType type)
+        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
         {
             protocol = TransportProtocol.kHttp;
-            msg_type_ = type;
+            encoding_ = type;
 
             SetAddress(hostname_or_ip, port, https);
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiHttpTransport(..., FunMsgType type)' instead.")]
+        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiHttpTransport(..., FunEncoding type)' instead.")]
         public FunapiHttpTransport (string hostname_or_ip, UInt16 port, bool https = false)
-            : this(hostname_or_ip, port, https, Fun.FunMsgType.kNone)
+            : this(hostname_or_ip, port, https, Fun.FunEncoding.kNone)
         {
         }
 
@@ -1622,7 +1622,7 @@ namespace Fun
                     // Response
                     WebState ws = new WebState();
                     ws.request = request;
-                    ws.msgtype = body.msg_type;
+                    ws.msg_type = body.msg_type;
                     ws.sending = body.buffer;
                     list_.Add(ws);
 
@@ -1865,7 +1865,7 @@ namespace Fun
             public byte[] read_data = null;
             public int read_offset = 0;
             public bool aborted = false;
-            public string msgtype;
+            public string msg_type;
             public ArraySegment<byte> sending;
         }
 

@@ -26,11 +26,11 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 79;
+        public static readonly int kPluginVersion = 80;
     }
 
     // Funapi message type
-    public enum FunMsgType
+    public enum FunEncoding
     {
         kNone,
         kJson,
@@ -102,16 +102,9 @@ namespace Fun
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
-        public FunapiNetwork(FunMsgType type, bool session_reliability)
-            : this(session_reliability)
-        {
-            msg_type_ = type;
-        }
-
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
-        public FunapiNetwork(FunapiTransport transport, FunMsgType type, bool session_reliability,
+        public FunapiNetwork(FunapiTransport transport, bool session_reliability,
                              SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
-            : this(type, session_reliability)
+            : this(session_reliability)
         {
             OnSessionInitiated += new SessionInitHandler(on_session_initiated);
             OnSessionClosed += new SessionCloseHandler(on_session_closed);
@@ -161,9 +154,6 @@ namespace Fun
                                      "' type already exists. You should call DetachTransport first.");
                     return;
                 }
-
-                if (transport.msg_type_ == FunMsgType.kNone)
-                    transport.msg_type_ = msg_type_;
 
                 transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
                 transport.StartedInternalCallback += new TransportEventHandler(OnTransportStarted);
@@ -521,19 +511,13 @@ namespace Fun
             get { return session_reliability_; }
         }
 
-        [System.Obsolete("This will be deprecated in September 2015. Use 'GetMsgType(TransportProtocol)' instead.")]
-        public FunMsgType MsgType
-        {
-            get { return msg_type_; }
-        }
-
-        public FunMsgType GetMsgType (TransportProtocol protocol)
+        public FunEncoding GetEncoding (TransportProtocol protocol)
         {
             FunapiTransport transport = GetTransport(protocol);
             if (transport == null)
-                return FunMsgType.kNone;
+                return FunEncoding.kNone;
 
-            return transport.MsgType;
+            return transport.encoding;
         }
 
         [System.Obsolete("This will be deprecated in September 2015. Use 'CreateFunMessage(object, MessageType)' instead.")]
@@ -630,7 +614,7 @@ namespace Fun
             {
                 FunapiMessage fun_msg = null;
 
-                if (transport.msg_type_ == FunMsgType.kJson)
+                if (transport.encoding == FunEncoding.kJson)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, transport.JsonHelper.Clone(message), encryption);
 
@@ -656,7 +640,7 @@ namespace Fun
                         Debug.Log(protocol + " send message - msgtype:" + msg_type);
                     }
                 }
-                else if (transport.msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.encoding == FunEncoding.kProtobuf)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
 
@@ -693,14 +677,14 @@ namespace Fun
             else if (transport_reliability ||
                      (transport != null && transport.state == FunapiTransport.State.kEstablished))
             {
-                if (transport.msg_type_ == FunMsgType.kJson)
+                if (transport.encoding == FunEncoding.kJson)
                 {
                     if (transport == null)
                         unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, encryption));
                     else
                         unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, transport.JsonHelper.Clone(message), encryption));
                 }
-                else if (transport.msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.encoding == FunEncoding.kProtobuf)
                 {
                     unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, encryption));
                 }
@@ -903,7 +887,7 @@ namespace Fun
             string msg_type = "";
             string session_id = "";
 
-            if (transport.msg_type_ == FunMsgType.kJson)
+            if (transport.encoding == FunEncoding.kJson)
             {
                 object json;
 
@@ -961,7 +945,7 @@ namespace Fun
                         message_handlers_[msg_type](msg_type, json);
                 }
             }
-            else if (transport.msg_type_ == FunMsgType.kProtobuf)
+            else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage message;
 
@@ -1011,7 +995,7 @@ namespace Fun
             }
             else
             {
-                Debug.Log("Invalid message type. type: " + transport.msg_type_);
+                Debug.Log("Invalid message type. type: " + transport.encoding);
                 DebugUtils.Assert(false);
                 return;
             }
@@ -1049,7 +1033,7 @@ namespace Fun
                     continue;
                 }
 
-                if (transport.msg_type_ == FunMsgType.kJson)
+                if (transport.encoding == FunEncoding.kJson)
                 {
                     object json = msg.message;
 
@@ -1071,7 +1055,7 @@ namespace Fun
                         Debug.Log(transport.protocol + " send unsent message - msgtype:" + msg.msg_type);
                     }
                 }
-                else if (transport.msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.encoding == FunEncoding.kProtobuf)
                 {
                     FunMessage pbuf = msg.message as FunMessage;
                     pbuf.msgtype = msg.msg_type;
@@ -1119,14 +1103,14 @@ namespace Fun
 
             Debug.Log(transport.protocol + " send ack message - ack:" + ack);
 
-            if (transport.msg_type_ == FunMsgType.kJson)
+            if (transport.encoding == FunEncoding.kJson)
             {
                 object ack_msg = transport.JsonHelper.Deserialize("{}");
                 transport.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
                 transport.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
-            else if (transport.msg_type_ == FunMsgType.kProtobuf)
+            else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
                 ack_msg.sid = session_id_;
@@ -1146,12 +1130,12 @@ namespace Fun
 
             Debug.Log(transport.protocol + " send empty message");
 
-            if (transport.msg_type_ == FunMsgType.kJson)
+            if (transport.encoding == FunEncoding.kJson)
             {
                 object msg = transport.JsonHelper.Deserialize("{}");
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", msg));
             }
-            else if (transport.msg_type_ == FunMsgType.kProtobuf)
+            else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = new FunMessage();
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", msg));
@@ -1196,11 +1180,11 @@ namespace Fun
             {
                 UInt32 seq;
                 FunapiMessage last_msg = send_queue_.Peek();
-                if (transport.msg_type_ == FunMsgType.kJson)
+                if (transport.encoding == FunEncoding.kJson)
                 {
                     seq = (UInt32)transport.JsonHelper.GetIntegerField(last_msg.message, kSeqNumberField);
                 }
-                else if (transport.msg_type_ == FunMsgType.kProtobuf)
+                else if (transport.encoding == FunEncoding.kProtobuf)
                 {
                     seq = (last_msg.message as FunMessage).seq;
                 }
@@ -1224,13 +1208,13 @@ namespace Fun
             {
                 foreach (FunapiMessage msg in send_queue_)
                 {
-                    if (transport.msg_type_ == FunMsgType.kJson)
+                    if (transport.encoding == FunEncoding.kJson)
                     {
                         UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
                         DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
                         transport.SendMessage(msg);
                     }
-                    else if (transport.msg_type_ == FunMsgType.kProtobuf)
+                    else if (transport.encoding == FunEncoding.kProtobuf)
                     {
                         UInt32 seq = (msg.message as FunMessage).seq;
                         DebugUtils.Assert(seq == ack || SeqLess (seq, ack));
@@ -1420,7 +1404,6 @@ namespace Fun
         // Member variables.
         private State state_;
         private Type recv_type_;
-        private FunMsgType msg_type_ = FunMsgType.kNone;
         private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
         private FunMessageSerializer serializer_;
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
