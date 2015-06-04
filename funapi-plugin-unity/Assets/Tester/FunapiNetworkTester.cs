@@ -103,7 +103,7 @@ public class FunapiNetworkTester : MonoBehaviour
         // Resource download test
         //----------------------------------------------------------------------------
         GUI.enabled = downloader_ == null;
-        GUI.Label(new Rect(30, 390, 300, 20), "server : " + kDownloadServerIp + ":" + kDownloadServerPort);
+        GUI.Label(new Rect(30, 390, 300, 20), String.Format("server : {0}:{1}", kDownloadServerIp, kDownloadServerPort));
         if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
         {
             downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
@@ -120,7 +120,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 60, 240, 40), multicast_title))
         {
             if (multicast_ == null)
-                multicast_ = new FunapiMulticastClient(FunMsgType.kProtobuf);
+                multicast_ = new FunapiMulticastClient(FunEncoding.kProtobuf);
 
             multicast_.Connect(kMulticastServerIp, kMulticastPbufPort);
             Debug.Log("Connecting to the multicast server..");
@@ -131,7 +131,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 110, 240, 40), multicast_title))
         {
             multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelSignalled);
-            Debug.Log("Joining the multicast channel '" + kMulticastTestChannel + "'");
+            Debug.Log(String.Format("Joining the multicast channel '{0}'", kMulticastTestChannel));
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
@@ -149,7 +149,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
             multicast_.SendToChannel(mcast_msg);
 
-            Debug.Log("Sending a message to the multicast channel '" + kMulticastTestChannel + "'");
+            Debug.Log(String.Format("Sending a message to the multicast channel '{0}'", kMulticastTestChannel));
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
@@ -157,7 +157,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 210, 240, 40), multicast_title))
         {
             multicast_.LeaveChannel(kMulticastTestChannel);
-            Debug.Log("Leaving the multicast channel '" + kMulticastTestChannel + "'");
+            Debug.Log(String.Format("Leaving the multicast channel '{0}'", kMulticastTestChannel));
         }
 
         GUI.enabled = (chat_ == null || !chat_.Connected);
@@ -167,7 +167,7 @@ public class FunapiNetworkTester : MonoBehaviour
             if (chat_ == null)
                 chat_ = new FunapiChatClient();
 
-            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunMsgType.kProtobuf);
+            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunEncoding.kProtobuf);
             Debug.Log("Connecting to the chat server..");
         }
 
@@ -176,7 +176,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 310, 240, 40), chat_title))
         {
             chat_.JoinChannel(kChatTestChannel, kChatUserName, OnChatChannelReceived);
-            Debug.Log("Joining the chat channel '" + kChatTestChannel + "'");
+            Debug.Log(String.Format("Joining the chat channel '{0}'", kChatTestChannel));
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
@@ -185,7 +185,7 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             chat_.SendText(kChatTestChannel, "hello world");
 
-            Debug.Log("Sending a message to the chat channel '" + kChatTestChannel + "'");
+            Debug.Log(String.Format("Sending a message to the chat channel '{0}'", kChatTestChannel));
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
@@ -193,7 +193,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 410, 240, 40), chat_title))
         {
             chat_.LeaveChannel(kChatTestChannel);
-            Debug.Log("Leaving the chat channel '" + kChatTestChannel + "'");
+            Debug.Log(String.Format("Leaving the chat channel '{0}'", kChatTestChannel));
         }
     }
 
@@ -201,20 +201,20 @@ public class FunapiNetworkTester : MonoBehaviour
     private FunapiTransport GetNewTransport (TransportProtocol protocol)
     {
         FunapiTransport transport = null;
-        FunMsgType msg_type = with_protobuf_ ? FunMsgType.kProtobuf : FunMsgType.kJson;
+        FunEncoding encoding = with_protobuf_ ? FunEncoding.kProtobuf : FunEncoding.kJson;
 
         if (protocol == TransportProtocol.kTcp)
         {
-            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), msg_type);
+            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
             //transport.DisableNagle = true;
         }
         else if (protocol == TransportProtocol.kUdp)
         {
-            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), msg_type);
+            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), encoding);
         }
         else if (protocol == TransportProtocol.kHttp)
         {
-            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, msg_type);
+            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
         }
 
         if (transport != null)
@@ -326,21 +326,21 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else
         {
-            FunMsgType msgtype = network_.GetMsgType(network_.GetDefaultProtocol());
-            if (msgtype == FunMsgType.kNone)
+            FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
+            if (encoding == FunEncoding.kNone)
             {
                 Debug.Log("You should attach transport first.");
                 return;
             }
 
-            if (msgtype == FunMsgType.kProtobuf)
+            if (encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = "hello proto";
                 FunMessage message = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
                 network_.SendMessage(MessageType.pbuf_echo, message);
             }
-            if (msgtype == FunMsgType.kJson)
+            if (encoding == FunEncoding.kJson)
             {
                 // In this example, we are using Dictionary<string, object>.
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
@@ -365,17 +365,17 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnConnectTimeout (TransportProtocol protocol)
     {
-        Debug.Log(protocol + " Transport Connection timed out.");
+        Debug.Log(String.Format("{0} Transport Connection timed out.", protocol));
     }
 
     private void OnTransportStarted (TransportProtocol protocol)
     {
-        Debug.Log(protocol + " Transport started.");
+        Debug.Log(String.Format("{0} Transport started.", protocol));
     }
 
     private void OnTransportClosed (TransportProtocol protocol)
     {
-        Debug.Log(protocol + " Transport closed.");
+        Debug.Log(String.Format("{0} Transport closed.", protocol));
     }
 
     private void OnEcho (string msg_type, object body)
@@ -399,7 +399,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
-        Debug.Log("Downloading - path:" + path + " / received:" + bytes_received + " / total:" + total_bytes + " / " + percentage + "%");
+        Debug.Log(String.Format("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+                       path, bytes_received, total_bytes, percentage));
     }
 
     private void OnDownloadFinished (DownloadResult code)
@@ -422,7 +423,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 string buffer = "";
 
                 foreach (var item in list)
-                    buffer += item.Key + ": " + item.Value + "\n";
+                    buffer += String.Format("{0}: {1}\n", item.Key, item.Value);
 
                 Debug.Log("announcement >> " + buffer);
             }
@@ -431,14 +432,14 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnMaintenanceMessage (string msg_type, object body)
     {
-        FunMsgType msgtype = network_.GetMsgType(network_.GetDefaultProtocol());
-        if (msgtype == FunMsgType.kNone)
+        FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
+        if (encoding == FunEncoding.kNone)
         {
-            Debug.Log("Can't find a FunMsgType for maintenance message.");
+            Debug.Log("Can't find a FunEncoding type for maintenance message.");
             return;
         }
 
-        if (msgtype == FunMsgType.kProtobuf)
+        if (encoding == FunEncoding.kProtobuf)
         {
             FunMessage msg = body as FunMessage;
             object obj = network_.GetMessage(msg, MessageType.pbuf_maintenance);
@@ -447,14 +448,14 @@ public class FunapiNetworkTester : MonoBehaviour
 
             MaintenanceMessage maintenance = obj as MaintenanceMessage;
             Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
-                                    maintenance.date_start, maintenance.date_end, maintenance.messages));
+                           maintenance.date_start, maintenance.date_end, maintenance.messages));
         }
-        else if (msgtype == FunMsgType.kJson)
+        else if (encoding == FunEncoding.kJson)
         {
             DebugUtils.Assert(body is Dictionary<string, object>);
             Dictionary<string, object> msg = body as Dictionary<string, object>;
             Debug.Log(String.Format("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
-                                    msg["date_start"], msg["date_end"], msg["messages"]));
+                           msg["date_start"], msg["date_end"], msg["messages"]));
         }
     }
 
@@ -465,7 +466,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnTransportFailure (TransportProtocol protocol)
     {
-        Debug.Log("OnTransportFailure(" + protocol + ") - " + network_.LastErrorCode(protocol));
+        Debug.Log(String.Format("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol)));
     }
 
     private void OnMulticastChannelSignalled(string channel_id, object body)
@@ -475,12 +476,13 @@ public class FunapiNetworkTester : MonoBehaviour
         DebugUtils.Assert (mcast_msg.channel == kMulticastTestChannel);
         PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, 8);
         DebugUtils.Assert (hello_msg.message != "");
-        Debug.Log ("Received a multicast message from a channel " + channel_id);
+        Debug.Log("Received a multicast message from a channel " + channel_id);
     }
 
     private void OnChatChannelReceived(string chat_channel, string sender, string text)
     {
-        Debug.Log ("Received a chat channel message. Channel=" + chat_channel + ", sender=" + sender + ", text=" + text);
+        Debug.Log(String.Format("Received a chat channel message. Channel={0}, sender={1}, text={2}",
+                       chat_channel, sender, text));
     }
 
     // Please change this address for test.

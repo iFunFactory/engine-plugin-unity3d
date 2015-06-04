@@ -16,16 +16,29 @@ namespace Fun
         {
             get
             {
-                if ((Application.platform == RuntimePlatform.Android) ||
-                    (Application.platform == RuntimePlatform.IPhonePlayer))
+                if (path_ == null)
                 {
-                    return Application.persistentDataPath;
+                    if (Application.platform == RuntimePlatform.IPhonePlayer)
+                    {
+                        string path = Application.dataPath.Substring(0, Application.dataPath.Length - 5); // Strip "/Data" from path
+                        path = path.Substring(0, path.LastIndexOf('/'));
+                        path_ = path + "/Documents";
+                    }
+                    else if (Application.platform == RuntimePlatform.Android)
+                    {
+                        path_ = Application.persistentDataPath;
+                    }
+                    else
+                    {
+                        string path = Application.dataPath;
+                        path_ = path.Substring(0, path.LastIndexOf('/'));
+                    }
                 }
-                else
-                {
-                    return Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                }
+
+                return path_;
             }
         }
+
+        private static string path_ = null;
     }
 }
