@@ -7,6 +7,7 @@
 
 using Fun;
 using ProtoBuf;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -38,7 +39,7 @@ namespace Fun
         {
             bool need_to_start = false;
 
-            Debug.Log ("Multicast server is at " + hostname_or_ip + ":" + port);
+            Debug.Log(String.Format("Multicast server is at {0}:{1}", hostname_or_ip, port));
 
             lock (lock_)
             {

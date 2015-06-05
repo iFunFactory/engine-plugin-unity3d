@@ -45,10 +45,8 @@ namespace Fun
         // Start downloading
         public void StartDownload (string hostname_or_ip, UInt16 port, bool https)
         {
-            string url = "http://";
-            if (https)
-                url = "https://";
-            url += hostname_or_ip + ":" + port;
+            string url = String.Format("{0}://{1}:{2}",
+                                       (https ? "https" : "http"), hostname_or_ip, port);
 
             StartDownload(url);
         }

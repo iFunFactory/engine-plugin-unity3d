@@ -345,7 +345,7 @@ namespace Fun
                 string str = this.JsonHelper.Serialize(fun_msg.message);
                 byte[] body = Encoding.UTF8.GetBytes(str);
 
-                DebugUtils.Log("JSON to send : " + str);
+                DebugUtils.Log(String.Format("JSON to send : {0}", str));
 
                 SendMessage(fun_msg, body);
             }
@@ -424,7 +424,7 @@ namespace Fun
                     if (encryptor.state != Encryptor.State.kEstablished)
                     {
                         last_error_code_ = ErrorCode.kInvalidEncryption;
-                        last_error_message_ = "'" + encryptor.name + "' is invalid encryption type. Check out the encryption type of server.";
+                        last_error_message_ = String.Format("'{0}' is invalid encryption type. Check out the encryption type of server.", encryptor.name);
                         Debug.Log(last_error_message_);
                         AddFailureCallback(message);
                         return false;
@@ -443,28 +443,28 @@ namespace Fun
                     DebugUtils.Assert(nSize == message.buffer.Count);
                 }
 
-                string header = "";
-                header += kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter;
+                StringBuilder header = new StringBuilder();
+                header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
                 if (first_sending_)
                 {
-                    header += kPluginVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kPluginVersion + kHeaderDelimeter;
+                    header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kPluginVersion, kHeaderDelimeter);
                     first_sending_ = false;
                 }
-                header += kLengthHeaderField + kHeaderFieldDelimeter + message.buffer.Count + kHeaderDelimeter;
+                header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, message.buffer.Count, kHeaderDelimeter);
                 if ((int)encryption != kNoneEncryption)
                 {
                     DebugUtils.Assert(encryptor != null);
                     DebugUtils.Assert(encryptor.encryption == encryption);
-                    header += kEncryptionHeaderField + kHeaderFieldDelimeter + Convert.ToInt32(encryption);
-                    header += "-" + encryption_header + kHeaderDelimeter;
+                    header.AppendFormat("{0}{1}{2}", kEncryptionHeaderField, kHeaderFieldDelimeter, Convert.ToInt32(encryption));
+                    header.AppendFormat("-{0}{1}", encryption_header, kHeaderDelimeter);
                 }
-                header += kHeaderDelimeter;
+                header.Append(kHeaderDelimeter);
 
                 FunapiMessage header_buffer = new FunapiMessage(protocol, message.msg_type, header);
-                header_buffer.buffer = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header));
+                header_buffer.buffer = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header.ToString()));
                 sending_.Insert(i, header_buffer);
 
-                DebugUtils.Log("Header to send: " + header + " body length: " + message.buffer.Count);
+                DebugUtils.Log(String.Format("Header to send: {0} body length: {1}", header, message.buffer.Count));
             }
 
             WireSend();
@@ -515,7 +515,7 @@ namespace Fun
                 // Otherwise, increase the receiving buffer size.
                 if (next_decoding_offset_ > 0)
                 {
-                    DebugUtils.Log("Compacting a receive buffer to save " + next_decoding_offset_ + " bytes.");
+                    Debug.Log(String.Format("Compacting a receive buffer to save {0} bytes.", next_decoding_offset_));
                     Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
                     receive_buffer_ = new_buffer;
                     received_size_ -= next_decoding_offset_;
@@ -523,7 +523,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugUtils.Log("Increasing a receive buffer to " + (receive_buffer_.Length + kUnitBufferSize) + " bytes.");
+                    Debug.Log(String.Format("Increasing a receive buffer to {0} bytes.", receive_buffer_.Length + kUnitBufferSize));
                     Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
                     receive_buffer_ = new_buffer;
                 }
@@ -541,7 +541,7 @@ namespace Fun
                 if (offset < 0)
                 {
                     // Not enough bytes. Wait for more bytes to come.
-                    DebugUtils.Log("We need more bytes for a header field. Waiting.");
+                    Debug.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
                 string line = Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
@@ -551,14 +551,14 @@ namespace Fun
                 {
                     // End of header.
                     header_decoded_ = true;
-                    DebugUtils.Log("End of header reached. Will decode body from now.");
+                    Debug.Log("End of header reached. Will decode body from now.");
                     return true;
                 }
 
-                DebugUtils.Log("Header line: " + line);
+                DebugUtils.Log(String.Format("Header line: {0}", line));
                 string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
                 tuple[0] = tuple[0].ToUpper();
-                DebugUtils.Log("Decoded header field '" + tuple[0] + "' => '" + tuple[1] + "'");
+                DebugUtils.Log(String.Format("Decoded header field '{0}' => '{1}'", tuple[0], tuple[1]));
                 DebugUtils.Assert(tuple.Length == 2);
                 header_fields_[tuple[0]] = tuple[1];
             }
@@ -576,12 +576,13 @@ namespace Fun
             // Header length
             DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderField));
             int body_length = Convert.ToInt32(header_fields_[kLengthHeaderField]);
-            DebugUtils.Log("We need " + body_length + " bytes for a message body. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+            DebugUtils.Log(String.Format("We need {0} bytes for a message body. Buffer has {1} bytes.",
+                                         body_length, received_size_ - next_decoding_offset_));
 
             if (received_size_ - next_decoding_offset_ < body_length)
             {
                 // Need more bytes.
-                DebugUtils.Log("We need more bytes for a message body. Waiting.");
+                Debug.Log("We need more bytes for a message body. Waiting.");
                 return false;
             }
 
@@ -782,7 +783,7 @@ namespace Fun
 
         internal virtual void OnFailure()
         {
-            Debug.Log("OnFailure(" + protocol + ") - state: " + state);
+            Debug.Log(String.Format("OnFailure({0}) - state: {1}", protocol, state));
             OnFailureCallback();
         }
 
@@ -922,7 +923,7 @@ namespace Fun
                 connect_timeout_ -= Time.deltaTime;
                 if (connect_timeout_ <= 0f)
                 {
-                    DebugUtils.Log("Connection waiting time has been exceeded.");
+                    Debug.Log("Connection waiting time has been exceeded.");
                     OnConnectionTimeout();
                 }
             }
@@ -960,7 +961,8 @@ namespace Fun
         {
             if (host_addr_ == hostname_or_ip && host_port_ == port)
             {
-                Debug.Log("Redirect Tcp [" + hostname_or_ip + ":" + port + "] - The same address is already connected.");
+                Debug.Log(String.Format("Redirect Tcp [{0}:{1}] - The same address is already connected.",
+                                        hostname_or_ip, port));
                 return;
             }
 
@@ -1056,7 +1058,7 @@ namespace Fun
                 }
 
                 int nSent = sock_.EndSend(ar);
-                DebugUtils.Log("Sent " + nSent + "bytes");
+                DebugUtils.Log(String.Format("Sent {0}bytes", nSent));
 
                 lock (sending_lock_)
                 {
@@ -1068,7 +1070,7 @@ namespace Fun
                         if (sending_[0].buffer.Count > nSent)
                         {
                             // partial data
-                            DebugUtils.Log("Partially sent. Will resume.");
+                            Debug.Log("Partially sent. Will resume.");
                             break;
                         }
                         else
@@ -1082,7 +1084,7 @@ namespace Fun
 
                     while (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
                     {
-                        DebugUtils.Log("Remove zero byte buffer.");
+                        Debug.Log("Remove zero byte buffer.");
                         sending_.RemoveAt(0);
                     }
 
@@ -1136,7 +1138,8 @@ namespace Fun
                     if (nRead > 0)
                     {
                         received_size_ += nRead;
-                        DebugUtils.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+                        DebugUtils.Log(String.Format("Received {0} bytes. Buffer has {1} bytes.",
+                                                     nRead, received_size_ - next_decoding_offset_));
                     }
 
                     // Try to decode as many messages as possible.
@@ -1168,17 +1171,21 @@ namespace Fun
                         List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                         buffer.Add(residual);
                         sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                        DebugUtils.Log("Ready to receive more. We can receive upto " + (receive_buffer_.Length - received_size_) + " more bytes");
+                        DebugUtils.Log(String.Format("Ready to receive more. We can receive upto {0} more bytes",
+                                                     receive_buffer_.Length - received_size_));
+
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
                     else
                     {
-                        DebugUtils.Log("Socket closed");
+                        Debug.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                            Debug.Log(String.Format("Buffer has {0} bytes. But they failed to decode. Discarding.",
+                                                    receive_buffer_.Length - received_size_));
                         }
+
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
@@ -1281,7 +1288,8 @@ namespace Fun
         {
             if (host_addr_ == hostname_or_ip && host_port_ == port)
             {
-                Debug.Log("Redirect Udp [" + hostname_or_ip + ":" + port + "] - The same address is already connected.");
+                Debug.Log(String.Format("Redirect Udp [{0}:{1}] - The same address is already connected.",
+                                        hostname_or_ip, port));
                 return;
             }
 
@@ -1353,7 +1361,7 @@ namespace Fun
                 lock (sending_lock_)
                 {
                     int nSent = sock_.EndSend(ar);
-                    DebugUtils.Log("Sent " + nSent + "bytes");
+                    DebugUtils.Log(String.Format("Sent {0}bytes", nSent));
 
                     DebugUtils.Assert(sending_.Count >= 2);
 
@@ -1410,7 +1418,8 @@ namespace Fun
                     if (nRead > 0)
                     {
                         received_size_ += nRead;
-                        DebugUtils.Log("Received " + nRead + " bytes. Buffer has " + (received_size_ - next_decoding_offset_) + " bytes.");
+                        DebugUtils.Log(String.Format("Received {0} bytes. Buffer has {1} bytes.",
+                                                     nRead, received_size_ - next_decoding_offset_));
                     }
 
                     // Decoding a message
@@ -1436,23 +1445,26 @@ namespace Fun
                         next_decoding_offset_ = 0;
 
                         // Starts another async receive
-                        sock_.BeginReceiveFrom(receive_buffer_, received_size_, receive_buffer_.Length - received_size_, SocketFlags.None,
-                                               ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+                        sock_.BeginReceiveFrom(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
+                                               SocketFlags.None, ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+                        DebugUtils.Log(String.Format("Ready to receive more. We can receive upto {0} more bytes", receive_buffer_.Length));
 
-                        DebugUtils.Log("Ready to receive more. We can receive upto " + receive_buffer_.Length + " more bytes");
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
                     else
                     {
-                        DebugUtils.Log("Socket closed");
+                        Debug.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has " + (receive_buffer_.Length - received_size_) + " bytes. But they failed to decode. Discarding.");
+                            Debug.Log(String.Format("Buffer has {0} bytes. But they failed to decode. Discarding.",
+                                                    receive_buffer_.Length - received_size_));
                         }
+
                         last_error_code_ = ErrorCode.kReceiveFailed;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
+
                         AddToEventQueue(OnFailure);
                     }
                 }
@@ -1560,18 +1572,17 @@ namespace Fun
             host_port_ = port;
 
             // Url
-            host_url_ = https ? "https://" : "http://";
-            host_url_ += hostname_or_ip + ":" + port;
-
-            // Version
-            host_url_ += "/v" + FunapiVersion.kProtocolVersion + "/";
+            host_url_ = String.Format("{0}://{1}:{2}/v{3}/",
+                                      (https ? "https" : "http"), hostname_or_ip, port,
+                                      FunapiVersion.kProtocolVersion);
         }
 
         internal void Redirect(string hostname_or_ip, UInt16 port, bool https = false)
         {
             if (host_addr_ == hostname_or_ip && host_port_ == port)
             {
-                Debug.Log("Redirect Http [" + hostname_or_ip + ":" + port + "] - The same address is already connected.");
+                Debug.Log(String.Format("Redirect Http [{0}:{1}] - The same address is already connected.",
+                                        hostname_or_ip, port));
                 return;
             }
 
@@ -1598,7 +1609,7 @@ namespace Fun
                 lock (sending_lock_)
                 {
                     DebugUtils.Assert(sending_.Count >= 2);
-                    DebugUtils.Log("Host Url: " + host_url_);
+                    DebugUtils.Log(String.Format("Host Url: {0}", host_url_));
 
                     FunapiMessage header = sending_[0];
                     FunapiMessage body = sending_[1];
@@ -1653,7 +1664,7 @@ namespace Fun
                 Stream stream = request.EndGetRequestStream(ar);
                 stream.Write(ws.sending.Array, 0, ws.sending.Count);
                 stream.Close();
-                DebugUtils.Log("Sent " + ws.sending.Count + "bytes");
+                DebugUtils.Log(String.Format("Sent {0}bytes.", ws.sending.Count));
 
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), ws);
             }
@@ -1692,7 +1703,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugUtils.Log("Failed response. status:" + response.StatusDescription);
+                    Debug.Log("Failed response. status:" + response.StatusDescription);
                     DebugUtils.Assert(false);
                     AddToEventQueue(OnFailure);
                 }
@@ -1734,7 +1745,7 @@ namespace Fun
                 {
                     if (ws.response == null)
                     {
-                        DebugUtils.LogWarning("Response instance is null.");
+                        Debug.LogWarning("Response instance is null.");
                         DebugUtils.Assert(false);
                         AddToEventQueue(OnFailure);
                         return;
@@ -1808,7 +1819,7 @@ namespace Fun
 
         internal override void OnFailure ()
         {
-            Debug.Log("OnFailure(" + protocol + ") - state: " + state);
+            Debug.Log(String.Format("OnFailure({0}) - state: {1}", protocol, state));
             if (state == State.kUnknown || cur_request_ == null)
             {
                 OnFailureCallback();
