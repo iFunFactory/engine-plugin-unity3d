@@ -1159,8 +1159,8 @@ namespace Fun
                     Debug.LogWarning(String.Format("Received wrong sequence number {0}. {1} expected.",
                                                    seq, seq_recvd_ + 1));
 
-                    DebugUtils.Assert(false);
                     Stop();
+                    DebugUtils.Assert(false);
                     return false;
                 }
             }

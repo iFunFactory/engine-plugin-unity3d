@@ -1704,7 +1704,6 @@ namespace Fun
                 else
                 {
                     Debug.Log("Failed response. status:" + response.StatusDescription);
-                    DebugUtils.Assert(false);
                     AddToEventQueue(OnFailure);
                 }
             }
@@ -1746,7 +1745,6 @@ namespace Fun
                     if (ws.response == null)
                     {
                         Debug.LogWarning("Response instance is null.");
-                        DebugUtils.Assert(false);
                         AddToEventQueue(OnFailure);
                         return;
                     }
