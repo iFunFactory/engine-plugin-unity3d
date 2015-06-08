@@ -26,9 +26,7 @@ public class FunapiNetworkTester : MonoBehaviour
 {
     public void Start()
     {
-        announcement_url_ = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
-        announcement_.Init(announcement_url_);
-        announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+        //FunapiConfig.Load("Config.json");
     }
 
     public void Update()
@@ -80,10 +78,26 @@ public class FunapiNetworkTester : MonoBehaviour
         //----------------------------------------------------------------------------
         // Announcements test
         //----------------------------------------------------------------------------
-        GUI.enabled = announcement_ != null;
-        GUI.Label(new Rect(30, 320, 300, 20), "server : " + announcement_url_);
+        GUI.enabled = true;
         if (GUI.Button(new Rect(30, 340, 240, 40), "Update Announcements"))
         {
+            if (announcement_ == null)
+            {
+                announcement_ = new FunapiAnnouncement();
+                announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+
+                string url = "";
+                if (FunapiConfig.IsValid)
+                    url = FunapiConfig.GetAnnouncementUrl();
+                else
+                    url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
+
+                if (url.Length <= 0)
+                    return;
+
+                announcement_.Init(url);
+            }
+
             announcement_.UpdateList();
         }
 
@@ -94,8 +108,18 @@ public class FunapiNetworkTester : MonoBehaviour
         GUI.Label(new Rect(30, 390, 300, 20), String.Format("server : {0}:{1}", kDownloadServerIp, kDownloadServerPort));
         if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
         {
-            downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
-            downloader_.StartDownload(string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort));
+            if (FunapiConfig.IsValid)
+            {
+                downloader_ = FunapiConfig.CreateDownloader(FunapiUtils.GetLocalDataPath);
+                downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
+                downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
+            }
+            else
+            {
+                downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
+                downloader_.StartDownload(string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort));
+            }
+
             Debug.Log("Start downloading..");
         }
 
@@ -107,10 +131,18 @@ public class FunapiNetworkTester : MonoBehaviour
         string multicast_title = "Multicast (Protobuf) connect";
         if (GUI.Button(new Rect(280, 60, 240, 40), multicast_title))
         {
-            if (multicast_ == null)
-                multicast_ = new FunapiMulticastClient(FunEncoding.kProtobuf);
+            if (FunapiConfig.IsValid)
+            {
+                multicast_ = FunapiConfig.CreateMulticasting(FunEncoding.kProtobuf, with_session_reliability_);
+            }
+            else
+            {
+                if (multicast_ == null)
+                    multicast_ = new FunapiMulticastClient(FunEncoding.kProtobuf);
 
-            multicast_.Connect(kMulticastServerIp, kMulticastPbufPort);
+                multicast_.Connect(kMulticastServerIp, kMulticastPbufPort, with_session_reliability_);
+            }
+
             Debug.Log("Connecting to the multicast server..");
         }
 
@@ -127,7 +159,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 160, 240, 40), multicast_title))
         {
             PbufHelloMessage hello_msg = new PbufHelloMessage();
-            hello_msg.message = "multicast test";
+            hello_msg.message = "multicast test message";
 
             FunMulticastMessage mcast_msg = new FunMulticastMessage();
             mcast_msg.channel = kMulticastTestChannel;
@@ -155,7 +187,7 @@ public class FunapiNetworkTester : MonoBehaviour
             if (chat_ == null)
                 chat_ = new FunapiChatClient();
 
-            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunEncoding.kProtobuf);
+            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunEncoding.kProtobuf, with_session_reliability_);
             Debug.Log("Connecting to the chat server..");
         }
 
@@ -191,24 +223,31 @@ public class FunapiNetworkTester : MonoBehaviour
         FunapiTransport transport = null;
         FunEncoding encoding = with_protobuf_ ? FunEncoding.kProtobuf : FunEncoding.kJson;
 
-        if (protocol == TransportProtocol.kTcp)
+        if (FunapiConfig.IsValid)
         {
-            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
-            //transport.DisableNagle = true;
+            transport = FunapiConfig.CreateTransport(protocol, encoding);
         }
-        else if (protocol == TransportProtocol.kUdp)
+        else
         {
-            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), encoding);
+            if (protocol == TransportProtocol.kTcp)
+            {
+                transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
+                //transport.DisableNagle = true;
+            }
+            else if (protocol == TransportProtocol.kUdp)
+            {
+                transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), encoding);
 
-            // Please set the same encryption type as the encryption type of server.
-            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-        }
-        else if (protocol == TransportProtocol.kHttp)
-        {
-            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
+                // Please set the same encryption type as the encryption type of server.
+                //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            }
+            else if (protocol == TransportProtocol.kHttp)
+            {
+                transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
 
-            // Please set the same encryption type as the encryption type of server.
-            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+                // Please set the same encryption type as the encryption type of server.
+                //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+            }
         }
 
         if (transport != null)
@@ -236,7 +275,6 @@ public class FunapiNetworkTester : MonoBehaviour
         if (network_ == null || !network_.SessionReliability)
         {
             network_ = new FunapiNetwork(with_session_reliability_);
-
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
             network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
@@ -299,17 +337,6 @@ public class FunapiNetworkTester : MonoBehaviour
         else
         {
             Debug.Log("Seems network succeeded to make a connection to a server.");
-        }
-    }
-
-    private void CheckDownloadConnection ()
-    {
-        if (downloader_ != null && !downloader_.Connected)
-        {
-            Debug.Log("Maybe the server is down? Stopping Download.");
-
-            downloader_.Stop();
-            downloader_ = null;
         }
     }
 
@@ -469,17 +496,21 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         DebugUtils.Assert (body is FunMulticastMessage);
         FunMulticastMessage mcast_msg = body as FunMulticastMessage;
-        DebugUtils.Assert (mcast_msg.channel == kMulticastTestChannel);
-        PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, 8);
-        DebugUtils.Assert (hello_msg.message != "");
-        Debug.Log("Received a multicast message from a channel " + channel_id);
+        DebugUtils.Assert (channel_id == mcast_msg.channel);
+        PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, (int)MulticastMessageType.pbuf_hello);
+        if (hello_msg == null)
+            return;
+
+        Debug.Log(String.Format("Received a multicast message from a channel '{0}'\nMessage: {1}",
+                                channel_id, hello_msg.message));
     }
 
     private void OnChatChannelReceived(string chat_channel, string sender, string text)
     {
-        Debug.Log(String.Format("Received a chat channel message. Channel={0}, sender={1}, text={2}",
-                       chat_channel, sender, text));
+        Debug.Log(String.Format("Received a chat channel message.\nChannel={0}, sender={1}, text={2}",
+                                chat_channel, sender, text));
     }
+
 
     // Please change this address for test.
     private const string kServerIp = "127.0.0.1";
@@ -496,10 +527,9 @@ public class FunapiNetworkTester : MonoBehaviour
     // member variables.
     private FunapiNetwork network_ = null;
     private FunapiHttpDownloader downloader_ = null;
-    private FunapiAnnouncement announcement_ = new FunapiAnnouncement();
+    private FunapiAnnouncement announcement_ = null;
     private FunapiMulticastClient multicast_ = null;
     private FunapiChatClient chat_ = null;
     private bool with_protobuf_ = false;
     private bool with_session_reliability_ = false;
-    private string announcement_url_ = "";
 }

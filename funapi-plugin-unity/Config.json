@@ -1,0 +1,22 @@
+{
+  "tcp_server_ip": "",
+  "tcp_server_port": 0,
+  "disable_nagle": false,
+
+  "udp_server_ip": "",
+  "udp_server_port": 0,
+
+  "http_server_ip": "",
+  "http_server_port": 0,
+  "http_with_secure": false,
+
+  "multicast_server_ip": "",
+  "multicast_server_port": 0,
+
+  "download_server_ip": "",
+  "download_server_port": 0,
+
+  "announcement_server_ip": "",
+  "announcement_server_port": 0,
+  "announcement_with_secure": false
+}

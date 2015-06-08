@@ -30,14 +30,14 @@ namespace Fun
             get { return multicasting_ != null && multicasting_.Connected; }
         }
 
-        public void Connect(string hostname_or_ip, ushort port, FunEncoding encoding)
+        public void Connect(string hostname_or_ip, ushort port, FunEncoding encoding, bool session_reliability)
         {
             // TODO(dkmoon): currenlty only Protobuf is supported.
             DebugUtils.Assert(encoding == FunEncoding.kProtobuf);
 
             // Discards previous instance, if any, and creates a brand new instance.
             multicasting_ = new FunapiMulticastClient (encoding);
-            multicasting_.Connect(hostname_or_ip, port);
+            multicasting_.Connect(hostname_or_ip, port, session_reliability);
         }
 
         public bool JoinChannel(string chat_channel, string my_name, OnChannelMessage handler)
