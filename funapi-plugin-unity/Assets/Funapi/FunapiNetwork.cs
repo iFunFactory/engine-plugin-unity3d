@@ -26,10 +26,10 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 80;
+        public static readonly int kPluginVersion = 81;
     }
 
-    // Funapi message type
+    // Message encoding type
     public enum FunEncoding
     {
         kNone,
@@ -82,22 +82,22 @@ namespace Fun
     public class FunapiNetwork
     {
         #region public interface
-        public FunapiNetwork(bool session_reliability = false)
+        public FunapiNetwork (bool session_reliability = false)
         {
             state_ = State.kUnknown;
             recv_type_ = typeof(FunMessage);
-
             session_reliability_ = session_reliability;
-            InitSession();
 
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
+
+            InitSession();
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
-        public FunapiNetwork(FunapiTransport transport, bool session_reliability,
-                             SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
+        public FunapiNetwork (FunapiTransport transport, bool session_reliability,
+                              SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
             : this(session_reliability)
         {
             OnSessionInitiated += new SessionInitHandler(on_session_initiated);
@@ -735,25 +735,6 @@ namespace Fun
         #endregion
 
         #region internal implementation
-        private FunapiTransport FindOtherTransport (TransportProtocol protocol)
-        {
-            lock (transports_lock_)
-            {
-                if (protocol == TransportProtocol.kDefault || transports_.Count <= 0)
-                    return null;
-
-                foreach (FunapiTransport transport in transports_.Values)
-                {
-                    if (transport.protocol != protocol && transport.Started)
-                    {
-                        return transport;
-                    }
-                }
-            }
-
-            return null;
-        }
-
         private void InitSession()
         {
             session_id_ = "";
@@ -834,6 +815,25 @@ namespace Fun
             {
                 OnSessionClosed();
             }
+        }
+
+        private FunapiTransport FindOtherTransport (TransportProtocol protocol)
+        {
+            lock (transports_lock_)
+            {
+                if (protocol == TransportProtocol.kDefault || transports_.Count <= 0)
+                    return null;
+
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    if (transport.protocol != protocol && transport.Started)
+                    {
+                        return transport;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private void AddExpectedReply (FunapiMessage fun_msg, string reply_type,

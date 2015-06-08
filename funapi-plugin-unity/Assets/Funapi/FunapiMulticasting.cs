@@ -35,7 +35,7 @@ namespace Fun
             }
         }
 
-        public void Connect(string hostname_or_ip, ushort port)
+        public void Connect(string hostname_or_ip, ushort port, bool session_reliability)
         {
             bool need_to_start = false;
 
@@ -45,7 +45,7 @@ namespace Fun
             {
                 transport_ = new FunapiTcpTransport (hostname_or_ip, port, encoding_);
                 DebugUtils.Assert (transport_ != null);
-                network_ = new FunapiNetwork ();
+                network_ = new FunapiNetwork (session_reliability);
                 network_.AttachTransport (transport_);
                 network_.RegisterHandler(kMulticastMsgType, OnReceived);
                 need_to_start = true;

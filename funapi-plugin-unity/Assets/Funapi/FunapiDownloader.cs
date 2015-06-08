@@ -21,15 +21,12 @@ namespace Fun
     public class FunapiHttpDownloader
     {
         #region public interface
-        public FunapiHttpDownloader (string target_path, OnUpdate on_update, OnFinished on_finished)
+        public FunapiHttpDownloader (string target_path)
         {
             target_path_ = target_path;
             if (target_path_[target_path_.Length - 1] != '/')
                 target_path_ += "/";
             target_path_ += kRootPath + "/";
-
-            on_update_ = on_update;
-            on_finished_ = on_finished;
 
             // List file handler
             web_client_.DownloadDataCompleted += new DownloadDataCompletedEventHandler(DownloadDataCompleteCb);
@@ -40,6 +37,13 @@ namespace Fun
 
             // Check file list
             CheckLocalFiles();
+        }
+
+        public FunapiHttpDownloader (string target_path, UpdateEventHandler on_update, FinishEventHandler on_finished)
+            : this(target_path)
+        {
+            UpdateCallback = new UpdateEventHandler(on_update);
+            FinishedCallback = new FinishEventHandler(on_finished);
         }
 
         // Start downloading
@@ -90,8 +94,8 @@ namespace Fun
             {
                 web_client_.CancelAsync();
 
-                if (on_finished_ != null)
-                    on_finished_(DownloadResult.FAILED);
+                if (FinishedCallback != null)
+                    FinishedCallback(DownloadResult.FAILED);
             }
 
             url_list_.Clear();
@@ -256,8 +260,8 @@ namespace Fun
                     state_ = State.Completed;
                     Debug.Log("Download completed.");
 
-                    if (on_finished_ != null)
-                        on_finished_(DownloadResult.SUCCESS);
+                    if (FinishedCallback != null)
+                        FinishedCallback(DownloadResult.SUCCESS);
                 }
             }
             else
@@ -366,10 +370,10 @@ namespace Fun
         // Callback function for download progress.
         private void DownloadProgressChangedCb (object sender, DownloadProgressChangedEventArgs ar)
         {
-            if (cur_download_ == null || on_update_ == null)
+            if (cur_download_ == null || UpdateCallback == null)
                 return;
 
-            on_update_(cur_download_.path, ar.BytesReceived, ar.TotalBytesToReceive, ar.ProgressPercentage);
+            UpdateCallback(cur_download_.path, ar.BytesReceived, ar.TotalBytesToReceive, ar.ProgressPercentage);
         }
 
         // Callback function for downloaded file.
@@ -445,8 +449,11 @@ namespace Fun
             public string md5;      // file's hash
         }
 
-        public delegate void OnUpdate (string path, long bytes_received, long total_bytes, int percentage);
-        public delegate void OnFinished (DownloadResult code);
+        public delegate void UpdateEventHandler (string path, long bytes_received, long total_bytes, int percentage);
+        public delegate void FinishEventHandler (DownloadResult code);
+
+        public event UpdateEventHandler UpdateCallback;
+        public event FinishEventHandler FinishedCallback;
 
         // Save file-related constants.
         private readonly string kRootPath = "client_data";
@@ -462,8 +469,6 @@ namespace Fun
         private string host_url_ = "";
         private string target_path_ = "";
         private DownloadFile cur_download_ = null;
-        private OnUpdate on_update_ = null;
-        private OnFinished on_finished_ = null;
     }
 
     public enum DownloadResult
