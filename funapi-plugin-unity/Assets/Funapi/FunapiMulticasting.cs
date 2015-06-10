@@ -91,8 +91,7 @@ namespace Fun
             mcast_msg.channel = channel_id;
             mcast_msg.join = true;
 
-            FunMessage fun_msg = new FunMessage ();
-            Extensible.AppendValue (fun_msg, 8, mcast_msg);
+            FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
             network_.SendMessage (kMulticastMsgType, fun_msg);
 
             return true;
@@ -120,8 +119,7 @@ namespace Fun
             mcast_msg.channel = channel_id;
             mcast_msg.leave = true;
 
-            FunMessage fun_msg = new FunMessage ();
-            Extensible.AppendValue (fun_msg, 8, mcast_msg);
+            FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
             network_.SendMessage (kMulticastMsgType, fun_msg);
 
             return true;
@@ -164,8 +162,7 @@ namespace Fun
                 }
             }
 
-            FunMessage fun_msg = new FunMessage ();
-            Extensible.AppendValue (fun_msg, 8, mcast_msg);
+            FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
             network_.SendMessage (kMulticastMsgType, fun_msg);
             return true;
         }
@@ -198,7 +195,10 @@ namespace Fun
             DebugUtils.Assert (msg_type == kMulticastMsgType);
             FunMessage msg = body as FunMessage;
             DebugUtils.Assert (msg != null);
-            FunMulticastMessage mcast_msg = Extensible.GetValue<FunMulticastMessage> (msg, 8);
+            object obj = network_.GetMessage(msg, MessageType.multicast);
+            DebugUtils.Assert (obj != null);
+
+            FunMulticastMessage mcast_msg = obj as FunMulticastMessage;
             string channel_id = mcast_msg.channel;
 
             lock (lock_)
