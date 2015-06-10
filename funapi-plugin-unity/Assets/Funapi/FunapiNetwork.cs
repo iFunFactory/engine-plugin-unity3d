@@ -18,6 +18,7 @@ using UnityEngine;
 
 // Protobuf
 using funapi.network.fun_message;
+using funapi.service.multicast_message;
 
 
 namespace Fun
@@ -522,26 +523,26 @@ namespace Fun
         }
 
         [System.Obsolete("This will be deprecated in September 2015. Use 'CreateFunMessage(object, MessageType)' instead.")]
-        public FunMessage CreateFunMessage(object msg, int msg_index)
+        public FunMessage CreateFunMessage (object msg, int msg_index)
         {
             FunMessage _msg = new FunMessage();
-            Extensible.AppendValue(serializer_, _msg, msg_index, ProtoBuf.DataFormat.Default, msg);
+            Extensible.AppendValue(serializer_, _msg, msg_index, DataFormat.Default, msg);
             return _msg;
         }
 
-        public FunMessage CreateFunMessage(object msg, MessageType msg_type)
+        public FunMessage CreateFunMessage (object msg, MessageType msg_type)
         {
             FunMessage _msg = new FunMessage();
-            Extensible.AppendValue(serializer_, _msg, (int)msg_type, ProtoBuf.DataFormat.Default, msg);
+            Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
             return _msg;
         }
 
         [System.Obsolete("This will be deprecated in September 2015. Use 'GetMessage(FunMessage, MessageType)' instead.")]
-        public object GetMessage(FunMessage msg, Type msg_type, int msg_index)
+        public object GetMessage (FunMessage msg, Type msg_type, int msg_index)
         {
             object _msg = null;
             bool success = Extensible.TryGetValue(serializer_, msg_type, msg,
-                                                  msg_index, ProtoBuf.DataFormat.Default, true, out _msg);
+                                                  msg_index, DataFormat.Default, true, out _msg);
             if (!success)
             {
                 Debug.Log(String.Format("Failed to decode {0} {1}", msg_type, msg_index));
@@ -551,17 +552,17 @@ namespace Fun
             return _msg;
         }
 
-        public object GetMessage(FunMessage msg, MessageType msg_type)
+        public object GetMessage (FunMessage msg, MessageType msg_type)
         {
             object _msg = null;
-            bool success = Extensible.TryGetValue(
-                    serializer_, MessageTable.GetType(msg_type), msg, (int)msg_type,
-                    ProtoBuf.DataFormat.Default, true, out _msg);
+            bool success = Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
+                                                  (int)msg_type, DataFormat.Default, true, out _msg);
             if (!success)
             {
                 Debug.Log(String.Format("Failed to decode {0} {1}", MessageTable.GetType(msg_type), (int)msg_type));
                 return null;
             }
+
             return _msg;
         }
 

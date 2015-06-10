@@ -19,7 +19,6 @@ using funapi.management.maintenance_message;
 using funapi.service.multicast_message;
 // Protobuf (user defined)
 using test_messages;
-using test_multicast;
 
 
 public class FunapiNetworkTester : MonoBehaviour
@@ -519,7 +518,7 @@ public class FunapiNetworkTester : MonoBehaviour
     private const string kDownloadServerIp = "127.0.0.1";
     private const UInt16 kDownloadServerPort = 8020;
     private const string kMulticastServerIp = "127.0.0.1";
-    private const UInt16 kMulticastPbufPort = 8012;
+    private const UInt16 kMulticastPbufPort = 8022;
     private const string kMulticastTestChannel = "test_channel";
     private const string kChatTestChannel = "chat_channel";
     private const string kChatUserName = "my_name";
