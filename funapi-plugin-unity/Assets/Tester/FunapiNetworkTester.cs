@@ -23,12 +23,12 @@ using test_messages;
 
 public class FunapiNetworkTester : MonoBehaviour
 {
-    public void Start()
+    void Start()
     {
         //FunapiConfig.Load("Config.json");
     }
 
-    public void Update()
+    void Update()
     {
         if (network_ != null)
             network_.Update();
@@ -38,6 +38,18 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (chat_ != null)
             chat_.Update ();
+    }
+
+    void OnApplicationQuit()
+    {
+        if (network_ != null)
+            network_.Stop();
+
+        if (multicast_ != null)
+            multicast_.Close();
+
+        if (chat_ != null)
+            chat_.Close();
     }
 
     public void OnGUI()

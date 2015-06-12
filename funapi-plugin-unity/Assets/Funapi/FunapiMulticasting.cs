@@ -57,6 +57,12 @@ namespace Fun
             }
         }
 
+        public void Close()
+        {
+            if (network_ != null)
+                network_.Stop();
+        }
+
         public bool Connected
         {
             get { return network_ != null && network_.Connected; }
