@@ -5,6 +5,9 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 06/12/2015 (ver.78)
+- Multicasting, Chat 관련 Close 함수 추가
+
 ### 06/04/2015 (ver.77)
 - Transport 생성할 때 Encoding 타입을 지정하도록 변경. Transport 별로 Encoding 타입을 다르게 지정해서 사용 가능 (FunapiNetwork 생성자에서 지정하던 기능은 삭제 예정)
 - Transport를 새로 만들지 않고 다른 서버로 재접속하는 기능 추가 (기존 세션을 유지하고 다른 서버로 접속하는 기능은 해당 기능이 서버 릴리즈에 추가된 이후부터 사용하실 수 있습니다)

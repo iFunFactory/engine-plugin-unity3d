@@ -24,14 +24,14 @@ using test_multicast;
 
 public class FunapiNetworkTester : MonoBehaviour
 {
-    public void Start()
+    void Start()
     {
         announcement_url_ = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
         announcement_.Init(announcement_url_);
         announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
     }
 
-    public void Update()
+    void Update()
     {
         if (network_ != null)
             network_.Update();
@@ -41,6 +41,18 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (chat_ != null)
             chat_.Update ();
+    }
+
+    void OnApplicationQuit()
+    {
+        if (network_ != null)
+            network_.Stop();
+
+        if (multicast_ != null)
+            multicast_.Close();
+
+        if (chat_ != null)
+            chat_.Close();
     }
 
     public void OnGUI()

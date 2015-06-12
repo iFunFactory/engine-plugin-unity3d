@@ -40,6 +40,12 @@ namespace Fun
 			multicasting_.Connect(hostname_or_ip, port);
 		}
 
+        public void Close()
+        {
+            if (multicasting_ != null)
+                multicasting_.Close();
+        }
+
 		public bool JoinChannel(string chat_channel, string my_name, OnChannelMessage handler)
 		{
 			if (multicasting_ == null || !multicasting_.Connected)
@@ -67,7 +73,6 @@ namespace Fun
 			}
 			return true;
 		}
-
 
 		public bool LeaveChannel(string chat_channel)
 		{
@@ -164,5 +169,4 @@ namespace Fun
 		private object lock_ = new object();
 		#endregion
 	}
-
 }
