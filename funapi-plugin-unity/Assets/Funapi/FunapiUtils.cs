@@ -16,6 +16,7 @@ namespace Fun
     // Utility class
     public class FunapiUtils
     {
+        // Gets local path
         public static string GetLocalDataPath
         {
             get
@@ -47,6 +48,7 @@ namespace Fun
     }
 
 
+    // Config file handler
     public class FunapiConfig
     {
         public static bool IsValid
@@ -151,7 +153,7 @@ namespace Fun
             string str_port = "multicast_server_port";
             if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
             {
-                Debug.Log("CreateMulticasting - Can't find values for multicasting");
+                Debug.Log("CreateMulticasting - Can't find values for multicasting.");
                 return null;
             }
 
@@ -182,7 +184,7 @@ namespace Fun
             string str_port = "download_server_port";
             if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
             {
-                Debug.Log("CreateDownloader - Can't find values for downloader");
+                Debug.Log("CreateDownloader - Can't find values for downloader.");
                 return null;
             }
 
@@ -201,40 +203,222 @@ namespace Fun
             return downloader;
         }
 
-        public static string GetAnnouncementUrl ()
+        public static string AnnouncementUrl
         {
-            if (data_ == null)
+            get
             {
-                Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
-                return null;
-            }
+                if (announcement_url_ == null)
+                {
+                    if (data_ == null)
+                    {
+                        Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                        return "";
+                    }
 
-            string str_ip = "announcement_server_ip";
-            string str_port = "announcement_server_port";
-            if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
+                    string str_ip = "announcement_server_ip";
+                    string str_port = "announcement_server_port";
+                    if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
+                    {
+                        Debug.Log("AnnouncementUrl - Can't find values for announcement.");
+                        return "";
+                    }
+
+                    string hostname_or_ip = data_[str_ip] as string;
+                    UInt16 port = Convert.ToUInt16(data_[str_port]);
+                    if (hostname_or_ip.Length <= 0 || port == 0)
+                    {
+                        Debug.Log(String.Format("CreateDownloader - Invalid value. ip:{0} port:{1}",
+                                                hostname_or_ip, port));
+                        return "";
+                    }
+
+                    bool with_https = false;
+                    if (data_.ContainsKey("announcement_with_secure"))
+                        with_https = (bool)data_["announcement_with_secure"];
+
+                    announcement_url_ = string.Format("{0}://{1}:{2}", with_https ? "https" : "http", hostname_or_ip, port);
+                    Debug.Log("Announcement url : " + announcement_url_);
+                }
+
+                return announcement_url_;
+            }
+        }
+
+        public static int PingInterval
+        {
+            get
             {
-                Debug.Log("CreateDownloader - Can't find values for announcement");
-                return null;
+                if (ping_interval_ < 0)
+                {
+                    if (data_ == null)
+                    {
+                        Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                        ping_interval_ = 0;
+                        return 0;
+                    }
+
+                    string str_interval = "ping_interval_second";
+                    if (!data_.ContainsKey(str_interval))
+                    {
+                        Debug.Log("GetPingInterval - Can't find a interval value of ping.");
+                        ping_interval_ = 0;
+                        return 0;
+                    }
+
+                    ping_interval_ = Convert.ToInt32(data_[str_interval]);
+                }
+
+                return ping_interval_;
             }
-
-            string hostname_or_ip = data_[str_ip] as string;
-            UInt16 port = Convert.ToUInt16(data_[str_port]);
-            if (hostname_or_ip.Length <= 0 || port == 0)
-            {
-                Debug.Log(String.Format("CreateDownloader - Invalid value. ip:{0} port:{1}",
-                                        hostname_or_ip, port));
-                return null;
-            }
-
-            bool with_https = false;
-            if (data_.ContainsKey("announcement_with_secure"))
-                with_https = (bool)data_["announcement_with_secure"];
-
-            return string.Format("{0}://{1}:{2}", with_https ? "https" : "http", hostname_or_ip, port);
         }
 
 
         // static member variables
         private static Dictionary<string, object> data_ = null;
+        private static string announcement_url_ = null;
+        private static int ping_interval_ = -1;
+    }
+
+
+    // Timer
+    public class FunapiTimer
+    {
+        public void AddTimer (string name, float delay, bool loop, EventHandler callback, object param = null)
+        {
+            AddTimer(name, 0f, delay, loop, callback, param);
+        }
+
+        public void AddTimer (string name, float start, float delay, bool loop, EventHandler callback, object param = null)
+        {
+            if (callback == null)
+            {
+                Debug.LogWarning(string.Format("AddTimer - '{0}' timer's callback is null.", name));
+                return;
+            }
+
+            if (timer_list_.ContainsKey(name) || pending_list_.ContainsKey(name))
+            {
+                Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
+                return;
+            }
+
+            pending_list_.Add(name, new Event(name, start, delay, loop, callback, param));
+            Debug.Log(string.Format("AddTimer - '{0}' timer added.", name));
+        }
+
+        public void KillTimer (string name)
+        {
+            if (!timer_list_.ContainsKey(name) && !pending_list_.ContainsKey(name))
+                return;
+
+            remove_list_.Add(name);
+            Debug.Log(string.Format("KillTimer - '{0}' timer removed.", name));
+        }
+
+        public bool ContainTimer (string name)
+        {
+            return timer_list_.ContainsKey(name);
+        }
+
+        public void Clear ()
+        {
+            is_all_clear_ = true;
+        }
+
+        public void Update ()
+        {
+            if (is_all_clear_)
+            {
+                timer_list_.Clear();
+                pending_list_.Clear();
+                remove_list_.Clear();
+                is_all_clear_ = false;
+                return;
+            }
+
+            CheckRemoveList();
+
+            // Adds timer
+            if (pending_list_.Count > 0)
+            {
+                foreach (Event e in pending_list_.Values)
+                {
+                    timer_list_.Add(e.name, e);
+                }
+
+                pending_list_.Clear();
+            }
+
+            if (timer_list_.Count <= 0)
+                return;
+
+            // Updates timer
+            float delta = Time.deltaTime;
+            foreach (Event e in timer_list_.Values)
+            {
+                e.remaining -= delta;
+                if (e.remaining <= 0f)
+                {
+                    e.callback(e.param);
+
+                    if (e.loop)
+                        e.remaining = e.interval;
+                    else
+                        remove_list_.Add(e.name);
+                }
+            }
+
+            CheckRemoveList();
+        }
+
+        // Removes timer
+        private void CheckRemoveList ()
+        {
+            if (remove_list_.Count <= 0)
+                return;
+
+            foreach (string name in remove_list_)
+            {
+                if (timer_list_.ContainsKey(name))
+                {
+                    timer_list_.Remove(name);
+                }
+                else if (pending_list_.ContainsKey(name))
+                {
+                    pending_list_.Remove(name);
+                }
+            }
+
+            remove_list_.Clear();
+        }
+
+
+        public delegate void EventHandler (object param);
+
+        class Event
+        {
+            public string name;
+            public bool loop;
+            public float remaining;
+            public float interval;
+            public EventHandler callback;
+            public object param;
+
+            public Event (string name, float start, float delay, bool loop, EventHandler callback, object param)
+            {
+                this.name = name;
+                this.loop = loop;
+                this.interval = delay;
+                this.remaining = start;
+                this.callback = callback;
+                this.param = param;
+            }
+        }
+
+
+        private Dictionary<string, Event> timer_list_ = new Dictionary<string, Event>();
+        private Dictionary<string, Event> pending_list_ = new Dictionary<string, Event>();
+        private List<string> remove_list_ = new List<string>();
+        private bool is_all_clear_ = false;
     }
 }

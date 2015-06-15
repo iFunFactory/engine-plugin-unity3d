@@ -18,6 +18,7 @@ using UnityEngine;
 
 // Protobuf
 using funapi.network.fun_message;
+using funapi.network.ping_message;
 using funapi.service.multicast_message;
 
 
@@ -27,7 +28,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 82;
+        public static readonly int kPluginVersion = 83;
     }
 
     // Message encoding type
@@ -83,7 +84,7 @@ namespace Fun
     public class FunapiNetwork
     {
         #region public interface
-        public FunapiNetwork (bool session_reliability = false)
+        public FunapiNetwork (bool session_reliability = false, bool enable_ping = false)
         {
             state_ = State.kUnknown;
             recv_type_ = typeof(FunMessage);
@@ -94,6 +95,10 @@ namespace Fun
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
 
             InitSession();
+
+            if (enable_ping) {
+                InitPing();
+            }
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
@@ -332,6 +337,12 @@ namespace Fun
                 }
             }
 
+            if (transport.protocol == TransportProtocol.kTcp)
+            {
+                if (timer_.ContainTimer(kPingTimerType))
+                    timer_.KillTimer(kPingTimerType);
+            }
+
             transport.Stop();
         }
 
@@ -407,6 +418,8 @@ namespace Fun
         // Your update method inheriting MonoBehaviour should explicitly invoke this method.
         public void Update()
         {
+            timer_.Update();
+
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
@@ -429,7 +442,7 @@ namespace Fun
             {
                 if (message_buffer_.Count > 0)
                 {
-                    Debug.Log(String.Format("Update messages. count: {0}", message_buffer_.Count));
+                    DebugUtils.Log(String.Format("Update messages. count: {0}", message_buffer_.Count));
 
                     foreach (KeyValuePair<TransportProtocol, ArraySegment<byte>> buffer in message_buffer_)
                     {
@@ -784,7 +797,7 @@ namespace Fun
                     if (transport.state == FunapiTransport.State.kWaitForSession ||
                         transport.state == FunapiTransport.State.kWaitForSessionResponse)
                     {
-                        transport.OnStarted();
+                        SetTransportStarted(transport, false);
                     }
                 }
             }
@@ -818,6 +831,37 @@ namespace Fun
             }
         }
 
+        private void InitPing()
+        {
+            ping_interval_ = 0;
+
+            if (FunapiConfig.IsValid)
+                ping_interval_ = FunapiConfig.PingInterval;
+
+            if (ping_interval_ <= 0)
+                ping_interval_ = kPingIntervalSecond;
+
+            Debug.Log("Ping interval second : " + ping_interval_);
+        }
+
+        private void OnPingTimerEvent (object param)
+        {
+            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+                return;
+
+            // Waiting up to 120 seconds
+            if (wait_ping_count_ >= (120 / ping_interval_))
+            {
+                Debug.LogWarning("Network seems disabled. Stopping the transport.");
+                OnTransportDisconnectedCallback(transport.protocol);
+                StopTransport(transport);
+                return;
+            }
+
+            SendPingMessage(transport);
+        }
+
         private FunapiTransport FindOtherTransport (TransportProtocol protocol)
         {
             lock (transports_lock_)
@@ -835,6 +879,25 @@ namespace Fun
             }
 
             return null;
+        }
+
+        private void SetTransportStarted (FunapiTransport transport, bool send_unsent = true)
+        {
+            if (transport == null)
+                return;
+
+            transport.OnStarted();
+
+            if (send_unsent && unsent_queue_.Count > 0)
+            {
+                SendUnsentMessages();
+            }
+
+            if (ping_interval_ > 0 && transport.IsStream)
+            {
+                timer_.AddTimer(kPingTimerType, ping_interval_, true, OnPingTimerEvent);
+                wait_ping_count_ = 0;
+            }
         }
 
         private void AddExpectedReply (FunapiMessage fun_msg, string reply_type,
@@ -898,12 +961,12 @@ namespace Fun
 
                     PrepareSession(session_id);
 
-                    if (protocol == TransportProtocol.kTcp && session_reliability_)
+                    if (session_reliability_ && protocol == TransportProtocol.kTcp)
                     {
                         if (transport.JsonHelper.HasField(json, kAckNumberField))
                         {
                             UInt32 ack = (UInt32)transport.JsonHelper.GetIntegerField(json, kAckNumberField);
-                            OnAckReceived(ack);
+                            OnAckReceived(transport, ack);
                             // Does not support piggybacking.
                             DebugUtils.Assert(!transport.JsonHelper.HasField(json, kMsgTypeBodyField));
                             return;
@@ -912,11 +975,29 @@ namespace Fun
                         if (transport.JsonHelper.HasField(json, kSeqNumberField))
                         {
                             UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(json, kSeqNumberField);
-                            if (!OnSeqReceived(seq))
+                            if (!OnSeqReceived(transport, seq))
                             {
                                 return;
                             }
                             transport.JsonHelper.RemoveStringField(json, kSeqNumberField);
+                        }
+                    }
+
+                    string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+                    msg_type = msg_type_node;
+                    transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
+
+                    if (msg_type != null)
+                    {
+                        if (msg_type == kServerPingMessageType)
+                        {
+                            OnServerPingMessage(transport, json);
+                            return;
+                        }
+                        else if (msg_type == kClientPingMessageType)
+                        {
+                            OnClientPingMessage(transport, json);
+                            return;
                         }
                     }
                 }
@@ -927,12 +1008,8 @@ namespace Fun
                     return;
                 }
 
-                if (transport.JsonHelper.HasField(json, kMsgTypeBodyField))
+                if (msg_type != null && msg_type.Length > 0)
                 {
-                    string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
-                    msg_type = msg_type_node;
-                    transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
-
                     DeleteExpectedReply(msg_type);
 
                     if (message_handlers_.ContainsKey(msg_type))
@@ -952,21 +1029,37 @@ namespace Fun
 
                     PrepareSession(session_id);
 
-                    if (protocol == TransportProtocol.kTcp && session_reliability_)
+                    if (session_reliability_ && protocol == TransportProtocol.kTcp)
                     {
                         if (message.ackSpecified)
                         {
-                            OnAckReceived(message.ack);
+                            OnAckReceived(transport, message.ack);
                             // Does not support piggybacking.
                             return;
                         }
 
                         if (message.seqSpecified)
                         {
-                            if (!OnSeqReceived(message.seq))
+                            if (!OnSeqReceived(transport, message.seq))
                             {
                                 return;
                             }
+                        }
+                    }
+
+                    msg_type = message.msgtype;
+
+                    if (msg_type != null)
+                    {
+                        if (msg_type == kServerPingMessageType)
+                        {
+                            OnServerPingMessage(transport, message);
+                            return;
+                        }
+                        else if (msg_type == kClientPingMessageType)
+                        {
+                            OnClientPingMessage(transport, message);
+                            return;
                         }
                     }
                 }
@@ -977,10 +1070,8 @@ namespace Fun
                     return;
                 }
 
-                if (message.msgtype != null && message.msgtype.Length > 0)
+                if (msg_type != null && msg_type.Length > 0)
                 {
-                    msg_type = message.msgtype;
-
                     DeleteExpectedReply(msg_type);
 
                     if (message_handlers_.ContainsKey(msg_type))
@@ -998,12 +1089,7 @@ namespace Fun
             {
                 if (session_id_.Length > 0 && transport.state == FunapiTransport.State.kWaitForAck)
                 {
-                    transport.OnStarted();
-
-                    if (unsent_queue_.Count > 0)
-                    {
-                        SendUnsentMessages();
-                    }
+                    SetTransportStarted(transport);
                 }
 
                 Debug.Log(String.Format("No handler for message '{0}'. Ignoring.", msg_type));
@@ -1084,19 +1170,20 @@ namespace Fun
             unsent_queue_.Clear();
         }
 
-        private bool SeqLess(UInt32 x, UInt32 y)
+        private bool SeqLess (UInt32 x, UInt32 y)
         {
             Int32 dist = (Int32)(x - y);
             return dist > 0;
         }
 
-        private void SendAck(UInt32 ack)
+        private void SendAck (FunapiTransport transport, UInt32 ack)
         {
             DebugUtils.Assert(session_reliability_);
-
-            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
             if (transport == null)
+            {
+                Debug.Log("SendAck - transport is null.");
                 return;
+            }
 
             Debug.Log(String.Format("{0} send ack message - ack:{1}", transport.protocol, ack));
 
@@ -1139,7 +1226,34 @@ namespace Fun
             }
         }
 
-        private bool OnSeqReceived(UInt32 seq)
+        private void SendPingMessage (FunapiTransport transport)
+        {
+            long timestamp = DateTime.Now.Ticks;
+
+            // Send response
+            if (transport.encoding == FunEncoding.kJson)
+            {
+                object msg = transport.JsonHelper.Deserialize("{}");
+                transport.JsonHelper.SetStringField(msg, kMsgTypeBodyField, kClientPingMessageType);
+                transport.JsonHelper.SetStringField(msg, kSessionIdBodyField, session_id_);
+                transport.JsonHelper.SetIntegerField(msg, kPingTimestampField, timestamp);
+                transport.SendMessage(new FunapiMessage(transport.protocol, kClientPingMessageType, msg));
+            }
+            else if (transport.encoding == FunEncoding.kProtobuf)
+            {
+                FunPingMessage ping = new FunPingMessage();
+                ping.timestamp = timestamp;
+                FunMessage msg = CreateFunMessage(ping, MessageType.cs_ping);
+                msg.msgtype = kClientPingMessageType;
+                msg.sid = session_id_;
+                transport.SendMessage(new FunapiMessage(transport.protocol, kClientPingMessageType, msg));
+            }
+
+            ++wait_ping_count_;
+            DebugUtils.Log(String.Format("Send ping - timestamp: {0}", timestamp));
+        }
+
+        private bool OnSeqReceived (FunapiTransport transport, UInt32 seq)
         {
             if (first_receiving_)
             {
@@ -1159,15 +1273,14 @@ namespace Fun
             }
 
             seq_recvd_ = seq;
-            SendAck(seq_recvd_ + 1);
+            SendAck(transport, seq_recvd_ + 1);
+
             return true;
         }
 
-        private void OnAckReceived(UInt32 ack)
+        private void OnAckReceived (FunapiTransport transport, UInt32 ack)
         {
             DebugUtils.Assert(session_reliability_);
-
-            FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
             if (transport == null)
             {
                 Debug.LogError("OnAckReceived - transport is null.");
@@ -1226,12 +1339,7 @@ namespace Fun
                     }
                 }
 
-                transport.OnStarted();
-
-                if (unsent_queue_.Count > 0)
-                {
-                    SendUnsentMessages();
-                }
+                SetTransportStarted(transport);
             }
         }
 
@@ -1258,16 +1366,11 @@ namespace Fun
                     if (session_reliability_ && protocol == TransportProtocol.kTcp && seq_recvd_ != 0)
                     {
                         transport.state = FunapiTransport.State.kWaitForAck;
-                        SendAck(seq_recvd_ + 1);
+                        SendAck(transport, seq_recvd_ + 1);
                     }
                     else
                     {
-                        transport.OnStarted();
-
-                        if (unsent_queue_.Count > 0)
-                        {
-                            SendUnsentMessages();
-                        }
+                        SetTransportStarted(transport);
                     }
                 }
                 else if (state_ == State.kStarted || state_ == State.kStopped)
@@ -1290,6 +1393,12 @@ namespace Fun
             FunapiTransport transport = GetTransport(protocol);
             DebugUtils.Assert(transport != null);
             Debug.Log(String.Format("{0} Transport Stopped.", protocol));
+
+            if (protocol == TransportProtocol.kTcp)
+            {
+                if (timer_.ContainTimer(kPingTimerType))
+                    timer_.KillTimer(kPingTimerType);
+            }
 
             lock (state_lock_)
             {
@@ -1317,12 +1426,20 @@ namespace Fun
             }
         }
 
-        private void OnStoppedAllTransportCallback()
+        private void OnStoppedAllTransportCallback ()
         {
             Debug.Log("All transports has stopped.");
 
             if (StoppedAllTransportCallback != null)
                 StoppedAllTransportCallback();
+        }
+
+        private void OnTransportDisconnectedCallback (TransportProtocol protocol)
+        {
+            Debug.Log(string.Format("'{0}' transport disconnected.", protocol));
+
+            if (TransportDisconnectedCallback != null)
+                TransportDisconnectedCallback(protocol);
         }
 
         private void OnTransportReceived (TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body)
@@ -1346,24 +1463,98 @@ namespace Fun
         #endregion
 
         #region Funapi system message handlers
-        private void OnNewSession(string msg_type, object body)
+        private void OnNewSession (string msg_type, object body)
         {
             // ignore.
         }
 
-        private void OnSessionTimedout(string msg_type, object body)
+        private void OnSessionTimedout (string msg_type, object body)
         {
             Debug.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
 
             CloseSession();
         }
 
-        private void OnMaintenanceMessage(string msg_type, object body)
+        private void OnMaintenanceMessage (string msg_type, object body)
         {
             if (MaintenanceCallback != null)
             {
                 MaintenanceCallback(msg_type, body);
             }
+        }
+
+        private void OnServerPingMessage (FunapiTransport transport, object body)
+        {
+            if (transport == null)
+            {
+                Debug.Log("OnServerPingMessage - transport is null.");
+                return;
+            }
+
+            // Send response
+            if (transport.encoding == FunEncoding.kJson)
+            {
+                transport.JsonHelper.SetStringField(body, kMsgTypeBodyField, kServerPingMessageType);
+
+                if (session_id_.Length > 0)
+                    transport.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+
+                transport.SendMessage(new FunapiMessage(transport.protocol,
+                                                        kServerPingMessageType,
+                                                        transport.JsonHelper.Clone(body)));
+            }
+            else if (transport.encoding == FunEncoding.kProtobuf)
+            {
+                FunMessage msg = body as FunMessage;
+                FunPingMessage obj = (FunPingMessage)GetMessage(msg, MessageType.cs_ping);
+                if (obj == null)
+                    return;
+
+                FunPingMessage ping = new FunPingMessage();
+                ping.timestamp = obj.timestamp;
+                if (obj.data.Length > 0) {
+                    ping.data = new byte[obj.data.Length];
+                    Buffer.BlockCopy(ping.data, 0, obj.data, 0, obj.data.Length);
+                }
+
+                FunMessage send_msg = CreateFunMessage(ping, MessageType.cs_ping);
+                send_msg.msgtype = msg.msgtype;
+                send_msg.sid = session_id_;
+
+                transport.SendMessage(new FunapiMessage(transport.protocol, kServerPingMessageType, send_msg));
+            }
+        }
+
+        private void OnClientPingMessage (FunapiTransport transport, object body)
+        {
+            if (transport == null)
+            {
+                Debug.Log("OnClientPingMessage - transport is null.");
+                return;
+            }
+
+            long timestamp = 0;
+
+            if (transport.encoding == FunEncoding.kJson)
+            {
+                if (transport.JsonHelper.HasField(body, kPingTimestampField))
+                {
+                    timestamp = (long)transport.JsonHelper.GetIntegerField(body, kPingTimestampField);
+                }
+            }
+            else if (transport.encoding == FunEncoding.kProtobuf)
+            {
+                FunMessage msg = body as FunMessage;
+                object obj = GetMessage(msg, MessageType.cs_ping);
+                if (obj == null)
+                    return;
+
+                FunPingMessage ping = obj as FunPingMessage;
+                timestamp = ping.timestamp;
+            }
+
+            --wait_ping_count_;
+            DebugUtils.Log(String.Format("Receive ping - timestamp: {0}", timestamp));
         }
         #endregion
 
@@ -1390,6 +1581,7 @@ namespace Fun
         public event SessionCloseHandler OnSessionClosed;
         public event MessageEventHandler MaintenanceCallback;
         public event NotifyHandler StoppedAllTransportCallback;
+        public event TransportEventHandler TransportDisconnectedCallback;
 
         // Funapi message-related constants.
         private static readonly float kFunapiSessionTimeout = 3600.0f;
@@ -1400,6 +1592,13 @@ namespace Fun
         private static readonly string kNewSessionMessageType = "_session_opened";
         private static readonly string kSessionClosedMessageType = "_session_closed";
         private static readonly string kMaintenanceMessageType = "_maintenance";
+
+        // Ping message-related constants.
+        private static readonly int kPingIntervalSecond = 10;
+        private static readonly string kPingTimerType = "ping";
+        private static readonly string kServerPingMessageType = "_ping_s";
+        private static readonly string kClientPingMessageType = "_ping_c";
+        private static readonly string kPingTimestampField = "timestamp";
 
         // Member variables.
         private State state_;
@@ -1417,6 +1616,11 @@ namespace Fun
         private object transports_lock_ = new object();
         private object expected_reply_lock = new object();
         private DateTime last_received_ = DateTime.Now;
+        private FunapiTimer timer_ = new FunapiTimer();
+
+        // Ping-releated member variables.
+        private int ping_interval_ = 0;
+        private int wait_ping_count_ = 0;
 
         // Reliability-releated member variables.
         private bool session_reliability_;
