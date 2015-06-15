@@ -17,6 +17,7 @@ using UnityEngine;
 using funapi.network.fun_message;
 using funapi.management.maintenance_message;
 using funapi.service.multicast_message;
+
 // Protobuf (user defined)
 using test_messages;
 
@@ -99,8 +100,9 @@ public class FunapiNetworkTester : MonoBehaviour
 
                 string url = "";
                 if (FunapiConfig.IsValid)
-                    url = FunapiConfig.GetAnnouncementUrl();
-                else
+                    url = FunapiConfig.AnnouncementUrl;
+
+                if (url.Length <= 0)
                     url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
 
                 if (url.Length <= 0)
@@ -125,7 +127,8 @@ public class FunapiNetworkTester : MonoBehaviour
                 downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
                 downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
             }
-            else
+
+            if (downloader_ == null)
             {
                 downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
                 downloader_.StartDownload(string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort));
@@ -146,7 +149,8 @@ public class FunapiNetworkTester : MonoBehaviour
             {
                 multicast_ = FunapiConfig.CreateMulticasting(FunEncoding.kProtobuf, with_session_reliability_);
             }
-            else
+
+            if (multicast_ == null)
             {
                 if (multicast_ == null)
                     multicast_ = new FunapiMulticastClient(FunEncoding.kProtobuf);
@@ -238,7 +242,8 @@ public class FunapiNetworkTester : MonoBehaviour
         {
             transport = FunapiConfig.CreateTransport(protocol, encoding);
         }
-        else
+
+        if (transport == null)
         {
             if (protocol == TransportProtocol.kTcp)
             {
@@ -285,11 +290,13 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (network_ == null || !network_.SessionReliability)
         {
-            network_ = new FunapiNetwork(with_session_reliability_);
+            bool enable_ping = true;
+            network_ = new FunapiNetwork(with_session_reliability_, enable_ping);
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
             network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
             network_.StoppedAllTransportCallback += new FunapiNetwork.NotifyHandler(OnStoppedAllTransport);
+            network_.TransportDisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
 
             network_.RegisterHandler("echo", this.OnEcho);
             network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
@@ -496,6 +503,11 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnStoppedAllTransport()
     {
         Debug.Log("OnStoppedAllTransport called.");
+    }
+
+    private void OnTransportDisconnected (TransportProtocol protocol)
+    {
+        Debug.Log("OnTransportDisconnected called.");
     }
 
     private void OnTransportFailure (TransportProtocol protocol)

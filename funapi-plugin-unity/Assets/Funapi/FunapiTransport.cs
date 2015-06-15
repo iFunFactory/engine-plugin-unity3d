@@ -551,7 +551,7 @@ namespace Fun
                 {
                     // End of header.
                     header_decoded_ = true;
-                    Debug.Log("End of header reached. Will decode body from now.");
+                    DebugUtils.Log("End of header reached. Will decode body from now.");
                     return true;
                 }
 
