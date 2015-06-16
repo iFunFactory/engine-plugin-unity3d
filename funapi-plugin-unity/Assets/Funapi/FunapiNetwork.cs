@@ -25,28 +25,10 @@ using funapi.service.multicast_message;
 namespace Fun
 {
     // Funapi version
-    public class FunapiVersion
+    internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 83;
-    }
-
-    // Message encoding type
-    public enum FunEncoding
-    {
-        kNone,
-        kJson,
-        kProtobuf
-    }
-
-    // Error code
-    public enum ErrorCode
-    {
-        kNone,
-        kConnectFailed,
-        kSendFailed,
-        kReceiveFailed,
-        kExceptionError
+        public static readonly int kPluginVersion = 84;
     }
 
     // Sending message-related class.
@@ -157,9 +139,11 @@ namespace Fun
                     return;
                 }
 
+                transport.Timer = timer_;
                 transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
                 transport.StartedInternalCallback += new TransportEventHandler(OnTransportStarted);
                 transport.StoppedCallback += new TransportEventHandler(OnTransportStopped);
+                transport.DisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
                 transport.ReceivedCallback += new TransportReceivedHandler(OnTransportReceived);
                 transport.MessageFailureCallback += new TransportMessageHandler(OnTransportFailure);
 
@@ -854,8 +838,7 @@ namespace Fun
             if (wait_ping_count_ >= (120 / ping_interval_))
             {
                 Debug.LogWarning("Network seems disabled. Stopping the transport.");
-                OnTransportDisconnectedCallback(transport.protocol);
-                StopTransport(transport);
+                OnTransportDisconnected(transport.protocol);
                 return;
             }
 
@@ -952,7 +935,7 @@ namespace Fun
                 {
                     string str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
                     json = transport.JsonHelper.Deserialize(str);
-                    Debug.Log("Parsed json: " + str);
+                    DebugUtils.Log("Parsed json: " + str);
 
                     DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
                     string session_id_node = transport.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
@@ -1345,10 +1328,7 @@ namespace Fun
 
         private void OnConnectTimeout (TransportProtocol protocol)
         {
-            if (protocol != TransportProtocol.kTcp || session_reliability_ == false)
-            {
-                StopTransport(protocol);
-            }
+            StopTransport(protocol);
         }
 
         private void OnTransportStarted (TransportProtocol protocol)
@@ -1426,20 +1406,22 @@ namespace Fun
             }
         }
 
+        private void OnTransportDisconnected (TransportProtocol protocol)
+        {
+            Debug.Log(string.Format("'{0}' transport disconnected.", protocol));
+
+            StopTransport(protocol);
+
+            if (TransportDisconnectedCallback != null)
+                TransportDisconnectedCallback(protocol);
+        }
+
         private void OnStoppedAllTransportCallback ()
         {
             Debug.Log("All transports has stopped.");
 
             if (StoppedAllTransportCallback != null)
                 StoppedAllTransportCallback();
-        }
-
-        private void OnTransportDisconnectedCallback (TransportProtocol protocol)
-        {
-            Debug.Log(string.Format("'{0}' transport disconnected.", protocol));
-
-            if (TransportDisconnectedCallback != null)
-                TransportDisconnectedCallback(protocol);
         }
 
         private void OnTransportReceived (TransportProtocol protocol, Dictionary<string, string> header, ArraySegment<byte> body)
