@@ -302,6 +302,11 @@ namespace Fun
             AddTimer(name, 0f, delay, loop, callback, param);
         }
 
+        public void AddTimer (string name, float start, EventHandler callback, object param = null)
+        {
+            AddTimer(name, start, 0f, false, callback, param);
+        }
+
         public void AddTimer (string name, float start, float delay, bool loop, EventHandler callback, object param = null)
         {
             if (callback == null)
@@ -323,6 +328,9 @@ namespace Fun
         public void KillTimer (string name)
         {
             if (!timer_list_.ContainsKey(name) && !pending_list_.ContainsKey(name))
+                return;
+
+            if (remove_list_.Contains(name))
                 return;
 
             remove_list_.Add(name);

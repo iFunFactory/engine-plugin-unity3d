@@ -272,9 +272,9 @@ public class FunapiNetworkTester : MonoBehaviour
             transport.StoppedCallback += new TransportEventHandler(OnTransportClosed);
             transport.FailureCallback += new TransportEventHandler(OnTransportFailure);
 
-            // Timeout method only works with Tcp protocol.
+            // Connect timeout.
             transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
-            transport.ConnectTimeout = 3f;
+            transport.ConnectTimeout = 5f;
 
             // If you prefer use specific Json implementation other than Dictionary,
             // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().

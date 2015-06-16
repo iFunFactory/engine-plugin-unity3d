@@ -27,6 +27,28 @@ namespace Fun
         kHttp
     };
 
+    // Message encoding type
+    public enum FunEncoding
+    {
+        kNone,
+        kJson,
+        kProtobuf
+    }
+
+    // Error code
+    public enum ErrorCode
+    {
+        kNone,
+        kConnectFailed,
+        kSendFailed,
+        kReceiveFailed,
+        kEncryptionFailed,
+        kInvalidEncryption,
+        kUnknownEncryption,
+        kDisconnected,
+        kExceptionError
+    }
+
 
     // Abstract class to represent Transport used by Funapi
     // There are 3 transport types at the moment (though this plugin implements only TCP one.)
@@ -38,6 +60,7 @@ namespace Fun
         {
             state = State.kUnknown;
             protocol = TransportProtocol.kDefault;
+            ConnectTimeout = 10f;
         }
 
         public TransportProtocol protocol
@@ -107,6 +130,9 @@ namespace Fun
         // Update
         internal virtual void Update() {}
 
+        // Timer
+        internal FunapiTimer Timer { get; set; }
+
         // Check unsent messages
         internal abstract bool HasUnsentMessages { get; }
 
@@ -144,6 +170,14 @@ namespace Fun
             }
         }
 
+        internal void OnDisconnected ()
+        {
+            if (DisconnectedCallback != null)
+            {
+                DisconnectedCallback(protocol);
+            }
+        }
+
         internal void OnStartedInternal ()
         {
             if (StartedInternalCallback != null)
@@ -174,8 +208,6 @@ namespace Fun
             {
                 MessageFailureCallback(protocol, fun_msg);
             }
-
-            OnFailureCallback();
         }
         #endregion
 
@@ -204,15 +236,19 @@ namespace Fun
         public event TransportEventHandler StoppedCallback;
         public event TransportEventHandler FailureCallback;
         internal event TransportEventHandler StartedInternalCallback;
+        internal event TransportEventHandler DisconnectedCallback;
         internal event TransportReceivedHandler ReceivedCallback;
         internal event TransportMessageHandler MessageFailureCallback;
 
         // member variables.
         internal string host_addr_ = "";
         internal UInt16 host_port_ = 0;
+        internal string timeout_timer_id_ = "";
+
         internal FunEncoding encoding_ = FunEncoding.kNone;
         internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         internal FunMessageSerializer serializer_ = null;
+
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
         internal string last_error_message_ = "";
     }
@@ -241,14 +277,20 @@ namespace Fun
                 last_error_code_ = ErrorCode.kNone;
                 last_error_message_ = "";
 
+                if (ConnectTimeout > 0f)
+                {
+                    timeout_timer_id_ = string.Format("{0}_connet_timeout", protocol);
+                    Timer.AddTimer(timeout_timer_id_, ConnectTimeout, OnCheckConnectTimeout);
+                }
+
                 Init();
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kConnectFailed;
                 last_error_message_ = "Failure in Start: " + e.ToString();
                 Debug.Log(last_error_message_);
-                AddToEventQueue(OnFailureAndStop);
+                AddToEventQueue(OnFailure);
             }
         }
 
@@ -261,6 +303,9 @@ namespace Fun
             state = State.kUnknown;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
+
+            if (Timer.ContainTimer(timeout_timer_id_))
+                Timer.KillTimer(timeout_timer_id_);
 
             AddToEventQueue(OnStopped);
         }
@@ -318,6 +363,7 @@ namespace Fun
                 delegate
                 {
                     OnMessageFailureCallback(fun_msg);
+                    OnFailureCallback();
                 }
             );
         }
@@ -387,7 +433,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendMessage: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddFailureCallback(fun_msg);
@@ -781,16 +827,24 @@ namespace Fun
             }
         }
 
+        internal void OnCheckConnectTimeout (object param)
+        {
+            if (state == State.kEstablished)
+                return;
+
+            Debug.Log(string.Format("{0} Connection waiting time has been exceeded.", protocol));
+            OnConnectionTimeout();
+        }
+
         internal virtual void OnFailure()
         {
             Debug.Log(String.Format("OnFailure({0}) - state: {1}", protocol, state));
             OnFailureCallback();
-        }
 
-        internal void OnFailureAndStop()
-        {
-            OnFailure();
-            Stop();
+            if (state != State.kEstablished)
+            {
+                Stop();
+            }
         }
 
         private static int BytePatternMatch (ArraySegment<byte> haystack, ArraySegment<byte> needle)
@@ -913,21 +967,6 @@ namespace Fun
         {
             get; set;
         }
-
-        internal override void Update ()
-        {
-            base.Update();
-
-            if (state == State.kConnecting && connect_timeout_ > 0f)
-            {
-                connect_timeout_ -= Time.deltaTime;
-                if (connect_timeout_ <= 0f)
-                {
-                    Debug.Log("Connection waiting time has been exceeded.");
-                    OnConnectionTimeout();
-                }
-            }
-        }
         #endregion
 
         #region internal implementation
@@ -935,7 +974,6 @@ namespace Fun
         internal override void Init()
         {
             state = State.kConnecting;
-            connect_timeout_ = ConnectTimeout;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             if (DisableNagle)
                 sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
@@ -1014,7 +1052,7 @@ namespace Fun
                     last_error_code_ = ErrorCode.kConnectFailed;
                     last_error_message_ = "Failed to connect.";
                     Debug.Log(last_error_message_);
-                    AddToEventQueue(OnFailureAndStop);
+                    AddToEventQueue(OnFailure);
                     return;
                 }
                 Debug.Log("Connected.");
@@ -1036,10 +1074,10 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kConnectFailed;
                 last_error_message_ = "Failure in StartCb: " + e.ToString();
                 Debug.Log(last_error_message_);
-                AddToEventQueue(OnFailureAndStop);
+                AddToEventQueue(OnFailure);
             }
         }
 
@@ -1111,7 +1149,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1186,10 +1224,10 @@ namespace Fun
                                                     receive_buffer_.Length - received_size_));
                         }
 
-                        last_error_code_ = ErrorCode.kReceiveFailed;
+                        last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
-                        AddToEventQueue(OnFailure);
+                        AddToEventQueue(OnDisconnected);
                     }
                 }
             }
@@ -1199,7 +1237,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1208,7 +1246,6 @@ namespace Fun
 
         internal Socket sock_;
         private IPEndPoint connect_ep_;
-        private float connect_timeout_ = 0f;
         #endregion
     }
 
@@ -1391,7 +1428,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1461,11 +1498,10 @@ namespace Fun
                                                     receive_buffer_.Length - received_size_));
                         }
 
-                        last_error_code_ = ErrorCode.kReceiveFailed;
+                        last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
-
-                        AddToEventQueue(OnFailure);
+                        AddToEventQueue(OnDisconnected);
                     }
                 }
             }
@@ -1475,7 +1511,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1645,7 +1681,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1670,7 +1706,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1709,7 +1745,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1808,7 +1844,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
@@ -1817,42 +1853,39 @@ namespace Fun
 
         internal override void OnFailure ()
         {
-            Debug.Log(String.Format("OnFailure({0}) - state: {1}", protocol, state));
-            if (state == State.kUnknown || cur_request_ == null)
+            if (cur_request_ != null)
             {
-                OnFailureCallback();
-                Stop();
-                return;
+                WebState ws = cur_request_;
+                cur_request_ = null;
+                response_time_ = -1f;
+
+                if (ws.request != null)
+                {
+                    ws.aborted = true;
+                    ws.request.Abort();
+                }
+
+                if (ws.stream != null)
+                    ws.stream.Close();
+
+                list_.Remove(ws);
+
+                lock (sending_lock_)
+                {
+                    DebugUtils.Assert(sending_.Count >= 2);
+
+                    OnMessageFailureCallback(sending_[1]);
+
+                    // Removes header and body segment
+                    sending_.RemoveAt(0);
+                    sending_.RemoveAt(0);
+
+                    // Sends next message
+                    SendUnsentMessages();
+                }
             }
 
-            WebState ws = cur_request_;
-
-            cur_request_ = null;
-            response_time_ = -1f;
-
-            if (ws.request != null)
-            {
-                ws.aborted = true;
-                ws.request.Abort();
-            }
-
-            if (ws.stream != null)
-                ws.stream.Close();
-
-            list_.Remove(ws);
-
-            lock (sending_lock_)
-            {
-                DebugUtils.Assert(sending_.Count >= 2);
-
-                OnMessageFailureCallback(sending_[1]);
-
-                // Removes header and body segment
-                sending_.RemoveAt(0);
-                sending_.RemoveAt(0);
-
-                SendUnsentMessages();
-            }
+            base.OnFailure();
         }
         #endregion
 
