@@ -248,6 +248,7 @@ public class FunapiNetworkTester : MonoBehaviour
             if (protocol == TransportProtocol.kTcp)
             {
                 transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
+                //transport.AutoReconnect = true;
                 //transport.DisableNagle = true;
             }
             else if (protocol == TransportProtocol.kUdp)

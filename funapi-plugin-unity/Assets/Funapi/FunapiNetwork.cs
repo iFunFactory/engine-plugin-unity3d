@@ -28,7 +28,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 84;
+        public static readonly int kPluginVersion = 85;
     }
 
     // Sending message-related class.
@@ -143,6 +143,8 @@ namespace Fun
                 }
 
                 transport.Timer = timer_;
+
+                // Callback functions
                 transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
                 transport.StartedInternalCallback += new TransportEventHandler(OnTransportStarted);
                 transport.StoppedCallback += new TransportEventHandler(OnTransportStopped);
@@ -312,15 +314,6 @@ namespace Fun
                         other.state = FunapiTransport.State.kWaitForSessionResponse;
                         SendEmptyMessage(other.protocol);
                     }
-                }
-            }
-
-            if (transport.protocol == default_protocol_)
-            {
-                FunapiTransport other = FindOtherTransport(transport.protocol);
-                if (other != null)
-                {
-                    SetDefaultProtocol(other.protocol);
                 }
             }
 
@@ -830,7 +823,7 @@ namespace Fun
             if (ping_interval_ <= 0)
                 ping_interval_ = kPingIntervalSecond;
 
-            Debug.Log("Ping interval second : " + ping_interval_);
+            Debug.Log(string.Format("Ping - interval seconds: {0}", ping_interval_));
         }
 
         private void OnPingTimerEvent (object param)
@@ -839,11 +832,10 @@ namespace Fun
             if (transport == null)
                 return;
 
-            // Waiting up to 120 seconds
-            if (wait_ping_count_ >= (120 / ping_interval_))
+            if (wait_ping_count_ > (kPingTimeoutSeconds / ping_interval_))
             {
                 Debug.LogWarning("Network seems disabled. Stopping the transport.");
-                OnTransportDisconnected(transport.protocol);
+                transport.OnDisconnected();
                 return;
             }
 
@@ -1377,6 +1369,15 @@ namespace Fun
             DebugUtils.Assert(transport != null);
             Debug.Log(String.Format("{0} Transport Stopped.", protocol));
 
+            if (protocol == default_protocol_)
+            {
+                FunapiTransport other = FindOtherTransport(protocol);
+                if (other != null)
+                {
+                    SetDefaultProtocol(other.protocol);
+                }
+            }
+
             if (protocol == TransportProtocol.kTcp)
             {
                 if (timer_.ContainTimer(kPingTimerType))
@@ -1412,8 +1413,6 @@ namespace Fun
         private void OnTransportDisconnected (TransportProtocol protocol)
         {
             Debug.Log(string.Format("'{0}' transport disconnected.", protocol));
-
-            StopTransport(protocol);
 
             if (TransportDisconnectedCallback != null)
                 TransportDisconnectedCallback(protocol);
@@ -1580,6 +1579,7 @@ namespace Fun
 
         // Ping message-related constants.
         private static readonly int kPingIntervalSecond = 10;
+        private static readonly float kPingTimeoutSeconds = 30f;
         private static readonly string kPingTimerType = "ping";
         private static readonly string kServerPingMessageType = "_ping_s";
         private static readonly string kClientPingMessageType = "_ping_c";

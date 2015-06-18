@@ -68,6 +68,11 @@ namespace Fun
             get; set;
         }
 
+        public string str_protocol
+        {
+            get; set;
+        }
+
         public FunEncoding encoding
         {
             get { return encoding_; }
@@ -89,6 +94,11 @@ namespace Fun
         }
 
         public float ConnectTimeout
+        {
+            get; set;
+        }
+
+        public bool AutoReconnect
         {
             get; set;
         }
@@ -144,6 +154,21 @@ namespace Fun
             get; set;
         }
 
+        internal void Reconnect ()
+        {
+            Debug.Log(string.Format("Wait {0} seconds for reconnect to {1} transport.",
+                                    reconnect_time_, str_protocol));
+
+            string id = string.Format("{0}_reconnect", str_protocol);
+            timer_id_list_.Add(id);
+            Timer.AddTimer(id, reconnect_time_,
+                delegate (object param) {
+                    Debug.Log(string.Format("'{0}' Try to reconnect to server.", str_protocol));
+                    timer_id_list_.Remove(id);
+                    Start();
+            });
+        }
+
         internal void OnConnectionTimeout ()
         {
             if (ConnectTimeoutCallback != null)
@@ -170,14 +195,6 @@ namespace Fun
             }
         }
 
-        internal void OnDisconnected ()
-        {
-            if (DisconnectedCallback != null)
-            {
-                DisconnectedCallback(protocol);
-            }
-        }
-
         internal void OnStartedInternal ()
         {
             if (StartedInternalCallback != null)
@@ -191,6 +208,45 @@ namespace Fun
             if (StoppedCallback != null)
             {
                 StoppedCallback(protocol);
+            }
+
+            if (try_to_reconnect_)
+            {
+                reconnect_time_ *= 2f;
+                if (reconnect_time_ < kMaxReconnectTime)
+                {
+                    Reconnect();
+                }
+                else
+                {
+                    try_to_reconnect_ = false;
+                    reconnect_time_ = 0f;
+                    OnDisconnectedCallback();
+                }
+            }
+        }
+
+        internal void OnDisconnected ()
+        {
+            if (AutoReconnect)
+            {
+                try_to_reconnect_ = true;
+                reconnect_time_ = 1f;
+            }
+
+            Stop();
+
+            if (try_to_reconnect_)
+                return;
+
+            OnDisconnectedCallback();
+        }
+
+        internal void OnDisconnectedCallback ()
+        {
+            if (DisconnectedCallback != null)
+            {
+                DisconnectedCallback(protocol);
             }
         }
 
@@ -230,6 +286,10 @@ namespace Fun
             kIFunEngine1
         }
 
+
+        // constants.
+        private static readonly float kMaxReconnectTime = 120f;
+
         // Event handlers
         public event TransportEventHandler ConnectTimeoutCallback;
         public event TransportEventHandler StartedCallback;
@@ -243,12 +303,16 @@ namespace Fun
         // member variables.
         internal string host_addr_ = "";
         internal UInt16 host_port_ = 0;
-        internal string timeout_timer_id_ = "";
+        internal bool try_to_reconnect_ = false;
+        internal float reconnect_time_ = 0f;
+        internal List<string> timer_id_list_ = new List<string>();
 
+        // Encoding-serializer-releated member variables.
         internal FunEncoding encoding_ = FunEncoding.kNone;
         internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
         internal FunMessageSerializer serializer_ = null;
 
+        // Error-releated member variables.
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
         internal string last_error_message_ = "";
     }
@@ -279,8 +343,17 @@ namespace Fun
 
                 if (ConnectTimeout > 0f)
                 {
-                    timeout_timer_id_ = string.Format("{0}_connet_timeout", protocol);
-                    Timer.AddTimer(timeout_timer_id_, ConnectTimeout, OnCheckConnectTimeout);
+                    string id = string.Format("{0}_connet_timeout", str_protocol);
+                    timer_id_list_.Add(id);
+                    Timer.AddTimer(id, ConnectTimeout,
+                        delegate (object param) {
+                            timer_id_list_.Remove(id);
+                            if (state == State.kEstablished)
+                                return;
+
+                            Debug.Log(string.Format("{0} Connection waiting time has been exceeded.", str_protocol));
+                            OnConnectionTimeout();
+                    });
                 }
 
                 Init();
@@ -304,8 +377,14 @@ namespace Fun
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
-            if (Timer.ContainTimer(timeout_timer_id_))
-                Timer.KillTimer(timeout_timer_id_);
+            if (timer_id_list_.Count > 0)
+            {
+                foreach (string id in timer_id_list_)
+                {
+                    if (Timer.ContainTimer(id))
+                        Timer.KillTimer(id);
+                }
+            }
 
             AddToEventQueue(OnStopped);
         }
@@ -827,18 +906,10 @@ namespace Fun
             }
         }
 
-        internal void OnCheckConnectTimeout (object param)
-        {
-            if (state == State.kEstablished)
-                return;
-
-            Debug.Log(string.Format("{0} Connection waiting time has been exceeded.", protocol));
-            OnConnectionTimeout();
-        }
-
         internal virtual void OnFailure()
         {
-            Debug.Log(String.Format("OnFailure({0}) - state: {1}", protocol, state));
+            Debug.Log(String.Format("OnFailure({0}) - state: {1}", str_protocol, state));
+
             OnFailureCallback();
 
             if (state != State.kEstablished)
@@ -923,6 +994,7 @@ namespace Fun
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
             protocol = TransportProtocol.kTcp;
+            str_protocol = "tcp";
             DisableNagle = false;
             encoding_ = type;
 
@@ -1257,6 +1329,7 @@ namespace Fun
         public FunapiUdpTransport(string hostname_or_ip, UInt16 port, FunEncoding type)
         {
             protocol = TransportProtocol.kUdp;
+            str_protocol = "udp";
             encoding_ = type;
 
             SetAddress(hostname_or_ip, port);
@@ -1501,7 +1574,7 @@ namespace Fun
                         last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         Debug.Log(last_error_message_);
-                        AddToEventQueue(OnDisconnected);
+                        AddToEventQueue(OnFailure);
                     }
                 }
             }
@@ -1533,6 +1606,7 @@ namespace Fun
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
         {
             protocol = TransportProtocol.kHttp;
+            str_protocol = "http";
             encoding_ = type;
 
             SetAddress(hostname_or_ip, port, https);
