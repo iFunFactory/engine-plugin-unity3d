@@ -286,11 +286,40 @@ namespace Fun
             }
         }
 
+        public static float PingTimeoutSeconds
+        {
+            get
+            {
+                if (ping_timeout_seconds_ < 0f)
+                {
+                    if (data_ == null)
+                    {
+                        Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                        ping_timeout_seconds_ = 0f;
+                        return 0f;
+                    }
+
+                    string str_ping_timeout = "ping_timeout_second";
+                    if (!data_.ContainsKey(str_ping_timeout))
+                    {
+                        Debug.Log("PingTimeoutSeconds - Can't find a timeout value of ping.");
+                        ping_timeout_seconds_ = 0f;
+                        return 0f;
+                    }
+
+                    ping_timeout_seconds_ = Convert.ToInt32(data_[str_ping_timeout]);
+                }
+
+                return ping_timeout_seconds_;
+            }
+        }
+
 
         // static member variables
         private static Dictionary<string, object> data_ = null;
         private static string announcement_url_ = null;
         private static int ping_interval_ = -1;
+        private static float ping_timeout_seconds_ = -1f;
     }
 
 
