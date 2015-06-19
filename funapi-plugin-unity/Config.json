@@ -20,5 +20,6 @@
   "announcement_server_port": 0,
   "announcement_with_secure": false,
 
-  "ping_interval_second": 10
+  "ping_interval_second": 10,
+  "ping_timeout_second": 30
 }

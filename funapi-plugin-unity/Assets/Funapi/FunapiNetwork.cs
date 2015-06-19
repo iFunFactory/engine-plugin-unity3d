@@ -28,7 +28,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 85;
+        public static readonly int kPluginVersion = 86;
     }
 
     // Sending message-related class.
@@ -811,14 +811,22 @@ namespace Fun
         private void InitPing()
         {
             ping_interval_ = 0;
+            ping_timeout_seconds_ = 0f;
 
             if (FunapiConfig.IsValid)
+            {
                 ping_interval_ = FunapiConfig.PingInterval;
+                ping_timeout_seconds_ = FunapiConfig.PingTimeoutSeconds;
+            }
 
             if (ping_interval_ <= 0)
                 ping_interval_ = kPingIntervalSecond;
 
-            Debug.Log(string.Format("Ping - interval seconds: {0}", ping_interval_));
+            if (ping_timeout_seconds_ <= 0f)
+                ping_timeout_seconds_ = kPingTimeoutSeconds;
+
+            Debug.Log(string.Format("Ping - interval seconds: {0}, timeout seconds: {1}",
+                                    ping_interval_, ping_timeout_seconds_));
         }
 
         private void OnPingTimerEvent (object param)
@@ -827,7 +835,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            if (wait_ping_count_ > (kPingTimeoutSeconds / ping_interval_))
+            if (wait_ping_count_ > (ping_timeout_seconds_ / ping_interval_))
             {
                 Debug.LogWarning("Network seems disabled. Stopping the transport.");
                 transport.OnDisconnected();
@@ -1603,6 +1611,7 @@ namespace Fun
         // Ping-releated member variables.
         private int ping_interval_ = 0;
         private int wait_ping_count_ = 0;
+        private float ping_timeout_seconds_ = 0f;
 
         // Reliability-releated member variables.
         private bool session_reliability_;
