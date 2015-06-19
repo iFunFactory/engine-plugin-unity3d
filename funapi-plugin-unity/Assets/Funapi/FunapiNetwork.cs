@@ -28,7 +28,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 86;
+        public static readonly int kPluginVersion = 87;
     }
 
     // Sending message-related class.
@@ -733,8 +733,8 @@ namespace Fun
             if (session_reliability_)
             {
                 seq_recvd_ = 0;
-                first_receiving_ = true;
                 send_queue_.Clear();
+                first_receiving_ = true;
                 seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
             }
         }
@@ -766,6 +766,7 @@ namespace Fun
             }
 
             session_id_ = session_id;
+            first_receiving_ = true;
 
             lock (transports_lock_)
             {
@@ -966,11 +967,14 @@ namespace Fun
                         }
                     }
 
-                    string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
-                    msg_type = msg_type_node;
-                    transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
+                    if (transport.JsonHelper.HasField(json, kMsgTypeBodyField))
+                    {
+                        string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
+                        msg_type = msg_type_node;
+                        transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
+                    }
 
-                    if (msg_type != null)
+                    if (msg_type.Length > 0)
                     {
                         if (msg_type == kServerPingMessageType)
                         {
@@ -991,7 +995,7 @@ namespace Fun
                     return;
                 }
 
-                if (msg_type != null && msg_type.Length > 0)
+                if (msg_type.Length > 0)
                 {
                     DeleteExpectedReply(msg_type);
 
@@ -1030,9 +1034,12 @@ namespace Fun
                         }
                     }
 
-                    msg_type = message.msgtype;
+                    if (message.msgtype != null)
+                    {
+                        msg_type = message.msgtype;
+                    }
 
-                    if (msg_type != null)
+                    if (msg_type.Length > 0)
                     {
                         if (msg_type == kServerPingMessageType)
                         {
@@ -1075,7 +1082,10 @@ namespace Fun
                     SetTransportStarted(transport);
                 }
 
-                Debug.Log(String.Format("No handler for message '{0}'. Ignoring.", msg_type));
+                if (msg_type.Length > 0)
+                {
+                    Debug.Log(String.Format("No handler for message '{0}'. Ignoring.", msg_type));
+                }
             }
         }
 
@@ -1110,6 +1120,7 @@ namespace Fun
                         transport.JsonHelper.SetIntegerField(json, kSeqNumberField, seq_);
                         ++seq_;
 
+                        send_queue_.Enqueue(msg);
                         Debug.Log(String.Format("{0} send unsent message - msgtype:{1} seq:{2}",
                                                 transport.protocol, msg.msg_type, seq_ - 1));
                     }
@@ -1132,6 +1143,7 @@ namespace Fun
                         pbuf.seq = seq_;
                         ++seq_;
 
+                        send_queue_.Enqueue(msg);
                         Debug.Log(String.Format("{0} send unsent message - msgtype:{1} seq:{2}",
                                                 transport.protocol, msg.msg_type, pbuf.seq));
                     }
@@ -1244,13 +1256,18 @@ namespace Fun
             }
             else
             {
-                if (seq_recvd_ + 1 != seq)
+                UInt32 seq_interval = seq - seq_recvd_;
+                if (seq_interval < 1 && Math.Abs(seq_interval) < kStableSequenceInterval)
+                {
+                    Debug.Log(String.Format("Received previous sequence number {0}. Skipping message.", seq));
+                    SendAck(transport, seq_recvd_ + 1);
+                    return false;
+                }
+                else if (seq_interval != 1)
                 {
                     Debug.LogWarning(String.Format("Received wrong sequence number {0}. {1} expected.",
                                                    seq, seq_recvd_ + 1));
-
-                    Stop();
-                    DebugUtils.Assert(false);
+                    StopTransport(transport);
                     return false;
                 }
             }
@@ -1581,6 +1598,7 @@ namespace Fun
         private static readonly string kNewSessionMessageType = "_session_opened";
         private static readonly string kSessionClosedMessageType = "_session_closed";
         private static readonly string kMaintenanceMessageType = "_maintenance";
+        private static readonly int kStableSequenceInterval = 20;
 
         // Ping message-related constants.
         private static readonly int kPingIntervalSecond = 10;

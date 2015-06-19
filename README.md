@@ -5,6 +5,13 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 06/22/2015 (ver.87)
+- Sequence number 관련 버그 수정
+- Ping timeout 시간을 정할 수 있도록 Config.json 파일에 추가
+- 연결이 끊겼을 때 재접속을 시도하는 옵션 추가
+- Connect 실패 및 Disconnect에 대한 오류 처리
+- Client - Server 간의 Ping time을 얻는 기능 추가
+
 ### 06/16/2015 (ver.82)
 - Multicasting 관련 메시지의 숫자를 MessageType으로 변경
 
