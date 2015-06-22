@@ -1560,7 +1560,8 @@ namespace Fun
             }
 
             --wait_ping_count_;
-            DebugUtils.Log(String.Format("Receive ping - timestamp: {0}", timestamp));
+            DebugUtils.Log(String.Format("Receive ping - timestamp:{0} time={1} ms",
+                                         timestamp, (DateTime.Now.Ticks - timestamp) / 10000));
         }
         #endregion
 
