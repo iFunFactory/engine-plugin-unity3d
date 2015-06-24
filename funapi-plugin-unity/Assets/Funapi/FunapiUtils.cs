@@ -351,7 +351,7 @@ namespace Fun
             }
 
             pending_list_.Add(name, new Event(name, start, delay, loop, callback, param));
-            Debug.Log(string.Format("AddTimer - '{0}' timer added.", name));
+            DebugUtils.Log(string.Format("AddTimer - '{0}' timer added.", name));
         }
 
         public void KillTimer (string name)
@@ -363,7 +363,7 @@ namespace Fun
                 return;
 
             remove_list_.Add(name);
-            Debug.Log(string.Format("KillTimer - '{0}' timer removed.", name));
+            DebugUtils.Log(string.Format("KillTimer - '{0}' timer removed.", name));
         }
 
         public bool ContainTimer (string name)
