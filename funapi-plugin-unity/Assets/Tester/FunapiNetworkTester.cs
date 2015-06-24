@@ -79,7 +79,7 @@ public class FunapiNetworkTester : MonoBehaviour
         GUI.enabled = (network_ != null && network_.Connected);
         if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
         {
-            DisConnect();
+            Disconnect();
         }
 
         if (GUI.Button(new Rect(30, 260, 240, 40), "Send 'Hello World'"))
@@ -248,7 +248,7 @@ public class FunapiNetworkTester : MonoBehaviour
             if (protocol == TransportProtocol.kTcp)
             {
                 transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
-                //transport.AutoReconnect = true;
+                transport.AutoReconnect = true;
                 //transport.DisableNagle = true;
             }
             else if (protocol == TransportProtocol.kUdp)
@@ -269,11 +269,18 @@ public class FunapiNetworkTester : MonoBehaviour
 
             // Connect timeout.
             transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
-            transport.ConnectTimeout = 5f;
+            transport.ConnectTimeout = 10f;
 
             // If you prefer use specific Json implementation other than Dictionary,
             // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
             // E.g., transport.JsonHelper = new YourJsonAccessorClass
+
+            // Adds extra server list
+            // Use HostHttp for http transport.
+            //transport.AddServerList(new List<HostAddr>{
+            //    new HostAddr("127.0.0.1", 8012), new HostAddr("127.0.0.1", 8012),
+            //    new HostAddr("127.0.0.1", 8013), new HostAddr("127.0.0.1", 8018)
+            //});
         }
 
         return transport;
@@ -291,6 +298,7 @@ public class FunapiNetworkTester : MonoBehaviour
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
             network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
             network_.StoppedAllTransportCallback += new FunapiNetwork.NotifyHandler(OnStoppedAllTransport);
+            network_.TransportConnectFailedCallback += new TransportEventHandler(OnTransportConnectFailed);
             network_.TransportDisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
 
             network_.RegisterHandler("echo", this.OnEcho);
@@ -316,7 +324,7 @@ public class FunapiNetworkTester : MonoBehaviour
         network_.Start();
     }
 
-    private void DisConnect ()
+    private void Disconnect ()
     {
         CancelInvoke();
 
@@ -326,7 +334,7 @@ public class FunapiNetworkTester : MonoBehaviour
         }
         else if (network_.SessionReliability)
         {
-            network_.StopTransportAll();
+            network_.Stop(false);
         }
         else
         {
@@ -496,6 +504,17 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnStoppedAllTransport()
     {
         Debug.Log("OnStoppedAllTransport called.");
+    }
+
+    private void OnTransportConnectFailed (TransportProtocol protocol)
+    {
+        Debug.Log("OnTransportConnectFailed called.");
+
+        // If you want to try to reconnect, call 'Connect' or 'Reconnect' function.
+        // Be careful to avoid falling into an infinite loop.
+
+        //network_.Connect(protocol, new HostHttp("127.0.0.1", 8018));
+        //network_.Reconnect(protocol);
     }
 
     private void OnTransportDisconnected (TransportProtocol protocol)

@@ -105,6 +105,13 @@ namespace Fun
             get; set;
         }
 
+        public bool IsConnecting
+        {
+            get { return cstate_ == ConnectState.kConnecting ||
+                         cstate_ == ConnectState.kReconnecting ||
+                         cstate_ == ConnectState.kRedirecting; }
+        }
+
         public ErrorCode LastErrorCode
         {
             get { return last_error_code_; }
@@ -127,6 +134,14 @@ namespace Fun
             get { return serializer_; }
             set { serializer_ = value; }
         }
+
+        public void AddServerList (List<HostAddr> list)
+        {
+            if (list == null || list.Count <= 0)
+                return;
+
+            extra_list_.Add(list);
+        }
         #endregion
 
         #region internal implementation
@@ -140,7 +155,27 @@ namespace Fun
         internal abstract bool Started { get; }
 
         // Update
-        internal virtual void Update() {}
+        internal virtual void Update()
+        {
+            Queue<DelegateEventHandler> queue = null;
+
+            lock (event_lock_)
+            {
+                if (event_queue_.Count > 0)
+                {
+                    queue = event_queue_;
+                    event_queue_ = new Queue<DelegateEventHandler>();
+                }
+            }
+
+            if (queue != null)
+            {
+                foreach (DelegateEventHandler func in queue)
+                {
+                    func();
+                }
+            }
+        }
 
         // Timer
         internal FunapiTimer Timer { get; set; }
@@ -156,23 +191,199 @@ namespace Fun
             get; set;
         }
 
+        // Sets address
+        internal bool SetNextAddress ()
+        {
+            HostAddr addr = ip_list_.GetNextAddress();
+            if (addr != null)
+            {
+                SetAddress(addr);
+            }
+            else
+            {
+                HostAddr extra = extra_list_.GetNextAddress();
+                if (extra == null) {
+                    Debug.Log("SetAvailableAddress - There's no available address.");
+                    return false;
+                }
+
+                SetAddress(extra);
+            }
+
+            return true;
+        }
+
+        internal abstract void SetAddress (HostAddr addr);
+
+        // Connect functions
+        internal void Connect ()
+        {
+            Debug.Log(string.Format("'{0}' Try to connect to server.", str_protocol));
+            exponential_time_ = 1f;
+            reconnect_count_ = 0;
+
+            Start();
+        }
+
+        internal void Connect (HostAddr addr)
+        {
+            SetAddress(addr);
+            Connect();
+        }
+
         internal void Reconnect ()
         {
-            Debug.Log(string.Format("Wait {0} seconds for reconnect to {1} transport.",
-                                    reconnect_time_, str_protocol));
+            Debug.Log(string.Format("'{0}' Try to reconnect to server.", str_protocol));
+            cstate_ = ConnectState.kReconnecting;
+            Connect();
+        }
 
-            string id = string.Format("{0}_reconnect", str_protocol);
+        internal void Redirect (HostAddr addr)
+        {
+            Debug.Log(String.Format("Redirect {0} [{1}:{2}]", str_protocol, addr.host, addr.port));
+
+            if (Started) {
+                Stop();
+            }
+
+            AddToEventQueue(
+                delegate {
+                    cstate_ = ConnectState.kRedirecting;
+                    Connect(addr);
+                }
+            );
+        }
+
+        // Checks connection list
+        internal void CheckConnectList ()
+        {
+            if (IsConnecting)
+                return;
+
+            cstate_ = ConnectState.kConnecting;
+            exponential_time_ = 1f;
+        }
+
+        internal void CheckReconnect ()
+        {
+            if (!AutoReconnect || cstate_ == ConnectState.kReconnecting)
+                return;
+
+            cstate_ = ConnectState.kReconnecting;
+            exponential_time_ = 1f;
+            reconnect_count_ = 0;
+        }
+
+        private bool TryToConnect ()
+        {
+            if (reconnect_count_ >= 0)
+            {
+                if (TryToReconnect())
+                    return true;
+            }
+
+            float delay_time = 0f;
+            if (ip_list_.IsNextAvailable)
+            {
+                if (exponential_time_ < kMaxConnectingTime)
+                {
+                    delay_time = exponential_time_;
+                    exponential_time_ *= 2f;
+                }
+                else
+                {
+                    ip_list_.SetLast();
+                }
+            }
+
+            if (delay_time <= 0f)
+            {
+                if (extra_list_.IsNextAvailable)
+                    delay_time = kFixedConnectWaitTime;
+
+                if (delay_time <= 0f)
+                    return false;
+            }
+
+            Debug.Log(string.Format("Wait {0} seconds for connect to {1} transport.",
+                                    delay_time, str_protocol));
+
+            string id = string.Format("{0}_try_connect", str_protocol);
             timer_id_list_.Add(id);
-            Timer.AddTimer(id, reconnect_time_,
+            Timer.AddTimer(id, delay_time,
+                delegate (object param) {
+                    Debug.Log(string.Format("'{0}' Try to connect to server.", str_protocol));
+                    timer_id_list_.Remove(id);
+                    SetNextAddress();
+                    Connect();
+                }
+            );
+
+            return true;
+        }
+
+        private bool TryToReconnect ()
+        {
+            ++reconnect_count_;
+            if (reconnect_count_ > kMaxReconnectCount)
+                return false;
+
+            float delay_time = 0f;
+            if (exponential_time_ < kMaxConnectingTime)
+            {
+                delay_time = exponential_time_;
+                exponential_time_ *= 2f;
+            }
+
+            if (delay_time <= 0f)
+                return false;
+
+            Debug.Log(string.Format("Wait {0} seconds for reconnect to {1} transport.",
+                                    delay_time, str_protocol));
+
+            string id = string.Format("{0}_try_reconnect", str_protocol);
+            timer_id_list_.Add(id);
+            Timer.AddTimer(id, delay_time,
                 delegate (object param) {
                     Debug.Log(string.Format("'{0}' Try to reconnect to server.", str_protocol));
                     timer_id_list_.Remove(id);
                     Start();
-            });
+                }
+            );
+
+            return true;
         }
 
+        internal void AddToEventQueue (DelegateEventHandler handler)
+        {
+            if (handler == null)
+            {
+                Debug.Log("AddToEventQueue - handler is null.");
+                return;
+            }
+
+            lock (event_lock_)
+            {
+                event_queue_.Enqueue(handler);
+            }
+        }
+
+        internal void AddFailureCallback (FunapiMessage fun_msg)
+        {
+            AddToEventQueue(
+                delegate
+                {
+                OnMessageFailureCallback(fun_msg);
+                OnFailureCallback();
+            }
+            );
+        }
+
+        // Callback functions
         internal void OnConnectionTimeout ()
         {
+            CheckConnectList();
+
             if (ConnectTimeoutCallback != null)
             {
                 ConnectTimeoutCallback(protocol);
@@ -212,36 +423,53 @@ namespace Fun
                 StoppedCallback(protocol);
             }
 
-            if (try_to_reconnect_)
+            if (cstate_ == ConnectState.kConnecting)
             {
-                reconnect_time_ *= 2f;
-                if (reconnect_time_ < kMaxReconnectTime)
+                if (!TryToConnect())
                 {
-                    Reconnect();
+                    cstate_ = ConnectState.kUnknown;
+                    OnConnectFailureCallback();
                 }
-                else
+            }
+            else if (cstate_ == ConnectState.kReconnecting)
+            {
+                if (!TryToReconnect())
                 {
-                    try_to_reconnect_ = false;
-                    reconnect_time_ = 0f;
+                    cstate_ = ConnectState.kUnknown;
                     OnDisconnectedCallback();
+                }
+            }
+            else if (cstate_ == ConnectState.kRedirecting)
+            {
+                if (!TryToReconnect())
+                {
+                    cstate_ = ConnectState.kUnknown;
+                    OnConnectFailureCallback();
                 }
             }
         }
 
         internal void OnDisconnected ()
         {
-            if (AutoReconnect)
-            {
-                try_to_reconnect_ = true;
-                reconnect_time_ = 1f;
-            }
+            CheckReconnect();
 
             Stop();
 
-            if (try_to_reconnect_)
-                return;
+            if (cstate_ != ConnectState.kReconnecting)
+            {
+                OnDisconnectedCallback();
+            }
+        }
 
-            OnDisconnectedCallback();
+        internal void OnConnectFailureCallback ()
+        {
+            ip_list_.SetFirst();
+            extra_list_.SetFirst();
+
+            if (ConnectFailureCallback != null)
+            {
+                ConnectFailureCallback(protocol);
+            }
         }
 
         internal void OnDisconnectedCallback ()
@@ -275,32 +503,46 @@ namespace Fun
             kUnknown = 0,
             kConnecting,
             kConnected,
-            kWaitForSessionResponse,
             kWaitForSession,
             kWaitForAck,
             kEstablished
         };
 
+        internal enum ConnectState
+        {
+            kUnknown = 0,
+            kConnecting,
+            kReconnecting,
+            kRedirecting,
+            kConnected
+        };
+
+
+        internal delegate void DelegateEventHandler();
 
         // constants.
-        private static readonly float kMaxReconnectTime = 120f;
+        private static readonly int kMaxReconnectCount = 3;
+        private static readonly float kMaxConnectingTime = 120f;
+        private static readonly float kFixedConnectWaitTime = 10f;
 
         // Event handlers
         public event TransportEventHandler ConnectTimeoutCallback;
         public event TransportEventHandler StartedCallback;
         public event TransportEventHandler StoppedCallback;
         public event TransportEventHandler FailureCallback;
+
         internal event TransportEventHandler StartedInternalCallback;
         internal event TransportEventHandler DisconnectedCallback;
         internal event TransportReceivedHandler ReceivedCallback;
         internal event TransportMessageHandler MessageFailureCallback;
+        internal event TransportEventHandler ConnectFailureCallback;
 
-        // member variables.
-        internal string host_addr_ = "";
-        internal UInt16 host_port_ = 0;
-        internal bool try_to_reconnect_ = false;
-        internal float reconnect_time_ = 0f;
-        internal List<string> timer_id_list_ = new List<string>();
+        // Connect-releated member variables.
+        internal ConnectState cstate_ = ConnectState.kUnknown;
+        internal ConnectList ip_list_ = new ConnectList();
+        internal ConnectList extra_list_ = new ConnectList();
+        internal float exponential_time_ = 0f;
+        internal int reconnect_count_ = 0;
 
         // Encoding-serializer-releated member variables.
         internal FunEncoding encoding_ = FunEncoding.kNone;
@@ -310,6 +552,11 @@ namespace Fun
         // Error-releated member variables.
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
         internal string last_error_message_ = "";
+
+        // member variables.
+        internal object event_lock_ = new object();
+        internal Queue<DelegateEventHandler> event_queue_ = new Queue<DelegateEventHandler>();
+        internal List<string> timer_id_list_ = new List<string>();
     }
 
 
@@ -328,6 +575,7 @@ namespace Fun
             try
             {
                 // Resets states.
+                first_receiving_ = true;
                 header_decoded_ = false;
                 received_size_ = 0;
                 next_decoding_offset_ = 0;
@@ -384,28 +632,6 @@ namespace Fun
             AddToEventQueue(OnStopped);
         }
 
-        internal override void Update()
-        {
-            Queue<DelegateEventHandler> queue = null;
-
-            lock (event_lock_)
-            {
-                if (event_queue_.Count > 0)
-                {
-                    queue = event_queue_;
-                    event_queue_ = new Queue<DelegateEventHandler>();
-                }
-            }
-
-            if (queue != null)
-            {
-                foreach (DelegateEventHandler func in queue)
-                {
-                    func();
-                }
-            }
-        }
-
         internal override bool HasUnsentMessages
         {
             get
@@ -417,29 +643,9 @@ namespace Fun
             }
         }
 
-        internal void AddToEventQueue (DelegateEventHandler handler)
+        internal virtual bool IsSendable
         {
-            if (handler == null)
-            {
-                Debug.Log("AddToEventQueue - handler is null.");
-                return;
-            }
-
-            lock (event_lock_)
-            {
-                event_queue_.Enqueue(handler);
-            }
-        }
-
-        internal void AddFailureCallback (FunapiMessage fun_msg)
-        {
-            AddToEventQueue(
-                delegate
-                {
-                    OnMessageFailureCallback(fun_msg);
-                    OnFailureCallback();
-                }
-            );
+            get { return sending_.Count == 0; }
         }
 
         internal override void SendMessage (FunapiMessage fun_msg)
@@ -493,7 +699,7 @@ namespace Fun
                     pending_.Add(msg_header);
                     pending_.Add(msg_body);
 
-                    if (Started && sending_.Count == 0)
+                    if (Started && IsSendable)
                     {
                         List<FunapiMessage> tmp = sending_;
                         sending_ = pending_;
@@ -565,6 +771,55 @@ namespace Fun
                     Debug.Log(String.Format("Increasing a receive buffer to {0} bytes.", receive_buffer_.Length + kUnitBufferSize));
                     Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
                     receive_buffer_ = new_buffer;
+                }
+            }
+        }
+
+        // Decoding a messages
+        internal void TryToDecodeMessage ()
+        {
+            if (first_receiving_)
+            {
+                first_receiving_ = false;
+                cstate_ = ConnectState.kConnected;
+            }
+
+            if (IsStream)
+            {
+                // Try to decode as many messages as possible.
+                while (true)
+                {
+                    if (header_decoded_ == false)
+                    {
+                        if (TryToDecodeHeader() == false)
+                        {
+                            break;
+                        }
+                    }
+                    if (header_decoded_)
+                    {
+                        if (TryToDecodeBody() == false)
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Try to decode a message.
+                if (TryToDecodeHeader())
+                {
+                    if (TryToDecodeBody() == false)
+                    {
+                        Debug.LogWarning("Failed to decode body.");
+                        DebugUtils.Assert(false);
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("Failed to decode header.");
+                    DebugUtils.Assert(false);
                 }
             }
         }
@@ -646,15 +901,17 @@ namespace Fun
             return true;
         }
 
-
         internal virtual void OnFailure()
         {
-            Debug.Log(String.Format("OnFailure({0}) - state: {1}", str_protocol, state));
+            Debug.Log(String.Format("OnFailure({0}) - state: {1}\n{2}:{3}",
+                                    str_protocol, state, last_error_code_, last_error_message_));
 
             OnFailureCallback();
 
             if (state != State.kEstablished)
             {
+                CheckConnectList();
+
                 Stop();
             }
         }
@@ -686,8 +943,6 @@ namespace Fun
         }
 
 
-        internal delegate void DelegateEventHandler();
-
         // Buffer-related constants.
         internal static readonly int kUnitBufferSize = 65536;
 
@@ -704,18 +959,17 @@ namespace Fun
 
         // State-related.
         private bool first_sending_ = true;
+        private bool first_receiving_ = true;
         internal bool header_decoded_ = false;
         internal int received_size_ = 0;
         internal int next_decoding_offset_ = 0;
         internal object sending_lock_ = new object();
         internal object receive_lock_ = new object();
-        internal object event_lock_ = new object();
         internal byte[] receive_buffer_ = new byte[kUnitBufferSize];
         internal byte[] send_buffer_ = new byte[kUnitBufferSize];
         internal List<FunapiMessage> pending_ = new List<FunapiMessage>();
         internal List<FunapiMessage> sending_ = new List<FunapiMessage>();
         internal Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
-        internal Queue<DelegateEventHandler> event_queue_ = new Queue<DelegateEventHandler>();
     }
 
 
@@ -726,11 +980,12 @@ namespace Fun
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
             protocol = TransportProtocol.kTcp;
-            str_protocol = "tcp";
+            str_protocol = "Tcp";
             DisableNagle = false;
             encoding_ = type;
 
-            SetAddress(hostname_or_ip, port);
+            ip_list_.Add(hostname_or_ip, port);
+            SetNextAddress();
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiTcpTransport(..., FunEncoding type)' instead.")]
@@ -785,41 +1040,22 @@ namespace Fun
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
 
-        internal void SetAddress (string hostname_or_ip, UInt16 port)
+        internal override void SetAddress (HostAddr addr)
         {
-            if (host_addr_ == hostname_or_ip && host_port_ == port)
-                return;
-
-            host_addr_ = hostname_or_ip;
-            host_port_ = port;
-
-            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
-            DebugUtils.Assert(host_info.AddressList.Length == 1);
-            IPAddress address = host_info.AddressList[0];
-            connect_ep_ = new IPEndPoint(address, port);
-        }
-
-        internal void Redirect(string hostname_or_ip, UInt16 port)
-        {
-            if (host_addr_ == hostname_or_ip && host_port_ == port)
+            IPAddress ip = null;
+            if (addr is HostIP)
             {
-                Debug.Log(String.Format("Redirect Tcp [{0}:{1}] - The same address is already connected.",
-                                        hostname_or_ip, port));
-                return;
+                ip = ((HostIP)addr).ip;
+            }
+            else
+            {
+                IPHostEntry host_info = Dns.GetHostEntry(addr.host);
+                DebugUtils.Assert(host_info.AddressList.Length > 0);
+                ip = host_info.AddressList[0];
             }
 
-            if (Started)
-            {
-                Stop();
-            }
-
-            AddToEventQueue(
-                delegate
-                {
-                    SetAddress(hostname_or_ip, port);
-                    Start();
-                }
-            );
+            connect_ep_ = new IPEndPoint(ip, addr.port);
+            Debug.Log(String.Format("SetAddress - {0}:{1}", ip, addr.port));
         }
 
         internal override void WireSend()
@@ -985,24 +1221,8 @@ namespace Fun
                                                      nRead, received_size_ - next_decoding_offset_));
                     }
 
-                    // Try to decode as many messages as possible.
-                    while (true)
-                    {
-                        if (header_decoded_ == false)
-                        {
-                            if (TryToDecodeHeader() == false)
-                            {
-                                break;
-                            }
-                        }
-                        if (header_decoded_)
-                        {
-                            if (TryToDecodeBody() == false)
-                            {
-                                break;
-                            }
-                        }
-                    }
+                    // Decoding a messages
+                    TryToDecodeMessage();
 
                     if (nRead > 0)
                     {
@@ -1059,13 +1279,14 @@ namespace Fun
     public class FunapiUdpTransport : FunapiDecodedTransport
     {
         #region public interface
-        public FunapiUdpTransport(string hostname_or_ip, UInt16 port, FunEncoding type)
+        public FunapiUdpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
             protocol = TransportProtocol.kUdp;
-            str_protocol = "udp";
+            str_protocol = "Udp";
             encoding_ = type;
 
-            SetAddress(hostname_or_ip, port);
+            ip_list_.Add(hostname_or_ip, port);
+            SetNextAddress();
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiUdpTransport(..., FunEncoding type)' instead.")]
@@ -1112,42 +1333,23 @@ namespace Fun
             OnStartedInternal();
         }
 
-        internal void SetAddress (string hostname_or_ip, UInt16 port)
+        internal override void SetAddress (HostAddr addr)
         {
-            if (host_addr_ == hostname_or_ip && host_port_ == port)
-                return;
-
-            host_addr_ = hostname_or_ip;
-            host_port_ = port;
-
-            IPHostEntry host_info = Dns.GetHostEntry(hostname_or_ip);
-            DebugUtils.Assert(host_info.AddressList.Length == 1);
-            IPAddress address = host_info.AddressList[0];
-            send_ep_ = new IPEndPoint(address, port);
-            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, port);
-        }
-
-        internal void Redirect(string hostname_or_ip, UInt16 port)
-        {
-            if (host_addr_ == hostname_or_ip && host_port_ == port)
+            IPAddress ip = null;
+            if (addr is HostIP)
             {
-                Debug.Log(String.Format("Redirect Udp [{0}:{1}] - The same address is already connected.",
-                                        hostname_or_ip, port));
-                return;
+                ip = ((HostIP)addr).ip;
+            }
+            else
+            {
+                IPHostEntry host_info = Dns.GetHostEntry(addr.host);
+                DebugUtils.Assert(host_info.AddressList.Length > 0);
+                ip = host_info.AddressList[0];
             }
 
-            if (Started)
-            {
-                Stop();
-            }
-
-            AddToEventQueue(
-                delegate
-                {
-                    SetAddress(hostname_or_ip, port);
-                    Start();
-                }
-            );
+            send_ep_ = new IPEndPoint(ip, addr.port);
+            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr.port);
+            Debug.Log(String.Format("SetAddress - {0}:{1}", ip, addr.port));
         }
 
         // Send a packet.
@@ -1266,19 +1468,7 @@ namespace Fun
                     }
 
                     // Decoding a message
-                    if (TryToDecodeHeader())
-                    {
-                        if (TryToDecodeBody() == false)
-                        {
-                            Debug.LogWarning("Failed to decode body.");
-                            DebugUtils.Assert(false);
-                        }
-                    }
-                    else
-                    {
-                        Debug.LogWarning("Failed to decode header.");
-                        DebugUtils.Assert(false);
-                    }
+                    TryToDecodeMessage();
 
                     if (nRead > 0)
                     {
@@ -1339,10 +1529,11 @@ namespace Fun
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
         {
             protocol = TransportProtocol.kHttp;
-            str_protocol = "http";
+            str_protocol = "Http";
             encoding_ = type;
 
-            SetAddress(hostname_or_ip, port, https);
+            ip_list_.Add(hostname_or_ip, port, https);
+            SetNextAddress();
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiHttpTransport(..., FunEncoding type)' instead.")]
@@ -1355,6 +1546,9 @@ namespace Fun
         {
             if (state == State.kUnknown)
                 return;
+
+            cur_request_ = null;
+            response_time_ = -1f;
 
             foreach (WebState ws in list_)
             {
@@ -1406,41 +1600,22 @@ namespace Fun
             OnStartedInternal();
         }
 
-        internal void SetAddress (string hostname_or_ip, UInt16 port, bool https)
+        internal override void SetAddress (HostAddr addr)
         {
-            if (host_addr_ == hostname_or_ip && host_port_ == port)
-                return;
-
-            host_addr_ = hostname_or_ip;
-            host_port_ = port;
+            DebugUtils.Assert(addr is HostHttp);
+            HostHttp http = (HostHttp)addr;
 
             // Url
             host_url_ = String.Format("{0}://{1}:{2}/v{3}/",
-                                      (https ? "https" : "http"), hostname_or_ip, port,
+                                      (http.https ? "https" : "http"), http.host, http.port,
                                       FunapiVersion.kProtocolVersion);
+
+            Debug.Log(String.Format("SetAddress - {0}:{1}", http.host, http.port));
         }
 
-        internal void Redirect(string hostname_or_ip, UInt16 port, bool https = false)
+        internal override bool IsSendable
         {
-            if (host_addr_ == hostname_or_ip && host_port_ == port)
-            {
-                Debug.Log(String.Format("Redirect Http [{0}:{1}] - The same address is already connected.",
-                                        hostname_or_ip, port));
-                return;
-            }
-
-            if (Started)
-            {
-                Stop();
-            }
-
-            AddToEventQueue(
-                delegate
-                {
-                    SetAddress(hostname_or_ip, port, https);
-                    Start();
-                }
-            );
+            get { return cur_request_ == null; }
         }
 
         internal override void WireSend()
@@ -1498,14 +1673,28 @@ namespace Fun
                 stream.Close();
                 DebugUtils.Log(String.Format("Sent {0}bytes.", ws.sending.Count));
 
+                lock (sending_lock_)
+                {
+                    DebugUtils.Assert(sending_.Count >= 2);
+
+                    // Removes header and body segment
+                    sending_.RemoveAt(0);
+                    sending_.RemoveAt(0);
+
+                    SendUnsentMessages();
+                }
+
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), ws);
             }
-            catch (Exception e)
+            catch (WebException e)
             {
-                last_error_code_ = ErrorCode.kSendFailed;
-                last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
-                Debug.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                if (e.Status != WebExceptionStatus.RequestCanceled)
+                {
+                    last_error_code_ = ErrorCode.kSendFailed;
+                    last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
+                    Debug.Log(last_error_message_);
+                    AddToEventQueue(OnFailure);
+                }
             }
         }
 
@@ -1539,12 +1728,15 @@ namespace Fun
                     AddToEventQueue(OnFailure);
                 }
             }
-            catch (Exception e)
+            catch (WebException e)
             {
-                last_error_code_ = ErrorCode.kReceiveFailed;
-                last_error_message_ = "Failure in ResponseCb: " + e.ToString();
-                Debug.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                if (e.Status != WebExceptionStatus.RequestCanceled)
+                {
+                    last_error_code_ = ErrorCode.kReceiveFailed;
+                    last_error_message_ = "Failure in ResponseCb: " + e.ToString();
+                    Debug.Log(last_error_message_);
+                    AddToEventQueue(OnFailure);
+                }
             }
         }
 
@@ -1601,19 +1793,7 @@ namespace Fun
                         Buffer.BlockCopy(ws.read_data, 0, receive_buffer_, offset + header.Length, ws.read_offset);
 
                         // Decoding a message
-                        if (TryToDecodeHeader())
-                        {
-                            if (TryToDecodeBody() == false)
-                            {
-                                Debug.LogWarning("Failed to decode body.");
-                                DebugUtils.Assert(false);
-                            }
-                        }
-                        else
-                        {
-                            Debug.LogWarning("Failed to decode header.");
-                            DebugUtils.Assert(false);
-                        }
+                        TryToDecodeMessage();
 
                         ws.stream.Close();
                         ws.stream = null;
@@ -1624,25 +1804,17 @@ namespace Fun
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
-
-                    lock (sending_lock_)
-                    {
-                        DebugUtils.Assert(sending_.Count >= 2);
-
-                        // Removes header and body segment
-                        sending_.RemoveAt(0);
-                        sending_.RemoveAt(0);
-
-                        SendUnsentMessages();
-                    }
                 }
             }
-            catch (Exception e)
+            catch (WebException e)
             {
-                last_error_code_ = ErrorCode.kReceiveFailed;
-                last_error_message_ = "Failure in ReadCb: " + e.ToString();
-                Debug.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                if (e.Status != WebExceptionStatus.RequestCanceled)
+                {
+                    last_error_code_ = ErrorCode.kReceiveFailed;
+                    last_error_message_ = "Failure in ReadCb: " + e.ToString();
+                    Debug.Log(last_error_message_);
+                    AddToEventQueue(OnFailure);
+                }
             }
         }
 
@@ -1664,20 +1836,6 @@ namespace Fun
                     ws.stream.Close();
 
                 list_.Remove(ws);
-
-                lock (sending_lock_)
-                {
-                    DebugUtils.Assert(sending_.Count >= 2);
-
-                    OnMessageFailureCallback(sending_[1]);
-
-                    // Removes header and body segment
-                    sending_.RemoveAt(0);
-                    sending_.RemoveAt(0);
-
-                    // Sends next message
-                    SendUnsentMessages();
-                }
             }
 
             base.OnFailure();
