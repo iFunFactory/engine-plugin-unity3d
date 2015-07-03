@@ -249,6 +249,7 @@ public class FunapiNetworkTester : MonoBehaviour
             {
                 transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
                 transport.AutoReconnect = true;
+                transport.EnablePing = true;
                 //transport.DisableNagle = true;
             }
             else if (protocol == TransportProtocol.kUdp)
@@ -292,8 +293,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (network_ == null || !network_.SessionReliability)
         {
-            bool enable_ping = true;
-            network_ = new FunapiNetwork(with_session_reliability_, enable_ping);
+            network_ = new FunapiNetwork(with_session_reliability_);
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
             network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
