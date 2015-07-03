@@ -103,6 +103,11 @@ namespace Fun
             get; set;
         }
 
+        public bool EnablePing
+        {
+            get; set;
+        }
+
         public bool IsConnecting
         {
             get { return cstate_ == ConnectState.kConnecting ||
@@ -177,6 +182,8 @@ namespace Fun
 
         // Timer
         internal FunapiTimer Timer { get; set; }
+
+        internal float PingWaitTime { get; set; }
 
         // Check unsent messages
         internal abstract bool HasUnsentMessages { get; }

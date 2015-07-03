@@ -28,7 +28,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 89;
+        public static readonly int kPluginVersion = 90;
     }
 
     // Sending message-related class.
@@ -69,7 +69,7 @@ namespace Fun
     public class FunapiNetwork
     {
         #region public interface
-        public FunapiNetwork (bool session_reliability = false, bool enable_ping = false)
+        public FunapiNetwork (bool session_reliability = false)
         {
             state_ = State.kUnknown;
             recv_type_ = typeof(FunMessage);
@@ -80,10 +80,7 @@ namespace Fun
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
 
             InitSession();
-
-            if (enable_ping) {
-                InitPing();
-            }
+            InitPing();
         }
 
         [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
@@ -308,8 +305,7 @@ namespace Fun
 
             Debug.Log(String.Format("Stopping {0} transport.", transport.protocol));
 
-            if (timer_.ContainTimer(kPingTimerType))
-                timer_.KillTimer(kPingTimerType);
+            StopPingTimer(transport);
 
             transport.Stop();
         }
@@ -844,13 +840,33 @@ namespace Fun
                                     ping_interval_, ping_timeout_seconds_));
         }
 
+        private void StartPingTimer (FunapiTransport transport)
+        {
+            if (transport.protocol != TransportProtocol.kTcp)
+                return;
+
+            string timer_id = string.Format("{0}_ping", transport.str_protocol);
+            timer_.AddTimer(timer_id, ping_interval_, true, OnPingTimerEvent, transport.protocol);
+            transport.PingWaitTime = 0f;
+        }
+
+        private void StopPingTimer (FunapiTransport transport)
+        {
+            if (transport.protocol != TransportProtocol.kTcp)
+                return;
+
+            string timer_id = string.Format("{0}_ping", transport.str_protocol);
+            if (timer_.ContainTimer(timer_id))
+                timer_.KillTimer(timer_id);
+        }
+
         private void OnPingTimerEvent (object param)
         {
-            FunapiTransport transport = GetTransport(default_protocol_);
+            FunapiTransport transport = GetTransport((TransportProtocol)param);
             if (transport == null)
                 return;
 
-            if (ping_wait_time_ > ping_timeout_seconds_)
+            if (transport.PingWaitTime > ping_timeout_seconds_)
             {
                 Debug.LogWarning("Network seems disabled. Stopping the transport.");
                 transport.OnDisconnected();
@@ -891,10 +907,9 @@ namespace Fun
                 SendUnsentMessages();
             }
 
-            if (ping_interval_ > 0 && transport.protocol != TransportProtocol.kUdp)
+            if (transport.EnablePing && ping_interval_ > 0)
             {
-                timer_.AddTimer(kPingTimerType, ping_interval_, true, OnPingTimerEvent);
-                ping_wait_time_ = 0f;
+                StartPingTimer(transport);
             }
         }
 
@@ -1301,8 +1316,8 @@ namespace Fun
                 transport.SendMessage(new FunapiMessage(transport.protocol, kClientPingMessageType, msg));
             }
 
-            ping_wait_time_ += ping_interval_;
-            DebugUtils.Log(String.Format("Send ping - timestamp: {0}", timestamp));
+            transport.PingWaitTime += ping_interval_;
+            DebugUtils.Log(String.Format("Send {0} ping - timestamp: {1}", transport.str_protocol, timestamp));
         }
 
         private bool OnSeqReceived (FunapiTransport transport, UInt32 seq)
@@ -1446,8 +1461,7 @@ namespace Fun
             DebugUtils.Assert(transport != null);
             Debug.Log(String.Format("{0} Transport Stopped.", protocol));
 
-            if (timer_.ContainTimer(kPingTimerType))
-                timer_.KillTimer(kPingTimerType);
+            StopPingTimer(transport);
 
             CheckTransportConnection(protocol);
         }
@@ -1591,11 +1605,11 @@ namespace Fun
                 timestamp = ping.timestamp;
             }
 
-            if (ping_wait_time_ > 0)
-                ping_wait_time_ -= ping_interval_;
+            if (transport.PingWaitTime > 0)
+                transport.PingWaitTime -= ping_interval_;
 
-            DebugUtils.Log(String.Format("Receive ping - timestamp:{0} time={1} ms",
-                                         timestamp, (DateTime.Now.Ticks - timestamp) / 10000));
+            DebugUtils.Log(String.Format("Receive {0} ping - timestamp:{1} time={2} ms",
+                                         transport.str_protocol, timestamp, (DateTime.Now.Ticks - timestamp) / 10000));
         }
         #endregion
 
@@ -1639,7 +1653,6 @@ namespace Fun
         // Ping message-related constants.
         private static readonly int kPingIntervalSecond = 3;
         private static readonly float kPingTimeoutSeconds = 20f;
-        private static readonly string kPingTimerType = "ping";
         private static readonly string kServerPingMessageType = "_ping_s";
         private static readonly string kClientPingMessageType = "_ping_c";
         private static readonly string kPingTimestampField = "timestamp";
@@ -1664,7 +1677,6 @@ namespace Fun
 
         // Ping-releated member variables.
         private int ping_interval_ = 0;
-        private float ping_wait_time_ = 0f;
         private float ping_timeout_seconds_ = 0f;
 
         // Reliability-releated member variables.
