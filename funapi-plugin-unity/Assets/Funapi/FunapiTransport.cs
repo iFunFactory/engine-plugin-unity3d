@@ -5,6 +5,7 @@
 // consent of iFunFactory Inc.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -669,6 +670,7 @@ namespace Fun
 
             default_encryptor_ = (int)encryption;
             encryptors_[encryption] = encryptor;
+            Debug.Log("Set encryption type - " + default_encryptor_);
         }
 
         internal virtual bool IsSendable
@@ -768,17 +770,20 @@ namespace Fun
                         return false;
                     }
 
-                    Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref encryption_header);
-                    if (nSize <= 0)
+                    if (message.buffer.Count > 0)
                     {
-                        last_error_code_ = ErrorCode.kEncryptionFailed;
-                        last_error_message_ = "Encrypt failure: " + encryptor.name;
-                        Debug.Log(last_error_message_);
-                        AddFailureCallback(message);
-                        return false;
-                    }
+                        Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref encryption_header);
+                        if (nSize <= 0)
+                        {
+                            last_error_code_ = ErrorCode.kEncryptionFailed;
+                            last_error_message_ = "Encrypt failure: " + encryptor.name;
+                            Debug.Log(last_error_message_);
+                            AddFailureCallback(message);
+                            return false;
+                        }
 
-                    DebugUtils.Assert(nSize == message.buffer.Count);
+                        DebugUtils.Assert(nSize == message.buffer.Count);
+                    }
                 }
 
                 StringBuilder header = new StringBuilder();
@@ -820,7 +825,7 @@ namespace Fun
                     Debug.Log("Retrying unsent messages.");
                     WireSend();
                 }
-                else if (pending_.Count > 0)
+                else if (IsSendable && pending_.Count > 0)
                 {
                     // Otherwise, try to process pending messages.
                     List<FunapiMessage> tmp = sending_;
@@ -1020,7 +1025,7 @@ namespace Fun
                         encryption_list.Add(encryption);
                     }
 
-                    if (encryption_list.Count > 0)
+                    if (default_encryptor_ == kNoneEncryption && encryption_list.Count > 0)
                     {
                         default_encryptor_ = (int)encryption_list[0];
                         Debug.Log("Set default encryption: " + default_encryptor_);
@@ -1438,7 +1443,7 @@ namespace Fun
 
                     while (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
                     {
-                        Debug.Log("Remove zero byte buffer.");
+                        DebugUtils.Log("Remove empty buffer.");
                         sending_.RemoveAt(0);
                     }
 
@@ -1822,6 +1827,10 @@ namespace Fun
             if (state == State.kUnknown)
                 return;
 
+            if (cur_www_ != null)
+                cancel_www_ = true;
+
+            cur_www_ = null;
             cur_request_ = null;
             response_time_ = -1f;
 
@@ -1850,6 +1859,11 @@ namespace Fun
         public override bool IsRequestResponse
         {
             get { return true; }
+        }
+
+        public bool UseWWW
+        {
+            set { using_www_ = value; }
         }
 
         internal override void Update ()
@@ -1890,7 +1904,7 @@ namespace Fun
 
         internal override bool IsSendable
         {
-            get { return cur_request_ == null; }
+            get { return cur_www_ == null && cur_request_ == null; }
         }
 
         internal override void WireSend()
@@ -1907,33 +1921,33 @@ namespace Fun
                     FunapiMessage header = sending_[0];
                     FunapiMessage body = sending_[1];
 
-                    // Request
-                    HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-                    request.Method = "POST";
-                    request.ContentType = "application/x-www-form-urlencoded";
-                    request.ContentLength = body.buffer.Count;
+                    // Header
+                    Dictionary<string, string> headers = new Dictionary<string, string>();
+                    string str_header = ((StringBuilder)header.message).ToString();
+                    string[] list = str_header.Split(kHeaderSeparator, StringSplitOptions.None);
 
-                    // encryption type
-                    string str_header = Encoding.ASCII.GetString(header.buffer.Array, header.buffer.Offset, header.buffer.Count);
-                    int start_offset = str_header.IndexOf(kEncryptionHeaderField);
-                    if (start_offset != -1)
+                    for (int i = 0; i < list.Length; i += 2)
                     {
-                        start_offset += kEncryptionHeaderField.Length + 1;
-                        int end_offset = str_header.IndexOf(kHeaderDelimeter, start_offset);
-                        request.Headers[kEncryptionHttpHeaderField] = str_header.Substring(start_offset, end_offset - start_offset);
+                        if (list[i].Length <= 0)
+                            break;
+
+                        if (list[i] == kEncryptionHeaderField)
+                            headers.Add(kEncryptionHttpHeaderField, list[i+1]);
+                        else
+                            headers.Add(list[i], list[i+1]);
                     }
 
-                    // Response
-                    WebState ws = new WebState();
-                    ws.request = request;
-                    ws.msg_type = body.msg_type;
-                    ws.sending = body.buffer;
-                    list_.Add(ws);
-
-                    cur_request_ = ws;
                     response_time_ = kResponseTimeout;
 
-                    request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), ws);
+                    // Sending a message
+                    if (using_www_)
+                    {
+                        SendWWWRequest(headers, body);
+                    }
+                    else
+                    {
+                        SendHttpWebRequest(headers, body);
+                    }
                 }
             }
             catch (Exception e)
@@ -1943,6 +1957,67 @@ namespace Fun
                 Debug.Log(last_error_message_);
                 AddToEventQueue(OnFailure);
             }
+        }
+
+        private void SendWWWRequest (Dictionary<string, string> headers, FunapiMessage body)
+        {
+            cancel_www_ = false;
+
+            if (body.buffer.Count > 0)
+            {
+                FunapiManager.instance.StartCoroutine(
+                    WWWPost(new WWW(host_url_, body.buffer.Array, headers)));
+            }
+            else
+            {
+                FunapiManager.instance.StartCoroutine(
+                    WWWPost(new WWW(host_url_, null, headers)));
+            }
+        }
+
+        private void SendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage body)
+        {
+            // Request
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+            request.ContentLength = body.buffer.Count;
+
+            foreach (KeyValuePair<string, string> item in headers) {
+                request.Headers[item.Key] = item.Value;
+            }
+
+            // Response
+            WebState ws = new WebState();
+            ws.request = request;
+            ws.msg_type = body.msg_type;
+            ws.sending = body.buffer;
+            list_.Add(ws);
+
+            cur_request_ = ws;
+            request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), ws);
+        }
+
+        private void DecodeMessage (string headers, ArraySegment<byte> body)
+        {
+            headers = headers.ToLower();
+            headers = headers.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
+            headers = headers.Replace(kLengthHttpHeaderField, kLengthHeaderField);
+            headers = headers.Replace(kEncryptionHttpHeaderField.ToLower(), kEncryptionHeaderField);
+            headers = headers.Replace("\r", "");
+            byte[] header = Encoding.ASCII.GetBytes(headers);
+
+            // Checks buffer space
+            int offset = received_size_;
+            received_size_ += header.Length + body.Count;
+            CheckReceiveBuffer();
+
+            // Copy to buffer
+            Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
+            Buffer.BlockCopy(body.Array, 0, receive_buffer_, offset + header.Length, body.Count);
+
+            // Decoding a message
+            TryToDecodeMessage();
         }
 
         private void RequestStreamCb (IAsyncResult ar)
@@ -1966,8 +2041,6 @@ namespace Fun
                     // Removes header and body segment
                     sending_.RemoveAt(0);
                     sending_.RemoveAt(0);
-
-                    SendUnsentMessages();
                 }
 
                 request.BeginGetResponse(new AsyncCallback(ResponseCb), ws);
@@ -2061,26 +2134,10 @@ namespace Fun
 
                     lock (receive_lock_)
                     {
-                        // Header
+                        // Decodes message
                         byte[] header = ws.response.Headers.ToByteArray();
                         string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
-                        str_header = str_header.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
-                        str_header = str_header.Replace(kLengthHttpHeaderField, kLengthHeaderField);
-                        str_header = str_header.Replace(kEncryptionHttpHeaderField, kEncryptionHeaderField);
-                        str_header = str_header.Replace("\r", "");
-                        header = Encoding.ASCII.GetBytes(str_header);
-
-                        // Checks buffer space
-                        int offset = received_size_;
-                        received_size_ += header.Length + ws.read_offset;
-                        CheckReceiveBuffer();
-
-                        // Copy to buffer
-                        Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
-                        Buffer.BlockCopy(ws.read_data, 0, receive_buffer_, offset + header.Length, ws.read_offset);
-
-                        // Decoding a message
-                        TryToDecodeMessage();
+                        DecodeMessage(str_header, new ArraySegment<byte>(ws.read_data, 0, ws.read_offset));
 
                         ws.stream.Close();
                         ws.stream = null;
@@ -2090,6 +2147,8 @@ namespace Fun
                         response_time_ = -1f;
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
+
+                        SendUnsentMessages();
                     }
                 }
             }
@@ -2105,13 +2164,72 @@ namespace Fun
             }
         }
 
+        private IEnumerator WWWPost (WWW www)
+        {
+            cur_www_ = www;
+
+            while (!www.isDone && !cancel_www_)
+            {
+                yield return null;
+            }
+
+            if (cancel_www_)
+            {
+                cur_www_ = null;
+                yield break;
+            }
+
+            try
+            {
+                lock (sending_lock_)
+                {
+                    DebugUtils.Assert(sending_.Count >= 2);
+
+                    // Removes header and body segment
+                    sending_.RemoveAt(0);
+                    sending_.RemoveAt(0);
+                }
+
+                // Decodes message
+                StringBuilder headers = new StringBuilder();
+                foreach (KeyValuePair<string, string> item in www.responseHeaders)
+                {
+                    headers.AppendFormat("{0}{1}{2}{3}",
+                        item.Key, kHeaderFieldDelimeter, item.Value, kHeaderDelimeter);
+                }
+                headers.Append(kHeaderDelimeter);
+
+                DecodeMessage(headers.ToString(), new ArraySegment<byte>(www.bytes));
+
+                cur_www_ = null;
+                response_time_ = -1f;
+                last_error_code_ = ErrorCode.kNone;
+                last_error_message_ = "";
+
+                // Sends unsent messages
+                SendUnsentMessages();
+            }
+            catch (Exception e)
+            {
+                last_error_code_ = ErrorCode.kExceptionError;
+                last_error_message_ = "Failure in WWWPost: " + e.ToString();
+                Debug.Log(last_error_message_);
+                AddToEventQueue(OnFailure);
+            }
+        }
+
         internal override void OnFailure ()
         {
+            if (cur_www_ != null)
+                cancel_www_ = true;
+
+            cur_www_ = null;
+            response_time_ = -1f;
+
             if (cur_request_ != null)
             {
                 WebState ws = cur_request_;
                 cur_request_ = null;
-                response_time_ = -1f;
 
                 if (ws.request != null)
                 {
@@ -2134,6 +2252,8 @@ namespace Fun
         private static readonly string kLengthHttpHeaderField = "content-length";
         private static readonly string kEncryptionHttpHeaderField = "X-iFun-Enc";
 
+        private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
+
         // waiting time for response
         private static readonly float kResponseTimeout = 30f;    // seconds
 
@@ -2154,6 +2274,13 @@ namespace Fun
         // member variables.
         private string host_url_;
         private float response_time_ = -1f;
+
+        // WWW-related member variables.
+        private bool using_www_ = false;
+        private WWW cur_www_ = null;
+        private bool cancel_www_ = false;
+
+        // WebRequest-related member variables.
         private WebState cur_request_ = null;
         private List<WebState> list_ = new List<WebState>();
     }
