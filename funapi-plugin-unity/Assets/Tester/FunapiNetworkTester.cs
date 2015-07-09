@@ -249,8 +249,10 @@ public class FunapiNetworkTester : MonoBehaviour
             {
                 transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
                 transport.AutoReconnect = true;
-                transport.EnablePing = true;
+                //transport.EnablePing = true;
                 //transport.DisableNagle = true;
+
+                //((FunapiTcpTransport)transport).SetEncryption(EncryptionType.kIFunEngine2Encryption);
             }
             else if (protocol == TransportProtocol.kUdp)
             {
@@ -259,6 +261,9 @@ public class FunapiNetworkTester : MonoBehaviour
             else if (protocol == TransportProtocol.kHttp)
             {
                 transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
+
+                // Send messages using WWW class
+                //((FunapiHttpTransport)transport).UseWWW = true;
             }
         }
 
