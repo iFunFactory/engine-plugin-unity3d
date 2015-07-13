@@ -111,6 +111,11 @@ namespace Fun
             get; set;
         }
 
+        public int PingTime
+        {
+            get; internal set;
+        }
+
         public bool IsConnecting
         {
             get { return cstate_ == ConnectState.kConnecting ||

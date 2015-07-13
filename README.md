@@ -5,6 +5,46 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 07/15/2015 (ver.92)
+- FunapiNetwork에 EnablePing 옵션 추가 (아무때나 켜고 끌 수 있는 옵션)
+- 마지막 핑 값을 가져오는 PingTime 함수 추가
+
+### 07/13/2015 (ver.91)
+- 기존의 HttpWebRequest가 Unity Editor Windows 버전에서 Blocking 되는 경우가 있어 UnityEngine.WWW를 사용해서 메시지를 보내는 옵션을 추가
+- Coroutine을 사용하기 위해 FunapiManager Singleton class 추가
+- Tcp의 경우 재접속을 무한 시도하는 버그가 수정
+
+### 07/13/2015 (ver.90)
+- EnablePing 값이 true이면 핑 사용 (Tcp만 사용 가능)
+
+### 07/13/2015 (ver.89)
+- Connect, Reconnect 방식 변경
+
+  - 기존의 연결, 재연결 룰을 아래와 같은 방식으로 변경
+
+    - 클라이언트가 처음 서버에 연결할 때
+      DNS 주소로 여러개가 나오나 보고, 여러 개가 나오면 순차적으로 접근 (하나면 그것만 시도)
+      재시도할 때는 exponential back-off (최대 3회)
+      재시도에 실패하면 IP-list가 주어진 경우 하나씩 시도
+      모두 실패하면 ConnectFailureCallback 호출
+
+    - 클라이언트가 `Redirect` 로 다른 서버로 이동할 때
+      연결 시도한 서버만 계속 재접속 시도 (exponential back-off, 최대 3회)
+      실패하면 ConnectFailureCallback 호출
+
+    - 클라이언트가 연결이 끊겼을 때
+      원래 붙어 있던 서버에 재접속 시도 (exponetial-backoff, 최대 3회)
+      실패하면 DisconnectedCallback 호출
+
+- Ping 관련 수정사항
+
+  - Udp가 기본 프로토콜일 경우 Ping 사용 못하도록 막음
+  - Ping Timeout 체크 기준 값을 횟수에서 시간으로 변경
+  - 이전 연결에서 보낸 Ping 값을 재연결됐을 때 받으면 무시함
+
+- Transport가 Stop될 때 Default protocol 변경하던 것 삭제
+  - 연결이 잠시 끊겼다가 재연결될 때 기본 프로토콜이 바뀌면 안되므로 변경 안함
+
 ### 06/22/2015 (ver.87)
 - Sequence number 관련 버그 수정
 - Ping timeout 시간을 정할 수 있도록 Config.json 파일에 추가
