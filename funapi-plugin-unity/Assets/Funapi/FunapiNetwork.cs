@@ -28,7 +28,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 91;
+        public static readonly int kPluginVersion = 92;
     }
 
     // Sending message-related class.
@@ -399,6 +399,65 @@ namespace Fun
             }
 
             OnStoppedAllTransportCallback();
+        }
+
+        public bool EnablePing
+        {
+            get
+            {
+                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+                if (transport == null)
+                {
+                    Debug.LogWarning("EnablePing - Tcp transport is null.");
+                    return false;
+                }
+
+                return transport.EnablePing;
+            }
+            set
+            {
+                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+                if (transport == null)
+                {
+                    Debug.LogWarning("EnablePing - Tcp transport is null.");
+                    return;
+                }
+
+                if (transport.EnablePing == value)
+                    return;
+
+                if (value)
+                {
+                    if (ping_interval_ <= 0)
+                    {
+                        Debug.LogWarning("EnablePing - ping interval time is 0.");
+                        return;
+                    }
+
+                    transport.EnablePing = true;
+                    StartPingTimer(transport);
+                }
+                else
+                {
+                    transport.EnablePing = false;
+                    StopPingTimer(transport);
+                }
+            }
+        }
+
+        public int PingTime
+        {
+            get
+            {
+                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
+                if (transport == null)
+                {
+                    Debug.LogWarning("PingTime - Tcp transport is null.");
+                    return 0;
+                }
+
+                return transport.PingTime;
+            }
         }
 
         // Your update method inheriting MonoBehaviour should explicitly invoke this method.
@@ -854,6 +913,8 @@ namespace Fun
         {
             if (transport.protocol != TransportProtocol.kTcp)
                 return;
+
+            transport.PingTime = 0;
 
             string timer_id = string.Format("{0}_ping", transport.str_protocol);
             if (timer_.ContainTimer(timer_id))
@@ -1608,8 +1669,10 @@ namespace Fun
             if (transport.PingWaitTime > 0)
                 transport.PingWaitTime -= ping_interval_;
 
+            transport.PingTime = (int)((DateTime.Now.Ticks - timestamp) / 10000);
+
             DebugUtils.Log(String.Format("Receive {0} ping - timestamp:{1} time={2} ms",
-                                         transport.str_protocol, timestamp, (DateTime.Now.Ticks - timestamp) / 10000));
+                                         transport.str_protocol, timestamp, transport.PingTime));
         }
         #endregion
 
