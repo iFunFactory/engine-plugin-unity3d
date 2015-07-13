@@ -876,12 +876,6 @@ namespace Fun
         // Decoding a messages
         internal void TryToDecodeMessage ()
         {
-            if (first_receiving_)
-            {
-                first_receiving_ = false;
-                cstate_ = ConnectState.kConnected;
-            }
-
             if (IsStream)
             {
                 // Try to decode as many messages as possible.
@@ -1136,6 +1130,12 @@ namespace Fun
 
                     // TODO: Implementation
                     DebugUtils.Assert(body_length == nSize);
+                }
+
+                if (first_receiving_)
+                {
+                    first_receiving_ = false;
+                    cstate_ = ConnectState.kConnected;
                 }
 
                 ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
