@@ -4,12 +4,12 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-
 using Fun;
 using ProtoBuf;
 using System.Collections.Generic;
 using UnityEngine;
 
+// protobuf
 using funapi.network.fun_message;
 using funapi.service.multicast_message;
 
@@ -18,7 +18,6 @@ namespace Fun
 {
     public class FunapiChatClient
     {
-        #region public interface
         public delegate void OnChannelMessage(string channel_id, string sender, string text);
 
         public FunapiChatClient()
@@ -140,9 +139,7 @@ namespace Fun
             if (multicasting_ != null)
                 multicasting_.Update ();
         }
-        #endregion
 
-        #region Funapi system message handlers
         private void OnMulticastingReceived(string chat_channel, object data)
         {
             DebugUtils.Assert (data is FunMulticastMessage);
@@ -162,11 +159,9 @@ namespace Fun
         }
 
 
-        FunapiMulticastClient multicasting_;
-
-        private Dictionary<string, KeyValuePair<string, OnChannelMessage> > channel_info_ = new Dictionary<string, KeyValuePair<string, OnChannelMessage> > ();
+        private FunapiMulticastClient multicasting_;
 
         private object lock_ = new object();
-        #endregion
+        private Dictionary<string, KeyValuePair<string, OnChannelMessage>> channel_info_ = new Dictionary<string, KeyValuePair<string, OnChannelMessage>>();
     }
 }

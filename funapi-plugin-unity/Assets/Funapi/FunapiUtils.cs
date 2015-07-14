@@ -8,13 +8,13 @@ using MiniJSON;
 using System;
 using System.IO;
 using System.Collections.Generic;
-using System.Text;
 using UnityEngine;
+
 
 namespace Fun
 {
     // Utility class
-    public class FunapiUtils
+    internal class FunapiUtils
     {
         // Gets local path
         public static string GetLocalDataPath
@@ -310,7 +310,7 @@ namespace Fun
 
 
     // Timer
-    public class FunapiTimer
+    internal class FunapiTimer
     {
         public void AddTimer (string name, float delay, bool loop, EventHandler callback, object param = null)
         {

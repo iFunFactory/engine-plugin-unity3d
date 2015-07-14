@@ -13,7 +13,6 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-
 #if !NO_UNITY
 using UnityEngine;
 #endif
@@ -55,21 +54,45 @@ namespace Fun
 
 
     // Abstract class to represent Transport used by Funapi
-    // There are 3 transport types at the moment (though this plugin implements only TCP one.)
     // TCP, UDP, and HTTP.
     public abstract class FunapiTransport
     {
-        #region public interface
         public FunapiTransport()
         {
-            state = State.kUnknown;
-            protocol = TransportProtocol.kDefault;
+            state_ = State.kUnknown;
+            protocol_ = TransportProtocol.kDefault;
             ConnectTimeout = 10f;
         }
 
-        public TransportProtocol protocol
+        // Start connecting
+        internal abstract void Start();
+
+        // Disconnection
+        internal abstract void Stop();
+
+        // Check connection
+        internal abstract bool Started { get; }
+
+        // Timer
+        internal FunapiTimer Timer { get; set; }
+
+        internal float PingWaitTime { get; set; }
+
+        // Check unsent messages
+        internal abstract bool HasUnsentMessages { get; }
+
+        // Send a message
+        internal abstract void SendMessage(FunapiMessage fun_msg);
+
+        internal State state
         {
-            get; set;
+            get { return state_; }
+            set { state_ = value; }
+        }
+
+        public TransportProtocol Protocol
+        {
+            get { return protocol_; }
         }
 
         public string str_protocol
@@ -77,7 +100,7 @@ namespace Fun
             get; set;
         }
 
-        public FunEncoding encoding
+        public FunEncoding Encoding
         {
             get { return encoding_; }
         }
@@ -124,16 +147,6 @@ namespace Fun
                          cstate_ == ConnectState.kRedirecting; }
         }
 
-        public ErrorCode LastErrorCode
-        {
-            get { return last_error_code_; }
-        }
-
-        public string LastErrorMessage
-        {
-            get { return last_error_message_; }
-        }
-
         // Encoding/Decoding related
         public JsonAccessor JsonHelper
         {
@@ -153,56 +166,6 @@ namespace Fun
                 return;
 
             extra_list_.Add(list);
-        }
-        #endregion
-
-        #region internal implementation
-        // Start connecting
-        internal abstract void Start();
-
-        // Disconnection
-        internal abstract void Stop();
-
-        // Check connection
-        internal abstract bool Started { get; }
-
-        // Update
-        internal virtual void Update()
-        {
-            Queue<DelegateEventHandler> queue = null;
-
-            lock (event_lock_)
-            {
-                if (event_queue_.Count > 0)
-                {
-                    queue = event_queue_;
-                    event_queue_ = new Queue<DelegateEventHandler>();
-                }
-            }
-
-            if (queue != null)
-            {
-                foreach (DelegateEventHandler func in queue)
-                {
-                    func();
-                }
-            }
-        }
-
-        // Timer
-        internal FunapiTimer Timer { get; set; }
-
-        internal float PingWaitTime { get; set; }
-
-        // Check unsent messages
-        internal abstract bool HasUnsentMessages { get; }
-
-        // Send a message
-        internal abstract void SendMessage(FunapiMessage fun_msg);
-
-        internal State state
-        {
-            get; set;
         }
 
         // Sets address
@@ -368,6 +331,29 @@ namespace Fun
             return true;
         }
 
+        // Update
+        internal virtual void Update()
+        {
+            Queue<DelegateEventHandler> queue = null;
+
+            lock (event_lock_)
+            {
+                if (event_queue_.Count > 0)
+                {
+                    queue = event_queue_;
+                    event_queue_ = new Queue<DelegateEventHandler>();
+                }
+            }
+
+            if (queue != null)
+            {
+                foreach (DelegateEventHandler func in queue)
+                {
+                    func();
+                }
+            }
+        }
+
         internal void AddToEventQueue (DelegateEventHandler handler)
         {
             if (handler == null)
@@ -385,22 +371,33 @@ namespace Fun
         internal void AddFailureCallback (FunapiMessage fun_msg)
         {
             AddToEventQueue(
-                delegate
-                {
-                OnMessageFailureCallback(fun_msg);
-                OnFailureCallback();
-            }
+                delegate {
+                    OnMessageFailureCallback(fun_msg);
+                    OnFailureCallback();
+                }
             );
         }
 
-        // Callback functions
+        public ErrorCode LastErrorCode
+        {
+            get { return last_error_code_; }
+        }
+
+        public string LastErrorMessage
+        {
+            get { return last_error_message_; }
+        }
+
+        //---------------------------------------------------------------------
+        // Callback-related functions
+        //---------------------------------------------------------------------
         internal void OnConnectionTimeout ()
         {
             CheckConnectList();
 
             if (ConnectTimeoutCallback != null)
             {
-                ConnectTimeoutCallback(protocol);
+                ConnectTimeoutCallback(protocol_);
             }
         }
 
@@ -408,17 +405,17 @@ namespace Fun
         {
             if (ReceivedCallback != null)
             {
-                ReceivedCallback(protocol, header, body);
+                ReceivedCallback(protocol_, header, body);
             }
         }
 
         internal void OnStarted ()
         {
-            state = State.kEstablished;
+            state_ = State.kEstablished;
 
             if (StartedCallback != null)
             {
-                StartedCallback(protocol);
+                StartedCallback(protocol_);
             }
         }
 
@@ -426,7 +423,7 @@ namespace Fun
         {
             if (StartedInternalCallback != null)
             {
-                StartedInternalCallback(protocol);
+                StartedInternalCallback(protocol_);
             }
         }
 
@@ -434,7 +431,7 @@ namespace Fun
         {
             if (StoppedCallback != null)
             {
-                StoppedCallback(protocol);
+                StoppedCallback(protocol_);
             }
 
             if (cstate_ == ConnectState.kConnecting)
@@ -482,7 +479,7 @@ namespace Fun
 
             if (ConnectFailureCallback != null)
             {
-                ConnectFailureCallback(protocol);
+                ConnectFailureCallback(protocol_);
             }
         }
 
@@ -490,7 +487,7 @@ namespace Fun
         {
             if (DisconnectedCallback != null)
             {
-                DisconnectedCallback(protocol);
+                DisconnectedCallback(protocol_);
             }
         }
 
@@ -498,7 +495,7 @@ namespace Fun
         {
             if (FailureCallback != null)
             {
-                FailureCallback(protocol);
+                FailureCallback(protocol_);
             }
         }
 
@@ -506,10 +503,9 @@ namespace Fun
         {
             if (MessageFailureCallback != null)
             {
-                MessageFailureCallback(protocol, fun_msg);
+                MessageFailureCallback(protocol_, fun_msg);
             }
         }
-        #endregion
 
 
         internal enum State
@@ -568,6 +564,8 @@ namespace Fun
         internal string last_error_message_ = "";
 
         // member variables.
+        internal State state_;
+        internal TransportProtocol protocol_;
         internal object event_lock_ = new object();
         internal Queue<DelegateEventHandler> event_queue_ = new Queue<DelegateEventHandler>();
         internal List<string> timer_id_list_ = new List<string>();
@@ -605,7 +603,7 @@ namespace Fun
                     Timer.AddTimer(id, ConnectTimeout,
                         delegate (object param) {
                             timer_id_list_.Remove(id);
-                            if (state == State.kEstablished)
+                            if (state_ == State.kEstablished)
                                 return;
 
                             Debug.Log(string.Format("{0} Connection waiting time has been exceeded.", str_protocol));
@@ -627,10 +625,10 @@ namespace Fun
         // Stops a socket.
         internal override void Stop()
         {
-            if (state == State.kUnknown)
+            if (state_ == State.kUnknown)
                 return;
 
-            state = State.kUnknown;
+            state_ = State.kUnknown;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
@@ -667,7 +665,7 @@ namespace Fun
             if (encoding_ == FunEncoding.kJson)
             {
                 string str = this.JsonHelper.Serialize(fun_msg.message);
-                byte[] body = Encoding.UTF8.GetBytes(str);
+                byte[] body = System.Text.Encoding.UTF8.GetBytes(str);
 
                 DebugUtils.Log(String.Format("JSON to send : {0}", str));
 
@@ -707,7 +705,7 @@ namespace Fun
                     header.Append(kHeaderDelimeter);
 
                     FunapiMessage msg_header = new FunapiMessage(msg_body.protocol, msg_body.msg_type, header);
-                    msg_header.buffer = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header.ToString()));
+                    msg_header.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                     msg_body.buffer = new ArraySegment<byte>(buffer);
 
                     pending_.Add(msg_header);
@@ -846,7 +844,7 @@ namespace Fun
                     Debug.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
-                string line = Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
+                string line = System.Text.Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
                 next_decoding_offset_ = offset + 1;
 
                 if (line == "")
@@ -890,9 +888,9 @@ namespace Fun
 
             if (body_length > 0)
             {
-                if ((int)state < (int)State.kConnected)
+                if ((int)state_ < (int)State.kConnected)
                 {
-                    Debug.Log("Unexpected message. state:" + state);
+                    Debug.Log("Unexpected message. state:" + state_);
                     return false;
                 }
 
@@ -918,11 +916,11 @@ namespace Fun
         internal virtual void OnFailure()
         {
             Debug.Log(String.Format("OnFailure({0}) - state: {1}\n{2}:{3}",
-                                    str_protocol, state, last_error_code_, last_error_message_));
+                                    str_protocol, state_, last_error_code_, last_error_message_));
 
             OnFailureCallback();
 
-            if (state != State.kEstablished)
+            if (state_ != State.kEstablished)
             {
                 CheckConnectList();
 
@@ -968,10 +966,10 @@ namespace Fun
         internal static readonly string kLengthHeaderField = "LEN";
 
         // for speed-up.
-        private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(Encoding.ASCII.GetBytes(kHeaderDelimeter));
+        private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
         private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
-        // State-related.
+        // Message-related.
         private bool first_sending_ = true;
         private bool first_receiving_ = true;
         internal bool header_decoded_ = false;
@@ -990,10 +988,9 @@ namespace Fun
     // TCP transport layer
     public class FunapiTcpTransport : FunapiDecodedTransport
     {
-        #region public interface
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
-            protocol = TransportProtocol.kTcp;
+            protocol_ = TransportProtocol.kTcp;
             str_protocol = "Tcp";
             DisableNagle = false;
             encoding_ = type;
@@ -1011,7 +1008,7 @@ namespace Fun
         // Stops a socket.
         internal override void Stop()
         {
-            if (state == State.kUnknown)
+            if (state_ == State.kUnknown)
                 return;
 
             if (sock_ != null)
@@ -1027,7 +1024,7 @@ namespace Fun
         {
             get
             {
-                return sock_ != null && sock_.Connected && (int)state >= (int)State.kConnected;
+                return sock_ != null && sock_.Connected && (int)state_ >= (int)State.kConnected;
             }
         }
 
@@ -1040,13 +1037,11 @@ namespace Fun
         {
             get; set;
         }
-        #endregion
 
-        #region internal implementation
         // Create a socket.
         internal override void Init()
         {
-            state = State.kConnecting;
+            state_ = State.kConnecting;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             if (DisableNagle)
                 sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
@@ -1111,7 +1106,7 @@ namespace Fun
                 }
                 Debug.Log("Connected.");
 
-                state = State.kConnected;
+                state_ = State.kConnected;
 
                 OnStartedInternal();
 
@@ -1285,17 +1280,15 @@ namespace Fun
 
         internal Socket sock_;
         private IPEndPoint connect_ep_;
-        #endregion
     }
 
 
     // UDP transport layer
     public class FunapiUdpTransport : FunapiDecodedTransport
     {
-        #region public interface
         public FunapiUdpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
-            protocol = TransportProtocol.kUdp;
+            protocol_ = TransportProtocol.kUdp;
             str_protocol = "Udp";
             encoding_ = type;
 
@@ -1312,7 +1305,7 @@ namespace Fun
         // Stops a socket.
         internal override void Stop()
         {
-            if (state == State.kUnknown)
+            if (state_ == State.kUnknown)
                 return;
 
             if (sock_ != null)
@@ -1326,20 +1319,18 @@ namespace Fun
 
         internal override bool Started
         {
-            get { return sock_ != null && (int)state >= (int)State.kConnected; }
+            get { return sock_ != null && (int)state_ >= (int)State.kConnected; }
         }
 
         public override bool IsDatagram
         {
             get { return true; }
         }
-        #endregion
 
-        #region internal implementation
         // Create a socket.
         internal override void Init()
         {
-            state = State.kConnected;
+            state_ = State.kConnected;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
@@ -1532,17 +1523,15 @@ namespace Fun
         internal Socket sock_;
         private IPEndPoint send_ep_;
         private EndPoint receive_ep_;
-        #endregion
     }
 
 
     // HTTP transport layer
 	public class FunapiHttpTransport : FunapiDecodedTransport
     {
-        #region public interface
         public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
         {
-            protocol = TransportProtocol.kHttp;
+            protocol_ = TransportProtocol.kHttp;
             str_protocol = "Http";
             encoding_ = type;
 
@@ -1558,7 +1547,7 @@ namespace Fun
 
         internal override void Stop()
         {
-            if (state == State.kUnknown)
+            if (state_ == State.kUnknown)
                 return;
 
             if (cur_www_ != null)
@@ -1585,7 +1574,7 @@ namespace Fun
 
         internal override bool Started
         {
-            get { return (int)state >= (int)State.kConnected; }
+            get { return (int)state_ >= (int)State.kConnected; }
         }
 
         public override bool IsRequestResponse
@@ -1597,12 +1586,10 @@ namespace Fun
         {
             set { using_www_ = value; }
         }
-        #endregion
 
-        #region internal implementation
         internal override void Init()
         {
-            state = State.kConnected;
+            state_ = State.kConnected;
 
             OnStartedInternal();
         }
@@ -1720,7 +1707,7 @@ namespace Fun
             headers = headers.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
             headers = headers.Replace(kLengthHttpHeaderField, kLengthHeaderField);
             headers = headers.Replace("\r", "");
-            byte[] header = Encoding.ASCII.GetBytes(headers);
+            byte[] header = System.Text.Encoding.ASCII.GetBytes(headers);
 
             // Checks buffer space
             int offset = received_size_;
@@ -1851,7 +1838,7 @@ namespace Fun
                     {
                         // Decodes message
                         byte[] header = ws.response.Headers.ToByteArray();
-                        string str_header = Encoding.ASCII.GetString(header, 0, header.Length);
+                        string str_header = System.Text.Encoding.ASCII.GetString(header, 0, header.Length);
                         DecodeMessage(str_header, new ArraySegment<byte>(ws.read_data, 0, ws.read_offset));
 
                         ws.stream.Close();
@@ -1977,7 +1964,6 @@ namespace Fun
             CancelRequest();
             base.OnFailure();
         }
-        #endregion
 
 
         // Funapi header-related constants.

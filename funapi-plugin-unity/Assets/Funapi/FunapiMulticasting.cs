@@ -4,13 +4,13 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-
 using Fun;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+// protobuf
 using funapi.network.fun_message;
 using funapi.service.multicast_message;
 
@@ -19,23 +19,12 @@ namespace Fun
 {
     public class FunapiMulticastClient
     {
-        #region public interface
-        public delegate void ChannelReceiveHandler(string channel_id, object body);
-
-        public FunapiMulticastClient(FunEncoding encoding)
+        public FunapiMulticastClient (FunEncoding encoding)
         {
             encoding_ = encoding;
         }
 
-        public bool Started
-        {
-            get
-            {
-                return network_ != null && network_.Started;
-            }
-        }
-
-        public void Connect(string hostname_or_ip, ushort port, bool session_reliability)
+        public void Connect (string hostname_or_ip, ushort port, bool session_reliability)
         {
             bool need_to_start = false;
 
@@ -63,13 +52,17 @@ namespace Fun
                 network_.Stop();
         }
 
+        public bool Started
+        {
+            get { return network_ != null && network_.Started; }
+        }
+
         public bool Connected
         {
             get { return network_ != null && network_.Connected; }
         }
 
-
-        public bool JoinChannel(string channel_id, ChannelReceiveHandler handler)
+        public bool JoinChannel (string channel_id, ChannelReceiveHandler handler)
         {
             lock (lock_)
             {
@@ -97,7 +90,7 @@ namespace Fun
             return true;
         }
 
-        public bool LeaveChannel(string channel_id)
+        public bool LeaveChannel (string channel_id)
         {
             lock (lock_)
             {
@@ -125,7 +118,7 @@ namespace Fun
             return true;
         }
 
-        public bool InChannel(string channel_id)
+        public bool InChannel (string channel_id)
         {
             lock (lock_)
             {
@@ -138,7 +131,7 @@ namespace Fun
         /// The "channel_id" field is mandatory.
         /// And mcas_msg must have join and leave flags set.
         /// </summary>
-        public bool SendToChannel(FunMulticastMessage mcast_msg)
+        public bool SendToChannel (FunMulticastMessage mcast_msg)
         {
             DebugUtils.Assert (encoding_ == FunEncoding.kProtobuf);
             DebugUtils.Assert (mcast_msg != null);
@@ -172,13 +165,13 @@ namespace Fun
         /// The "channel_id" field is mandatory.
         /// And mcas_msg must have join and leave flags set.
         /// </summary>
-        public bool SendToChannel(object json_msg) {
+        public bool SendToChannel (object json_msg)
+        {
             DebugUtils.Assert (encoding_ == FunEncoding.kJson);
             // TODO(dkmoon): Verifies the passed json_msg has required fields.
             network_.SendMessage (kMulticastMsgType, json_msg);
             return true;
         }
-
 
         /// <summary>
         /// Please call this Update function inside your Unity3d Update.
@@ -188,10 +181,9 @@ namespace Fun
             if (network_ != null)
                 network_.Update ();
         }
-        #endregion
 
-        #region internal implementation
-        private void OnReceived(string msg_type, object body) {
+        private void OnReceived (string msg_type, object body)
+        {
             DebugUtils.Assert (msg_type == kMulticastMsgType);
             FunMessage msg = body as FunMessage;
             DebugUtils.Assert (msg != null);
@@ -213,14 +205,15 @@ namespace Fun
             }
         }
 
-        private const string kMulticastMsgType = "_multicast";
+
+        public delegate void ChannelReceiveHandler(string channel_id, object body);
+
+        private static readonly string kMulticastMsgType = "_multicast";
 
         private FunEncoding encoding_;
         private FunapiNetwork network_;
         private FunapiTcpTransport transport_;
-        private Dictionary<string, ChannelReceiveHandler> channels_ = new Dictionary<string, ChannelReceiveHandler> ();
-
+        private Dictionary<string, ChannelReceiveHandler> channels_ = new Dictionary<string, ChannelReceiveHandler>();
         private object lock_ = new object();
-        #endregion
     }
 }
