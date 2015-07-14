@@ -46,6 +46,7 @@ namespace Fun
         kEncryptionFailed,
         kInvalidEncryption,
         kUnknownEncryption,
+        kRequestTimeout,
         kDisconnected,
         kExceptionError
     }
@@ -1835,9 +1836,7 @@ namespace Fun
             if (cur_www_ != null)
                 cancel_www_ = true;
 
-            cur_www_ = null;
-            cur_request_ = null;
-            response_time_ = -1f;
+            ClearRequest();
 
             foreach (WebState ws in list_)
             {
@@ -1869,20 +1868,6 @@ namespace Fun
         public bool UseWWW
         {
             set { using_www_ = value; }
-        }
-
-        internal override void Update ()
-        {
-            base.Update();
-
-            if (response_time_ > 0f)
-            {
-                response_time_ -= Time.deltaTime;
-                if (response_time_ <= 0f)
-                {
-                    OnFailure();
-                }
-            }
         }
         #endregion
 
@@ -1942,7 +1927,8 @@ namespace Fun
                             headers.Add(list[i], list[i+1]);
                     }
 
-                    response_time_ = kResponseTimeout;
+                    // Sets timeout timer
+                    Timer.AddTimer(kTimeoutTimerId, kTimeoutSeconds, OnRequestTimeout, body.msg_type);
 
                     // Sending a message
                     if (using_www_)
@@ -2148,11 +2134,9 @@ namespace Fun
                         ws.stream = null;
                         list_.Remove(ws);
 
-                        cur_request_ = null;
-                        response_time_ = -1f;
-                        last_error_code_ = ErrorCode.kNone;
-                        last_error_message_ = "";
+                        ClearRequest();
 
+                        // Sends unsent messages
                         SendUnsentMessages();
                     }
                 }
@@ -2206,10 +2190,7 @@ namespace Fun
 
                 DecodeMessage(headers.ToString(), new ArraySegment<byte>(www.bytes));
 
-                cur_www_ = null;
-                response_time_ = -1f;
-                last_error_code_ = ErrorCode.kNone;
-                last_error_message_ = "";
+                ClearRequest();
 
                 // Sends unsent messages
                 SendUnsentMessages();
@@ -2223,18 +2204,14 @@ namespace Fun
             }
         }
 
-        internal override void OnFailure ()
+        private void CancelRequest ()
         {
             if (cur_www_ != null)
                 cancel_www_ = true;
 
-            cur_www_ = null;
-            response_time_ = -1f;
-
             if (cur_request_ != null)
             {
                 WebState ws = cur_request_;
-                cur_request_ = null;
 
                 if (ws.request != null)
                 {
@@ -2245,9 +2222,35 @@ namespace Fun
                 if (ws.stream != null)
                     ws.stream.Close();
 
-                list_.Remove(ws);
+                if (list_.Contains(ws))
+                    list_.Remove(ws);
             }
 
+            ClearRequest();
+        }
+
+        private void ClearRequest ()
+        {
+            cur_www_ = null;
+            cur_request_ = null;
+            last_error_code_ = ErrorCode.kNone;
+            last_error_message_ = "";
+
+            if (Timer.ContainTimer(kTimeoutTimerId))
+                Timer.KillTimer(kTimeoutTimerId);
+        }
+
+        private void OnRequestTimeout (object param)
+        {
+            last_error_code_ = ErrorCode.kRequestTimeout;
+            last_error_message_ = string.Format("Http Request timeout - msg_type:{0}", (string)param);
+            Debug.Log(last_error_message_);
+            OnFailure();
+        }
+
+        internal override void OnFailure ()
+        {
+            CancelRequest();
             base.OnFailure();
         }
         #endregion
@@ -2260,7 +2263,8 @@ namespace Fun
         private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
 
         // waiting time for response
-        private static readonly float kResponseTimeout = 30f;    // seconds
+        private static readonly string kTimeoutTimerId = "http_timeout";
+        private static readonly float kTimeoutSeconds = 30f;
 
         // Response-related.
         class WebState
@@ -2278,7 +2282,6 @@ namespace Fun
 
         // member variables.
         private string host_url_;
-        private float response_time_ = -1f;
 
         // WWW-related member variables.
         private bool using_www_ = false;
