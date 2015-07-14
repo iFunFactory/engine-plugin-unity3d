@@ -11,6 +11,7 @@ using System.Collections;
 using UnityEngine;
 #endif
 
+
 namespace Fun
 {
     public enum EncryptionType
@@ -22,7 +23,7 @@ namespace Fun
     }
 
 
-    // class Encryptor
+    // Abstract class
     public abstract class Encryptor
     {
         public static Encryptor Create (EncryptionType type)
@@ -116,7 +117,7 @@ namespace Fun
     }
 
 
-    // class Encryptor0
+    // encryption - dummy
     public class Encryptor0 : Encryptor
     {
         public Encryptor0 () : base(EncryptionType.kDummyEncryption, kName, State.kEstablished)
@@ -148,11 +149,11 @@ namespace Fun
             return Encrypt(src, dst, ref out_header);
         }
 
-        public static readonly string kName = "dummy";
+        internal static readonly string kName = "dummy";
     }
 
 
-    // class Encryptor1
+    // encryption - ife1
     public class Encryptor1 : Encryptor
     {
         public Encryptor1 () : base(EncryptionType.kIFunEngine1Encryption, kName, State.kHandshaking)
@@ -233,14 +234,14 @@ namespace Fun
             return src.Count;
         }
 
-        public static readonly string kName = "ife1";
+        internal static readonly string kName = "ife1";
 
         private UInt32 enc_key_;
         private UInt32 dec_key_;
     }
 
 
-    // class Encryptor2
+    // encryption - ife2
     public class Encryptor2 : Encryptor
     {
         public Encryptor2 () : base(EncryptionType.kIFunEngine2Encryption, kName, State.kEstablished)
@@ -292,6 +293,6 @@ namespace Fun
             return src.Count;
         }
 
-        public static readonly string kName = "ife2";
+        internal static readonly string kName = "ife2";
     }
 }

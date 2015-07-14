@@ -35,7 +35,7 @@ namespace Fun
         public bool https;
     }
 
-    public class HostIP : HostAddr
+    internal class HostIP : HostAddr
     {
         public HostIP (string host, IPAddress ip, UInt16 port)
             : base(host, port)

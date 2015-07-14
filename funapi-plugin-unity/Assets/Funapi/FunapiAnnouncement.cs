@@ -14,6 +14,7 @@ using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
+
 namespace Fun
 {
     public enum AnnounceResult
@@ -25,9 +26,9 @@ namespace Fun
         kExceptionError
     }
 
+
     public class FunapiAnnouncement
     {
-        #region public interface
         public void Init (string url)
         {
             // Url
@@ -68,9 +69,7 @@ namespace Fun
         {
             get { return announce_list_.Count; }
         }
-        #endregion
 
-        #region internal implementation
         private void DownloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
         {
             try
@@ -207,16 +206,12 @@ namespace Fun
                 ResultCallback(result);
             }
         }
-        #endregion
 
 
         // Url-related constants.
         private static readonly string kLocalPath = "/funapi";
-        private static readonly string kAnnouncementsUrl = "/announcements";
         private static readonly string kImagesUrl = "/images";
-
-        // Result callback delegate
-        public delegate void EventHandler(AnnounceResult result);
+        private static readonly string kAnnouncementsUrl = "/announcements";
 
         // member variables.
         private string host_url_ = "";
@@ -225,6 +220,8 @@ namespace Fun
         private List<Dictionary<string, object>> announce_list_ = new List<Dictionary<string, object>>();
         private List<KeyValuePair<string, string>> image_list_ = new List<KeyValuePair<string, string>>();
 
+        // Result callback delegate
+        public delegate void EventHandler(AnnounceResult result);
         public event EventHandler ResultCallback;
     }
 }

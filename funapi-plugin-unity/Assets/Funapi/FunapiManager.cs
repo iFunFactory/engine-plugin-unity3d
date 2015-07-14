@@ -4,8 +4,6 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-//using System;
-using System.Collections;
 using UnityEngine;
 
 
@@ -35,4 +33,4 @@ namespace Fun
         private static FunapiManager instance_ = null;
     }
 
-}  // namespace Fun
+}

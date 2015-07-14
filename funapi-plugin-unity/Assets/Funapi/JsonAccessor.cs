@@ -25,6 +25,8 @@ namespace Fun
         public abstract object Clone(object json_obj);
     }
 
+
+    // Default json accessor
     public class DictionaryJsonAccessor : JsonAccessor
     {
         public override string Serialize(object json_obj)

@@ -5,7 +5,6 @@
 // consent of iFunFactory Inc.
 
 using MiniJSON;
-using UnityEngine;
 using System;
 using System.ComponentModel;
 using System.Collections.Generic;
@@ -14,13 +13,13 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using UnityEngine;
 
 
 namespace Fun
 {
     public class FunapiHttpDownloader
     {
-        #region public interface
         public FunapiHttpDownloader (string target_path)
         {
             target_path_ = target_path;
@@ -108,9 +107,7 @@ namespace Fun
         {
             get { return state_ == State.Downloading || state_ == State.Completed; }
         }
-        #endregion
 
-        #region internal implementation
         // Load file's information.
         private void CheckLocalFiles ()
         {
@@ -424,7 +421,6 @@ namespace Fun
             // Check next download file.
             DownloadResourceFile();
         }
-        #endregion
 
 
         enum State
@@ -456,19 +452,20 @@ namespace Fun
         public event FinishEventHandler FinishedCallback;
 
         // Save file-related constants.
-        private readonly string kRootPath = "client_data";
+        private static readonly string kRootPath = "client_data";
 
         // member variables.
         private Mutex mutex_ = new Mutex();
         private State state_ = State.Ready;
+        private string host_url_ = "";
+        private string target_path_ = "";
+        private DownloadFile cur_download_ = null;
+
         private WebClient web_client_ = new WebClient();
         private List<string> check_files_list_ = new List<string>();
         private List<DownloadUrl> url_list_ = new List<DownloadUrl>();
         private List<DownloadFile> download_list_ = new List<DownloadFile>();
         private List<DownloadFile> cached_files_list_ = new List<DownloadFile>();
-        private string host_url_ = "";
-        private string target_path_ = "";
-        private DownloadFile cur_download_ = null;
     }
 
     public enum DownloadResult
