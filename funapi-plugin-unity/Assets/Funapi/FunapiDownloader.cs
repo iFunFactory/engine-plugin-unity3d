@@ -26,6 +26,7 @@ namespace Fun
             if (target_path_[target_path_.Length - 1] != '/')
                 target_path_ += "/";
             target_path_ += kRootPath + "/";
+            Debug.Log("Download path : " + target_path_);
 
             // List file handler
             web_client_.DownloadDataCompleted += new DownloadDataCompletedEventHandler(DownloadDataCompleteCb);
@@ -108,6 +109,17 @@ namespace Fun
             get { return state_ == State.Downloading || state_ == State.Completed; }
         }
 
+        public int CurrentDownloadFileCount
+        {
+            get { return cur_download_count_; }
+        }
+
+        public int TotalDownloadFileCount
+        {
+            get { return total_download_count_; }
+        }
+
+
         // Load file's information.
         private void CheckLocalFiles ()
         {
@@ -124,7 +136,8 @@ namespace Fun
                 {
                     foreach (string s in files)
                     {
-                        check_files_list_.Add(s);
+                        string path = s.Replace('\\', '/');
+                        check_files_list_.Add(path);
                     }
 
                     MD5Async.Compute(check_files_list_[0], OnCheckMd5Finish);
@@ -162,7 +175,10 @@ namespace Fun
         private void CheckFileList (List<DownloadFile> list)
         {
             if (list.Count <= 0 || cached_files_list_.Count <= 0)
+            {
+                total_download_count_ = list.Count;
                 return;
+            }
 
             List<DownloadFile> remove_list = new List<DownloadFile>();
 
@@ -213,6 +229,7 @@ namespace Fun
                 remove_list.Clear();
             }
 
+            total_download_count_ = list.Count;
             remove_list = null;
         }
 
@@ -389,6 +406,8 @@ namespace Fun
                 }
                 else
                 {
+                    ++cur_download_count_;
+
                     if (download_list_.Count > 0)
                     {
                         cached_files_list_.Add(cur_download_);
@@ -460,6 +479,8 @@ namespace Fun
         private string host_url_ = "";
         private string target_path_ = "";
         private DownloadFile cur_download_ = null;
+        private int cur_download_count_ = 0;
+        private int total_download_count_ = 0;
 
         private WebClient web_client_ = new WebClient();
         private List<string> check_files_list_ = new List<string>();
