@@ -695,18 +695,18 @@ namespace Fun
             {
                 lock (sending_lock_)
                 {
-                    string header = "";
-                    header += kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter;
+                    StringBuilder header = new StringBuilder();
+                    header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
                 	if (first_sending_)
                     {
-                        header += kPluginVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kPluginVersion + kHeaderDelimeter;
+                        header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kPluginVersion, kHeaderDelimeter);
                     	first_sending_ = false;
                     }
-                    header += kLengthHeaderField + kHeaderFieldDelimeter + buffer.Length + kHeaderDelimeter;
-                    header += kHeaderDelimeter;
+                    header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, buffer.Length, kHeaderDelimeter);
+                    header.Append(kHeaderDelimeter);
 
                     FunapiMessage msg_header = new FunapiMessage(msg_body.protocol, msg_body.msg_type, header);
-                    msg_header.buffer = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header));
+                    msg_header.buffer = new ArraySegment<byte>(Encoding.ASCII.GetBytes(header.ToString()));
                     msg_body.buffer = new ArraySegment<byte>(buffer);
 
                     pending_.Add(msg_header);
