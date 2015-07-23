@@ -101,6 +101,7 @@ namespace Fun
         public FunEncoding Encoding
         {
             get { return encoding_; }
+            set { encoding_ = value; }
         }
 
         public virtual bool IsStream
@@ -167,6 +168,18 @@ namespace Fun
         }
 
         // Sets address
+        public void ResetAddress (HostAddr addr)
+        {
+            ip_list_.Clear();
+
+            if (addr is HostHttp)
+                ip_list_.Add(addr.host, addr.port, ((HostHttp)addr).https);
+            else
+                ip_list_.Add(addr.host, addr.port);
+
+            SetNextAddress();
+        }
+
         internal bool SetNextAddress ()
         {
             HostAddr addr = ip_list_.GetNextAddress();
