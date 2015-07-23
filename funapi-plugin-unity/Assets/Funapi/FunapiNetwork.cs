@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 94;
+        public static readonly int kPluginVersion = 95;
     }
 
     // Sending message-related class.
@@ -148,7 +148,8 @@ namespace Fun
         //---------------------------------------------------------------------
         // Connect-related functions
         //---------------------------------------------------------------------
-        public bool Connect (TransportProtocol protocol, HostAddr addr)
+        // For http transport, Pass a HostHttp instead of HostAddr.
+        public bool Connect (TransportProtocol protocol, FunEncoding type, HostAddr addr)
         {
             FunapiTransport transport = GetTransport(protocol);
             if (transport == null)
@@ -157,7 +158,10 @@ namespace Fun
                 return false;
             }
 
-            transport.Connect(addr);
+            transport.Encoding = type;
+            transport.ResetAddress(addr);
+
+            transport.Connect();
             return true;
         }
 

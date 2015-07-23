@@ -96,6 +96,13 @@ namespace Fun
             addr_list_.Add(addr);
         }
 
+        internal void Clear ()
+        {
+            addr_list_.Clear();
+            addr_list_index_ = 0;
+            first_ = true;
+        }
+
         internal void SetFirst ()
         {
             addr_list_index_ = 0;
