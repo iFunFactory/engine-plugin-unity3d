@@ -211,7 +211,14 @@ namespace Fun
                 return null;
             }
 
-            FunapiHttpDownloader downloader = new FunapiHttpDownloader(target_path);
+            bool enable_verify = false;
+            string str_verify = "download_verify_enable";
+            if (data_.ContainsKey(str_verify))
+            {
+                enable_verify = Convert.ToBoolean(data_[str_verify]);
+            }
+
+            FunapiHttpDownloader downloader = new FunapiHttpDownloader(target_path, enable_verify);
             downloader.StartDownload(string.Format("http://{0}:{1}", hostname_or_ip, port));
 
             return downloader;

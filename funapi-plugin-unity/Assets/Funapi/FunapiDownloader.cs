@@ -20,8 +20,11 @@ namespace Fun
 {
     public class FunapiHttpDownloader
     {
-        public FunapiHttpDownloader (string target_path)
+        public FunapiHttpDownloader (string target_path, bool enable_verify = false)
         {
+            manager_ = FunapiManager.instance;
+            enable_verify_ = enable_verify;
+
             target_path_ = target_path;
             if (target_path_[target_path_.Length - 1] != '/')
                 target_path_ += "/";
@@ -34,13 +37,11 @@ namespace Fun
             // Download file handler
             web_client_.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgressChangedCb);
             web_client_.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCompleteCb);
-
-            // Check file list
-            CheckLocalFiles();
         }
 
-        public FunapiHttpDownloader (string target_path, UpdateEventHandler on_update, FinishEventHandler on_finished)
-            : this(target_path)
+        public FunapiHttpDownloader (string target_path, bool enable_verify,
+                                     UpdateEventHandler on_update, FinishEventHandler on_finished)
+            : this(target_path, enable_verify)
         {
             UpdateCallback = new UpdateEventHandler(on_update);
             FinishedCallback = new FinishEventHandler(on_finished);
@@ -76,9 +77,9 @@ namespace Fun
 
                 state_ = State.Start;
                 host_url_ = host_url;
-                Debug.Log("Start Download.");
 
-                DownloadListFile(url);
+                // Check file list
+                CheckLocalFiles();
             }
             finally
             {
@@ -123,13 +124,19 @@ namespace Fun
         // Load file's information.
         private void CheckLocalFiles ()
         {
+            Debug.Log("Checks local files..");
+
             try
             {
-                check_files_list_.Clear();
+                verify_file_list.Clear();
                 cached_files_list_.Clear();
 
                 if (!Directory.Exists(target_path_))
+                {
+                    // Gets list file
+                    DownloadListFile(host_url_);
                     return;
+                }
 
                 string[] files = Directory.GetFiles(target_path_, "*", SearchOption.AllDirectories);
                 if (files.Length > 0)
@@ -137,10 +144,30 @@ namespace Fun
                     foreach (string s in files)
                     {
                         string path = s.Replace('\\', '/');
-                        check_files_list_.Add(path);
+
+                        if (enable_verify_)
+                        {
+                            verify_file_list.Add(path);
+                        }
+                        else
+                        {
+                            path = path.Substring(target_path_.Length);
+
+                            DownloadFile info = new DownloadFile();
+                            info.path = path;
+                            cached_files_list_.Add(info);
+                        }
                     }
 
-                    MD5Async.Compute(check_files_list_[0], OnCheckMd5Finish);
+                    if (enable_verify_)
+                    {
+                        MD5Async.Get(verify_file_list[0], OnCheckMd5Finish);
+                    }
+                    else
+                    {
+                        // Gets list file
+                        DownloadListFile(host_url_);
+                    }
                 }
             }
             catch (Exception e)
@@ -151,8 +178,11 @@ namespace Fun
 
         private void OnCheckMd5Finish (string md5hash)
         {
-            DebugUtils.Assert(check_files_list_.Count > 0);
-            string path = check_files_list_[0];
+            if (!enable_verify_)
+                return;
+
+            DebugUtils.Assert(verify_file_list.Count > 0);
+            string path = verify_file_list[0];
             path = path.Substring(target_path_.Length);
 
             DownloadFile info = new DownloadFile();
@@ -160,14 +190,18 @@ namespace Fun
             info.md5 = md5hash;
             cached_files_list_.Add(info);
 
-            check_files_list_.RemoveAt(0);
-            if (check_files_list_.Count > 0)
+            verify_file_list.RemoveAt(0);
+            if (verify_file_list.Count > 0)
             {
-                MD5Async.Compute(check_files_list_[0], OnCheckMd5Finish);
+                MD5Async.Get(verify_file_list[0], OnCheckMd5Finish);
             }
             else
             {
-                Debug.Log("Check file's information : " + cached_files_list_.Count);
+                Debug.Log(string.Format("Checked {0} files.",
+                                        cached_files_list_.Count));
+
+                // Gets list file
+                DownloadListFile(host_url_);
             }
         }
 
@@ -175,10 +209,7 @@ namespace Fun
         private void CheckFileList (List<DownloadFile> list)
         {
             if (list.Count <= 0 || cached_files_list_.Count <= 0)
-            {
-                total_download_count_ = list.Count;
                 return;
-            }
 
             List<DownloadFile> remove_list = new List<DownloadFile>();
 
@@ -210,9 +241,7 @@ namespace Fun
                 DownloadFile info = cached_files_list_.Find(i => i.path == item.path);
                 if (info != null)
                 {
-                    bool is_same = info.md5 == item.md5;
-
-                    if (is_same)
+                    if (!enable_verify_ || info.md5 == item.md5)
                         remove_list.Add(item);
                     else
                         cached_files_list_.Remove(info);
@@ -229,7 +258,6 @@ namespace Fun
                 remove_list.Clear();
             }
 
-            total_download_count_ = list.Count;
             remove_list = null;
         }
 
@@ -241,7 +269,7 @@ namespace Fun
                 cur_download_ = null;
 
                 // Request a list of download files.
-                Debug.Log("List file url : " + url);
+                Debug.Log("Getting list file from " + url);
                 web_client_.DownloadDataAsync(new Uri(url));
             }
             catch (Exception e)
@@ -296,6 +324,7 @@ namespace Fun
                     File.Delete(file_path);
 
                 // Request a file.
+                Debug.Log("Download file - " + file_path);
                 web_client_.DownloadFileAsync(new Uri(host_url_ + cur_download_.path), file_path);
             }
         }
@@ -326,7 +355,7 @@ namespace Fun
                     string data = Encoding.UTF8.GetString(ar.Result);
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
 
-                    Debug.Log("Json data >>  " + data);
+                    //Debug.Log("Json data >>  " + data);
 
                     // Redirect url
                     if (json.ContainsKey("url"))
@@ -359,6 +388,10 @@ namespace Fun
 
                         // Check files
                         CheckFileList(download_list_);
+
+                        total_download_count_ = download_list_.Count;
+                        if (total_download_count_ > 0)
+                            Debug.Log(string.Format("Start downloading {0} files..", total_download_count_));
 
                         // Download file.
                         DownloadResourceFile();
@@ -413,7 +446,16 @@ namespace Fun
                         cached_files_list_.Add(cur_download_);
                         download_list_.RemoveAt(0);
 
-                        MD5Async.Compute(target_path_ + cur_download_.path, OnMd5Finish);
+                        if (enable_verify_)
+                        {
+                            string path = target_path_ + cur_download_.path;
+                            manager_.AddEvent(() => MD5Async.Get(path, OnMd5Finish));
+                        }
+                        else
+                        {
+                            // Check next download file.
+                            DownloadResourceFile();
+                        }
                     }
                 }
             }
@@ -474,6 +516,7 @@ namespace Fun
         private static readonly string kRootPath = "client_data";
 
         // member variables.
+        private FunapiManager manager_ = null;
         private Mutex mutex_ = new Mutex();
         private State state_ = State.Ready;
         private string host_url_ = "";
@@ -481,9 +524,10 @@ namespace Fun
         private DownloadFile cur_download_ = null;
         private int cur_download_count_ = 0;
         private int total_download_count_ = 0;
+        private bool enable_verify_ = true;
 
         private WebClient web_client_ = new WebClient();
-        private List<string> check_files_list_ = new List<string>();
+        private List<string> verify_file_list = new List<string>();
         private List<DownloadUrl> url_list_ = new List<DownloadUrl>();
         private List<DownloadFile> download_list_ = new List<DownloadFile>();
         private List<DownloadFile> cached_files_list_ = new List<DownloadFile>();
