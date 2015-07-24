@@ -5,6 +5,7 @@
 // consent of iFunFactory Inc.
 
 using System;
+using System.Collections;
 using System.IO;
 using System.Security.Cryptography;
 using UnityEngine;
@@ -12,66 +13,57 @@ using UnityEngine;
 
 public class MD5Async
 {
-    public static void Compute (string path, OnFinish on_finish)
+    public static void Get (string path, OnFinish on_finish)
     {
         if (!File.Exists(path))
         {
-            Debug.Log("MD5Async.Compute - Can't find a file. path: " + path);
+            Debug.Log(string.Format("MD5Async.Compute - Can't find a file.\npath: {0}", path));
             return;
         }
 
-        FileStream stream = File.OpenRead(path);
-
-        MD5Request request = new MD5Request();
-        request.md5 = MD5.Create();
-        request.stream = stream;
-        request.on_finish = on_finish;
-
-        int length = (stream.Length < kBlockSize) ? (int)stream.Length : kBlockSize;
-        stream.BeginRead(request.buffer, 0, length, new AsyncCallback(ReadCb), request);
+        Fun.FunapiManager.instance.StartCoroutine(Compute(path, on_finish));
     }
 
-    static void ReadCb (IAsyncResult ar)
+    static IEnumerator Compute (string path, OnFinish on_finish)
     {
-        MD5Request request = (MD5Request)ar.AsyncState;
-        FileStream stream = request.stream;
+        FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        byte[] buffer = new byte[kBlockSize];
+        MD5 md5 = MD5.Create();
+        int length, read_bytes;
 
-        int length = stream.EndRead(ar);
-
-        if (stream.Position >= stream.Length)
+        while (stream.Position < stream.Length)
         {
-            request.md5.TransformFinalBlock(request.buffer, 0, length);
-
-            string md5hash = "";
-            foreach (byte n in request.md5.Hash)
-                md5hash += n.ToString("x2");
-
-            Fun.DebugUtils.Log(String.Format("MD5 >> {0} > {1}", stream.Name, md5hash));
-
-            if (request.on_finish != null)
-                request.on_finish(md5hash);
-        }
-        else
-        {
-            request.md5.TransformBlock(request.buffer, 0, length, request.buffer, 0);
-
             length = (stream.Position + kBlockSize > stream.Length) ? (int)(stream.Length - stream.Position) : kBlockSize;
-            stream.BeginRead(request.buffer, 0, length, new AsyncCallback(ReadCb), request);
+            read_bytes = stream.Read(buffer, 0, length);
+
+            if (stream.Position < stream.Length)
+            {
+                md5.TransformBlock(buffer, 0, read_bytes, buffer, 0);
+            }
+            else
+            {
+                md5.TransformFinalBlock(buffer, 0, read_bytes);
+                stream.Close();
+                break;
+            }
+
+            yield return new WaitForEndOfFrame();
         }
+
+        string md5hash = "";
+        foreach (byte n in md5.Hash)
+            md5hash += n.ToString("x2");
+
+        Fun.DebugUtils.Log(String.Format("MD5 >> {0} > {1}", stream.Name, md5hash));
+
+        if (on_finish != null)
+            on_finish(md5hash);
     }
 
 
     // Buffer-related constants.
-    private static readonly int kBlockSize = 65536;
+    private static readonly int kBlockSize = 1024 * 1024;
 
     // Event handler delegate
     public delegate void OnFinish (string md5hash);
-
-    class MD5Request
-    {
-        public MD5 md5 = null;
-        public FileStream stream = null;
-        public byte[] buffer = new byte[kBlockSize];
-        public OnFinish on_finish = null;
-    }
 }

@@ -4,6 +4,8 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 
@@ -28,9 +30,46 @@ namespace Fun
             }
         }
 
+        public void AddEvent (Action action)
+        {
+            if (action == null)
+            {
+                Debug.Log("FunapiManager.AddEvent - action is null.");
+                return;
+            }
 
+            lock (event_lock_)
+            {
+                event_queue_.Enqueue(action);
+            }
+        }
+
+        void Update()
+        {
+            if (event_queue_.Count <= 0)
+                return;
+
+            Queue<Action> queue = null;
+
+            lock (event_lock_)
+            {
+                queue = event_queue_;
+                event_queue_ = new Queue<Action>();
+            }
+
+            foreach (Action action in queue)
+            {
+                action();
+            }
+        }
+
+
+        // Singleton-releated static variables
         private static readonly string kInstanceName = "Funapi Manager";
         private static FunapiManager instance_ = null;
-    }
 
+        // Action event-releated member variables
+        private object event_lock_ = new object();
+        private Queue<Action> event_queue_ = new Queue<Action>();
+    }
 }

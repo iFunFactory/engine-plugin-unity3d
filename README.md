@@ -5,6 +5,24 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 08/04/2015 (ver.96)
+- 유니티에서 FileStream을 비동기로 사용이 불가능하여 코루틴 사용으로 변경
+- 파일 유효성을 체크하기 위해 MD5 계산하는 기능을 옵션으로 선택할 수 있도록 변경 (생성자 파라미터)
+- 파일 목록 문자열이 192kb를 넘으면 유니티 로그로 출력시 에러가 발생하여 파일 목록 로그 주석 처리
+- 비동기 함수에서 코루틴을 호출할 때 사용하기 위해 FunapiManager에 Action 이벤트큐 추가
+
+### 07/23/2015 (ver.95)
+- Connect 할 때 기존의 Transport가 갖고 있던 주소들은 모두 날리고 새로운 주소로 리셋
+
+### 07/22/2015 (ver.94)
+- CurrentDownloadFileCount, TotalDownloadFileCount 함수 추가
+- Windows에서 파일 경로 구분이 '\'여서 경로를 찾지 못하는 버그 수정
+
+### 07/15/2015 (ver.93)
+- Http response timeout 체크를 Update에서 하던 것을 Timer 사용으로 변경
+- region으로 묶는 형식에서 관련 있는 함수끼리 모아놓는 형식으로 변경
+- FunapiTransport의 encoding과 protocol 이름을 Encoding, Protocol로 변경
+
 ### 07/15/2015 (ver.92)
 - FunapiNetwork에 EnablePing 옵션 추가 (아무때나 켜고 끌 수 있는 옵션)
 - 마지막 핑 값을 가져오는 PingTime 함수 추가

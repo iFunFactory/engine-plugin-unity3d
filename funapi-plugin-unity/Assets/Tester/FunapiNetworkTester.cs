@@ -124,17 +124,18 @@ public class FunapiNetworkTester : MonoBehaviour
             if (FunapiConfig.IsValid)
             {
                 downloader_ = FunapiConfig.CreateDownloader(FunapiUtils.GetLocalDataPath);
-                downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
-                downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
+                if (downloader_ != null)
+                {
+                    downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
+                    downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
+                }
             }
 
             if (downloader_ == null)
             {
-                downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, OnDownloadUpdate, OnDownloadFinished);
+                downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, false, OnDownloadUpdate, OnDownloadFinished);
                 downloader_.StartDownload(string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort));
             }
-
-            Debug.Log("Start downloading..");
         }
 
         //----------------------------------------------------------------------------
@@ -446,8 +447,8 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
-        Debug.Log(String.Format("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
-                       path, bytes_received, total_bytes, percentage));
+        DebugUtils.Log(String.Format("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+                                     path, bytes_received, total_bytes, percentage));
     }
 
     private void OnDownloadFinished (DownloadResult code)
