@@ -51,6 +51,9 @@ public class FunapiNetworkTester : MonoBehaviour
 
         if (chat_ != null)
             chat_.Close();
+
+        if (downloader_ != null)
+            downloader_.Stop();
     }
 
     public void OnGUI()
@@ -121,21 +124,23 @@ public class FunapiNetworkTester : MonoBehaviour
         GUI.Label(new Rect(30, 390, 300, 20), String.Format("server : {0}:{1}", kDownloadServerIp, kDownloadServerPort));
         if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
         {
-            if (FunapiConfig.IsValid)
-            {
-                downloader_ = FunapiConfig.CreateDownloader(FunapiUtils.GetLocalDataPath);
-                if (downloader_ != null)
-                {
-                    downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
-                    downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
-                }
+            string download_url = "";
+            bool enable_verify = true;
+
+            if (FunapiConfig.IsValid) {
+                FunapiConfig.GetDownloaderUrl(out download_url, out enable_verify);
             }
 
-            if (downloader_ == null)
-            {
-                downloader_ = new FunapiHttpDownloader(FunapiUtils.GetLocalDataPath, false, OnDownloadUpdate, OnDownloadFinished);
-                downloader_.StartDownload(string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort));
+            if (download_url == "") {
+                download_url = string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort);
             }
+
+            downloader_ = new FunapiHttpDownloader(enable_verify);
+            downloader_.VerifyCallback += new FunapiHttpDownloader.VerifyEventHandler(OnDownloadVerify);
+            downloader_.ReadyCallback += new FunapiHttpDownloader.ReadyEventHandler(OnDownloadReady);
+            downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
+            downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
+            downloader_.GetDownloadList(download_url, FunapiUtils.GetLocalDataPath);
         }
 
         //----------------------------------------------------------------------------
@@ -445,6 +450,16 @@ public class FunapiNetworkTester : MonoBehaviour
         Debug.Log("Received an echo message: " + echo.msg);
     }
 
+    private void OnDownloadVerify (string path)
+    {
+        DebugUtils.Log("Check file - " + path);
+    }
+
+    private void OnDownloadReady (int total_count, UInt64 total_size)
+    {
+        downloader_.StartDownload();
+    }
+
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
         DebugUtils.Log(String.Format("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
@@ -454,7 +469,6 @@ public class FunapiNetworkTester : MonoBehaviour
     private void OnDownloadFinished (DownloadResult code)
     {
         downloader_ = null;
-        Debug.Log("Download completed. result:" + code);
     }
 
     private void OnAnnouncementResult (AnnounceResult result)
