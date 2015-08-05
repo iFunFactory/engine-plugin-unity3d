@@ -186,12 +186,15 @@ namespace Fun
             return multicast;
         }
 
-        public static FunapiHttpDownloader CreateDownloader (string target_path)
+        public static void GetDownloaderUrl (out string url, out bool enable_verify)
         {
+            url = "";
+            enable_verify = false;
+
             if (data_ == null)
             {
                 Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
-                return null;
+                return;
             }
 
             string str_ip = "download_server_ip";
@@ -199,7 +202,7 @@ namespace Fun
             if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
             {
                 Debug.Log("CreateDownloader - Can't find values for downloader.");
-                return null;
+                return;
             }
 
             string hostname_or_ip = data_[str_ip] as string;
@@ -208,20 +211,16 @@ namespace Fun
             {
                 Debug.Log(String.Format("CreateDownloader - Invalid value. ip:{0} port:{1}",
                                         hostname_or_ip, port));
-                return null;
+                return;
             }
 
-            bool enable_verify = false;
             string str_verify = "download_verify_enable";
             if (data_.ContainsKey(str_verify))
             {
                 enable_verify = Convert.ToBoolean(data_[str_verify]);
             }
 
-            FunapiHttpDownloader downloader = new FunapiHttpDownloader(target_path, enable_verify);
-            downloader.StartDownload(string.Format("http://{0}:{1}", hostname_or_ip, port));
-
-            return downloader;
+            url = string.Format("http://{0}:{1}", hostname_or_ip, port);
         }
 
         public static string AnnouncementUrl
