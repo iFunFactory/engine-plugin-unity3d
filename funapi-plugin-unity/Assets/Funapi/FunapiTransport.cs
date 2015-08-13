@@ -617,7 +617,7 @@ namespace Fun
 
                 if (ConnectTimeout > 0f)
                 {
-                    string id = string.Format("{0}_connet_timeout", str_protocol);
+                    string id = string.Format("{0}_connect_timeout", str_protocol);
                     timer_id_list_.Add(id);
                     Timer.AddTimer(id, ConnectTimeout,
                         delegate (object param) {
@@ -2265,7 +2265,7 @@ namespace Fun
         private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
 
         // waiting time for response
-        private static readonly string kTimeoutTimerId = "http_timeout";
+        private static readonly string kTimeoutTimerId = "http_request_timeout";
         private static readonly float kTimeoutSeconds = 30f;
 
         // Response-related.
