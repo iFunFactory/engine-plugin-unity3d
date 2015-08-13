@@ -5,6 +5,18 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 08/14/2015 (ver.98)
+- WWW로 메시지 전송에 실패했을 때 에러 처리
+- 타이머의 등록, 삭제 관련 버그 수정
+
+### 08/14/2015 (ver.97)
+- 리소스 다운로드 방식 변경, 파일 크기 정보 추가
+
+  - StartDownload 함수를 GetDownloadList 와 StartDownload 함수 두 개로 나눔
+    (GetDownloadList 함수를 호출하면 다운로드 목록 확인 후 ReadyCallback 함수가 호출됨)
+  - CurDownloadFileSize, TotalDownloadFileSize 함수 추가
+  - MD5 계산을 동시에 할 수 있도록 변경 (기존엔 순차 처리)
+
 ### 08/04/2015 (ver.96)
 - 유니티에서 FileStream을 비동기로 사용이 불가능하여 코루틴 사용으로 변경
 - 파일 유효성을 체크하기 위해 MD5 계산하는 기능을 옵션으로 선택할 수 있도록 변경 (생성자 파라미터)

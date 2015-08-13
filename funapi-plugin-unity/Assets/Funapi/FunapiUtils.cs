@@ -338,8 +338,11 @@ namespace Fun
 
             if (timer_list_.ContainsKey(name) || pending_list_.ContainsKey(name))
             {
-                Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
-                return;
+                if (!remove_list_.Contains(name))
+                {
+                    Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
+                    return;
+                }
             }
 
             pending_list_.Add(name, new Event(name, start, delay, loop, callback, param));
@@ -351,10 +354,19 @@ namespace Fun
             if (!timer_list_.ContainsKey(name) && !pending_list_.ContainsKey(name))
                 return;
 
-            if (remove_list_.Contains(name))
+            if (pending_list_.ContainsKey(name))
+            {
+                pending_list_.Remove(name);
+            }
+            else if (!remove_list_.Contains(name))
+            {
+                remove_list_.Add(name);
+            }
+            else
+            {
                 return;
+            }
 
-            remove_list_.Add(name);
             DebugUtils.Log(string.Format("KillTimer - '{0}' timer removed.", name));
         }
 
