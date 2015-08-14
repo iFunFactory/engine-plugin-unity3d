@@ -2182,6 +2182,11 @@ namespace Fun
                     sending_.RemoveAt(0);
                 }
 
+                if (www.error != null && www.error.Length > 0)
+                {
+                    throw new Exception(www.error);
+                }
+
                 // Decodes message
                 StringBuilder headers = new StringBuilder();
                 foreach (KeyValuePair<string, string> item in www.responseHeaders)
