@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 99;
+        public static readonly int kPluginVersion = 100;
     }
 
     // Sending message-related class.
@@ -69,6 +69,7 @@ namespace Fun
             state_ = State.kUnknown;
             recv_type_ = typeof(FunMessage);
             session_reliability_ = session_reliability;
+            serializer_ = new FunMessageSerializer ();
 
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
@@ -218,17 +219,20 @@ namespace Fun
         // Stops FunapiNetwork
         public void Stop (bool clear_all = true)
         {
+            stop_with_clear_ = clear_all;
+
             // Waits for unsent messages.
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
-                    if (transport.Started && transport.HasUnsentMessages)
+                    if (transport.Protocol == TransportProtocol.kTcp &&
+                        transport.Started && transport.HasUnsentMessages)
                     {
                         lock (state_lock_)
                         {
                             state_ = State.kWaitForStop;
-                            DebugUtils.Log(string.Format("{0} Stop waiting for send unsent messages...",
+                            Debug.Log(string.Format("{0} Stop waiting for send unsent messages...",
                                                          transport.str_protocol));
                             return;
                         }
@@ -263,6 +267,11 @@ namespace Fun
                 {
                     state_ = State.kStopped;
                 }
+            }
+
+            lock (message_lock_)
+            {
+                message_buffer_.Clear();
             }
 
             OnStoppedAllTransportCallback();
@@ -317,7 +326,7 @@ namespace Fun
             {
                 if (state_ == State.kWaitForStop)
                 {
-                    Stop();
+                    Stop(stop_with_clear_);
                     return;
                 }
             }
@@ -407,7 +416,6 @@ namespace Fun
                 transport.ReceivedCallback += new TransportReceivedHandler(OnTransportReceived);
                 transport.MessageFailureCallback += new TransportMessageHandler(OnTransportFailure);
 
-                serializer_ = new FunMessageSerializer ();
                 transport.ProtobufHelper = serializer_;
 
                 transports_[transport.Protocol] = transport;
@@ -574,6 +582,12 @@ namespace Fun
                     if (all_stopped)
                     {
                         state_ = State.kStopped;
+
+                        lock (message_lock_)
+                        {
+                            message_buffer_.Clear();
+                        }
+
                         OnStoppedAllTransportCallback();
                     }
                 }
@@ -890,8 +904,8 @@ namespace Fun
 
                 transport.SendMessage(fun_msg);
             }
-            else if (transport_reliability ||
-                     (transport != null && transport.state == FunapiTransport.State.kEstablished))
+            else if (transport != null &&
+                     (transport_reliability || transport.state == FunapiTransport.State.kEstablished))
             {
                 if (transport.Encoding == FunEncoding.kJson)
                 {
@@ -1216,7 +1230,10 @@ namespace Fun
                 return;
             }
 
-            Debug.Log(String.Format("{0} send ack message - ack:{1}", transport.Protocol, ack));
+            if (state_ == State.kStopped)
+                return;
+
+            DebugUtils.Log(String.Format("{0} send ack message - ack:{1}", transport.Protocol, ack));
 
             if (transport.Encoding == FunEncoding.kJson)
             {
@@ -1244,7 +1261,7 @@ namespace Fun
             }
 
             session_protocol_ = protocol;
-            Debug.Log(String.Format("{0} send empty message", transport.str_protocol));
+            DebugUtils.Log(String.Format("{0} send empty message", transport.str_protocol));
 
             if (transport.Encoding == FunEncoding.kJson)
             {
@@ -1749,6 +1766,7 @@ namespace Fun
         private string session_id_ = "";
         private object state_lock_ = new object();
         private FunapiTimer timer_ = new FunapiTimer();
+        private bool stop_with_clear_ = false;
 
         // Reliability-releated member variables.
         private bool session_reliability_;

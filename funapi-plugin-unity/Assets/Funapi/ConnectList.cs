@@ -7,7 +7,9 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 
 namespace Fun
