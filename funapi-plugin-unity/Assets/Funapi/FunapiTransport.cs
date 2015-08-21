@@ -877,7 +877,11 @@ namespace Fun
                 if (next_decoding_offset_ > 0)
                 {
                     Debug.Log(String.Format("Compacting a receive buffer to save {0} bytes.", next_decoding_offset_));
-                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                    // calc copy_length first to make sure
+                    // src range[next_decoding_offset_ .. next_decoding_offset_ + copy_length)
+                    // fit in src buffer boundary
+                    int copy_length = Mathf.Min (receive_buffer_.Length, received_size_) - next_decoding_offset_;
+                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, copy_length);
                     receive_buffer_ = new_buffer;
                     received_size_ -= next_decoding_offset_;
                     next_decoding_offset_ = 0;
@@ -885,7 +889,7 @@ namespace Fun
                 else
                 {
                     Debug.Log(String.Format("Increasing a receive buffer to {0} bytes.", receive_buffer_.Length + kUnitBufferSize));
-                    Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
+                    Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, receive_buffer_.Length);
                     receive_buffer_ = new_buffer;
                 }
             }
@@ -2002,11 +2006,14 @@ namespace Fun
             byte[] header = System.Text.Encoding.ASCII.GetBytes(headers);
 
             // Checks buffer space
-            int offset = received_size_;
-            received_size_ += header.Length + body.Count;
+            int total_size = header.Length + body.Count;
+            received_size_ += total_size;
             CheckReceiveBuffer();
 
             // Copy to buffer
+            // NOTE: offset should be calculated after CheckReceiveBuffer()
+            //       (CheckReceiveBuffer() may change received_size_)
+            int offset = received_size_ - total_size;
             Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
             Buffer.BlockCopy(body.Array, 0, receive_buffer_, offset + header.Length, body.Count);
 
