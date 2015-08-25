@@ -1412,7 +1412,8 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                Debug.Log("BeginConnect operation has been Cancelled.\n" + e.ToString());
+                Debug.Log("BeginConnect operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
             }
             catch (Exception e)
             {
@@ -1487,7 +1488,8 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                Debug.Log("BeginSend operation has been Cancelled.\n" + e.ToString());
+                Debug.Log("BeginSend operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
             }
             catch (Exception e)
             {
@@ -1559,7 +1561,14 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                Debug.Log("BeginReceive operation has been Cancelled.\n" + e.ToString());
+                Debug.Log("BeginReceive operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
+            }
+            catch (NullReferenceException e)
+            {
+                // When Stop is called Socket.EndReceive may return a NullReferenceException
+                Debug.Log("BeginReceive operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
             }
             catch (Exception e)
             {
@@ -1729,7 +1738,8 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                Debug.Log("BeginSendTo operation has been Cancelled.\n" + e.ToString());
+                Debug.Log("BeginSendTo operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
             }
             catch (Exception e)
             {
@@ -1800,7 +1810,8 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                Debug.Log("BeginReceiveFrom operation has been Cancelled.\n" + e.ToString());
+                Debug.Log("BeginReceiveFrom operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
             }
             catch (Exception e)
             {
@@ -2048,13 +2059,16 @@ namespace Fun
             }
             catch (WebException e)
             {
-                if (e.Status != WebExceptionStatus.RequestCanceled)
-                {
-                    last_error_code_ = ErrorCode.kSendFailed;
-                    last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
-                    Debug.Log(last_error_message_);
-                    AddToEventQueue(OnFailure);
-                }
+                // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
+                Debug.Log("Http request operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
+            }
+            catch (Exception e)
+            {
+                last_error_code_ = ErrorCode.kSendFailed;
+                last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
+                Debug.Log(last_error_message_);
+                AddToEventQueue(OnFailure);
             }
         }
 
@@ -2090,13 +2104,16 @@ namespace Fun
             }
             catch (WebException e)
             {
-                if (e.Status != WebExceptionStatus.RequestCanceled)
-                {
-                    last_error_code_ = ErrorCode.kReceiveFailed;
-                    last_error_message_ = "Failure in ResponseCb: " + e.ToString();
-                    Debug.Log(last_error_message_);
-                    AddToEventQueue(OnFailure);
-                }
+                // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
+                Debug.Log("Http request operation has been Cancelled.");
+                DebugUtils.Log(e.ToString());
+            }
+            catch (Exception e)
+            {
+                last_error_code_ = ErrorCode.kReceiveFailed;
+                last_error_message_ = "Failure in ResponseCb: " + e.ToString();
+                Debug.Log(last_error_message_);
+                AddToEventQueue(OnFailure);
             }
         }
 
@@ -2151,15 +2168,12 @@ namespace Fun
                     }
                 }
             }
-            catch (WebException e)
+            catch (Exception e)
             {
-                if (e.Status != WebExceptionStatus.RequestCanceled)
-                {
-                    last_error_code_ = ErrorCode.kReceiveFailed;
-                    last_error_message_ = "Failure in ReadCb: " + e.ToString();
-                    Debug.Log(last_error_message_);
-                    AddToEventQueue(OnFailure);
-                }
+                last_error_code_ = ErrorCode.kReceiveFailed;
+                last_error_message_ = "Failure in ReadCb: " + e.ToString();
+                Debug.Log(last_error_message_);
+                AddToEventQueue(OnFailure);
             }
         }
 
