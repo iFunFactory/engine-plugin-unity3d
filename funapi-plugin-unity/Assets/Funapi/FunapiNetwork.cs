@@ -1235,7 +1235,10 @@ namespace Fun
                 return;
             }
 
-            Debug.Log(String.Format("{0} send ack message - ack:{1}", transport.Protocol, ack));
+            if (state_ == State.kStopped)
+                return;
+
+            DebugUtils.Log(String.Format("{0} send ack message - ack:{1}", transport.Protocol, ack));
 
             if (transport.Encoding == FunEncoding.kJson)
             {
@@ -1263,7 +1266,7 @@ namespace Fun
             }
 
             session_protocol_ = protocol;
-            Debug.Log(String.Format("{0} send empty message", transport.str_protocol));
+            DebugUtils.Log(String.Format("{0} send empty message", transport.str_protocol));
 
             if (transport.Encoding == FunEncoding.kJson)
             {
