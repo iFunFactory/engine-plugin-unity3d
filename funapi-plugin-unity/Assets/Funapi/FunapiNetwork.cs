@@ -222,17 +222,20 @@ namespace Fun
         // Stops FunapiNetwork
         public void Stop (bool clear_all = true)
         {
+            stop_with_clear_ = clear_all;
+
             // Waits for unsent messages.
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
-                    if (transport.Started && transport.HasUnsentMessages)
+                    if (transport.Protocol == TransportProtocol.kTcp &&
+                        transport.Started && transport.HasUnsentMessages)
                     {
                         lock (state_lock_)
                         {
                             state_ = State.kWaitForStop;
-                            DebugUtils.Log(string.Format("{0} Stop waiting for send unsent messages...",
+                            Debug.Log(string.Format("{0} Stop waiting for send unsent messages...",
                                                          transport.str_protocol));
                             return;
                         }
@@ -321,7 +324,7 @@ namespace Fun
             {
                 if (state_ == State.kWaitForStop)
                 {
-                    Stop();
+                    Stop(stop_with_clear_);
                     return;
                 }
             }
@@ -1752,6 +1755,7 @@ namespace Fun
         private string session_id_ = "";
         private object state_lock_ = new object();
         private FunapiTimer timer_ = new FunapiTimer();
+        private bool stop_with_clear_ = false;
 
         // Reliability-releated member variables.
         private bool session_reliability_;
