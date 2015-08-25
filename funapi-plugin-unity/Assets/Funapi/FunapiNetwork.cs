@@ -272,6 +272,11 @@ namespace Fun
                 }
             }
 
+            lock (message_lock_)
+            {
+                message_buffer_.Clear();
+            }
+
             OnStoppedAllTransportCallback();
         }
 
@@ -580,6 +585,12 @@ namespace Fun
                     if (all_stopped)
                     {
                         state_ = State.kStopped;
+
+                        lock (message_lock_)
+                        {
+                            message_buffer_.Clear();
+                        }
+
                         OnStoppedAllTransportCallback();
                     }
                 }
@@ -898,8 +909,8 @@ namespace Fun
 
                 transport.SendMessage(fun_msg);
             }
-            else if (transport_reliability ||
-                     (transport != null && transport.state == FunapiTransport.State.kEstablished))
+            else if (transport != null &&
+                     (transport_reliability || transport.state == FunapiTransport.State.kEstablished))
             {
                 if (transport.Encoding == FunEncoding.kJson)
                 {
