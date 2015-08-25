@@ -72,6 +72,7 @@ namespace Fun
             state_ = State.kUnknown;
             recv_type_ = typeof(FunMessage);
             session_reliability_ = session_reliability;
+            serializer_ = new FunMessageSerializer ();
 
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
@@ -410,7 +411,6 @@ namespace Fun
                 transport.ReceivedCallback += new TransportReceivedHandler(OnTransportReceived);
                 transport.MessageFailureCallback += new TransportMessageHandler(OnTransportFailure);
 
-                serializer_ = new FunMessageSerializer ();
                 transport.ProtobufHelper = serializer_;
 
                 transports_[transport.Protocol] = transport;
