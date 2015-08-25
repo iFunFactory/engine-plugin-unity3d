@@ -7,6 +7,8 @@ Temp
 *.sln
 *.userprefs
 *.apk
-setting.dat
+*.exe
+*.mdb
 maps.meta
+setting.dat
 funapi-plugin-unity/client_data

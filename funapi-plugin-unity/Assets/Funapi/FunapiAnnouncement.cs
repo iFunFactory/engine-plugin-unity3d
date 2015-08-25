@@ -12,8 +12,9 @@ using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+#if !NO_UNITY
 using UnityEngine;
-
+#endif
 
 namespace Fun
 {

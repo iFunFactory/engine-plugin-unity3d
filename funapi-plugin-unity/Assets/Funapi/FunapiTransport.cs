@@ -658,6 +658,8 @@ namespace Fun
                     if (Timer.ContainTimer(id))
                         Timer.KillTimer(id);
                 }
+
+                timer_id_list_.Clear();
             }
 
             AddToEventQueue(OnStopped);
@@ -880,7 +882,7 @@ namespace Fun
                     // calc copy_length first to make sure
                     // src range[next_decoding_offset_ .. next_decoding_offset_ + copy_length)
                     // fit in src buffer boundary
-                    int copy_length = Mathf.Min (receive_buffer_.Length, received_size_) - next_decoding_offset_;
+                    int copy_length = Math.Min (receive_buffer_.Length, received_size_) - next_decoding_offset_;
                     Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, copy_length);
                     receive_buffer_ = new_buffer;
                     received_size_ -= next_decoding_offset_;
@@ -952,6 +954,7 @@ namespace Fun
                     Debug.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
+
                 string line = System.Text.Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
                 next_decoding_offset_ = offset + 1;
 
@@ -1853,8 +1856,10 @@ namespace Fun
             if (state_ == State.kUnknown)
                 return;
 
+#if !NO_UNITY
             if (cur_www_ != null)
                 cancel_www_ = true;
+#endif
 
             ClearRequest();
 
@@ -1885,10 +1890,12 @@ namespace Fun
             get { return true; }
         }
 
+#if !NO_UNITY
         public bool UseWWW
         {
             set { using_www_ = value; }
         }
+#endif
 
         internal override void Init()
         {
@@ -1912,7 +1919,18 @@ namespace Fun
 
         internal override bool IsSendable
         {
-            get { return cur_www_ == null && cur_request_ == null; }
+            get
+            {
+#if !NO_UNITY
+                if (cur_www_ != null)
+                    return false;
+#endif
+
+                if (cur_request_ != null)
+                    return false;
+
+                return true;
+            }
         }
 
         internal override void WireSend()
@@ -1949,11 +1967,13 @@ namespace Fun
                     Timer.AddTimer(kTimeoutTimerId, kTimeoutSeconds, OnRequestTimeout, body.msg_type);
 
                     // Sending a message
+#if !NO_UNITY
                     if (using_www_)
                     {
                         SendWWWRequest(headers, body);
                     }
                     else
+#endif
                     {
                         SendHttpWebRequest(headers, body);
                     }
@@ -1968,6 +1988,7 @@ namespace Fun
             }
         }
 
+#if !NO_UNITY
         private void SendWWWRequest (Dictionary<string, string> headers, FunapiMessage body)
         {
             cancel_www_ = false;
@@ -1983,6 +2004,7 @@ namespace Fun
                     WWWPost(new WWW(host_url_, null, headers)));
             }
         }
+#endif
 
         private void SendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage body)
         {
@@ -2177,6 +2199,7 @@ namespace Fun
             }
         }
 
+#if !NO_UNITY
         private IEnumerator WWWPost (WWW www)
         {
             cur_www_ = www;
@@ -2232,12 +2255,14 @@ namespace Fun
                 AddToEventQueue(OnFailure);
             }
         }
+#endif
 
         private void CancelRequest ()
         {
+#if !NO_UNITY
             if (cur_www_ != null)
                 cancel_www_ = true;
-
+#endif
             if (cur_request_ != null)
             {
                 WebState ws = cur_request_;
@@ -2260,7 +2285,9 @@ namespace Fun
 
         private void ClearRequest ()
         {
+#if !NO_UNITY
             cur_www_ = null;
+#endif
             cur_request_ = null;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
@@ -2312,9 +2339,11 @@ namespace Fun
         private string host_url_;
 
         // WWW-related member variables.
+#if !NO_UNITY
         private bool using_www_ = false;
-        private WWW cur_www_ = null;
         private bool cancel_www_ = false;
+        private WWW cur_www_ = null;
+#endif
 
         // WebRequest-related member variables.
         private WebState cur_request_ = null;

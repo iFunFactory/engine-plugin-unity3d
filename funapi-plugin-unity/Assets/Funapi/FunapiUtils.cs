@@ -8,14 +8,16 @@ using MiniJSON;
 using System;
 using System.IO;
 using System.Collections.Generic;
+#if !NO_UNITY
 using UnityEngine;
-
+#endif
 
 namespace Fun
 {
     // Utility class
     internal class FunapiUtils
     {
+#if !NO_UNITY
         // Gets local path
         public static string GetLocalDataPath
         {
@@ -45,6 +47,7 @@ namespace Fun
         }
 
         private static string path_ = null;
+#endif
     }
 
 
