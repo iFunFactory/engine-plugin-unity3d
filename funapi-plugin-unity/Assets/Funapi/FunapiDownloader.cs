@@ -124,6 +124,11 @@ namespace Fun
 
             state_ = State.Downloading;
             check_time_ = DateTime.Now;
+
+            // Deletes files
+            DeleteLocalFiles();
+
+            // Starts download
             DownloadResourceFile();
 
             mutex_.ReleaseMutex();
@@ -190,8 +195,7 @@ namespace Fun
                             FileInfo info = new FileInfo(path);
                             if (file.size != info.Length)
                             {
-                                File.Delete(path);
-                                Debug.Log("Deleted resource file. path: " + find_path);
+                                remove_list_.Add(path);
                             }
                             else if (enable_verify_)
                             {
@@ -209,14 +213,9 @@ namespace Fun
                                     verify_file_list.Remove(f.path);
 
                                     if (is_match)
-                                    {
                                         list.Remove(f);
-                                    }
                                     else
-                                    {
-                                        File.Delete(p);
-                                        Debug.Log("Deleted resource file. path: " + f.path);
-                                    }
+                                        remove_list_.Add(p);
                                 });
                             }
                             else
@@ -226,8 +225,7 @@ namespace Fun
                         }
                         else
                         {
-                            File.Delete(path);
-                            Debug.Log("Deleted resource file. path: " + find_path);
+                            remove_list_.Add(path);
                         }
 
                         yield return new WaitForEndOfFrame();
@@ -258,6 +256,8 @@ namespace Fun
             }
             else
             {
+                DeleteLocalFiles();
+
                 state_ = State.Completed;
                 Debug.Log("All resources are up to date.");
                 OnFinishedCallback(DownloadResult.SUCCESS);
@@ -283,6 +283,20 @@ namespace Fun
             {
                 Stop();
             }
+        }
+
+        private void DeleteLocalFiles ()
+        {
+            if (remove_list_.Count <= 0)
+                return;
+
+            foreach (string path in remove_list_)
+            {
+                File.Delete(path);
+                Debug.Log("Deleted resource file \npath: " + path);
+            }
+
+            remove_list_.Clear();
         }
 
         // Downloading files.
@@ -514,5 +528,6 @@ namespace Fun
         private DateTime check_time_;
         private WebClient web_client_ = new WebClient();
         private List<DownloadFileInfo> download_list_ = new List<DownloadFileInfo>();
+        private List<string> remove_list_ = new List<string>();
     }
 }
