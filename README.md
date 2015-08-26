@@ -5,6 +5,9 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 08/26/2015 (ver.101)
+- 리소스 다운로드시 파일 삭제 시점 변경
+
 ### 08/25/2015 (ver.100)
 - C# Runtime Compile 지원 작업
 - 메시지 관련 버그 수정
