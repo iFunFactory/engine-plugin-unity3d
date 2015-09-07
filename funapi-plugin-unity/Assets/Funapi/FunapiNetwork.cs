@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 101;
+        public static readonly int kPluginVersion = 102;
     }
 
     // Sending message-related class.
@@ -252,8 +252,6 @@ namespace Fun
 
             if (clear_all)
             {
-                transports_.Clear();
-
                 CloseSession();
 
                 lock (state_lock_)
@@ -267,11 +265,6 @@ namespace Fun
                 {
                     state_ = State.kStopped;
                 }
-            }
-
-            lock (message_lock_)
-            {
-                message_buffer_.Clear();
             }
 
             OnStoppedAllTransportCallback();
@@ -315,15 +308,34 @@ namespace Fun
 
             lock (transports_lock_)
             {
-                foreach (FunapiTransport transport in transports_.Values)
+                if (transports_.Count > 0)
                 {
-                    if (transport != null)
-                        transport.Update();
+                    foreach (FunapiTransport transport in transports_.Values)
+                    {
+                        if (transport != null)
+                            transport.Update();
+                    }
                 }
             }
 
             lock (state_lock_)
             {
+                if (state_ == State.kUnknown || state_ == State.kStopped)
+                {
+                    lock (message_lock_)
+                    {
+                        if (message_buffer_.Count > 0)
+                            message_buffer_.Clear();
+                    }
+
+                    lock (expected_reply_lock)
+                    {
+                        if (expected_replies_.Count > 0)
+                            expected_replies_.Clear();
+                    }
+                    return;
+                }
+
                 if (state_ == State.kWaitForStop)
                 {
                     Stop(stop_with_clear_);
@@ -582,12 +594,6 @@ namespace Fun
                     if (all_stopped)
                     {
                         state_ = State.kStopped;
-
-                        lock (message_lock_)
-                        {
-                            message_buffer_.Clear();
-                        }
-
                         OnStoppedAllTransportCallback();
                     }
                 }
