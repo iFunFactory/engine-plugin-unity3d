@@ -189,10 +189,9 @@ namespace Fun
             return multicast;
         }
 
-        public static void GetDownloaderUrl (out string url, out bool enable_verify)
+        public static void GetDownloaderUrl (out string url)
         {
             url = "";
-            enable_verify = false;
 
             if (data_ == null)
             {
@@ -215,12 +214,6 @@ namespace Fun
                 Debug.Log(String.Format("CreateDownloader - Invalid value. ip:{0} port:{1}",
                                         hostname_or_ip, port));
                 return;
-            }
-
-            string str_verify = "download_verify_enable";
-            if (data_.ContainsKey(str_verify))
-            {
-                enable_verify = Convert.ToBoolean(data_[str_verify]);
             }
 
             url = string.Format("http://{0}:{1}", hostname_or_ip, port);
