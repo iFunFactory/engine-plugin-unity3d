@@ -125,17 +125,16 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
         {
             string download_url = "";
-            bool enable_verify = true;
 
             if (FunapiConfig.IsValid) {
-                FunapiConfig.GetDownloaderUrl(out download_url, out enable_verify);
+                FunapiConfig.GetDownloaderUrl(out download_url);
             }
 
             if (download_url == "") {
                 download_url = string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort);
             }
 
-            downloader_ = new FunapiHttpDownloader(enable_verify);
+            downloader_ = new FunapiHttpDownloader();
             downloader_.VerifyCallback += new FunapiHttpDownloader.VerifyEventHandler(OnDownloadVerify);
             downloader_.ReadyCallback += new FunapiHttpDownloader.ReadyEventHandler(OnDownloadReady);
             downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);

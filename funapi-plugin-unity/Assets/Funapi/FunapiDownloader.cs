@@ -37,10 +37,9 @@ namespace Fun
 
     public class FunapiHttpDownloader
     {
-        public FunapiHttpDownloader (bool enable_verify = false)
+        public FunapiHttpDownloader ()
         {
             manager_ = FunapiManager.instance;
-            enable_verify_ = enable_verify;
 
             // List file handler
             web_client_.DownloadDataCompleted += new DownloadDataCompletedEventHandler(DownloadDataCompleteCb);
@@ -95,6 +94,8 @@ namespace Fun
                 cur_download_size_ = 0;
                 total_download_count_ = 0;
                 total_download_size_ = 0;
+
+                LoadCachedList();
 
                 // Gets list file
                 DownloadListFile(host_url_);
@@ -172,76 +173,212 @@ namespace Fun
             get {  return total_download_size_; }
         }
 
+        private void LoadCachedList ()
+        {
+            cached_list_.Clear();
+
+            string path = target_path_ + kCachedFileName;
+            if (!File.Exists(path))
+                return;
+
+            StreamReader stream = File.OpenText(path);
+            string data = stream.ReadToEnd();
+            stream.Close();
+
+            if (data.Length <= 0)
+            {
+                Debug.Log("Failed to get a cached file list.");
+                DebugUtils.Assert(false);
+                return;
+            }
+
+            Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
+            List<object> list = json["list"] as List<object>;
+
+            foreach (Dictionary<string, object> node in list)
+            {
+                DownloadFileInfo info = new DownloadFileInfo();
+                info.path = node["path"] as string;
+                info.size = Convert.ToUInt32(node["size"]);
+                info.hash = node["hash"] as string;
+                if (node.ContainsKey("front"))
+                    info.hash_front = node["front"] as string;
+                else
+                    info.hash_front = "";
+
+                cached_list_.Add(info);
+            }
+        }
+
+        private void UpdateCachedList ()
+        {
+            StringBuilder data = new StringBuilder();
+            data.Append("{ \"list\": [ ");
+
+            int index = 0;
+            foreach (DownloadFileInfo info in cached_list_)
+            {
+                data.AppendFormat("{{ \"path\":\"{0}\", ", info.path);
+                data.AppendFormat("\"size\":{0}, ", info.size);
+                if (info.hash_front.Length > 0)
+                    data.AppendFormat("\"front\":\"{0}\", ", info.hash_front);
+                data.AppendFormat("\"hash\":\"{0}\" }}", info.hash);
+
+                if (++index < cached_list_.Count)
+                    data.Append(", ");
+            }
+
+            data.Append(" ] }");
+
+            string path = target_path_ + kCachedFileName;
+            FileStream file = File.Open(path, FileMode.Create);
+            StreamWriter stream = new StreamWriter(file);
+            stream.Write(data.ToString());
+            stream.Flush();
+            stream.Close();
+        }
+
         // Checks download file list
         private IEnumerator CheckFileList (List<DownloadFileInfo> list)
         {
+            List<DownloadFileInfo> tmp_list = new List<DownloadFileInfo>(list);
             List<string> verify_file_list = new List<string>();
+            List<string> remove_list = new List<string>();
+            Queue<int> rnd_list = new Queue<int>();
+            bool verify_success = true;
+            int rnd_index = -1;
+
+            DateTime cached_time = File.GetLastWriteTime(target_path_ + kCachedFileName);
             check_time_ = DateTime.Now;
 
-            if (Directory.Exists(target_path_))
+            delete_file_list_.Clear();
+
+            // Randomly check list
+            if (cached_list_.Count > 0)
             {
-                string[] files = Directory.GetFiles(target_path_, "*", SearchOption.AllDirectories);
-                if (files.Length > 0)
+                int max_count = cached_list_.Count;
+                int count = Math.Min(Math.Max(1, max_count / 10), 10);
+                System.Random rnd = new System.Random((int)DateTime.Now.Ticks);
+
+                while (rnd_list.Count < count)
                 {
-                    Debug.Log("Checks local files...");
+                    rnd_index = rnd.Next(1, max_count + 1) - 1;
+                    if (!rnd_list.Contains(rnd_index))
+                        rnd_list.Enqueue(rnd_index);
+                }
 
-                    foreach (string s in files)
+                rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
+                DebugUtils.Log("Random check file count is " + rnd_list.Count);
+            }
+
+            // Checks local files
+            int index = 0;
+            foreach (DownloadFileInfo file in cached_list_)
+            {
+                DownloadFileInfo item = list.Find(i => i.path == file.path);
+                if (item != null)
+                {
+                    string path = target_path_ + file.path;
+                    FileInfo info = new FileInfo(path);
+
+                    if (!File.Exists(path) || info.Length != file.size || item.hash != file.hash)
                     {
-                        string path = s.Replace('\\', '/');
-                        string find_path = path.Substring(target_path_.Length);
-                        DownloadFileInfo file = list.Find(i => i.path == find_path);
-                        if (file != null)
+                        remove_list.Add(file.path);
+                    }
+                    else
+                    {
+                        string filename = Path.GetFileName(item.path);
+                        if (filename[0] == '_' || index == rnd_index ||
+                            File.GetLastWriteTime(path).Ticks > cached_time.Ticks)
                         {
-                            FileInfo info = new FileInfo(path);
-                            if (file.size != info.Length)
-                            {
-                                remove_list_.Add(path);
+                            if (index == rnd_index) {
+                                rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
                             }
-                            else if (enable_verify_)
+
+                            verify_file_list.Add(file.path);
+
+                            MD5Async.Compute(ref path, ref item, delegate (string p, DownloadFileInfo f, bool is_match)
                             {
-                                verify_file_list.Add(file.path);
+                                if (VerifyCallback != null)
+                                    VerifyCallback(p);
 
-                                while (verify_file_list.Count > kMaxAsyncRequestCount) {
-                                    yield return new WaitForEndOfFrame();
-                                }
+                                verify_file_list.Remove(f.path);
 
-                                MD5Async.Compute(ref path, ref file, delegate (string p, DownloadFileInfo f, bool is_match)
+                                if (is_match)
                                 {
-                                    if (VerifyCallback != null)
-                                        VerifyCallback(path);
-
-                                    verify_file_list.Remove(f.path);
-
-                                    if (is_match)
-                                        list.Remove(f);
-                                    else
-                                        remove_list_.Add(p);
-                                });
-                            }
-                            else
-                            {
-                                list.Remove(file);
-                            }
+                                    list.Remove(f);
+                                }
+                                else
+                                {
+                                    remove_list.Add(f.path);
+                                    verify_success = false;
+                                }
+                            });
                         }
                         else
                         {
-                            remove_list_.Add(path);
+                            list.Remove(item);
                         }
-
-                        yield return new WaitForEndOfFrame();
                     }
                 }
-            } // if (Directory.Exists(target_path_))
+                else
+                {
+                    remove_list.Add(file.path);
+                }
+
+                ++index;
+            }
 
             while (verify_file_list.Count > 0)
             {
                 yield return new WaitForSeconds(0.1f);
             }
 
+            RemoveCachedList(remove_list);
+
+            Debug.Log("Random validation has " + (verify_success ? "succeeded" : "failed"));
+
+            // Checks all local files
+            if (!verify_success)
+            {
+                foreach (DownloadFileInfo file in cached_list_)
+                {
+                    DownloadFileInfo item = tmp_list.Find(i => i.path == file.path);
+                    if (item != null)
+                    {
+                        verify_file_list.Add(file.path);
+
+                        string path = target_path_ + file.path;
+                        MD5Async.Compute(ref path, ref item, delegate (string p, DownloadFileInfo f, bool is_match)
+                        {
+                            if (VerifyCallback != null)
+                                VerifyCallback(p);
+
+                            verify_file_list.Remove(f.path);
+
+                            if (!is_match)
+                            {
+                                remove_list.Add(f.path);
+
+                                if (!list.Contains(f))
+                                    list.Add(f);
+                            }
+                        });
+                    }
+                }
+
+                while (verify_file_list.Count > 0)
+                {
+                    yield return new WaitForSeconds(0.1f);
+                }
+
+                RemoveCachedList(remove_list);
+            }
+
             TimeSpan span = new TimeSpan(DateTime.Now.Ticks - check_time_.Ticks);
             Debug.Log(string.Format("File check total time - {0:F2}s", span.TotalMilliseconds / 1000f));
 
-            total_download_count_ = download_list_.Count;
+            total_download_count_ = list.Count;
 
             foreach (DownloadFileInfo item in list)
             {
@@ -257,11 +394,28 @@ namespace Fun
             else
             {
                 DeleteLocalFiles();
+                UpdateCachedList();
 
                 state_ = State.Completed;
                 Debug.Log("All resources are up to date.");
                 OnFinishedCallback(DownloadResult.SUCCESS);
             }
+        }
+
+        private void RemoveCachedList (List<string> remove_list)
+        {
+            if (remove_list.Count <= 0)
+                return;
+
+            cached_list_.RemoveAll(item => {
+                return remove_list.Contains(item.path);
+            });
+
+            foreach (string path in remove_list) {
+                delete_file_list_.Add(target_path_ + path);
+            }
+
+            remove_list.Clear();
         }
 
         private void DownloadListFile (string url)
@@ -287,16 +441,19 @@ namespace Fun
 
         private void DeleteLocalFiles ()
         {
-            if (remove_list_.Count <= 0)
+            if (delete_file_list_.Count <= 0)
                 return;
 
-            foreach (string path in remove_list_)
+            foreach (string path in delete_file_list_)
             {
-                File.Delete(path);
-                Debug.Log("Deleted resource file \npath: " + path);
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    Debug.Log("Deleted resource file \npath: " + path);
+                }
             }
 
-            remove_list_.Clear();
+            delete_file_list_.Clear();
         }
 
         // Downloading files.
@@ -304,6 +461,8 @@ namespace Fun
         {
             if (download_list_.Count <= 0)
             {
+                UpdateCachedList();
+
                 TimeSpan span = new TimeSpan(DateTime.Now.Ticks - check_time_.Ticks);
                 Debug.Log(string.Format("File download total time - {0:F2}s", span.TotalMilliseconds / 1000f));
 
@@ -389,7 +548,7 @@ namespace Fun
                             info.size = Convert.ToUInt32(node["size"]);
                             info.hash = node["md5"] as string;
                             if (node.ContainsKey("md5_front"))
-                                info.hash_front = node["md5_front"] as String;
+                                info.hash_front = node["md5_front"] as string;
                             else
                                 info.hash_front = "";
 
@@ -462,6 +621,7 @@ namespace Fun
                         ++cur_download_count_;
                         cur_download_size_ += info.size;
                         download_list_.Remove(info);
+                        cached_list_.Add(info);
 
                         DownloadResourceFile();
                     }
@@ -511,11 +671,11 @@ namespace Fun
 
         // Save file-related constants.
         private static readonly string kRootPath = "client_data";
-        private static readonly int kMaxAsyncRequestCount = 10;
+        private readonly string kCachedFileName = "cached_files";
+        //private static readonly int kMaxAsyncRequestCount = 10;
 
         // member variables.
         private State state_ = State.None;
-        private bool enable_verify_ = true;
         private string host_url_ = "";
         private string target_path_ = "";
         private int cur_download_count_ = 0;
@@ -527,7 +687,8 @@ namespace Fun
         private Mutex mutex_ = new Mutex();
         private DateTime check_time_;
         private WebClient web_client_ = new WebClient();
+        private List<DownloadFileInfo> cached_list_ = new List<DownloadFileInfo>();
         private List<DownloadFileInfo> download_list_ = new List<DownloadFileInfo>();
-        private List<string> remove_list_ = new List<string>();
+        private List<string> delete_file_list_ = new List<string>();
     }
 }
