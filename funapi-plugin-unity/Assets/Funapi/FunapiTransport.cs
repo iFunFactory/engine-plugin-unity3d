@@ -1625,6 +1625,7 @@ namespace Fun
         internal override void Init()
         {
             state_ = State.kConnected;
+            str_cookie_ = "";
 
             OnStartedInternal();
         }
@@ -1684,6 +1685,9 @@ namespace Fun
 
                         headers.Add(list[i], list[i+1]);
                     }
+
+                    if (str_cookie_.Length > 0)
+                        headers.Add(kCookieHeaderField, str_cookie_);
 
                     // Sets timeout timer
                     Timer.AddTimer(kTimeoutTimerId, kTimeoutSeconds, OnRequestTimeout, body.msg_type);
@@ -1751,16 +1755,45 @@ namespace Fun
             request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), ws);
         }
 
-        private void DecodeMessage (string headers, ArraySegment<byte> body)
+        private void DecodeMessage (string header, ArraySegment<byte> body)
         {
-            headers = headers.ToLower();
-            headers = headers.Insert(0, kVersionHeaderField + kHeaderFieldDelimeter + FunapiVersion.kProtocolVersion + kHeaderDelimeter);
-            headers = headers.Replace(kLengthHttpHeaderField, kLengthHeaderField);
-            headers = headers.Replace("\r", "");
-            byte[] header = System.Text.Encoding.ASCII.GetBytes(headers);
+            StringBuilder headers = new StringBuilder();
+            headers.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
+
+            string[] lines = header.Replace("\r", "").Split('\n');
+            foreach (string n in lines)
+            {
+                if (n.Length > 0)
+                {
+                    string[] tuple = n.Split(kHeaderSeparator, StringSplitOptions.RemoveEmptyEntries);
+                    string item = tuple[0].ToLower();
+
+                    switch (item)
+                    {
+                    case "content-type":
+                        break;
+                    case "set-cookie":
+                        str_cookie_ = tuple[1];
+                        DebugUtils.Log("Set Cookie : " + str_cookie_);
+                        break;
+                    case "content-length":
+                        headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
+                        break;
+                    default:
+                        headers.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
+                        break;
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+            headers.Append(kHeaderDelimeter);
+
+            byte[] header_bytes = System.Text.Encoding.ASCII.GetBytes(headers.ToString());
 
             // Checks buffer space
-            int total_size = header.Length + body.Count;
+            int total_size = header_bytes.Length + body.Count;
             received_size_ += total_size;
             CheckReceiveBuffer();
 
@@ -1768,8 +1801,8 @@ namespace Fun
             // NOTE: offset should be calculated after CheckReceiveBuffer()
             //       (CheckReceiveBuffer() may change received_size_)
             int offset = received_size_ - total_size;
-            Buffer.BlockCopy(header, 0, receive_buffer_, offset, header.Length);
-            Buffer.BlockCopy(body.Array, 0, receive_buffer_, offset + header.Length, body.Count);
+            Buffer.BlockCopy(header_bytes, 0, receive_buffer_, offset, header_bytes.Length);
+            Buffer.BlockCopy(body.Array, 0, receive_buffer_, offset + header_bytes.Length, body.Count);
 
             // Decoding a message
             TryToDecodeMessage();
@@ -2033,9 +2066,8 @@ namespace Fun
 
 
         // Funapi header-related constants.
-        private static readonly string kLengthHttpHeaderField = "content-length";
-
         private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
+        private static readonly string kCookieHeaderField = "Cookie";
 
         // waiting time for response
         private static readonly string kTimeoutTimerId = "http_request_timeout";
@@ -2057,6 +2089,7 @@ namespace Fun
 
         // member variables.
         private string host_url_;
+        private string str_cookie_;
 
         // WWW-related member variables.
 #if !NO_UNITY
