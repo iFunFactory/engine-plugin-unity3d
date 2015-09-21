@@ -172,6 +172,9 @@ namespace Fun
 
         private void CheckDownloadImage (string url, string imgmd5)
         {
+            if (url.Length <= 0 || imgmd5.Length <= 0)
+                return;
+
             string path = local_path_;
             int offset = url.LastIndexOf('/');
             if (offset >= 0)
@@ -210,7 +213,7 @@ namespace Fun
 
 
         // Url-related constants.
-        private static readonly string kLocalPath = "/funapi";
+        private static readonly string kLocalPath = "/announce";
         private static readonly string kImagesUrl = "/images";
         private static readonly string kAnnouncementsUrl = "/announcements";
 
