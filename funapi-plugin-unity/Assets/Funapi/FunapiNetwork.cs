@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 105;
+        public static readonly int kPluginVersion = 106;
     }
 
     // Sending message-related class.
@@ -77,18 +77,6 @@ namespace Fun
 
             InitSession();
             InitPing();
-        }
-
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork(bool session_reliability)' instead.")]
-        public FunapiNetwork (FunapiTransport transport, bool session_reliability,
-                              SessionInitHandler on_session_initiated, SessionCloseHandler on_session_closed)
-            : this(session_reliability)
-        {
-            OnSessionInitiated += new SessionInitHandler(on_session_initiated);
-            OnSessionClosed += new SessionCloseHandler(on_session_closed);
-
-            AttachTransport(transport);
-            SetDefaultProtocol(transport.Protocol);
         }
 
         public bool SessionReliability
@@ -521,25 +509,6 @@ namespace Fun
             transport.Stop();
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiNetwork.Stop(false)' instead.")]
-        public void StopTransportAll()
-        {
-            lock (state_lock_)
-            {
-                state_ = State.kStopped;
-            }
-
-            lock (transports_lock_)
-            {
-                foreach (FunapiTransport transport in transports_.Values)
-                {
-                    StopTransport(transport);
-                }
-            }
-
-            OnStoppedAllTransportCallback();
-        }
-
         private void SetTransportStarted (FunapiTransport transport, bool send_unsent = true)
         {
             if (transport == null)
@@ -759,33 +728,10 @@ namespace Fun
             message_handlers_[type] = handler;
         }
 
-        [System.Obsolete("This will be deprecated in September 2015. Use 'CreateFunMessage(object, MessageType)' instead.")]
-        public FunMessage CreateFunMessage (object msg, int msg_index)
-        {
-            FunMessage _msg = new FunMessage();
-            Extensible.AppendValue(serializer_, _msg, msg_index, DataFormat.Default, msg);
-            return _msg;
-        }
-
         public FunMessage CreateFunMessage (object msg, MessageType msg_type)
         {
             FunMessage _msg = new FunMessage();
             Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
-            return _msg;
-        }
-
-        [System.Obsolete("This will be deprecated in September 2015. Use 'GetMessage(FunMessage, MessageType)' instead.")]
-        public object GetMessage (FunMessage msg, Type msg_type, int msg_index)
-        {
-            object _msg = null;
-            bool success = Extensible.TryGetValue(serializer_, msg_type, msg,
-                                                  msg_index, DataFormat.Default, true, out _msg);
-            if (!success)
-            {
-                Debug.Log(String.Format("Failed to decode {0} {1}", msg_type, msg_index));
-                return null;
-            }
-
             return _msg;
         }
 

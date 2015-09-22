@@ -1019,12 +1019,6 @@ namespace Fun
             SetNextAddress();
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiTcpTransport(..., FunEncoding type)' instead.")]
-        public FunapiTcpTransport (string hostname_or_ip, UInt16 port)
-            : this(hostname_or_ip, port, Fun.FunEncoding.kNone)
-        {
-        }
-
         // Stops a socket.
         internal override void Stop()
         {
@@ -1325,12 +1319,6 @@ namespace Fun
             SetNextAddress();
         }
 
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiUdpTransport(..., FunEncoding type)' instead.")]
-        public FunapiUdpTransport (string hostname_or_ip, UInt16 port)
-            : this(hostname_or_ip, port, Fun.FunEncoding.kNone)
-        {
-        }
-
         // Stops a socket.
         internal override void Stop()
         {
@@ -1568,12 +1556,6 @@ namespace Fun
 
             ip_list_.Add(hostname_or_ip, port, https);
             SetNextAddress();
-        }
-
-        [System.Obsolete("This will be deprecated September 2015. Use 'FunapiHttpTransport(..., FunEncoding type)' instead.")]
-        public FunapiHttpTransport (string hostname_or_ip, UInt16 port, bool https = false)
-            : this(hostname_or_ip, port, https, Fun.FunEncoding.kNone)
-        {
         }
 
         internal override void Stop()
