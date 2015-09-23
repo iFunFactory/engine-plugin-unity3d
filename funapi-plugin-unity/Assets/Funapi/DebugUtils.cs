@@ -13,29 +13,6 @@ using System.Diagnostics;
 
 namespace Fun
 {
-#if NO_UNITY
-    class Debug
-    {
-        public static void Log(object message) {
-            Console.WriteLine(message);
-        }
-
-        public static void LogWarning(object message) {
-            Console.WriteLine("Warning: " + message);
-        }
-
-        public static void LogError(object message) {
-            Console.WriteLine("Error: " + message);
-        }
-    }
-
-    class Time
-    {
-        public const float deltaTime = 0.3f; // dummy delta time
-    }
-#endif
-
-
     // Utility class
     public class DebugUtils
     {
@@ -83,21 +60,9 @@ namespace Fun
         }
 
         [Conditional("DEBUG_LOG")]
-        public static void Log (object message, UnityEngine.Object context)
-        {
-            UnityEngine.Debug.Log(message, context);
-        }
-
-        [Conditional("DEBUG_LOG")]
         public static void LogError (object message)
         {
             UnityEngine.Debug.LogError(message);
-        }
-
-        [Conditional("DEBUG_LOG")]
-        public static void LogError (object message, UnityEngine.Object context)
-        {
-            UnityEngine.Debug.LogError(message, context);
         }
 
         [Conditional("DEBUG_LOG")]
@@ -105,12 +70,32 @@ namespace Fun
         {
             UnityEngine.Debug.LogWarning(message);
         }
-
-        [Conditional("DEBUG_LOG")]
-        public static void LogWarning (object message, UnityEngine.Object context)
-        {
-            UnityEngine.Debug.LogWarning(message, context);
-        }
 #endif
     }
+
+
+#if NO_UNITY
+    class Debug
+    {
+        public static void Log(object message)
+        {
+            Console.WriteLine(message);
+        }
+
+        public static void LogWarning(object message)
+        {
+            Console.WriteLine("Warning: " + message);
+        }
+
+        public static void LogError(object message)
+        {
+            Console.WriteLine("Error: " + message);
+        }
+    }
+
+    class Time
+    {
+        public const float deltaTime = 0.3f; // dummy delta time
+    }
+#endif
 }

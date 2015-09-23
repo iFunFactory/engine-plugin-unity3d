@@ -144,37 +144,6 @@ namespace Fun
             return null;
         }
 
-        public static FunapiMulticastClient CreateMulticasting (FunEncoding encoding, bool session_reliability)
-        {
-            if (data_ == null)
-            {
-                Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
-                return null;
-            }
-
-            string str_ip = "multicast_server_ip";
-            string str_port = "multicast_server_port";
-            if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
-            {
-                Debug.Log("CreateMulticasting - Can't find values for multicasting.");
-                return null;
-            }
-
-            string hostname_or_ip = data_[str_ip] as string;
-            UInt16 port = Convert.ToUInt16(data_[str_port]);
-            if (hostname_or_ip.Length <= 0 || port == 0)
-            {
-                Debug.Log(String.Format("CreateMulticasting - Invalid value. ip:{0} port:{1} encoding:{2}",
-                                        hostname_or_ip, port, encoding));
-                return null;
-            }
-
-            FunapiMulticastClient multicast = new FunapiMulticastClient(encoding);
-            multicast.Connect(hostname_or_ip, port, session_reliability);
-
-            return multicast;
-        }
-
         public static void GetDownloaderUrl (out string url)
         {
             url = "";
