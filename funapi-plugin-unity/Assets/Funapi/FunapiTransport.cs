@@ -1162,6 +1162,7 @@ namespace Fun
 
                 int nSent = sock_.EndSend(ar);
                 DebugUtils.Log(String.Format("Sent {0}bytes", nSent));
+                DebugUtils.Assert(nSent > 0, "Failed to transfer tcp messages.");
 
                 lock (sending_lock_)
                 {
@@ -1178,8 +1179,10 @@ namespace Fun
                         }
                         else
                         {
+                            DebugUtils.Log(string.Format("Discarding a fully sent message. ({0}bytes)",
+                                                         sending_[0].buffer.Count));
+
                             // fully sent.
-                            DebugUtils.Log("Discarding a fully sent message.");
                             nSent -= sending_[0].buffer.Count;
                             sending_.RemoveAt(0);
                         }
@@ -1200,10 +1203,10 @@ namespace Fun
                         DebugUtils.Assert(nSent <= sending_[0].buffer.Count);
                         ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
                         sending_[0].buffer = adjusted;
-
-                        last_error_code_ = ErrorCode.kNone;
-                        last_error_message_ = "";
                     }
+
+                    last_error_code_ = ErrorCode.kNone;
+                    last_error_message_ = "";
 
                     SendUnsentMessages();
                 }
@@ -1429,6 +1432,7 @@ namespace Fun
                 {
                     int nSent = sock_.EndSend(ar);
                     DebugUtils.Log(String.Format("Sent {0}bytes", nSent));
+                    DebugUtils.Assert(nSent > 0, "Failed to transfer udp messages.");
 
                     DebugUtils.Assert(sending_.Count >= 2);
 
@@ -1440,11 +1444,8 @@ namespace Fun
                         sending_.RemoveAt(0);
                     }
 
-                    if (nSent > 0 && nSent < nToSend)
-                    {
-                        Debug.Log("Failed to transfer udp messages.");
-                        DebugUtils.Assert(false);
-                    }
+                    DebugUtils.Assert(nSent == nToSend,
+                        string.Format("Failed to sending whole messages. {0}:{1}", nToSend, nSent));
 
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
