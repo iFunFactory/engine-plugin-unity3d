@@ -39,7 +39,6 @@ namespace Fun
     // Utility class
     public class DebugUtils
     {
-#if NO_UNITY
         [Conditional("DEBUG")]
         public static void Assert (bool condition)
         {
@@ -49,6 +48,16 @@ namespace Fun
             }
         }
 
+        [Conditional("DEBUG")]
+        public static void Assert (bool condition, string message)
+        {
+            if (!condition)
+            {
+                throw new Exception(message);
+            }
+        }
+
+#if NO_UNITY
         [Conditional("DEBUG_LOG")]
         public static void Log (object message)
         {
@@ -67,15 +76,6 @@ namespace Fun
             Console.WriteLine("Warning: " + message);
         }
 #else
-        [Conditional("DEBUG")]
-        public static void Assert (bool condition)
-        {
-            if (!condition)
-            {
-                throw new Exception();
-            }
-        }
-
         [Conditional("DEBUG_LOG")]
         public static void Log (object message)
         {
