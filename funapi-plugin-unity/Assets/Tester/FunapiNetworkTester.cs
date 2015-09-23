@@ -33,24 +33,12 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         if (network_ != null)
             network_.Update();
-
-        if (multicast_ != null)
-            multicast_.Update ();
-
-        if (chat_ != null)
-            chat_.Update ();
     }
 
     void OnApplicationQuit()
     {
         if (network_ != null)
             network_.Stop();
-
-        if (multicast_ != null)
-            multicast_.Close();
-
-        if (chat_ != null)
-            chat_.Close();
 
         if (downloader_ != null)
             downloader_.Stop();
@@ -61,31 +49,31 @@ public class FunapiNetworkTester : MonoBehaviour
         //----------------------------------------------------------------------------
         // FunapiNetwork test
         //----------------------------------------------------------------------------
-        with_protobuf_ = GUI.Toggle(new Rect(30, 0, 300, 20), with_protobuf_, " google protocol buffer");
-        with_session_reliability_ = GUI.Toggle(new Rect(30, 20, 300, 20), with_session_reliability_, " session reliability");
-        GUI.Label(new Rect(30, 40, 300, 20), "server : " + kServerIp);
+        with_session_reliability_ = GUI.Toggle(new Rect(30, 5, 130, 20), with_session_reliability_, " session reliability");
+        with_protobuf_ = GUI.Toggle(new Rect(180, 5, 150, 20), with_protobuf_, " google protocol buffer");
 
+        GUI.Label(new Rect(30, 40, 300, 20), "[FunapiNetwork] - " + kServerIp);
         GUI.enabled = (network_ == null || !network_.Started);
         if (GUI.Button(new Rect(30, 60, 240, 40), "Connect (TCP)"))
         {
             Connect(TransportProtocol.kTcp);
         }
-        if (GUI.Button(new Rect(30, 110, 240, 40), "Connect (UDP)"))
+        if (GUI.Button(new Rect(30, 105, 240, 40), "Connect (UDP)"))
         {
             Connect(TransportProtocol.kUdp);
         }
-        if (GUI.Button(new Rect(30, 160, 240, 40), "Connect (HTTP)"))
+        if (GUI.Button(new Rect(30, 150, 240, 40), "Connect (HTTP)"))
         {
             Connect(TransportProtocol.kHttp);
         }
 
         GUI.enabled = (network_ != null && network_.Connected);
-        if (GUI.Button(new Rect(30, 210, 240, 40), "Disconnect"))
+        if (GUI.Button(new Rect(30, 195, 240, 40), "Disconnect"))
         {
             Disconnect();
         }
 
-        if (GUI.Button(new Rect(30, 260, 240, 40), "Send 'Hello World'"))
+        if (GUI.Button(new Rect(30, 240, 240, 40), "Send a message"))
         {
             SendEchoMessage();
         }
@@ -94,7 +82,8 @@ public class FunapiNetworkTester : MonoBehaviour
         // Announcements test
         //----------------------------------------------------------------------------
         GUI.enabled = true;
-        if (GUI.Button(new Rect(30, 340, 240, 40), "Update Announcements"))
+        GUI.Label(new Rect(30, 300, 300, 20), String.Format("[Announcer] - {0}:{1}", kAnnouncementIp, kAnnouncementPort));
+        if (GUI.Button(new Rect(30, 320, 240, 40), "Update announcements"))
         {
             if (announcement_ == null)
             {
@@ -121,8 +110,8 @@ public class FunapiNetworkTester : MonoBehaviour
         // Resource download test
         //----------------------------------------------------------------------------
         GUI.enabled = downloader_ == null;
-        GUI.Label(new Rect(30, 390, 300, 20), String.Format("server : {0}:{1}", kDownloadServerIp, kDownloadServerPort));
-        if (GUI.Button(new Rect(30, 410, 240, 40), "File Download (HTTP)"))
+        GUI.Label(new Rect(30, 380, 300, 20), String.Format("[Downloader] - {0}:{1}", kDownloadServerIp, kDownloadServerPort));
+        if (GUI.Button(new Rect(30, 400, 240, 40), "Resource downloader (HTTP)"))
         {
             string download_url = "";
 
@@ -145,82 +134,90 @@ public class FunapiNetworkTester : MonoBehaviour
         //----------------------------------------------------------------------------
         // FunapiMulticasting test
         //----------------------------------------------------------------------------
-        GUI.enabled = (multicast_ == null || !multicast_.Connected);
-        GUI.Label(new Rect(280, 40, 300, 20), "server : " + kMulticastServerIp);
-        string multicast_title = "Multicast (Protobuf) connect";
+        GUI.enabled = (multicast_ == null);
+        GUI.Label(new Rect(280, 40, 300, 20), "[Muticasting]");
+        string multicast_title = "Create 'multicast'";
         if (GUI.Button(new Rect(280, 60, 240, 40), multicast_title))
         {
-            if (FunapiConfig.IsValid)
-            {
-                multicast_ = FunapiConfig.CreateMulticasting(FunEncoding.kProtobuf, with_session_reliability_);
+            FunapiTransport transport = null;
+            if (network_ == null || (transport = network_.GetTransport(TransportProtocol.kTcp)) == null) {
+                Debug.LogWarning("You should connect to tcp transport first.");
             }
-
-            if (multicast_ == null)
-            {
-                if (multicast_ == null)
-                    multicast_ = new FunapiMulticastClient(FunEncoding.kProtobuf);
-
-                multicast_.Connect(kMulticastServerIp, kMulticastPbufPort, with_session_reliability_);
+            else {
+                multicast_ = new FunapiMulticastClient(network_, transport.Encoding);
+                multicast_encoding_ = transport.Encoding;
             }
-
-            Debug.Log("Connecting to the multicast server..");
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && !multicast_.InChannel(kMulticastTestChannel));
-        multicast_title = "Multicast (Protobuf) join";
-        if (GUI.Button(new Rect(280, 110, 240, 40), multicast_title))
+        multicast_title = "Join a channel";
+        if (GUI.Button(new Rect(280, 105, 240, 40), multicast_title))
         {
             multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelSignalled);
             Debug.Log(String.Format("Joining the multicast channel '{0}'", kMulticastTestChannel));
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
-        multicast_title = "Multicast (Protobuf) send";
-        if (GUI.Button(new Rect(280, 160, 240, 40), multicast_title))
+        multicast_title = "Send a message";
+        if (GUI.Button(new Rect(280, 150, 240, 40), multicast_title))
         {
-            PbufHelloMessage hello_msg = new PbufHelloMessage();
-            hello_msg.message = "multicast test message";
+            if (multicast_encoding_ == FunEncoding.kJson)
+            {
+                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
+                mcast_msg["_channel"] = kMulticastTestChannel;
+                mcast_msg["_bounce"] = true;
+                mcast_msg["message"] = "multicast test message";
 
-            FunMulticastMessage mcast_msg = new FunMulticastMessage();
-            mcast_msg.channel = kMulticastTestChannel;
-            mcast_msg.bounce = true;
+                multicast_.SendToChannel(mcast_msg);
+            }
+            else
+            {
+                PbufHelloMessage hello_msg = new PbufHelloMessage();
+                hello_msg.message = "multicast test message";
 
-            Extensible.AppendValue(mcast_msg, (int)MulticastMessageType.pbuf_hello, hello_msg);
+                FunMulticastMessage mcast_msg = new FunMulticastMessage();
+                mcast_msg.channel = kMulticastTestChannel;
+                mcast_msg.bounce = true;
+                Extensible.AppendValue(mcast_msg, (int)MulticastMessageType.pbuf_hello, hello_msg);
 
-            multicast_.SendToChannel(mcast_msg);
+                multicast_.SendToChannel(mcast_msg);
+            }
 
             Debug.Log(String.Format("Sending a message to the multicast channel '{0}'", kMulticastTestChannel));
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
-        multicast_title = "Multicast (Protobuf) leave";
-        if (GUI.Button(new Rect(280, 210, 240, 40), multicast_title))
+        multicast_title = "Leave a channel";
+        if (GUI.Button(new Rect(280, 195, 240, 40), multicast_title))
         {
             multicast_.LeaveChannel(kMulticastTestChannel);
             Debug.Log(String.Format("Leaving the multicast channel '{0}'", kMulticastTestChannel));
         }
 
-        GUI.enabled = (chat_ == null || !chat_.Connected);
-        string chat_title = "Chat (Protobuf) connect";
-        if (GUI.Button(new Rect(280, 260, 240, 40), chat_title))
+        GUI.Label(new Rect(280, 250, 300, 20), "[Multicast Chat]");
+        GUI.enabled = (chat_ == null);
+        string chat_title = "Create 'chat'";
+        if (GUI.Button(new Rect(280, 270, 240, 40), chat_title))
         {
-            if (chat_ == null)
-                chat_ = new FunapiChatClient();
-
-            chat_.Connect(kMulticastServerIp, kMulticastPbufPort, FunEncoding.kProtobuf, with_session_reliability_);
-            Debug.Log("Connecting to the chat server..");
+            FunapiTransport transport = null;
+            if (network_ == null || (transport = network_.GetTransport(TransportProtocol.kTcp)) == null) {
+                Debug.LogWarning("You should connect to tcp transport first.");
+            }
+            else {
+                chat_ = new FunapiChatClient(network_, transport.Encoding);
+            }
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && !chat_.InChannel(kChatTestChannel));
-        chat_title = "Chat (Protobuf) join";
-        if (GUI.Button(new Rect(280, 310, 240, 40), chat_title))
+        chat_title = "Join a channel";
+        if (GUI.Button(new Rect(280, 315, 240, 40), chat_title))
         {
             chat_.JoinChannel(kChatTestChannel, kChatUserName, OnChatChannelReceived);
             Debug.Log(String.Format("Joining the chat channel '{0}'", kChatTestChannel));
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
-        chat_title = "Chat (Protobuf) send";
+        chat_title = "Send a message";
         if (GUI.Button(new Rect(280, 360, 240, 40), chat_title))
         {
             chat_.SendText(kChatTestChannel, "hello world");
@@ -229,8 +226,8 @@ public class FunapiNetworkTester : MonoBehaviour
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
-        chat_title = "Chat (Protobuf) leave";
-        if (GUI.Button(new Rect(280, 410, 240, 40), chat_title))
+        chat_title = "Leave a channel";
+        if (GUI.Button(new Rect(280, 405, 240, 40), chat_title))
         {
             chat_.LeaveChannel(kChatTestChannel);
             Debug.Log(String.Format("Leaving the chat channel '{0}'", kChatTestChannel));
@@ -421,6 +418,8 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         Debug.Log("Session closed.");
         network_ = null;
+        multicast_ = null;
+        chat_ = null;
     }
 
     private void OnConnectTimeout (TransportProtocol protocol)
@@ -556,15 +555,27 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnMulticastChannelSignalled(string channel_id, object body)
     {
-        DebugUtils.Assert (body is FunMulticastMessage);
-        FunMulticastMessage mcast_msg = body as FunMulticastMessage;
-        DebugUtils.Assert (channel_id == mcast_msg.channel);
-        PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, (int)MulticastMessageType.pbuf_hello);
-        if (hello_msg == null)
-            return;
+        if (multicast_encoding_ == FunEncoding.kJson)
+        {
+            DebugUtils.Assert(body is Dictionary<string, object>);
+            Dictionary<string, object> mcast_msg = body as Dictionary<string, object>;
+            DebugUtils.Assert (channel_id == (mcast_msg["_channel"] as string));
 
-        Debug.Log(String.Format("Received a multicast message from a channel '{0}'\nMessage: {1}",
-                                channel_id, hello_msg.message));
+            Debug.Log(String.Format("Received a multicast message from a channel '{0}'\nMessage: {1}",
+                                    channel_id, mcast_msg["message"]));
+        }
+        else
+        {
+            DebugUtils.Assert (body is FunMulticastMessage);
+            FunMulticastMessage mcast_msg = body as FunMulticastMessage;
+            DebugUtils.Assert (channel_id == mcast_msg.channel);
+            PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, (int)MulticastMessageType.pbuf_hello);
+            if (hello_msg == null)
+                return;
+
+            Debug.Log(String.Format("Received a multicast message from a channel '{0}'\nMessage: {1}",
+                                    channel_id, hello_msg.message));
+        }
     }
 
     private void OnChatChannelReceived(string chat_channel, string sender, string text)
@@ -580,18 +591,19 @@ public class FunapiNetworkTester : MonoBehaviour
     private const UInt16 kAnnouncementPort = 8080;
     private const string kDownloadServerIp = "127.0.0.1";
     private const UInt16 kDownloadServerPort = 8020;
-    private const string kMulticastServerIp = "127.0.0.1";
-    private const UInt16 kMulticastPbufPort = 8022;
     private const string kMulticastTestChannel = "test_channel";
     private const string kChatTestChannel = "chat_channel";
     private const string kChatUserName = "my_name";
 
     // member variables.
+    private bool with_protobuf_ = false;
+    private bool with_session_reliability_ = false;
+
     private FunapiNetwork network_ = null;
     private FunapiHttpDownloader downloader_ = null;
     private FunapiAnnouncement announcement_ = null;
+
     private FunapiMulticastClient multicast_ = null;
     private FunapiChatClient chat_ = null;
-    private bool with_protobuf_ = false;
-    private bool with_session_reliability_ = false;
+    private FunEncoding multicast_encoding_;
 }
