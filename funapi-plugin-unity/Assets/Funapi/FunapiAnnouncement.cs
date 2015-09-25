@@ -45,7 +45,7 @@ namespace Fun
             web_client_.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCompleteCb);
         }
 
-        public void UpdateList ()
+        public void UpdateList (int max_count)
         {
             if (string.IsNullOrEmpty(host_url_))
             {
@@ -55,7 +55,13 @@ namespace Fun
             }
 
             // Request a list of announcements.
-            web_client_.DownloadDataAsync(new Uri(host_url_ + kAnnouncementsUrl));
+            string url = host_url_ + kAnnouncementsUrl + "?count=" + max_count;
+            web_client_.DownloadDataAsync(new Uri(url));
+        }
+
+        public int ListCount
+        {
+            get { return announce_list_.Count; }
         }
 
         public Dictionary<string, object> GetAnnouncement (int index)
@@ -66,9 +72,14 @@ namespace Fun
             return announce_list_[index];
         }
 
-        public int ListCount
+        public string GetImagePath (int index)
         {
-            get { return announce_list_.Count; }
+            Dictionary<string, object> item = GetAnnouncement(index);
+            if (item == null || !item.ContainsKey(kImageUrlKey))
+                return null;
+
+            string path = item[kImageUrlKey] as string;
+            return local_path_ + Path.GetFileName(path);
         }
 
         private void DownloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
@@ -109,9 +120,9 @@ namespace Fun
                         announce_list_.Add(node);
 
                         // download image
-                        if (node.ContainsKey("image_url") && node.ContainsKey("image_md5"))
+                        if (node.ContainsKey(kImageUrlKey) && node.ContainsKey(kImageMd5Key))
                         {
-                            CheckDownloadImage(node["image_url"] as string, node["image_md5"] as string);
+                            CheckDownloadImage(node[kImageUrlKey] as string, node[kImageMd5Key] as string);
                         }
                     }
 
@@ -177,11 +188,7 @@ namespace Fun
             if (url.Length <= 0 || imgmd5.Length <= 0)
                 return;
 
-            string path = local_path_;
-            int offset = url.LastIndexOf('/');
-            if (offset >= 0)
-                path += url.Substring(offset, url.Length - offset);
-
+            string path = local_path_ + Path.GetFileName(url);
             if (File.Exists(path))
             {
                 // Check md5
@@ -215,9 +222,11 @@ namespace Fun
 
 
         // Url-related constants.
-        private static readonly string kLocalPath = "/announce";
+        private static readonly string kLocalPath = "/announce/";
         private static readonly string kImagesUrl = "/images";
-        private static readonly string kAnnouncementsUrl = "/announcements";
+        private static readonly string kImageUrlKey = "image_url";
+        private static readonly string kImageMd5Key = "image_md5";
+        private static readonly string kAnnouncementsUrl = "/announcements/";
 
         // member variables.
         private string host_url_ = "";
