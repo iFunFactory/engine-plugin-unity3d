@@ -103,7 +103,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 announcement_.Init(url);
             }
 
-            announcement_.UpdateList();
+            announcement_.UpdateList(5);
         }
 
         //----------------------------------------------------------------------------
@@ -491,9 +491,14 @@ public class FunapiNetworkTester : MonoBehaviour
                 string buffer = "";
 
                 foreach (var item in list)
+                {
                     buffer += String.Format("{0}: {1}\n", item.Key, item.Value);
+                }
 
-                Debug.Log("announcement >> " + buffer);
+                Debug.Log(string.Format("announcement ({0}) >> {1}", i + 1, buffer));
+
+                if (list.ContainsKey("image_url"))
+                    Debug.Log("image path > " + announcement_.GetImagePath(i));
             }
         }
     }
