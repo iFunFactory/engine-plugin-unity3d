@@ -73,9 +73,6 @@ namespace Fun
         // Check connection
         internal abstract bool Started { get; }
 
-        // Timer
-        internal FunapiTimer Timer { get; set; }
-
         internal float PingWaitTime { get; set; }
 
         // Check unsent messages
@@ -298,12 +295,9 @@ namespace Fun
             Debug.Log(string.Format("Wait {0} seconds for connect to {1} transport.",
                                     delay_time, str_protocol));
 
-            string id = string.Format("{0}_try_connect", str_protocol);
-            timer_id_list_.Add(id);
-            Timer.AddTimer(id, delay_time,
+            timer_.AddTimer(kTryConnectTimerId, delay_time,
                 delegate (object param) {
                     Debug.Log(string.Format("'{0}' Try to connect to server.", str_protocol));
-                    timer_id_list_.Remove(id);
                     SetNextAddress();
                     Connect();
                 }
@@ -331,12 +325,9 @@ namespace Fun
             Debug.Log(string.Format("Wait {0} seconds for reconnect to {1} transport.",
                                     delay_time, str_protocol));
 
-            string id = string.Format("{0}_try_reconnect", str_protocol);
-            timer_id_list_.Add(id);
-            Timer.AddTimer(id, delay_time,
+            timer_.AddTimer(kTryReconnectTimerId, delay_time,
                 delegate (object param) {
                     Debug.Log(string.Format("'{0}' Try to reconnect to server.", str_protocol));
-                    timer_id_list_.Remove(id);
                     Start();
                 }
             );
@@ -347,6 +338,10 @@ namespace Fun
         // Update
         internal virtual void Update()
         {
+            // Timer
+            timer_.Update();
+
+            // Events
             Queue<DelegateEventHandler> queue = null;
 
             lock (event_lock_)
@@ -471,6 +466,12 @@ namespace Fun
                     OnConnectFailureCallback();
                 }
             }
+
+            if (cstate_ == ConnectState.kUnknown)
+            {
+                exponential_time_ = 1f;
+                reconnect_count_ = 0;
+            }
         }
 
         internal void OnDisconnected ()
@@ -544,6 +545,9 @@ namespace Fun
         internal delegate void DelegateEventHandler();
 
         // constants.
+        private static readonly string kTryConnectTimerId = "try_connect";
+        private static readonly string kTryReconnectTimerId = "try_reconnect";
+
         private static readonly int kMaxReconnectCount = 3;
         private static readonly float kMaxConnectingTime = 120f;
         private static readonly float kFixedConnectWaitTime = 10f;
@@ -579,9 +583,9 @@ namespace Fun
         // member variables.
         internal State state_;
         internal TransportProtocol protocol_;
+        internal FunapiTimer timer_ = new FunapiTimer();
         internal object event_lock_ = new object();
         internal Queue<DelegateEventHandler> event_queue_ = new Queue<DelegateEventHandler>();
-        internal List<string> timer_id_list_ = new List<string>();
     }
 
 
@@ -611,17 +615,16 @@ namespace Fun
 
                 if (ConnectTimeout > 0f)
                 {
-                    string id = string.Format("{0}_connect_timeout", str_protocol);
-                    timer_id_list_.Add(id);
-                    Timer.AddTimer(id, ConnectTimeout,
+                    timer_.KillTimer(kConnectTimeoutTimerId);
+                    timer_.AddTimer(kConnectTimeoutTimerId, ConnectTimeout,
                         delegate (object param) {
-                            timer_id_list_.Remove(id);
                             if (state_ == State.kEstablished)
                                 return;
 
                             Debug.Log(string.Format("{0} Connection waiting time has been exceeded.", str_protocol));
                             OnConnectionTimeout();
-                    });
+                        }
+                    );
                 }
 
                 Init();
@@ -644,17 +647,7 @@ namespace Fun
             state_ = State.kUnknown;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
-
-            if (timer_id_list_.Count > 0)
-            {
-                foreach (string id in timer_id_list_)
-                {
-                    if (Timer.ContainTimer(id))
-                        Timer.KillTimer(id);
-                }
-
-                timer_id_list_.Clear();
-            }
+            timer_.Clear();
 
             AddToEventQueue(OnStopped);
         }
@@ -974,6 +967,9 @@ namespace Fun
             return -1;
         }
 
+
+        // Timer-related constants
+        private static readonly string kConnectTimeoutTimerId = "connect_timeout";
 
         // Buffer-related constants.
         internal static readonly int kUnitBufferSize = 65536;
@@ -1673,7 +1669,8 @@ namespace Fun
                         headers.Add(kCookieHeaderField, str_cookie_);
 
                     // Sets timeout timer
-                    Timer.AddTimer(kTimeoutTimerId, kTimeoutSeconds, OnRequestTimeout, body.msg_type);
+                    timer_.KillTimer(kTimeoutTimerId);
+                    timer_.AddTimer(kTimeoutTimerId, kTimeoutSeconds, OnRequestTimeout, body.msg_type);
 
                     // Sending a message
 #if !NO_UNITY
@@ -2029,8 +2026,7 @@ namespace Fun
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
-            if (Timer.ContainTimer(kTimeoutTimerId))
-                Timer.KillTimer(kTimeoutTimerId);
+            timer_.KillTimer(kTimeoutTimerId);
         }
 
         private void OnRequestTimeout (object param)
