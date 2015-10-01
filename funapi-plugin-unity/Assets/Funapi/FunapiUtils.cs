@@ -315,9 +315,15 @@ namespace Fun
                 return;
             }
 
-            if (timer_list_.ContainsKey(name) || pending_list_.ContainsKey(name))
+            if (pending_list_.ContainsKey(name))
             {
-                if (!remove_list_.Contains(name))
+                Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
+                return;
+            }
+
+            if (timer_list_.ContainsKey(name))
+            {
+                if (!is_all_clear_ && !remove_list_.Contains(name))
                 {
                     Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
                     return;
@@ -351,7 +357,7 @@ namespace Fun
 
         public bool ContainTimer (string name)
         {
-            return timer_list_.ContainsKey(name);
+            return timer_list_.ContainsKey(name) || pending_list_.ContainsKey(name);
         }
 
         public void Clear ()
@@ -364,7 +370,6 @@ namespace Fun
             if (is_all_clear_)
             {
                 timer_list_.Clear();
-                pending_list_.Clear();
                 remove_list_.Clear();
                 is_all_clear_ = false;
                 return;
@@ -393,12 +398,15 @@ namespace Fun
                 e.remaining -= delta;
                 if (e.remaining <= 0f)
                 {
-                    e.callback(e.param);
+                    if (remove_list_.Contains(e.name))
+                        continue;
 
                     if (e.loop)
                         e.remaining = e.interval;
                     else
                         remove_list_.Add(e.name);
+
+                    e.callback(e.param);
                 }
             }
 

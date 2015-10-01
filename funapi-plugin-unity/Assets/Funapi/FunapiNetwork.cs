@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 109;
+        public static readonly int kPluginVersion = 110;
     }
 
     // Sending message-related class.
@@ -407,8 +407,6 @@ namespace Fun
                     Debug.LogWarning(strlog);
                     return;
                 }
-
-                transport.Timer = timer_;
 
                 // Callback functions
                 transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
