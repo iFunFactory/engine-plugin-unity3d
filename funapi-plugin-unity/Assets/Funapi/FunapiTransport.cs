@@ -236,9 +236,9 @@ namespace Fun
 
             AddToEventQueue(
                 delegate {
-                cstate_ = ConnectState.kRedirecting;
-                Connect(addr);
-            }
+                    cstate_ = ConnectState.kRedirecting;
+                    Connect(addr);
+                }
             );
         }
 
@@ -469,6 +469,12 @@ namespace Fun
                     cstate_ = ConnectState.kUnknown;
                     OnConnectFailureCallback();
                 }
+            }
+
+            if (cstate_ == ConnectState.kUnknown)
+            {
+                exponential_time_ = 1f;
+                reconnect_count_ = 0;
             }
         }
 
