@@ -23,7 +23,7 @@ public class MD5Async
             return;
         }
 
-        Debug.Log(string.Format("MD5Async.Compute - Can't find a file.\npath: {0}", path));
+        DebugUtils.Log("MD5Async.Compute - Can't find a file.\npath: {0}", path);
         if (on_result != null)
             on_result(path, file, false);
     }

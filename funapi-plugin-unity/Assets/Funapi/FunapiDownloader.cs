@@ -52,7 +52,7 @@ namespace Fun
         // Start downloading
         public void GetDownloadList (string hostname_or_ip, UInt16 port, bool https, string target_path)
         {
-            string url = String.Format("{0}://{1}:{2}",
+            string url = string.Format("{0}://{1}:{2}",
                                        (https ? "https" : "http"), hostname_or_ip, port);
 
             GetDownloadList(url, target_path);
@@ -62,7 +62,7 @@ namespace Fun
         {
             if (ReadyCallback == null)
             {
-                Debug.LogError("You must register the ReadyCallback first.");
+                DebugUtils.LogError("You must register the ReadyCallback first.");
                 return;
             }
 
@@ -72,8 +72,8 @@ namespace Fun
             {
                 if (IsDownloading)
                 {
-                    Debug.LogWarning(String.Format("The resource file is being downloaded. (Url: {0})\n"
-                                                   + "Please try again after the download is completed.", url));
+                    DebugUtils.LogWarning("The resource file is being downloaded. (Url: {0})\n"
+                                          + "Please try again after the download is completed.", url);
                     return;
                 }
 
@@ -88,7 +88,7 @@ namespace Fun
                 if (target_path_[target_path_.Length - 1] != '/')
                     target_path_ += "/";
                 target_path_ += kRootPath + "/";
-                Debug.Log(String.Format("Download path:{0}", target_path_));
+                DebugUtils.Log("Download path:{0}", target_path_);
 
                 cur_download_count_ = 0;
                 cur_download_size_ = 0;
@@ -110,7 +110,7 @@ namespace Fun
         {
             if (state_ != State.Ready)
             {
-                Debug.LogError("You must call GetDownloadList function first.");
+                DebugUtils.LogError("You must call GetDownloadList function first.");
                 return;
             }
 
@@ -118,9 +118,9 @@ namespace Fun
 
             if (total_download_count_ > 0)
             {
-                Debug.Log(String.Format("Ready to download {0} files ({1:F2}MB)",
-                                        total_download_count_,
-                                        (float)total_download_size_ / (1024f * 1024f)));
+                DebugUtils.Log("Ready to download {0} files ({1:F2}MB)",
+                               total_download_count_,
+                               (float)total_download_size_ / (1024f * 1024f));
             }
 
             state_ = State.Downloading;
@@ -187,7 +187,7 @@ namespace Fun
 
             if (data.Length <= 0)
             {
-                Debug.Log("Failed to get a cached file list.");
+                DebugUtils.Log("Failed to get a cached file list.");
                 DebugUtils.Assert(false);
                 return;
             }
@@ -268,7 +268,7 @@ namespace Fun
                 }
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
-                DebugUtils.Log("Random check file count is " + rnd_list.Count);
+                DebugUtils.DebugLog("Random check file count is " + rnd_list.Count);
             }
 
             // Checks local files
@@ -336,7 +336,7 @@ namespace Fun
 
             RemoveCachedList(remove_list);
 
-            Debug.Log("Random validation has " + (verify_success ? "succeeded" : "failed"));
+            DebugUtils.Log("Random validation has " + (verify_success ? "succeeded" : "failed"));
 
             // Checks all local files
             if (!verify_success)
@@ -376,7 +376,7 @@ namespace Fun
             }
 
             TimeSpan span = new TimeSpan(DateTime.Now.Ticks - check_time_.Ticks);
-            Debug.Log(string.Format("File check total time - {0:F2}s", span.TotalMilliseconds / 1000f));
+            DebugUtils.Log("File check total time - {0:F2}s", span.TotalMilliseconds / 1000f);
 
             total_download_count_ = list.Count;
 
@@ -397,7 +397,7 @@ namespace Fun
                 UpdateCachedList();
 
                 state_ = State.Completed;
-                Debug.Log("All resources are up to date.");
+                DebugUtils.Log("All resources are up to date.");
                 OnFinishedCallback(DownloadResult.SUCCESS);
             }
         }
@@ -424,12 +424,12 @@ namespace Fun
             try
             {
                 // Request a list of download files.
-                Debug.Log("Getting list file from " + url);
+                DebugUtils.Log("Getting list file from " + url);
                 web_client_.DownloadDataAsync(new Uri(url));
             }
             catch (Exception e)
             {
-                Debug.Log("Failure in DownloadListFile: " + e.ToString());
+                DebugUtils.Log("Failure in DownloadListFile: " + e.ToString());
                 failed = true;
             }
 
@@ -449,7 +449,7 @@ namespace Fun
                 if (File.Exists(path))
                 {
                     File.Delete(path);
-                    Debug.Log("Deleted resource file \npath: " + path);
+                    DebugUtils.Log("Deleted resource file \npath: " + path);
                 }
             }
 
@@ -464,10 +464,10 @@ namespace Fun
                 UpdateCachedList();
 
                 TimeSpan span = new TimeSpan(DateTime.Now.Ticks - check_time_.Ticks);
-                Debug.Log(string.Format("File download total time - {0:F2}s", span.TotalMilliseconds / 1000f));
+                DebugUtils.Log("File download total time - {0:F2}s", span.TotalMilliseconds / 1000f);
 
                 state_ = State.Completed;
-                Debug.Log("Download completed.");
+                DebugUtils.Log("Download completed.");
                 OnFinishedCallback(DownloadResult.SUCCESS);
             }
             else
@@ -488,7 +488,7 @@ namespace Fun
                     File.Delete(file_path);
 
                 // Requests a file.
-                Debug.Log("Download file - " + file_path);
+                DebugUtils.Log("Download file - " + file_path);
                 web_client_.DownloadFileAsync(new Uri(host_url_ + info.path), file_path, info);
             }
         }
@@ -503,7 +503,7 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    Debug.Log("Exception Error: " + ar.Error);
+                    DebugUtils.Log("Exception Error: " + ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
@@ -517,7 +517,7 @@ namespace Fun
                     string data = Encoding.ASCII.GetString(ar.Result);
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
 
-                    //Debug.Log("Json data >>  " + data);
+                    //DebugUtils.Log("Json data >>  " + data);
 
                     // Redirect url
                     if (json.ContainsKey("url"))
@@ -527,13 +527,13 @@ namespace Fun
                             url += "/";
 
                         host_url_ = url;
-                        Debug.Log("Download url : " + host_url_);
+                        DebugUtils.Log("Download url : " + host_url_);
                     }
 
                     List<object> list = json["data"] as List<object>;
                     if (list.Count <= 0)
                     {
-                        Debug.Log("Invalid list data. List count is 0.");
+                        DebugUtils.Log("Invalid list data. List count is 0.");
                         DebugUtils.Assert(false);
                         failed = true;
                     }
@@ -563,7 +563,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                Debug.Log("Failure in DownloadDataCompleteCb: " + e.ToString());
+                DebugUtils.Log("Failure in DownloadDataCompleteCb: " + e.ToString());
                 failed = true;
             }
             finally
@@ -604,7 +604,7 @@ namespace Fun
 
                 if (ar.Error != null)
                 {
-                    Debug.Log("Exception Error: " + ar.Error);
+                    DebugUtils.Log("Exception Error: " + ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
@@ -613,7 +613,7 @@ namespace Fun
                     var info = (DownloadFileInfo)ar.UserState;
                     if (info == null)
                     {
-                        Debug.Log("DownloadFileInfo object is null.");
+                        DebugUtils.Log("DownloadFileInfo object is null.");
                         failed = true;
                     }
                     else
@@ -629,7 +629,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                Debug.Log("Failure in DownloadFileCompleteCb: " + e.ToString());
+                DebugUtils.Log("Failure in DownloadFileCompleteCb: " + e.ToString());
                 failed = true;
             }
             finally

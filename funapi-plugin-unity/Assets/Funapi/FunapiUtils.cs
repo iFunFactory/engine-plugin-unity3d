@@ -63,17 +63,17 @@ namespace Fun
         {
             if (!File.Exists(path))
             {
-                Debug.Log(String.Format("Can't find a config file. path: {0}", path));
+                DebugUtils.Log("Can't find a config file. path: {0}", path);
                 return;
             }
 
             string text = File.ReadAllText(path);
-            DebugUtils.Log(String.Format("{0} >> {1}", path, text));
+            DebugUtils.DebugLog("{0} >> {1}", path, text);
 
             Dictionary<string, object> json = Json.Deserialize(text) as Dictionary<string, object>;
             if (json == null)
             {
-                Debug.Log("Deserialize json failed. json: " + text);
+                DebugUtils.Log("Deserialize json failed. json: " + text);
                 return;
             }
 
@@ -85,7 +85,7 @@ namespace Fun
         {
             if (data_ == null)
             {
-                Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                DebugUtils.Log("There's no config data. You should call FunapiConfig.Load first.");
                 return null;
             }
 
@@ -98,15 +98,15 @@ namespace Fun
                 str_protocol = "http";
             else
             {
-                Debug.Log(String.Format("CreateTransport - Invalid protocol. protocol: {0}", protocol));
+                DebugUtils.Log("CreateTransport - Invalid protocol. protocol: {0}", protocol);
                 return null;
             }
 
-            string str_ip = String.Format("{0}_server_ip", str_protocol);
-            string str_port = String.Format("{0}_server_port", str_protocol);
+            string str_ip = string.Format("{0}_server_ip", str_protocol);
+            string str_port = string.Format("{0}_server_port", str_protocol);
             if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
             {
-                Debug.Log(String.Format("CreateTransport - Can't find values with '{0}'", str_protocol));
+                DebugUtils.Log("CreateTransport - Can't find values with '{0}'", str_protocol);
                 return null;
             }
 
@@ -114,8 +114,8 @@ namespace Fun
             UInt16 port = Convert.ToUInt16(data_[str_port]);
             if (hostname_or_ip.Length <= 0 || port == 0)
             {
-                Debug.Log(String.Format("CreateTransport - Invalid value. ip:{0} port:{1} encoding:{2}",
-                                        hostname_or_ip, port, encoding));
+                DebugUtils.Log("CreateTransport - Invalid value. ip:{0} port:{1} encoding:{2}",
+                               hostname_or_ip, port, encoding);
                 return null;
             }
 
@@ -150,7 +150,7 @@ namespace Fun
 
             if (data_ == null)
             {
-                Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                DebugUtils.Log("There's no config data. You should call FunapiConfig.Load first.");
                 return;
             }
 
@@ -158,7 +158,7 @@ namespace Fun
             string str_port = "download_server_port";
             if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
             {
-                Debug.Log("CreateDownloader - Can't find values for downloader.");
+                DebugUtils.Log("CreateDownloader - Can't find values for downloader.");
                 return;
             }
 
@@ -166,8 +166,8 @@ namespace Fun
             UInt16 port = Convert.ToUInt16(data_[str_port]);
             if (hostname_or_ip.Length <= 0 || port == 0)
             {
-                Debug.Log(String.Format("CreateDownloader - Invalid value. ip:{0} port:{1}",
-                                        hostname_or_ip, port));
+                DebugUtils.Log("CreateDownloader - Invalid value. ip:{0} port:{1}",
+                               hostname_or_ip, port);
                 return;
             }
 
@@ -182,7 +182,7 @@ namespace Fun
                 {
                     if (data_ == null)
                     {
-                        Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                        DebugUtils.Log("There's no config data. You should call FunapiConfig.Load first.");
                         return "";
                     }
 
@@ -190,7 +190,7 @@ namespace Fun
                     string str_port = "announcement_server_port";
                     if (!data_.ContainsKey(str_ip) || !data_.ContainsKey(str_port))
                     {
-                        Debug.Log("AnnouncementUrl - Can't find values for announcement.");
+                        DebugUtils.Log("AnnouncementUrl - Can't find values for announcement.");
                         return "";
                     }
 
@@ -198,8 +198,8 @@ namespace Fun
                     UInt16 port = Convert.ToUInt16(data_[str_port]);
                     if (hostname_or_ip.Length <= 0 || port == 0)
                     {
-                        Debug.Log(String.Format("CreateDownloader - Invalid value. ip:{0} port:{1}",
-                                                hostname_or_ip, port));
+                        DebugUtils.Log("CreateDownloader - Invalid value. ip:{0} port:{1}",
+                                       hostname_or_ip, port);
                         return "";
                     }
 
@@ -208,7 +208,7 @@ namespace Fun
                         with_https = (bool)data_["announcement_with_secure"];
 
                     announcement_url_ = string.Format("{0}://{1}:{2}", with_https ? "https" : "http", hostname_or_ip, port);
-                    Debug.Log("Announcement url : " + announcement_url_);
+                    DebugUtils.Log("Announcement url : " + announcement_url_);
                 }
 
                 return announcement_url_;
@@ -223,7 +223,7 @@ namespace Fun
                 {
                     if (data_ == null)
                     {
-                        Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                        DebugUtils.Log("There's no config data. You should call FunapiConfig.Load first.");
                         ping_interval_ = 0;
                         return 0;
                     }
@@ -231,7 +231,7 @@ namespace Fun
                     string str_interval = "ping_interval_second";
                     if (!data_.ContainsKey(str_interval))
                     {
-                        Debug.Log("GetPingInterval - Can't find a interval value of ping.");
+                        DebugUtils.Log("GetPingInterval - Can't find a interval value of ping.");
                         ping_interval_ = 0;
                         return 0;
                     }
@@ -251,7 +251,7 @@ namespace Fun
                 {
                     if (data_ == null)
                     {
-                        Debug.Log("There's no config data. You should call FunapiConfig.Load first.");
+                        DebugUtils.Log("There's no config data. You should call FunapiConfig.Load first.");
                         ping_timeout_seconds_ = 0f;
                         return 0f;
                     }
@@ -259,7 +259,7 @@ namespace Fun
                     string str_ping_timeout = "ping_timeout_second";
                     if (!data_.ContainsKey(str_ping_timeout))
                     {
-                        Debug.Log("PingTimeoutSeconds - Can't find a timeout value of ping.");
+                        DebugUtils.Log("PingTimeoutSeconds - Can't find a timeout value of ping.");
                         ping_timeout_seconds_ = 0f;
                         return 0f;
                     }
@@ -297,13 +297,13 @@ namespace Fun
         {
             if (callback == null)
             {
-                Debug.LogWarning(string.Format("AddTimer - '{0}' timer's callback is null.", name));
+                DebugUtils.LogWarning("AddTimer - '{0}' timer's callback is null.", name);
                 return;
             }
 
             if (pending_list_.ContainsKey(name))
             {
-                Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
+                DebugUtils.LogWarning("AddTimer - '{0}' timer already exists.", name);
                 return;
             }
 
@@ -311,13 +311,13 @@ namespace Fun
             {
                 if (!is_all_clear_ && !remove_list_.Contains(name))
                 {
-                    Debug.LogWarning(string.Format("AddTimer - '{0}' timer already exists.", name));
+                    DebugUtils.LogWarning("AddTimer - '{0}' timer already exists.", name);
                     return;
                 }
             }
 
             pending_list_.Add(name, new Event(name, start, delay, loop, callback, param));
-            DebugUtils.Log(string.Format("AddTimer - '{0}' timer added.", name));
+            DebugUtils.DebugLog("AddTimer - '{0}' timer added.", name);
         }
 
         public void KillTimer (string name)
@@ -338,7 +338,7 @@ namespace Fun
                 return;
             }
 
-            DebugUtils.Log(string.Format("KillTimer - '{0}' timer removed.", name));
+            DebugUtils.DebugLog("KillTimer - '{0}' timer removed.", name);
         }
 
         public bool ContainTimer (string name)

@@ -39,7 +39,7 @@ namespace Fun
         {
             if (!Connected)
             {
-                Debug.Log ("Not connected. First connect before join a multicast channel.");
+                DebugUtils.Log("Not connected. First connect before join a multicast channel.");
                 return false;
             }
 
@@ -47,7 +47,7 @@ namespace Fun
             {
                 if (channels_.ContainsKey(channel_id))
                 {
-                    Debug.Log ("Already joined the channel: " + channel_id);
+                    DebugUtils.Log("Already joined the channel: " + channel_id);
                     return false;
                 }
 
@@ -78,8 +78,8 @@ namespace Fun
         {
             if (!Connected)
             {
-                Debug.Log ("Not connected. If you are trying to leave a channel in which you were, "
-                           + "connect first while preserving the session id you used for join.");
+                DebugUtils.Log("Not connected. If you are trying to leave a channel in which you were, "
+                               + "connect first while preserving the session id you used for join.");
                 return false;
             }
 
@@ -87,7 +87,7 @@ namespace Fun
             {
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    Debug.Log ("You are not in the channel: " + channel_id);
+                    DebugUtils.Log("You are not in the channel: " + channel_id);
                     return false;
                 }
 
@@ -129,24 +129,25 @@ namespace Fun
         /// </summary>
         public bool SendToChannel (FunMulticastMessage mcast_msg)
         {
-            DebugUtils.Assert (encoding_ == FunEncoding.kProtobuf);
-            DebugUtils.Assert (mcast_msg != null);
-            DebugUtils.Assert (!mcast_msg.join);
-            DebugUtils.Assert (!mcast_msg.leave);
+            DebugUtils.Assert(encoding_ == FunEncoding.kProtobuf);
+            DebugUtils.Assert(mcast_msg != null);
+            DebugUtils.Assert(!mcast_msg.join);
+            DebugUtils.Assert(!mcast_msg.leave);
 
             string channel_id = mcast_msg.channel;
-            DebugUtils.Assert (channel_id != "");
+            DebugUtils.Assert(channel_id != "");
 
             lock (channel_lock_)
             {
                 if (!Connected)
                 {
-                    Debug.Log ("Not connected. If you are trying to leave a channel in which you were, connect first while preserving the session id you used for join.");
+                    DebugUtils.Log("Not connected. If you are trying to leave a channel in which you were, "
+                                   + "connect first while preserving the session id you used for join.");
                     return false;
                 }
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    Debug.Log ("You are not in the channel: " + channel_id);
+                    DebugUtils.Log("You are not in the channel: " + channel_id);
                     return false;
                 }
             }
@@ -163,7 +164,7 @@ namespace Fun
         /// </summary>
         public bool SendToChannel (object json_msg)
         {
-            DebugUtils.Assert (encoding_ == FunEncoding.kJson);
+            DebugUtils.Assert(encoding_ == FunEncoding.kJson);
             // TODO(dkmoon): Verifies the passed json_msg has required fields.
             network_.SendMessage (kMulticastMsgType, json_msg);
             return true;
@@ -171,7 +172,7 @@ namespace Fun
 
         private void OnReceived (string msg_type, object body)
         {
-            DebugUtils.Assert (msg_type == kMulticastMsgType);
+            DebugUtils.Assert(msg_type == kMulticastMsgType);
 
             string channel_id = "";
 
@@ -186,7 +187,7 @@ namespace Fun
                 {
                     if (!channels_.ContainsKey(channel_id))
                     {
-                        Debug.Log("You are not in the channel: " + channel_id);
+                        DebugUtils.Log("You are not in the channel: " + channel_id);
                         return;
                     }
 
@@ -196,11 +197,11 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Assert (body is FunMessage);
+                DebugUtils.Assert(body is FunMessage);
                 FunMessage msg = body as FunMessage;
 
                 object obj = network_.GetMessage(msg, MessageType.multicast);
-                DebugUtils.Assert (obj != null);
+                DebugUtils.Assert(obj != null);
 
                 FunMulticastMessage mcast_msg = obj as FunMulticastMessage;
                 channel_id = mcast_msg.channel;
@@ -209,7 +210,7 @@ namespace Fun
                 {
                     if (!channels_.ContainsKey(channel_id))
                     {
-                        Debug.Log("You are not in the channel: " + channel_id);
+                        DebugUtils.Log("You are not in the channel: " + channel_id);
                         return;
                     }
 

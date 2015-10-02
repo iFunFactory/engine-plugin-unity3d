@@ -55,7 +55,7 @@ namespace Fun
         {
             IPAddress[] list = Dns.GetHostAddresses(hostname);
             if (list == null) {
-                Debug.Log(string.Format("ConnectList - Can't find any ip address with hostname [{0}].", hostname));
+                DebugUtils.Log("ConnectList - Can't find any ip address with hostname [{0}].", hostname);
                 return;
             }
 
@@ -64,14 +64,14 @@ namespace Fun
                 addr_list_.Add(new HostIP(hostname, ip, port));
             }
 
-            Debug.Log(string.Format("[{0}] Dns address count : {1}", hostname, addr_list_.Count));
+            DebugUtils.Log("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
         }
 
         internal void Add (string hostname, UInt16 port, bool https)
         {
             IPAddress[] list = Dns.GetHostAddresses(hostname);
             if (list == null) {
-                Debug.Log(string.Format("ConnectList - Can't find any ip address with hostname [{0}].", hostname));
+                DebugUtils.Log("ConnectList - Can't find any ip address with hostname [{0}].", hostname);
                 return;
             }
 
@@ -80,13 +80,13 @@ namespace Fun
                 addr_list_.Add(new HostHttp(ip.ToString(), port, https));
             }
 
-            Debug.Log(string.Format("[{0}] Dns address count : {1}", hostname, addr_list_.Count));
+            DebugUtils.Log("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
         }
 
         internal void Add (List<HostAddr> list)
         {
             if (list == null || list.Count <= 0) {
-                Debug.Log("ConnectList - Invalid connect list parameter.");
+                DebugUtils.Log("ConnectList - Invalid connect list parameter.");
                 return;
             }
 
