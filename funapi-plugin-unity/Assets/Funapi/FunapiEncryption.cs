@@ -35,7 +35,7 @@ namespace Fun
             else if (type == EncryptionType.kIFunEngine2Encryption)
                 return new Encryptor2();
 
-            Debug.LogWarning("Unknown encryptor: " + type);
+            DebugUtils.LogWarning("Unknown encryptor: " + type);
             DebugUtils.Assert(false);
 
             return null;
@@ -50,7 +50,7 @@ namespace Fun
             else if (name == Encryptor2.kName)
                 return new Encryptor2();
 
-            Debug.LogWarning("Unknown encryptor: " + name);
+            DebugUtils.LogWarning("Unknown encryptor: " + name);
             DebugUtils.Assert(false);
 
             return null;
@@ -141,7 +141,7 @@ namespace Fun
         {
             if (in_header.Length > 0)
             {
-                Debug.LogWarning("Wrong encryptor header.");
+                DebugUtils.LogWarning("Wrong encryptor header.");
                 return -1;
             }
 
@@ -187,7 +187,7 @@ namespace Fun
 
             if (in_header.Length > 0)
             {
-                Debug.LogWarning("Wrong encryptor header.");
+                DebugUtils.LogWarning("Wrong encryptor header.");
                 return -1;
             }
 
@@ -261,7 +261,7 @@ namespace Fun
 
             if (in_header.Length > 0)
             {
-                Debug.LogWarning("Wrong encryptor header.");
+                DebugUtils.LogWarning("Wrong encryptor header.");
                 return -1;
             }
 

@@ -34,41 +34,71 @@ namespace Fun
             }
         }
 
-#if NO_UNITY
-        [Conditional("DEBUG_LOG")]
-        public static void Log (object message)
+#if !NO_UNITY
+        public static void Log (string message, params object[] args)
         {
-            Console.WriteLine(message);
+            UnityEngine.Debug.Log(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+        }
+
+        public static void LogWarning (string message, params object[] args)
+        {
+            UnityEngine.Debug.LogWarning(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+        }
+
+        public static void LogError (string message, params object[] args)
+        {
+            UnityEngine.Debug.LogError(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
         [Conditional("DEBUG_LOG")]
-        public static void LogError (object message)
+        public static void DebugLog (string message, params object[] args)
         {
-            Console.WriteLine("Error: " + message);
+            UnityEngine.Debug.Log(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
         [Conditional("DEBUG_LOG")]
-        public static void LogWarning (object message)
+        public static void DebugLogWarning (string message, params object[] args)
         {
-            Console.WriteLine("Warning: " + message);
+            UnityEngine.Debug.LogWarning(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void DebugLogError (string message, params object[] args)
+        {
+            UnityEngine.Debug.LogError(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 #else
-        [Conditional("DEBUG_LOG")]
-        public static void Log (object message)
+        public static void Log (string message, params object[] args)
         {
-            UnityEngine.Debug.Log(message);
+            Console.WriteLine(string.Format(message, args));
+        }
+
+        public static void LogWarning (string message, params object[] args)
+        {
+            Console.WriteLine("Warning: " + string.Format(message, args));
+        }
+
+        public static void LogError (string message, params object[] args)
+        {
+            Console.WriteLine("Error: " + string.Format(message, args));
         }
 
         [Conditional("DEBUG_LOG")]
-        public static void LogError (object message)
+        public static void DebugLog (string message, params object[] args)
         {
-            UnityEngine.Debug.LogError(message);
+            Console.WriteLine(string.Format(message, args));
         }
 
         [Conditional("DEBUG_LOG")]
-        public static void LogWarning (object message)
+        public static void DebugLogWarning (string message, params object[] args)
         {
-            UnityEngine.Debug.LogWarning(message);
+            Console.WriteLine("Warning: " + string.Format(message, args));
+        }
+
+        [Conditional("DEBUG_LOG")]
+        public static void DebugLogError (string message, params object[] args)
+        {
+            Console.WriteLine("Error: " + string.Format(message, args));
         }
 #endif
     }

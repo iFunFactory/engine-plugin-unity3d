@@ -34,7 +34,7 @@ namespace Fun
         {
             if (action == null)
             {
-                Debug.Log("FunapiManager.AddEvent - action is null.");
+                DebugUtils.Log("FunapiManager.AddEvent - action is null.");
                 return;
             }
 
