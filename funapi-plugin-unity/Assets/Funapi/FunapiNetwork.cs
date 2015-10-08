@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 111;
+        public static readonly int kPluginVersion = 112;
     }
 
     // Sending message-related class.
@@ -1415,7 +1415,7 @@ namespace Fun
         {
             DebugUtils.Log("Session timed out. Resetting my session id. The server will send me another one next time.");
 
-            CloseSession();
+            Stop();
         }
 
 
