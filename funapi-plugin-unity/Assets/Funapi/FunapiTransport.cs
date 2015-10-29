@@ -61,7 +61,21 @@ namespace Fun
         {
             state_ = State.kUnknown;
             protocol_ = TransportProtocol.kDefault;
+            PingIntervalSeconds = 0;
+            PingTimeoutSeconds = 0f;
             ConnectTimeout = 10f;
+
+            if (FunapiConfig.IsValid)
+            {
+                PingIntervalSeconds = FunapiConfig.PingInterval;
+                PingTimeoutSeconds = FunapiConfig.PingTimeoutSeconds;
+            }
+
+            if (PingIntervalSeconds <= 0)
+                PingIntervalSeconds = kPingIntervalSecond;
+
+            if (PingTimeoutSeconds <= 0f)
+                PingTimeoutSeconds = kPingTimeoutSeconds;
         }
 
         // Start connecting
@@ -129,6 +143,16 @@ namespace Fun
         }
 
         public bool EnablePing
+        {
+            get; set;
+        }
+
+        public int PingIntervalSeconds
+        {
+            get; set;
+        }
+
+        public float PingTimeoutSeconds
         {
             get; set;
         }
@@ -476,14 +500,9 @@ namespace Fun
 
         internal void OnDisconnected ()
         {
-            CheckReconnect();
-
             Stop();
 
-            if (cstate_ != ConnectState.kReconnecting)
-            {
-                OnDisconnectedCallback();
-            }
+            OnDisconnectedCallback();
         }
 
         internal void OnConnectFailureCallback ()
@@ -551,6 +570,10 @@ namespace Fun
         private static readonly int kMaxReconnectCount = 3;
         private static readonly float kMaxConnectingTime = 120f;
         private static readonly float kFixedConnectWaitTime = 10f;
+
+        // Ping message-related constants.
+        private static readonly int kPingIntervalSecond = 3;
+        private static readonly float kPingTimeoutSeconds = 20f;
 
         // Event handlers
         public event TransportEventHandler ConnectTimeoutCallback;
