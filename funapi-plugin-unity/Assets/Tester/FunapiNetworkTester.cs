@@ -296,11 +296,13 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void Connect (TransportProtocol protocol)
     {
-        DebugUtils.Log("-------- Connect --------\n" + DateTime.Now);
+        DebugUtils.Log("-------- Connect --------\n{0}", DateTime.Now);
 
         if (network_ == null || !network_.SessionReliability)
         {
             network_ = new FunapiNetwork(with_session_reliability_);
+            network_.ResponseTimeout = 10f;
+
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
             network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
@@ -405,7 +407,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnSessionInitiated (string session_id)
     {
-        DebugUtils.Log("Session initiated. Session id:" + session_id);
+        DebugUtils.Log("Session initiated. Session id:{0}", session_id);
     }
 
     private void OnSessionClosed ()
@@ -436,7 +438,7 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         DebugUtils.Assert(body is Dictionary<string, object>);
         string strJson = Json.Serialize(body as Dictionary<string, object>);
-        DebugUtils.Log("Received an echo message: " + strJson);
+        DebugUtils.Log("Received an echo message: {0}", strJson);
     }
 
     private void OnEchoWithProtobuf (string msg_type, object body)
@@ -448,12 +450,12 @@ public class FunapiNetworkTester : MonoBehaviour
             return;
 
         PbufEchoMessage echo = obj as PbufEchoMessage;
-        DebugUtils.Log("Received an echo message: " + echo.msg);
+        DebugUtils.Log("Received an echo message: {0}", echo.msg);
     }
 
     private void OnDownloadVerify (string path)
     {
-        DebugUtils.DebugLog("Check file - " + path);
+        DebugUtils.DebugLog("Check file - {0}", path);
     }
 
     private void OnDownloadReady (int total_count, UInt64 total_size)
@@ -474,7 +476,7 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void OnAnnouncementResult (AnnounceResult result)
     {
-        DebugUtils.Log("OnAnnouncementResult - result: " + result);
+        DebugUtils.Log("OnAnnouncementResult - result: {0}", result);
         if (result != AnnounceResult.kSuccess)
             return;
 
@@ -493,7 +495,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 DebugUtils.Log("announcement ({0}) >> {1}", i + 1, buffer);
 
                 if (list.ContainsKey("image_url"))
-                    DebugUtils.Log("image path > " + announcement_.GetImagePath(i));
+                    DebugUtils.Log("image path > {0}", announcement_.GetImagePath(i));
             }
         }
     }

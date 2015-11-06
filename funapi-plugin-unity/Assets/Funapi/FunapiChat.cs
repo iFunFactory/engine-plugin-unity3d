@@ -70,7 +70,7 @@ namespace Fun
             {
                 if (!channel_info_.ContainsKey(chat_channel))
                 {
-                    DebugUtils.Log("You are not in the chat channel: " + chat_channel);
+                    DebugUtils.Log("You are not in the chat channel: {0}", chat_channel);
                     return false;
                 }
                 channel_info_.Remove(chat_channel);
@@ -99,7 +99,7 @@ namespace Fun
             {
                 if (!channel_info_.TryGetValue(chat_channel, out p))
                 {
-                    DebugUtils.Log("You are not in the chat channel: " + chat_channel);
+                    DebugUtils.Log("You are not in the chat channel: {0}", chat_channel);
                     return false;
                 }
             }
@@ -139,7 +139,7 @@ namespace Fun
             {
                 if (!channel_info_.TryGetValue(chat_channel, out p))
                 {
-                    DebugUtils.Log("You are not in the chat channel: " + chat_channel);
+                    DebugUtils.Log("You are not in the chat channel: {0}", chat_channel);
                     return;
                 }
             }

@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 113;
+        public static readonly int kPluginVersion = 114;
     }
 
     // Sending message-related class.
@@ -70,6 +70,8 @@ namespace Fun
             recv_type_ = typeof(FunMessage);
             session_reliability_ = session_reliability;
             serializer_ = new FunMessageSerializer ();
+            response_timer_ = 0f;
+            ResponseTimeout = 0f;
 
             message_handlers_[kNewSessionMessageType] = this.OnNewSession;
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
@@ -81,6 +83,11 @@ namespace Fun
         public bool SessionReliability
         {
             get { return session_reliability_; }
+        }
+
+        public float ResponseTimeout
+        {
+            get; set;
         }
 
         public FunEncoding GetEncoding (TransportProtocol protocol)
@@ -209,19 +216,22 @@ namespace Fun
             stop_with_clear_ = clear_all;
 
             // Waits for unsent messages.
-            lock (transports_lock_)
+            if (response_timer_ <= 0f || response_timer_ < ResponseTimeout)
             {
-                foreach (FunapiTransport transport in transports_.Values)
+                lock (transports_lock_)
                 {
-                    if (transport.Protocol == TransportProtocol.kTcp &&
-                        transport.Started && transport.HasUnsentMessages)
+                    foreach (FunapiTransport transport in transports_.Values)
                     {
-                        lock (state_lock_)
+                        if (transport.Protocol == TransportProtocol.kTcp &&
+                            transport.Started && transport.HasUnsentMessages)
                         {
-                            state_ = State.kWaitForStop;
-                            DebugUtils.Log("{0} Stop waiting for send unsent messages...",
-                                           transport.str_protocol);
-                            return;
+                            lock (state_lock_)
+                            {
+                                state_ = State.kWaitForStop;
+                                DebugUtils.Log("{0} Stop waiting for send unsent messages...",
+                                               transport.str_protocol);
+                                return;
+                            }
                         }
                     }
                 }
@@ -342,6 +352,16 @@ namespace Fun
                     }
 
                     message_buffer_.Clear();
+                    response_timer_ = 0f;
+                }
+                else if (state_ == State.kConnected && ResponseTimeout > 0f)
+                {
+                    response_timer_ += Time.deltaTime;
+                    if (response_timer_ >= ResponseTimeout)
+                    {
+                        Stop(!session_reliability_);
+                        return;
+                    }
                 }
             }
 
@@ -618,6 +638,7 @@ namespace Fun
                 if (session_id_.Length > 0)
                 {
                     state_ = State.kConnected;
+                    response_timer_ = 0f;
 
                     if (session_reliability_ && protocol == TransportProtocol.kTcp && seq_recvd_ != 0)
                     {
@@ -909,7 +930,7 @@ namespace Fun
                     if (list.Count > 0)
                     {
                         list.RemoveAt(0);
-                        DebugUtils.Log("Deletes expected reply message - " + reply_type);
+                        DebugUtils.Log("Deletes expected reply message - {0}", reply_type);
                     }
 
                     if (list.Count <= 0)
@@ -935,7 +956,7 @@ namespace Fun
                 {
                     string str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
                     json = transport.JsonHelper.Deserialize(str);
-                    //DebugUtils.DebugLog("Parsed json: " + str);
+                    //DebugUtils.DebugLog("Parsed json: {0}", str);
 
                     DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
                     string session_id_node = transport.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
@@ -989,7 +1010,7 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    DebugUtils.Log("Failure in ProcessMessage: " + e.ToString());
+                    DebugUtils.Log("Failure in ProcessMessage: {0}", e.ToString());
                     StopTransport(transport);
                     return;
                 }
@@ -1054,7 +1075,7 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    DebugUtils.Log("Failure in ProcessMessage: " + e.ToString());
+                    DebugUtils.Log("Failure in ProcessMessage: {0}", e.ToString());
                     StopTransport(transport);
                     return;
                 }
@@ -1069,7 +1090,7 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Log("Invalid message type. type: " + transport.Encoding);
+                DebugUtils.Log("Invalid message type. type: {0}", transport.Encoding);
                 DebugUtils.Assert(false);
                 return;
             }
@@ -1360,6 +1381,7 @@ namespace Fun
             lock (state_lock_)
             {
                 state_ = State.kConnected;
+                response_timer_ = 0f;
             }
 
             session_id_ = session_id;
@@ -1695,6 +1717,7 @@ namespace Fun
         private string session_id_ = "";
         private object state_lock_ = new object();
         private FunapiTimer timer_ = new FunapiTimer();
+        private float response_timer_ = 0f;
         private bool stop_with_clear_ = false;
 
         // Reliability-releated member variables.

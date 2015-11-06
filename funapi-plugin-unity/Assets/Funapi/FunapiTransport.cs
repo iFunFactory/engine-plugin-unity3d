@@ -715,7 +715,7 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Log("SendMessage - Invalid FunEncoding type: " + encoding_);
+                DebugUtils.Log("SendMessage - Invalid FunEncoding type: {0}", encoding_);
             }
         }
 
@@ -926,7 +926,7 @@ namespace Fun
             {
                 if ((int)state_ < (int)State.kConnected)
                 {
-                    DebugUtils.Log("Unexpected message. state:" + state_);
+                    DebugUtils.Log("Unexpected message. state:{0}", state_);
                     return false;
                 }
 
@@ -1777,7 +1777,7 @@ namespace Fun
                         break;
                     case "set-cookie":
                         str_cookie_ = tuple[1];
-                        DebugUtils.DebugLog("Set Cookie : " + str_cookie_);
+                        DebugUtils.DebugLog("Set Cookie : {0}", str_cookie_);
                         break;
                     case "content-length":
                         headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
@@ -1877,7 +1877,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugUtils.Log("Failed response. status:" + response.StatusDescription);
+                    DebugUtils.Log("Failed response. status:{0}", response.StatusDescription);
                     AddToEventQueue(OnFailure);
                 }
             }

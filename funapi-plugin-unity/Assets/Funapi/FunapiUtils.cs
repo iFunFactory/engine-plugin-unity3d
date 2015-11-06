@@ -73,7 +73,7 @@ namespace Fun
             Dictionary<string, object> json = Json.Deserialize(text) as Dictionary<string, object>;
             if (json == null)
             {
-                DebugUtils.Log("Deserialize json failed. json: " + text);
+                DebugUtils.Log("Deserialize json failed. json: {0}", text);
                 return;
             }
 
@@ -208,7 +208,7 @@ namespace Fun
                         with_https = (bool)data_["announcement_with_secure"];
 
                     announcement_url_ = string.Format("{0}://{1}:{2}", with_https ? "https" : "http", hostname_or_ip, port);
-                    DebugUtils.Log("Announcement url : " + announcement_url_);
+                    DebugUtils.Log("Announcement url : {0}", announcement_url_);
                 }
 
                 return announcement_url_;
