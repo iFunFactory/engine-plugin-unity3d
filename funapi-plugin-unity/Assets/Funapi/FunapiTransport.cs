@@ -706,7 +706,7 @@ namespace Fun
 
             default_encryptor_ = (int)encryption;
             encryptors_[encryption] = encryptor;
-            DebugUtils.Log("Set encryption type - " + default_encryptor_);
+            DebugUtils.Log("Set encryption type - {0}", default_encryptor_);
         }
 
         internal virtual bool IsSendable
@@ -738,7 +738,7 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Log("SendMessage - Invalid FunEncoding type: " + encoding_);
+                DebugUtils.Log("SendMessage - Invalid FunEncoding type: {0}", encoding_);
             }
         }
 
@@ -1063,7 +1063,7 @@ namespace Fun
                     if (default_encryptor_ == kNoneEncryption && encryption_list.Count > 0)
                     {
                         default_encryptor_ = (int)encryption_list[0];
-                        DebugUtils.Log("Set default encryption: " + default_encryptor_);
+                        DebugUtils.Log("Set default encryption: {0}", default_encryptor_);
                     }
 
                     // Create encryptors
@@ -1072,7 +1072,7 @@ namespace Fun
                         Encryptor encryptor = Encryptor.Create(type);
                         if (encryptor == null)
                         {
-                            DebugUtils.Log("Failed to create encryptor: " + type);
+                            DebugUtils.Log("Failed to create encryptor: {0}", type);
                             return false;
                         }
 
@@ -1086,20 +1086,20 @@ namespace Fun
                     Encryptor encryptor = encryptors_[encryption];
                     if (encryptor == null)
                     {
-                        DebugUtils.Log("Unknown encryption: " + encryption_str);
+                        DebugUtils.Log("Unknown encryption: {0}", encryption_str);
                         return false;
                     }
 
                     if (encryptor.state != Encryptor.State.kHandshaking)
                     {
-                        DebugUtils.Log("Unexpected handshake message: " + encryptor.name);
+                        DebugUtils.Log("Unexpected handshake message: {0}", encryptor.name);
                         return false;
                     }
 
                     string out_header = "";
                     if (!encryptor.Handshake(encryption_header, ref out_header))
                     {
-                        DebugUtils.Log("Encryption handshake failure: " + encryptor.name);
+                        DebugUtils.Log("Encryption handshake failure: {0}", encryptor.name);
                         return false;
                     }
 
@@ -1138,13 +1138,13 @@ namespace Fun
             {
                 if ((int)state_ < (int)State.kConnected)
                 {
-                    DebugUtils.Log("Unexpected message. state:" + state_);
+                    DebugUtils.Log("Unexpected message. state:{0}", state_);
                     return false;
                 }
 
                 if ((encryptors_.Count == 0) != (encryption_str.Length == 0))
                 {
-                    DebugUtils.Log("Unknown encryption: " + encryption_str);
+                    DebugUtils.Log("Unknown encryption: {0}", encryption_str);
                     return false;
                 }
 
@@ -1155,7 +1155,7 @@ namespace Fun
 
                     if (encryptor == null)
                     {
-                        DebugUtils.Log("Unknown encryption: " + encryption_str);
+                        DebugUtils.Log("Unknown encryption: {0}", encryption_str);
                         return false;
                     }
 
@@ -2055,7 +2055,7 @@ namespace Fun
                         break;
                     case "set-cookie":
                         str_cookie_ = tuple[1];
-                        DebugUtils.DebugLog("Set Cookie : " + str_cookie_);
+                        DebugUtils.DebugLog("Set Cookie : {0}", str_cookie_);
                         break;
                     case "content-length":
                         headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
@@ -2158,7 +2158,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugUtils.Log("Failed response. status:" + response.StatusDescription);
+                    DebugUtils.Log("Failed response. status:{0}", response.StatusDescription);
                     AddToEventQueue(OnFailure);
                 }
             }

@@ -35,7 +35,7 @@ namespace Fun
             else if (type == EncryptionType.kIFunEngine2Encryption)
                 return new Encryptor2();
 
-            DebugUtils.LogWarning("Unknown encryptor: " + type);
+            DebugUtils.LogWarning("Unknown encryptor: {0}", type);
             DebugUtils.Assert(false);
 
             return null;
@@ -50,7 +50,7 @@ namespace Fun
             else if (name == Encryptor2.kName)
                 return new Encryptor2();
 
-            DebugUtils.LogWarning("Unknown encryptor: " + name);
+            DebugUtils.LogWarning("Unknown encryptor: {0}", name);
             DebugUtils.Assert(false);
 
             return null;

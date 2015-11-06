@@ -935,7 +935,7 @@ namespace Fun
                     if (list.Count > 0)
                     {
                         list.RemoveAt(0);
-                        DebugUtils.Log("Deletes expected reply message - " + reply_type);
+                        DebugUtils.Log("Deletes expected reply message - {0}", reply_type);
                     }
 
                     if (list.Count <= 0)
@@ -961,7 +961,7 @@ namespace Fun
                 {
                     string str = Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
                     json = transport.JsonHelper.Deserialize(str);
-                    //DebugUtils.DebugLog("Parsed json: " + str);
+                    //DebugUtils.DebugLog("Parsed json: {0}", str);
 
                     DebugUtils.Assert(transport.JsonHelper.GetStringField(json, kSessionIdBodyField) is string);
                     string session_id_node = transport.JsonHelper.GetStringField(json, kSessionIdBodyField) as string;
@@ -1015,7 +1015,7 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    DebugUtils.Log("Failure in ProcessMessage: " + e.ToString());
+                    DebugUtils.Log("Failure in ProcessMessage: {0}", e.ToString());
                     StopTransport(transport);
                     return;
                 }
@@ -1080,7 +1080,7 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    DebugUtils.Log("Failure in ProcessMessage: " + e.ToString());
+                    DebugUtils.Log("Failure in ProcessMessage: {0}", e.ToString());
                     StopTransport(transport);
                     return;
                 }
@@ -1095,7 +1095,7 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Log("Invalid message type. type: " + transport.Encoding);
+                DebugUtils.Log("Invalid message type. type: {0}", transport.Encoding);
                 DebugUtils.Assert(false);
                 return;
             }

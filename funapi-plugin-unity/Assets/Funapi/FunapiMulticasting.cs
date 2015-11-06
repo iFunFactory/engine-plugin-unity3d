@@ -47,7 +47,7 @@ namespace Fun
             {
                 if (channels_.ContainsKey(channel_id))
                 {
-                    DebugUtils.Log("Already joined the channel: " + channel_id);
+                    DebugUtils.Log("Already joined the channel: {0}", channel_id);
                     return false;
                 }
 
@@ -87,7 +87,7 @@ namespace Fun
             {
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    DebugUtils.Log("You are not in the channel: " + channel_id);
+                    DebugUtils.Log("You are not in the channel: {0}", channel_id);
                     return false;
                 }
 
@@ -147,7 +147,7 @@ namespace Fun
                 }
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    DebugUtils.Log("You are not in the channel: " + channel_id);
+                    DebugUtils.Log("You are not in the channel: {0}", channel_id);
                     return false;
                 }
             }
@@ -187,7 +187,7 @@ namespace Fun
                 {
                     if (!channels_.ContainsKey(channel_id))
                     {
-                        DebugUtils.Log("You are not in the channel: " + channel_id);
+                        DebugUtils.Log("You are not in the channel: {0}", channel_id);
                         return;
                     }
 
@@ -210,7 +210,7 @@ namespace Fun
                 {
                     if (!channels_.ContainsKey(channel_id))
                     {
-                        DebugUtils.Log("You are not in the channel: " + channel_id);
+                        DebugUtils.Log("You are not in the channel: {0}", channel_id);
                         return;
                     }
 

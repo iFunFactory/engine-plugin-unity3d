@@ -268,7 +268,7 @@ namespace Fun
                 }
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
-                DebugUtils.DebugLog("Random check file count is " + rnd_list.Count);
+                DebugUtils.DebugLog("Random check file count is {0}", rnd_list.Count);
             }
 
             // Checks local files
@@ -336,7 +336,7 @@ namespace Fun
 
             RemoveCachedList(remove_list);
 
-            DebugUtils.Log("Random validation has " + (verify_success ? "succeeded" : "failed"));
+            DebugUtils.Log("Random validation has {0}", (verify_success ? "succeeded" : "failed"));
 
             // Checks all local files
             if (!verify_success)
@@ -424,12 +424,12 @@ namespace Fun
             try
             {
                 // Request a list of download files.
-                DebugUtils.Log("Getting list file from " + url);
+                DebugUtils.Log("Getting list file from {0}", url);
                 web_client_.DownloadDataAsync(new Uri(url));
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in DownloadListFile: " + e.ToString());
+                DebugUtils.Log("Failure in DownloadListFile: {0}", e.ToString());
                 failed = true;
             }
 
@@ -449,7 +449,7 @@ namespace Fun
                 if (File.Exists(path))
                 {
                     File.Delete(path);
-                    DebugUtils.Log("Deleted resource file \npath: " + path);
+                    DebugUtils.Log("Deleted resource file \npath: {0}", path);
                 }
             }
 
@@ -488,7 +488,7 @@ namespace Fun
                     File.Delete(file_path);
 
                 // Requests a file.
-                DebugUtils.Log("Download file - " + file_path);
+                DebugUtils.Log("Download file - {0}", file_path);
                 web_client_.DownloadFileAsync(new Uri(host_url_ + info.path), file_path, info);
             }
         }
@@ -503,7 +503,7 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    DebugUtils.Log("Exception Error: " + ar.Error);
+                    DebugUtils.Log("Exception Error: {0}", ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
@@ -517,7 +517,7 @@ namespace Fun
                     string data = Encoding.UTF8.GetString(ar.Result);
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
 
-                    //DebugUtils.Log("Json data >>  " + data);
+                    //DebugUtils.Log("Json data >> {0}", data);
 
                     // Redirect url
                     if (json.ContainsKey("url"))
@@ -527,7 +527,7 @@ namespace Fun
                             url += "/";
 
                         host_url_ = url;
-                        DebugUtils.Log("Download url : " + host_url_);
+                        DebugUtils.Log("Download url : {0}", host_url_);
                     }
 
                     List<object> list = json["data"] as List<object>;
@@ -563,7 +563,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in DownloadDataCompleteCb: " + e.ToString());
+                DebugUtils.Log("Failure in DownloadDataCompleteCb: {0}", e.ToString());
                 failed = true;
             }
             finally
@@ -604,7 +604,7 @@ namespace Fun
 
                 if (ar.Error != null)
                 {
-                    DebugUtils.Log("Exception Error: " + ar.Error);
+                    DebugUtils.Log("Exception Error: {0}", ar.Error);
                     DebugUtils.Assert(false);
                     failed = true;
                 }
@@ -629,7 +629,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in DownloadFileCompleteCb: " + e.ToString());
+                DebugUtils.Log("Failure in DownloadFileCompleteCb: {0}", e.ToString());
                 failed = true;
             }
             finally
