@@ -25,7 +25,7 @@ namespace Fun
         public string path;         // save file path
         public uint size;           // file size
         public string hash;         // md5 hash
-        public string hash_front;   // front part of md5 hash
+        public string hash_front;   // front part of file (1MB)
     }
 
     public enum DownloadResult
@@ -125,6 +125,7 @@ namespace Fun
 
             state_ = State.Downloading;
             check_time_ = DateTime.Now;
+            retry_download_count_ = 0;
 
             // Deletes files
             DeleteLocalFiles();
@@ -133,6 +134,14 @@ namespace Fun
             DownloadResourceFile();
 
             mutex_.ReleaseMutex();
+        }
+
+        public void ContinueDownload()
+        {
+            if (download_list_.Count > 0)
+            {
+                DownloadResourceFile();
+            }
         }
 
         public void Stop()
@@ -266,9 +275,9 @@ namespace Fun
                     if (!rnd_list.Contains(rnd_index))
                         rnd_list.Enqueue(rnd_index);
                 }
+                DebugUtils.DebugLog("Random check file count is {0}", rnd_list.Count);
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
-                DebugUtils.DebugLog("Random check file count is {0}", rnd_list.Count);
             }
 
             // Checks local files
@@ -281,7 +290,7 @@ namespace Fun
                     string path = target_path_ + file.path;
                     FileInfo info = new FileInfo(path);
 
-                    if (!File.Exists(path) || info.Length != file.size || item.hash != file.hash)
+                    if (!File.Exists(path) || item.size != info.Length || item.hash != file.hash)
                     {
                         remove_list.Add(file.path);
                     }
@@ -489,7 +498,11 @@ namespace Fun
 
                 // Requests a file.
                 DebugUtils.Log("Download file - {0}", file_path);
-                web_client_.DownloadFileAsync(new Uri(host_url_ + info.path), file_path, info);
+                retry_download_count_ = 0;
+                cur_download_path_ = Path.GetDirectoryName(file_path);
+                cur_download_path_ += "/" + Path.GetRandomFileName();
+
+                web_client_.DownloadFileAsync(new Uri(host_url_ + info.path), cur_download_path_, info);
             }
         }
 
@@ -527,7 +540,7 @@ namespace Fun
                             url += "/";
 
                         host_url_ = url;
-                        DebugUtils.Log("Download url : {0}", host_url_);
+                        DebugUtils.Log("Redirect download url: {0}", host_url_);
                     }
 
                     List<object> list = json["data"] as List<object>;
@@ -618,6 +631,9 @@ namespace Fun
                     }
                     else
                     {
+                        string path = target_path_ + info.path;
+                        File.Move(cur_download_path_, path);
+
                         ++cur_download_count_;
                         cur_download_size_ += info.size;
                         download_list_.Remove(info);
@@ -639,8 +655,29 @@ namespace Fun
 
             if (failed)
             {
-                Stop();
+                web_client_.Dispose();
+                File.Delete(cur_download_path_);
+
+                if (retry_download_count_ < kMaxRetryCount)
+                {
+                    ++retry_download_count_;
+                    FunapiManager.instance.StartCoroutine(AsyncDownloadFile());
+                }
+                else
+                {
+                    Stop();
+                }
             }
+        }
+
+        IEnumerator AsyncDownloadFile ()
+        {
+            float time = 1f;
+            for (int i = 0; i < retry_download_count_; ++i)
+                time *= 2f;
+            yield return new WaitForSeconds(time);
+
+            DownloadResourceFile();
         }
 
         private void OnFinishedCallback (DownloadResult code)
@@ -671,17 +708,19 @@ namespace Fun
 
         // Save file-related constants.
         private static readonly string kRootPath = "client_data";
-        private readonly string kCachedFileName = "cached_files";
-        //private static readonly int kMaxAsyncRequestCount = 10;
+        private static readonly string kCachedFileName = "cached_files";
+        private static readonly int kMaxRetryCount = 3;
 
         // member variables.
         private State state_ = State.None;
         private string host_url_ = "";
         private string target_path_ = "";
+        private string cur_download_path_ = "";
         private int cur_download_count_ = 0;
         private int total_download_count_ = 0;
         private UInt64 cur_download_size_ = 0;
         private UInt64 total_download_size_ = 0;
+        private int retry_download_count_ = 0;
 
         private FunapiManager manager_ = null;
         private Mutex mutex_ = new Mutex();
