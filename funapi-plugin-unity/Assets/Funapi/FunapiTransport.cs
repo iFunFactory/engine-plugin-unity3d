@@ -2047,24 +2047,28 @@ namespace Fun
                 if (n.Length > 0)
                 {
                     string[] tuple = n.Split(kHeaderSeparator, StringSplitOptions.RemoveEmptyEntries);
-                    string item = tuple[0].ToLower();
+                    string key = tuple[0].ToLower();
+                    string value = "";
 
-                    switch (item)
+                    if (tuple.Length >= 2)
+                        value = tuple[1];
+
+                    switch (key)
                     {
                     case "content-type":
                         break;
                     case "set-cookie":
-                        str_cookie_ = tuple[1];
+                        str_cookie_ = value;
                         DebugUtils.DebugLog("Set Cookie : {0}", str_cookie_);
                         break;
                     case "content-length":
-                        headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
+                        headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     case "x-ifun-enc":
-                        headers.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
+                        headers.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     default:
-                        headers.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, tuple[1], kHeaderDelimeter);
+                        headers.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     }
                 }
