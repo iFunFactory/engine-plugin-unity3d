@@ -122,10 +122,5 @@ namespace Fun
             Console.WriteLine("Error: " + message);
         }
     }
-
-    class Time
-    {
-        public const float deltaTime = 0.3f; // dummy delta time
-    }
 #endif
 }

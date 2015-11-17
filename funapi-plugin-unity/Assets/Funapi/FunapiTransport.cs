@@ -466,36 +466,7 @@ namespace Fun
                 StoppedCallback(protocol_);
             }
 
-            if (cstate_ == ConnectState.kConnecting)
-            {
-                if (!TryToConnect())
-                {
-                    cstate_ = ConnectState.kUnknown;
-                    OnConnectFailureCallback();
-                }
-            }
-            else if (cstate_ == ConnectState.kReconnecting)
-            {
-                if (!TryToReconnect())
-                {
-                    cstate_ = ConnectState.kUnknown;
-                    OnDisconnectedCallback();
-                }
-            }
-            else if (cstate_ == ConnectState.kRedirecting)
-            {
-                if (!TryToReconnect())
-                {
-                    cstate_ = ConnectState.kUnknown;
-                    OnConnectFailureCallback();
-                }
-            }
-
-            if (cstate_ == ConnectState.kUnknown)
-            {
-                exponential_time_ = 1f;
-                reconnect_count_ = 0;
-            }
+            AddToEventQueue(CheckConnectState);
         }
 
         internal void OnDisconnected ()
@@ -537,6 +508,40 @@ namespace Fun
             if (MessageFailureCallback != null)
             {
                 MessageFailureCallback(protocol_, fun_msg);
+            }
+        }
+
+        internal void CheckConnectState ()
+        {
+            if (cstate_ == ConnectState.kConnecting)
+            {
+                if (!TryToConnect())
+                {
+                    cstate_ = ConnectState.kUnknown;
+                    OnConnectFailureCallback();
+                }
+            }
+            else if (cstate_ == ConnectState.kReconnecting)
+            {
+                if (!TryToReconnect())
+                {
+                    cstate_ = ConnectState.kUnknown;
+                    OnDisconnectedCallback();
+                }
+            }
+            else if (cstate_ == ConnectState.kRedirecting)
+            {
+                if (!TryToReconnect())
+                {
+                    cstate_ = ConnectState.kUnknown;
+                    OnConnectFailureCallback();
+                }
+            }
+
+            if (cstate_ == ConnectState.kUnknown)
+            {
+                exponential_time_ = 1f;
+                reconnect_count_ = 0;
             }
         }
 
@@ -672,7 +677,7 @@ namespace Fun
             last_error_message_ = "";
             timer_.Clear();
 
-            AddToEventQueue(OnStopped);
+            OnStopped();
         }
 
         internal override bool HasUnsentMessages
@@ -1124,7 +1129,7 @@ namespace Fun
                 if (sock_ == null)
                 {
                     last_error_code_ = ErrorCode.kConnectFailed;
-                    last_error_message_ = "Failed to connect.";
+                    last_error_message_ = "Failed to connect. socket is null.";
                     DebugUtils.Log(last_error_message_);
                     return;
                 }

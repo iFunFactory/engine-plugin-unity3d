@@ -5,6 +5,10 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 11/18/2015 (ver.118)
+- Time.timeScale 값이 0이어도 플러그인 타이머는 돌아가도록 하기 위해 플러그인 자체 deltaTime 값을 갖도록 수정
+- 연결이 종료되는 도중에 재연결을 시도할 수 없도록 Start() 함수가 다음 업데이트에 처리되도록 수정
+
 ### 11/17/2015 (ver.117)
 - Expected reply 응답 콜백에서 Expected reply가 포함된 패킷을 보내면 오류가 발생하는 버그 수정
 

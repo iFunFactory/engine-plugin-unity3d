@@ -30,6 +30,17 @@ namespace Fun
             }
         }
 
+        public FunapiManager ()
+        {
+            prev_ticks_ = DateTime.UtcNow.Ticks;
+            deltaTime_ = 0.03f;
+        }
+
+        public FunapiManager Create ()
+        {
+            return instance;
+        }
+
         public void AddEvent (Action action)
         {
             if (action == null)
@@ -46,6 +57,13 @@ namespace Fun
 
         void Update()
         {
+            // Gets delta time
+            long now = DateTime.UtcNow.Ticks;
+            int milliseconds = (int)((now - prev_ticks_) / 10000);
+            deltaTime_ = (float)milliseconds / 1000f;
+            prev_ticks_ = now;
+
+            // Event queue
             if (event_queue_.Count <= 0)
                 return;
 
@@ -61,6 +79,12 @@ namespace Fun
             {
                 action();
             }
+            queue = null;
+        }
+
+        public static float deltaTime
+        {
+            get { return deltaTime_; }
         }
 
 
@@ -71,5 +95,9 @@ namespace Fun
         // Action event-releated member variables
         private object event_lock_ = new object();
         private Queue<Action> event_queue_ = new Queue<Action>();
+
+        // Delta time
+        private long prev_ticks_ = 0;
+        private static float deltaTime_ = 0f;
     }
 }
