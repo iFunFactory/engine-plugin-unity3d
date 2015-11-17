@@ -392,7 +392,7 @@ namespace Fun
                 return;
 
             // Updates timer
-            float delta = Time.deltaTime;
+            float delta = FunapiManager.deltaTime;
             foreach (Event e in timer_list_.Values)
             {
                 e.remaining -= delta;

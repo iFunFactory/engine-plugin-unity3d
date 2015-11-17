@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 117;
+        public static readonly int kPluginVersion = 118;
     }
 
     // Sending message-related class.
@@ -80,6 +80,7 @@ namespace Fun
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
 
+            FunapiManager.instance.Create();
             InitSession();
         }
 
@@ -197,20 +198,23 @@ namespace Fun
         // Starts FunapiNetwork
         public void Start()
         {
-            DebugUtils.Log("Starting a network module.");
-
-            lock (state_lock_)
+            FunapiManager.instance.AddEvent(() =>
             {
-                state_ = State.kStarted;
-            }
+                DebugUtils.Log("Starting a network module.");
 
-            lock (transports_lock_)
-            {
-                foreach (FunapiTransport transport in transports_.Values)
+                lock (state_lock_)
                 {
-                    StartTransport(transport);
+                    state_ = State.kStarted;
                 }
-            }
+
+                lock (transports_lock_)
+                {
+                    foreach (FunapiTransport transport in transports_.Values)
+                    {
+                        StartTransport(transport);
+                    }
+                }
+            });
         }
 
         // Stops FunapiNetwork
@@ -250,7 +254,7 @@ namespace Fun
                 }
             }
 
-            if (clear_all)
+            if (stop_with_clear_)
             {
                 CloseSession();
 
@@ -259,15 +263,6 @@ namespace Fun
                     state_ = State.kUnknown;
                 }
             }
-            else
-            {
-                lock (state_lock_)
-                {
-                    state_ = State.kStopped;
-                }
-            }
-
-            OnStoppedAllTransportCallback();
         }
 
         public bool Started
@@ -359,7 +354,7 @@ namespace Fun
                 }
                 else if (state_ == State.kConnected && ResponseTimeout > 0f)
                 {
-                    response_timer_ += Time.deltaTime;
+                    response_timer_ += FunapiManager.deltaTime;
                     if (response_timer_ >= ResponseTimeout)
                     {
                         DebugUtils.LogWarning("Response timeout. disconnect to server...");
@@ -382,7 +377,7 @@ namespace Fun
                         int remove_count = 0;
                         foreach (FunapiMessage exp in item.Value)
                         {
-                            exp.reply_timeout -= Time.deltaTime;
+                            exp.reply_timeout -= FunapiManager.deltaTime;
                             if (exp.reply_timeout <= 0f)
                             {
                                 DebugUtils.Log("'{0}' message waiting time has been exceeded.", exp.msg_type);
