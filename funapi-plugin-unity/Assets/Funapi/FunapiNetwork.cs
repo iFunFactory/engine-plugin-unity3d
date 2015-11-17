@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 116;
+        public static readonly int kPluginVersion = 117;
     }
 
     // Sending message-related class.
@@ -359,6 +359,7 @@ namespace Fun
                     response_timer_ += Time.deltaTime;
                     if (response_timer_ >= ResponseTimeout)
                     {
+                        DebugUtils.LogWarning("Response timeout. disconnect to server...");
                         Stop(!session_reliability_);
                         return;
                     }
@@ -370,8 +371,10 @@ namespace Fun
                 if (expected_replies_.Count > 0)
                 {
                     List<string> remove_list = new List<string>();
+                    Dictionary<string, List<FunapiMessage>> exp_list = expected_replies_;
+                    expected_replies_ = new Dictionary<string, List<FunapiMessage>>();
 
-                    foreach (var item in expected_replies_)
+                    foreach (var item in exp_list)
                     {
                         int remove_count = 0;
                         foreach (FunapiMessage exp in item.Value)
@@ -398,7 +401,25 @@ namespace Fun
                     {
                         foreach (string key in remove_list)
                         {
-                            expected_replies_.Remove(key);
+                            exp_list.Remove(key);
+                        }
+                    }
+
+                    if (exp_list.Count > 0)
+                    {
+                        Dictionary<string, List<FunapiMessage>> added_list = expected_replies_;
+                        expected_replies_ = exp_list;
+
+                        if (added_list.Count > 0)
+                        {
+                            foreach (var item in added_list)
+                            {
+                                if (expected_replies_.ContainsKey(item.Key))
+                                    expected_replies_[item.Key].AddRange(item.Value);
+                                else
+                                    expected_replies_.Add(item.Key, item.Value);
+                            }
+                            added_list = null;
                         }
                     }
                 }

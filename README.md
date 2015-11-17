@@ -5,6 +5,9 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 11/17/2015 (ver.117)
+- Expected reply 응답 콜백에서 Expected reply가 포함된 패킷을 보내면 오류가 발생하는 버그 수정
+
 ### 11/11/2015 (ver.116)
 - Http header 파싱 버그 수정
 
