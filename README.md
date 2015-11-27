@@ -5,8 +5,22 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 12/02/2015 (ver.120)
+- Multicasting 채널 입/퇴장 콜백 추가 및 오류 처리
+- Multicasting 메시지에 기본 정보로 sender 추가
+
+멀티캐스팅 메시지 콜백 함수의 원형이 아래와 같이 변경되었습니다. 기존의 파라미터에서 sender 값이
+추가되었습니다.
+```csharp
+public delegate void ChannelMessage(string channel_id, string sender, object body);
+```
+
+### 12/02/2015 (ver.119)
+- 맥 실행파일 창모드에서 배경색 초기화가 안 되어서 깜빡이는 문제 수정
+
 ### 11/18/2015 (ver.118)
-- Time.timeScale 값이 0이어도 플러그인 타이머는 돌아가도록 하기 위해 플러그인 자체 deltaTime 값을 갖도록 수정
+- Time.timeScale 값이 0이어도 플러그인 타이머는 돌아가도록 하기 위해 플러그인 자체 deltaTime
+값을 갖도록 수정
 - 연결이 종료되는 도중에 재연결을 시도할 수 없도록 Start() 함수가 다음 업데이트에 처리되도록 수정
 
 ### 11/17/2015 (ver.117)
@@ -95,7 +109,8 @@ Funapi plugin의 업데이트 내용입니다.
 - 마지막 핑 값을 가져오는 PingTime 함수 추가
 
 ### 07/13/2015 (ver.91)
-- 기존의 HttpWebRequest가 Unity Editor Windows 버전에서 Blocking 되는 경우가 있어 UnityEngine.WWW를 사용해서 메시지를 보내는 옵션을 추가
+- 기존의 HttpWebRequest가 Unity Editor Windows 버전에서 Blocking 되는 경우가 있어
+UnityEngine.WWW를 사용해서 메시지를 보내는 옵션을 추가
 - Coroutine을 사용하기 위해 FunapiManager Singleton class 추가
 - Tcp의 경우 재접속을 무한 시도하는 버그가 수정
 
@@ -143,7 +158,9 @@ Funapi plugin의 업데이트 내용입니다.
 ### 06/16/2015 (ver.81)
 - 서버 접속 정보와 옵션 등을 설정하는 Config.json 파일 추가
 
-  기존 인터페이스는 그대로 유지하고 설정파일을 사용하는 인터페이스가 추가되었습니다. 설정파일을 Load한 뒤에도 사용자가 선택해서 설정파일을 사용해서 객체를 생성하거나 기존 방식대로 객체를 생성할 수 있습니다. 사용방법은 샘플코드를 참고해 주세요.
+  기존 인터페이스는 그대로 유지하고 설정파일을 사용하는 인터페이스가 추가되었습니다. 설정파일을 Load한
+  뒤에도 사용자가 선택해서 설정파일을 사용해서 객체를 생성하거나 기존 방식대로 객체를 생성할 수 있습니다.
+  사용방법은 샘플코드를 참고해 주세요.
 
   ```csharp
   // 초기화, Config.json 파일이 있는 경로를 파라미터로 전달
@@ -153,7 +170,10 @@ Funapi plugin의 업데이트 내용입니다.
 ### 06/16/2015 (ver.80)
 - MsgType -> Encoding 으로 변경
 
-  인코딩 타입으로 사용하는 MsgType과 메시지 타입으로 사용하는 msgtype의 이름을 동일하게 사용하고 있어 인코딩 관련 변수들의 이름이 Encoding으로 변경되었습니다. 기존 타입인 MsgType을 그대로 사용하고 싶다면 해당 파일 상단에 아래와 같은 코드를 추가하면 됩니다. 아래와 같은 방법으로 기존 타입을 그대로 사용하는 것이 가능하지만 될 수 있으면 Encoding 타입을 사용하는시는 것을 권장합니다.
+  인코딩 타입으로 사용하는 MsgType과 메시지 타입으로 사용하는 msgtype의 이름을 동일하게 사용하고
+  있어 인코딩 관련 변수들의 이름이 Encoding으로 변경되었습니다. 기존 타입인 MsgType을 그대로
+  사용하고 싶다면 해당 파일 상단에 아래와 같은 코드를 추가하면 됩니다. 아래와 같은 방법으로 기존 타입을
+  그대로 사용하는 것이 가능하지만 될 수 있으면 Encoding 타입을 사용하는시는 것을 권장합니다.
 
   ```csharp
   using FunMsgType = Fun.FunEncoding;
@@ -171,15 +191,18 @@ Funapi plugin의 업데이트 내용입니다.
 - Multicasting, Chat 관련 Close 함수 추가
 
 ### 06/04/2015 (ver.77)
-- Transport 생성할 때 Encoding 타입을 지정하도록 변경. Transport 별로 Encoding 타입을 다르게 지정해서 사용 가능 (FunapiNetwork 생성자에서 지정하던 기능은 삭제 예정)
-- Transport를 새로 만들지 않고 다른 서버로 재접속하는 기능 추가 (기존 세션을 유지하고 다른 서버로 접속하는 기능은 해당 기능이 서버 릴리즈에 추가된 이후부터 사용하실 수 있습니다)
+- Transport 생성할 때 Encoding 타입을 지정하도록 변경. Transport 별로 Encoding 타입을 다르게
+지정해서 사용 가능 (FunapiNetwork 생성자에서 지정하던 기능은 삭제 예정)
+- Transport를 새로 만들지 않고 다른 서버로 재접속하는 기능 추가 (기존 세션을 유지하고 다른 서버로
+  접속하는 기능은 해당 기능이 서버 릴리즈에 추가된 이후부터 사용하실 수 있습니다)
 
 ### 06/01/2015 (ver.76)
 - Expected reply 메시지 중복 등록 허용
 - SendMessage 파라미터에 기본값 적용해서 함수 개수 줄임
 - 콜백 함수가 메인 쓰레드(유니티의 Update)에서만 호출되도록 수정
 - 오류가 발생했을 때 Transport에 등록된 실패 콜백 호출
-- StartedEventHandler, StoppedEventHandler 등의 핸들러가 TransportEventHandler 등의 공통 핸들러로 이름이 변경됨
+- StartedEventHandler, StoppedEventHandler 등의 핸들러가 TransportEventHandler 등의
+공통 핸들러로 이름이 변경됨
 - protobuf 메시지를 보내고 받을 때 symbolic name 으로 할 수 있게 수정
 
 다음과 같은 현재의 코드를

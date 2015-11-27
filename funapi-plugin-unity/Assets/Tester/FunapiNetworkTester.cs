@@ -19,7 +19,7 @@ using funapi.management.maintenance_message;
 using funapi.service.multicast_message;
 
 // Protobuf (user defined)
-using test_messages;
+using plugin_messages;
 
 
 public class FunapiNetworkTester : MonoBehaviour
@@ -145,7 +145,16 @@ public class FunapiNetworkTester : MonoBehaviour
             }
             else {
                 multicast_ = new FunapiMulticastClient(network_, transport.Encoding);
+                multicast_.sender = "player" + UnityEngine.Random.Range(1, 100);
                 multicast_encoding_ = transport.Encoding;
+
+                multicast_.JoinedCallback += delegate(string channel_id, string sender) {
+                    DebugUtils.DebugLog("JoinedCallback called. player:{0}", sender);
+                };
+                multicast_.LeftCallback += delegate(string channel_id, string sender) {
+                    DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
+                };
+                multicast_.ErrorCallback += new FunapiMulticastClient.ErrorNotify(OnMulticastError);
             }
         }
 
@@ -154,7 +163,6 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 105, 240, 40), multicast_title))
         {
             multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelSignalled);
-            DebugUtils.Log("Joining the multicast channel '{0}'", kMulticastTestChannel);
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
@@ -182,8 +190,6 @@ public class FunapiNetworkTester : MonoBehaviour
 
                 multicast_.SendToChannel(mcast_msg);
             }
-
-            DebugUtils.Log("Sending a message to the multicast channel '{0}'", kMulticastTestChannel);
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
@@ -191,7 +197,6 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 195, 240, 40), multicast_title))
         {
             multicast_.LeaveChannel(kMulticastTestChannel);
-            DebugUtils.Log("Leaving the multicast channel '{0}'", kMulticastTestChannel);
         }
 
         GUI.Label(new Rect(280, 250, 300, 20), "[Multicast Chat]");
@@ -205,6 +210,14 @@ public class FunapiNetworkTester : MonoBehaviour
             }
             else {
                 chat_ = new FunapiChatClient(network_, transport.Encoding);
+                chat_.sender = "player" + UnityEngine.Random.Range(1, 100);
+
+                chat_.JoinedCallback += delegate(string channel_id, string sender) {
+                    DebugUtils.DebugLog("JoinedCallback called. player:{0}", sender);
+                };
+                chat_.LeftCallback += delegate(string channel_id, string sender) {
+                    DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
+                };
             }
         }
 
@@ -212,17 +225,14 @@ public class FunapiNetworkTester : MonoBehaviour
         chat_title = "Join a channel";
         if (GUI.Button(new Rect(280, 315, 240, 40), chat_title))
         {
-            chat_.JoinChannel(kChatTestChannel, kChatUserName, OnChatChannelReceived);
-            DebugUtils.Log("Joining the chat channel '{0}'", kChatTestChannel);
+            chat_.JoinChannel(kChatTestChannel, OnChatChannelReceived);
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
         chat_title = "Send a message";
         if (GUI.Button(new Rect(280, 360, 240, 40), chat_title))
         {
-            chat_.SendText(kChatTestChannel, "hello world");
-
-            DebugUtils.Log("Sending a message to the chat channel '{0}'", kChatTestChannel);
+            chat_.SendText(kChatTestChannel, "hello everyone.");
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && chat_.InChannel(kChatTestChannel));
@@ -230,7 +240,6 @@ public class FunapiNetworkTester : MonoBehaviour
         if (GUI.Button(new Rect(280, 405, 240, 40), chat_title))
         {
             chat_.LeaveChannel(kChatTestChannel);
-            DebugUtils.Log("Leaving the chat channel '{0}'", kChatTestChannel);
         }
     }
 
@@ -296,12 +305,12 @@ public class FunapiNetworkTester : MonoBehaviour
 
     private void Connect (TransportProtocol protocol)
     {
-        DebugUtils.Log("-------- Connect --------\n{0}", DateTime.Now);
+        DebugUtils.Log("-------- Connect --------");
 
         if (network_ == null || !network_.SessionReliability)
         {
             network_ = new FunapiNetwork(with_session_reliability_);
-            network_.ResponseTimeout = 10f;
+            // network_.ResponseTimeout = 10f;
 
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
@@ -555,7 +564,7 @@ public class FunapiNetworkTester : MonoBehaviour
         DebugUtils.Log("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol));
     }
 
-    private void OnMulticastChannelSignalled(string channel_id, object body)
+    private void OnMulticastChannelSignalled(string channel_id, string sender, object body)
     {
         if (multicast_encoding_ == FunEncoding.kJson)
         {
@@ -563,19 +572,21 @@ public class FunapiNetworkTester : MonoBehaviour
             Dictionary<string, object> mcast_msg = body as Dictionary<string, object>;
             DebugUtils.Assert (channel_id == (mcast_msg["_channel"] as string));
 
-            DebugUtils.Log("Received a multicast message from a channel '{0}'\nMessage: {1}",
-                           channel_id, mcast_msg["message"]);
+            string message = mcast_msg["message"] as string;
+            DebugUtils.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
+                           channel_id, message);
         }
         else
         {
             DebugUtils.Assert (body is FunMulticastMessage);
             FunMulticastMessage mcast_msg = body as FunMulticastMessage;
             DebugUtils.Assert (channel_id == mcast_msg.channel);
+
             PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, (int)MulticastMessageType.pbuf_hello);
             if (hello_msg == null)
                 return;
 
-            DebugUtils.Log("Received a multicast message from a channel '{0}'\nMessage: {1}",
+            DebugUtils.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
                            channel_id, hello_msg.message);
         }
     }
@@ -586,6 +597,11 @@ public class FunapiNetworkTester : MonoBehaviour
                        chat_channel, sender, text);
     }
 
+    private void OnMulticastError (FunMulticastMessage.ErrorCode code)
+    {
+        // do something..
+    }
+
 
     // Please change this address for test.
     private const string kServerIp = "127.0.0.1";
@@ -593,9 +609,8 @@ public class FunapiNetworkTester : MonoBehaviour
     private const UInt16 kAnnouncementPort = 8080;
     private const string kDownloadServerIp = "127.0.0.1";
     private const UInt16 kDownloadServerPort = 8020;
-    private const string kMulticastTestChannel = "test_channel";
-    private const string kChatTestChannel = "chat_channel";
-    private const string kChatUserName = "my_name";
+    private const string kMulticastTestChannel = "multicast";
+    private const string kChatTestChannel = "chat";
 
     // member variables.
     private bool with_protobuf_ = false;

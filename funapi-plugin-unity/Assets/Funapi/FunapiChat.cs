@@ -18,138 +18,106 @@ using funapi.service.multicast_message;
 
 namespace Fun
 {
-    public class FunapiChatClient
+    public class FunapiChatClient : FunapiMulticastClient
     {
         public FunapiChatClient (FunapiNetwork network, FunEncoding encoding)
+            : base(network, encoding)
         {
-            multicasting_ = new FunapiMulticastClient(network, encoding);
-            encoding_ = encoding;
+            JoinedCallback += new ChannelNotify(OnJoinedCallback);
+            LeftCallback += new ChannelNotify(OnLeftCallback);
         }
 
-        public bool Connected
+        public bool JoinChannel (string channel_id, string my_name, OnChatMessage handler)
         {
-            get { return multicasting_ != null && multicasting_.Connected; }
+            sender_ = my_name;
+
+            return this.JoinChannel(channel_id, handler);
         }
 
-        public bool JoinChannel (string chat_channel, string my_name, OnChannelMessage handler)
+        public bool JoinChannel (string channel_id, OnChatMessage handler)
         {
-            if (!Connected)
-            {
+            if (!base.JoinChannel(channel_id, OnMulticastingReceived))
                 return false;
-            }
 
-            bool need_multicast_join = false;
-            lock (channel_lock_)
+            lock (chat_channel_lock_)
             {
-                KeyValuePair<string, OnChannelMessage> p;
-                if (!channel_info_.TryGetValue(chat_channel, out p))
+                if (chat_channels_.ContainsKey(channel_id))
                 {
-                    p = new KeyValuePair<string, OnChannelMessage>(my_name, handler);
-                    channel_info_.Add (chat_channel, p);
-                    need_multicast_join = true;
-                }
-            }
-            if (need_multicast_join)
-            {
-                if (!multicasting_.JoinChannel(chat_channel, OnMulticastingReceived))
-                {
+                    DebugUtils.Log("Already joined the '{0}' channel.", channel_id);
                     return false;
                 }
+
+                chat_channels_.Add (channel_id, handler);
             }
+
             return true;
         }
 
-        public bool LeaveChannel (string chat_channel)
+        private void OnJoinedCallback (string channel_id, string sender)
         {
-            if (!Connected)
-            {
-                return false;
-            }
-
-            lock (channel_lock_)
-            {
-                if (!channel_info_.ContainsKey(chat_channel))
-                {
-                    DebugUtils.Log("You are not in the chat channel: {0}", chat_channel);
-                    return false;
-                }
-                channel_info_.Remove(chat_channel);
-            }
-            return multicasting_.LeaveChannel(chat_channel);
         }
 
-        public bool InChannel (string chat_channel)
+        private void OnLeftCallback (string channel_id, string sender)
         {
-            if (multicasting_ == null)
+            if (sender == sender_)
             {
-                return false;
-            }
-            return multicasting_.InChannel (chat_channel);
-        }
-
-        public bool SendText (string chat_channel, string text)
-        {
-            if (!Connected)
-            {
-                return false;
-            }
-
-            KeyValuePair<string, OnChannelMessage> p;
-            lock (channel_lock_)
-            {
-                if (!channel_info_.TryGetValue(chat_channel, out p))
+                lock (chat_channel_lock_)
                 {
-                    DebugUtils.Log("You are not in the chat channel: {0}", chat_channel);
-                    return false;
+                    if (!chat_channels_.ContainsKey(channel_id))
+                    {
+                        DebugUtils.Log("You are not in the '{0}' channel.", channel_id);
+                        return;
+                    }
+
+                    chat_channels_.Remove(channel_id);
                 }
             }
+        }
+
+        public bool SendText (string channel_id, string text)
+        {
+            if (!Connected)
+                return false;
 
             if (encoding_ == FunEncoding.kJson)
             {
                 Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
-                mcast_msg["_channel"] = chat_channel;
-                mcast_msg["_bounce"] = true;
+                mcast_msg[kChannelId] = channel_id;
+                mcast_msg[kBounce] = true;
+                mcast_msg[kMessage] = text;
 
-                mcast_msg["sender"] = p.Key;
-                mcast_msg["text"] = text;
-
-                multicasting_.SendToChannel(mcast_msg);
+                SendToChannel(mcast_msg);
             }
             else
             {
                 FunChatMessage chat_msg = new FunChatMessage ();
-                chat_msg.sender = p.Key;
                 chat_msg.text = text;
 
                 FunMulticastMessage mcast_msg = new FunMulticastMessage ();
-                mcast_msg.channel = chat_channel;
+                mcast_msg.channel = channel_id;
                 mcast_msg.bounce = true;
                 Extensible.AppendValue (mcast_msg, (int)MulticastMessageType.chat, chat_msg);
 
-                multicasting_.SendToChannel(mcast_msg);
+                SendToChannel(mcast_msg);
             }
 
             return true;
         }
 
-        private void OnMulticastingReceived (string chat_channel, object data)
+        private void OnMulticastingReceived (string channel_id, string sender, object data)
         {
-            KeyValuePair<string, OnChannelMessage> p;
-            lock (channel_lock_)
-            {
-                if (!channel_info_.TryGetValue(chat_channel, out p))
-                {
-                    DebugUtils.Log("You are not in the chat channel: {0}", chat_channel);
-                    return;
-                }
-            }
-
             if (encoding_ == FunEncoding.kJson)
             {
                 DebugUtils.Assert(data is Dictionary<string, object>);
                 Dictionary<string, object> mcast_msg = data as Dictionary<string, object>;
 
-                p.Value (chat_channel, mcast_msg["sender"] as string, mcast_msg["text"] as string);
+                lock (chat_channel_lock_)
+                {
+                    if (chat_channels_.ContainsKey(channel_id))
+                    {
+                        chat_channels_[channel_id](channel_id, sender, mcast_msg[kMessage] as string);
+                    }
+                }
             }
             else
             {
@@ -157,16 +125,23 @@ namespace Fun
                 FunMulticastMessage mcast_msg = data as FunMulticastMessage;
                 FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage> (mcast_msg, (int)MulticastMessageType.chat);
 
-                p.Value (chat_channel, chat_msg.sender, chat_msg.text);
+                lock (chat_channel_lock_)
+                {
+                    if (chat_channels_.ContainsKey(channel_id))
+                    {
+                        chat_channels_[channel_id](channel_id, sender, chat_msg.text);
+                    }
+                }
             }
         }
 
 
-        public delegate void OnChannelMessage(string channel_id, string sender, string text);
+        private static readonly string kBounce = "_bounce";
+        private static readonly string kMessage = "_message";
 
-        private FunapiMulticastClient multicasting_ = null;
-        private FunEncoding encoding_;
-        private object channel_lock_ = new object();
-        private Dictionary<string, KeyValuePair<string, OnChannelMessage>> channel_info_ = new Dictionary<string, KeyValuePair<string, OnChannelMessage>>();
+        public delegate void OnChatMessage(string channel_id, string sender, string text);
+
+        private object chat_channel_lock_ = new object();
+        private Dictionary<string, OnChatMessage> chat_channels_ = new Dictionary<string, OnChatMessage>();
     }
 }

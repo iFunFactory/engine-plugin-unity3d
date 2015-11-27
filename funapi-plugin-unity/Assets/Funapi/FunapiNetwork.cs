@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 119;
+        public static readonly int kPluginVersion = 120;
     }
 
     // Sending message-related class.
@@ -849,11 +849,11 @@ namespace Fun
                         ++seq_;
 
                         send_queue_.Enqueue(fun_msg);
-                        DebugUtils.Log("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, seq_ - 1);
+                        DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, seq_ - 1);
                     }
                     else
                     {
-                        DebugUtils.Log("{0} send message - msgtype:{1}", protocol, msg_type);
+                        DebugUtils.DebugLog("{0} send message - msgtype:{1}", protocol, msg_type);
                     }
                 }
                 else if (transport.Encoding == FunEncoding.kProtobuf)
@@ -875,11 +875,11 @@ namespace Fun
                         ++seq_;
 
                         send_queue_.Enqueue(fun_msg);
-                        DebugUtils.Log("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, pbuf.seq);
+                        DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, pbuf.seq);
                     }
                     else
                     {
-                        DebugUtils.Log("{0} send message - msgtype:{1}", protocol, msg_type);
+                        DebugUtils.DebugLog("{0} send message - msgtype:{1}", protocol, msg_type);
                     }
                 }
 
