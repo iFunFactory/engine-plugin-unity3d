@@ -5,6 +5,12 @@ Funapi plugin의 업데이트 내용입니다.
 
 ## Release Note
 
+### 12/08/2015 (ver.121)
+- Facebook SDK 7.2 적용
+- 친구 목록 및 사진 요청 API 분리
+- 프로필 사진 다운로드 수동/자동 옵션 추가
+- additioal plugins 패키지의 원본 파일 추가
+
 ### 12/02/2015 (ver.120)
 - Multicasting 채널 입/퇴장 콜백 추가 및 오류 처리
 - Multicasting 메시지에 기본 정보로 sender 추가
