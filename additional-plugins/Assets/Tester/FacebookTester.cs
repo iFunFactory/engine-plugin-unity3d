@@ -15,7 +15,12 @@ public class FacebookTester : MonoBehaviour
         facebook_ = GameObject.Find("SocialNetwork").GetComponent<FacebookConnector>();
         //facebook_.auto_request_picture = false;
 
-        facebook_.EventCallback += new SnEventHandler(OnEventHandler);
+        facebook_.OnEventCallback += new SocialNetwork.EventHandler(OnEventHandler);
+        facebook_.OnPictureDownloaded += delegate(SocialNetwork.UserInfo user) {
+            DebugUtils.Log("{0}'s profile picture.", user.name);
+            if (tex_ == null)
+                tex_ = user.picture;
+        };
 
         facebook_.Init();
     }
@@ -48,7 +53,7 @@ public class FacebookTester : MonoBehaviour
         // Picture
         if (GUI.Button(new Rect(285, 30, 240, 40), "Show friend's picture (random)"))
         {
-            SocialNetwork.UserInfo info = facebook_.FindFriendInfo(Random.Range(0, facebook_.FriendsCount));
+            SocialNetwork.UserInfo info = facebook_.FindFriendInfo(Random.Range(0, facebook_.friend_list_count));
             if (info != null && info.picture != null)
             {
                 tex_ = info.picture;
@@ -60,15 +65,15 @@ public class FacebookTester : MonoBehaviour
             GUI.DrawTexture(new Rect(285, 80, 128, 128), tex_);
     }
 
-    private void OnEventHandler (SnResultCode result)
+    private void OnEventHandler (SNResultCode result)
     {
         switch (result)
         {
-        case SnResultCode.kLoggedIn:
+        case SNResultCode.kLoggedIn:
             logged_in_ = true;
             break;
 
-        case SnResultCode.kError:
+        case SNResultCode.kError:
             DebugUtils.Assert(false);
             break;
         }

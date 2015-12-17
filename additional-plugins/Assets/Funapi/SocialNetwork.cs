@@ -6,12 +6,13 @@
 
 using System;
 using System.IO;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace Fun
 {
-    public enum SnResultCode
+    public enum SNResultCode
     {
         kInitialized = 1,
         kLoggedIn,
@@ -24,13 +25,10 @@ namespace Fun
         kError
     }
 
-    // Event handler delegate
-    public delegate void SnEventHandler (SnResultCode code);
 
     // SocialNetwork class
     public abstract class SocialNetwork : MonoBehaviour
     {
-        #region public abstract implementation
         public abstract void Init (params object[] param);
 
         public virtual void Post (string message)
@@ -52,6 +50,9 @@ namespace Fun
         public string my_name { get { return my_info_.name; } }
         public Texture2D my_picture { get { return my_info_.picture; } }
 
+        public int friend_list_count { get { return friends_.Count; } }
+        public int invite_list_count { get { return invite_friends_.Count; } }
+
         public UserInfo FindFriendInfo (string id)
         {
             foreach (UserInfo info in friends_)
@@ -70,8 +71,6 @@ namespace Fun
 
             return friends_[index];
         }
-
-        public int FriendsCount { get { return friends_.Count; } }
 
         public UserInfo FindInviteFriendInfo (string id)
         {
@@ -92,20 +91,52 @@ namespace Fun
             return invite_friends_[index];
         }
 
-        public int InviteFriendsCount { get { return invite_friends_.Count; } }
-        #endregion
 
-
-        #region internal implementation
-        protected void OnEventHandler (SnResultCode result)
+        // Picture-related functions
+        protected IEnumerator RequestPicture (UserInfo info)
         {
-            if (EventCallback != null)
-                EventCallback(result);
+            WWW www = new WWW(info.url);
+            yield return www;
+
+            if (www.texture != null) {
+                DebugUtils.DebugLog("Gotten {0}'s profile picture.", info.name);
+                info.picture = www.texture;
+                OnPictureNotify(info);
+            }
         }
-        #endregion
+
+        protected IEnumerator RequestPictureList (List<UserInfo> list)
+        {
+            if (list == null || list.Count <= 0)
+                yield break;
+
+            foreach (UserInfo user in list)
+            {
+                WWW www = new WWW(user.url);
+                yield return www;
+
+                if (www.texture != null) {
+                    DebugUtils.DebugLog("Gotten {0}'s profile picture.", user.name);
+                    user.picture = www.texture;
+                    OnPictureNotify(user);
+                }
+            }
+        }
+
+        protected void OnEventNotify (SNResultCode result)
+        {
+            if (OnEventCallback != null)
+                OnEventCallback(result);
+        }
+
+        protected void OnPictureNotify (UserInfo user)
+        {
+            if (OnPictureDownloaded != null)
+                OnPictureDownloaded(user);
+        }
 
 
-        #region user's information
+        // User's id, name, picture
         public class UserInfo
         {
             public string id = "";
@@ -113,11 +144,15 @@ namespace Fun
             public string url = "";  // url of picture
             public Texture2D picture = null;
         }
-        #endregion
 
+
+        // Event handler delegate
+        public delegate void EventHandler (SNResultCode code);
+        public delegate void PictureDownloaded (UserInfo user);
 
         // Registered event handlers.
-        public event SnEventHandler EventCallback;
+        public event EventHandler OnEventCallback;
+        public event PictureDownloaded OnPictureDownloaded;
 
         // Member variables.
         protected UserInfo my_info_ = new UserInfo();

@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 121;
+        public static readonly int kPluginVersion = 122;
     }
 
     // Sending message-related class.

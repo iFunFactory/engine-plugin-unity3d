@@ -92,9 +92,14 @@ public class OAuthHandler
         string header = "OAuth ";
         foreach (var item in parameters)
         {
-            header += string.Format("{0}=\"{1}\",", item.Key, item.Value);
+            if (item.Key == kOAuthVersion)
+                header += string.Format("{0}=\"{1}\"", item.Key, item.Value);
+            else
+                header += string.Format("{0}=\"{1}\",", item.Key, item.Value);
+
+            if (item.Key == kOAuthNonce)
+                header += string.Format("{0}=\"{1}\",", kOAuthSignature, UrlEncode(signature));
         }
-        header += string.Format("{0}=\"{1}\"", kOAuthSignature, UrlEncode(signature));
 
         return header;
     }
@@ -145,7 +150,8 @@ public class OAuthHandler
     private static readonly string kUnreservedChars =
         "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~";
 
-    private static readonly DateTime epoch_time_ = new DateTime(1970, 1, 1, 0, 0, 0);
+    private static readonly DateTime epoch_time_ =
+        new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
 
     private static readonly string[] except_parameters = new[]
     {
