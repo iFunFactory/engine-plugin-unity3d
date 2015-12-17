@@ -139,10 +139,10 @@ namespace Fun
 
                 if (FB.IsLoggedIn) {
                     DebugUtils.DebugLog("Already logged in.");
-                    OnEventHandler(SnResultCode.kLoggedIn);
+                    OnEventNotify(SNResultCode.kLoggedIn);
                 }
                 else {
-                    OnEventHandler(SnResultCode.kInitialized);
+                    OnEventNotify(SNResultCode.kInitialized);
                 }
             }
             else
@@ -161,12 +161,12 @@ namespace Fun
             if (result.Error != null)
             {
                 DebugUtils.DebugLogError(result.Error);
-                OnEventHandler(SnResultCode.kLoginFailed);
+                OnEventNotify(SNResultCode.kLoginFailed);
             }
             else if (!FB.IsLoggedIn)
             {
                 DebugUtils.DebugLog("User cancelled login.");
-                OnEventHandler(SnResultCode.kLoginFailed);
+                OnEventNotify(SNResultCode.kLoginFailed);
             }
             else
             {
@@ -185,7 +185,7 @@ namespace Fun
                 // Reqests my info and profile picture
                 FB.API("me?fields=id,name,picture.width(128).height(128)", HttpMethod.GET, OnMyProfileCb);
 
-                OnEventHandler(SnResultCode.kLoggedIn);
+                OnEventNotify(SNResultCode.kLoggedIn);
             }
         }
 
@@ -195,7 +195,7 @@ namespace Fun
             if (result.Error != null)
             {
                 DebugUtils.DebugLogError(result.Error);
-                OnEventHandler(SnResultCode.kError);
+                OnEventNotify(SNResultCode.kError);
                 return;
             }
 
@@ -205,7 +205,7 @@ namespace Fun
                 if (json == null)
                 {
                     DebugUtils.DebugLogError("OnMyProfileCb - json is null.");
-                    OnEventHandler(SnResultCode.kError);
+                    OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
@@ -220,7 +220,7 @@ namespace Fun
                 my_info_.url = data["url"] as string;
                 StartCoroutine(RequestPicture(my_info_));
 
-                OnEventHandler(SnResultCode.kMyProfile);
+                OnEventNotify(SNResultCode.kMyProfile);
             }
             catch (Exception e)
             {
@@ -236,7 +236,7 @@ namespace Fun
                 if (json == null)
                 {
                     DebugUtils.DebugLogError("OnFriendListCb - json is null.");
-                    OnEventHandler(SnResultCode.kError);
+                    OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
@@ -245,7 +245,7 @@ namespace Fun
                 json.TryGetValue("friends", out friend_list);
                 if (friend_list == null) {
                     DebugUtils.DebugLogError("OnInviteListCb - friend_list is null.");
-                    OnEventHandler(SnResultCode.kError);
+                    OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
@@ -266,8 +266,8 @@ namespace Fun
                     DebugUtils.DebugLog("> id:{0} name:{1} url:{2}", user.id, user.name, user.url);
                 }
 
-                DebugUtils.Log("Succeeded in getting the friend list.");
-                OnEventHandler(SnResultCode.kFriendList);
+                DebugUtils.Log("Succeeded in getting the friend list. count:{0}", friends_.Count);
+                OnEventNotify(SNResultCode.kFriendList);
 
                 if (auto_request_picture_ && friends_.Count > 0)
                     StartCoroutine(RequestPictureList(friends_));
@@ -285,7 +285,7 @@ namespace Fun
                 Dictionary<string, object> json = Json.Deserialize(result.RawResult) as Dictionary<string, object>;
                 if (json == null) {
                     DebugUtils.DebugLogError("OnInviteListCb - json is null.");
-                    OnEventHandler(SnResultCode.kError);
+                    OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
@@ -293,7 +293,7 @@ namespace Fun
                 json.TryGetValue("invitable_friends", out invitable_friends);
                 if (invitable_friends == null) {
                     DebugUtils.DebugLogError("OnInviteListCb - invitable_friends is null.");
-                    OnEventHandler(SnResultCode.kError);
+                    OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
@@ -316,7 +316,7 @@ namespace Fun
                 }
 
                 DebugUtils.Log("Succeeded in getting the invite list.");
-                OnEventHandler(SnResultCode.kInviteList);
+                OnEventNotify(SNResultCode.kInviteList);
 
                 if (auto_request_picture_ && invite_friends_.Count > 0)
                     StartCoroutine(RequestPictureList(invite_friends_));
@@ -324,34 +324,6 @@ namespace Fun
             catch (Exception e)
             {
                 DebugUtils.DebugLogError("Failure in OnInviteListCb: " + e.ToString());
-            }
-        }
-
-
-        // Picture-related functions
-        IEnumerator RequestPicture (UserInfo info)
-        {
-            WWW www = new WWW(info.url);
-            yield return www;
-
-            if (www.texture != null) {
-                info.picture = www.texture;
-                DebugUtils.DebugLog("Gotten {0}'s profile picture.", info.name);
-            }
-        }
-
-        IEnumerator RequestPictureList (List<UserInfo> list)
-        {
-            if (list == null || list.Count <= 0)
-                yield break;
-
-            foreach (UserInfo user in list)
-            {
-                WWW www = new WWW(user.url);
-                yield return www;
-
-                user.picture = www.texture;
-                DebugUtils.DebugLog("Gotten {0}'s profile picture.", user.name);
             }
         }
 
@@ -392,12 +364,12 @@ namespace Fun
             if (result.Error != null)
             {
                 DebugUtils.DebugLogError(result.Error);
-                OnEventHandler(SnResultCode.kPostFailed);
+                OnEventNotify(SNResultCode.kPostFailed);
                 return;
             }
 
             DebugUtils.Log("Post successful!");
-            OnEventHandler(SnResultCode.kPosted);
+            OnEventNotify(SNResultCode.kPosted);
         }
         #endregion
 
