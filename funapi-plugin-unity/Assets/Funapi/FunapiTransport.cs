@@ -268,21 +268,11 @@ namespace Fun
         // Checks connection list
         internal void CheckConnectList ()
         {
-            if (IsConnecting)
+            if (!AutoReconnect || IsConnecting)
                 return;
 
             cstate_ = ConnectState.kConnecting;
             exponential_time_ = 1f;
-        }
-
-        internal void CheckReconnect ()
-        {
-            if (!AutoReconnect || cstate_ == ConnectState.kReconnecting)
-                return;
-
-            cstate_ = ConnectState.kReconnecting;
-            exponential_time_ = 1f;
-            reconnect_count_ = 0;
         }
 
         private bool TryToConnect ()

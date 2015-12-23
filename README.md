@@ -1,9 +1,18 @@
 Funapi plugin
 ========================
 
-Funapi plugin의 업데이트 내용입니다.
+플러그인 버전 v120 이상을 사용하려면 서버 버전이 v1437 이상이어야 합니다.
+
+## Documentation
+
+[클라이언트 플러그인 문서](http://www.ifunfactory.com/engine/documents/reference/ko/client-plugin.html)
 
 ## Release Note
+
+Funapi plugin의 업데이트 내용입니다.
+
+### 01/04/2016 (ver.123)
+- AutoReconnect 옵션이 적용 안되는 버그 수정
 
 ### 12/21/2015 (ver.122)
 - 소셜 플러그인 개선 사항
@@ -26,6 +35,9 @@ Funapi plugin의 업데이트 내용입니다.
 ```csharp
 public delegate void ChannelMessage(string channel_id, string sender, object body);
 ```
+
+멀티캐스팅 관련 인터페이스가 변경되어 메뉴얼의 설명이 업데이트 되었습니다. 자세한 내용은 [멀티캐스팅 설명](http://www.ifunfactory.com/engine/documents/reference/ko/client-plugin.html#client-plugin-multicasting)
+에서 확인해주세요.
 
 ### 12/02/2015 (ver.119)
 - 맥 실행파일 창모드에서 배경색 초기화가 안 되어서 깜빡이는 문제 수정
@@ -251,7 +263,3 @@ Tools 이하의 파일들은 더 이상 사용되지 않습니다. protobuf-net�
 
 
 ### 2015년 6월 이전 업데이트 생략
-
-## Documentation
-
-http://www.ifunfactory.com/engine/documents/reference/ko/client-plugin.html
