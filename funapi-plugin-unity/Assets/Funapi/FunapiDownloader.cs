@@ -60,16 +60,16 @@ namespace Fun
 
         public void GetDownloadList (string url, string target_path)
         {
-            if (ReadyCallback == null)
-            {
-                DebugUtils.LogError("You must register the ReadyCallback first.");
-                return;
-            }
-
             mutex_.WaitOne();
 
             try
             {
+                if (ReadyCallback == null)
+                {
+                    DebugUtils.LogError("You must register the ReadyCallback first.");
+                    return;
+                }
+
                 if (IsDownloading)
                 {
                     DebugUtils.LogWarning("The resource file is being downloaded. (Url: {0})\n"
@@ -83,12 +83,13 @@ namespace Fun
                 if (host_url[host_url.Length - 1] != '/')
                     host_url += "/";
                 host_url_ = host_url;
+                DebugUtils.Log("Download url: {0}", host_url_);
 
                 target_path_ = target_path;
                 if (target_path_[target_path_.Length - 1] != '/')
                     target_path_ += "/";
                 target_path_ += kRootPath + "/";
-                DebugUtils.Log("Download path:{0}", target_path_);
+                DebugUtils.Log("Download path: {0}", target_path_);
 
                 cur_download_count_ = 0;
                 cur_download_size_ = 0;
@@ -108,39 +109,67 @@ namespace Fun
 
         public void StartDownload()
         {
-            if (state_ != State.Ready)
-            {
-                DebugUtils.LogError("You must call GetDownloadList function first.");
-                return;
-            }
-
             mutex_.WaitOne();
 
-            if (total_download_count_ > 0)
+            try
             {
-                DebugUtils.Log("Ready to download {0} files ({1:F2}MB)",
-                               total_download_count_,
-                               (float)total_download_size_ / (1024f * 1024f));
+                if (state_ != State.Ready)
+                {
+                    DebugUtils.LogError("You must call GetDownloadList function first {0}",
+                                        "or wait until ready to download.");
+                    return;
+                }
+
+                if (total_download_count_ > 0)
+                {
+                    float size;
+                    string unit;
+                    if (total_download_size_ < 1024 * 1024) {
+                        size = total_download_size_ / 1024f;
+                        unit = "K";
+                    }
+                    else {
+                        size = total_download_size_ / (1024f * 1024f);
+                        unit = "M";
+                    }
+
+                    DebugUtils.Log("Ready to download {0} files ({1}{2})",
+                                   total_download_count_, Math.Round(size, 3), unit);
+                }
+
+                state_ = State.Downloading;
+                check_time_ = DateTime.Now;
+                downloading_ticks_ = 0;
+                retry_download_count_ = 0;
+
+                // Deletes files
+                DeleteLocalFiles();
+
+                // Starts download
+                DownloadResourceFile();
             }
-
-            state_ = State.Downloading;
-            check_time_ = DateTime.Now;
-            retry_download_count_ = 0;
-
-            // Deletes files
-            DeleteLocalFiles();
-
-            // Starts download
-            DownloadResourceFile();
-
-            mutex_.ReleaseMutex();
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
         }
 
         public void ContinueDownload()
         {
-            if (download_list_.Count > 0)
+            mutex_.WaitOne();
+
+            try
             {
-                DownloadResourceFile();
+                if (state_ == State.Paused && download_list_.Count > 0)
+                {
+                    state_ = State.Downloading;
+                    check_time_ = DateTime.Now;
+                    DownloadResourceFile();
+                }
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
             }
         }
 
@@ -148,13 +177,35 @@ namespace Fun
         {
             mutex_.WaitOne();
 
-            if (IsDownloading)
+            try
             {
-                web_client_.CancelAsync();
-                OnFinishedCallback(DownloadResult.FAILED);
-            }
+                if (state_ == State.None || state_ == State.Completed)
+                    return;
 
-            mutex_.ReleaseMutex();
+                if (state_ == State.Downloading)
+                {
+                    state_ = State.Paused;
+                    web_client_.CancelAsync();
+                    downloading_ticks_ += (DateTime.Now.Ticks - check_time_.Ticks);
+                    DebugUtils.Log("Downloading paused.");
+
+                    OnFinishedCallback(DownloadResult.FAILED);
+                }
+                else
+                {
+                    state_ = State.None;
+                    DebugUtils.Log("Downloading stopped.");
+                }
+            }
+            finally
+            {
+                mutex_.ReleaseMutex();
+            }
+        }
+
+        public bool IsPaused
+        {
+            get { return state_ == State.Paused; }
         }
 
         public bool IsDownloading
@@ -182,6 +233,7 @@ namespace Fun
             get {  return total_download_size_; }
         }
 
+
         private void LoadCachedList ()
         {
             cached_list_.Clear();
@@ -196,8 +248,7 @@ namespace Fun
 
             if (data.Length <= 0)
             {
-                DebugUtils.Log("Failed to get a cached file list.");
-                DebugUtils.Assert(false);
+                DebugUtils.LogWarning("Failed to get a cached file list.");
                 return;
             }
 
@@ -217,6 +268,8 @@ namespace Fun
 
                 cached_list_.Add(info);
             }
+
+            DebugUtils.DebugLog("Loads cached list : {0}", cached_list_.Count);
         }
 
         private void UpdateCachedList ()
@@ -245,6 +298,8 @@ namespace Fun
             stream.Write(data.ToString());
             stream.Flush();
             stream.Close();
+
+            DebugUtils.DebugLog("Updates cached list : {0}", cached_list_.Count);
         }
 
         // Checks download file list
@@ -427,6 +482,23 @@ namespace Fun
             remove_list.Clear();
         }
 
+        private void DeleteLocalFiles ()
+        {
+            if (delete_file_list_.Count <= 0)
+                return;
+
+            foreach (string path in delete_file_list_)
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    DebugUtils.Log("Deleted resource file \npath: {0}", path);
+                }
+            }
+
+            delete_file_list_.Clear();
+        }
+
         private void DownloadListFile (string url)
         {
             bool failed = false;
@@ -448,31 +520,18 @@ namespace Fun
             }
         }
 
-        private void DeleteLocalFiles ()
-        {
-            if (delete_file_list_.Count <= 0)
-                return;
-
-            foreach (string path in delete_file_list_)
-            {
-                if (File.Exists(path))
-                {
-                    File.Delete(path);
-                    DebugUtils.Log("Deleted resource file \npath: {0}", path);
-                }
-            }
-
-            delete_file_list_.Clear();
-        }
-
         // Downloading files.
         private void DownloadResourceFile ()
         {
+            if (state_ != State.Downloading)
+                return;
+
             if (download_list_.Count <= 0)
             {
                 UpdateCachedList();
 
-                TimeSpan span = new TimeSpan(DateTime.Now.Ticks - check_time_.Ticks);
+                downloading_ticks_ += (DateTime.Now.Ticks - check_time_.Ticks);
+                TimeSpan span = new TimeSpan(downloading_ticks_);
                 DebugUtils.Log("File download total time - {0:F2}s", span.TotalMilliseconds / 1000f);
 
                 state_ = State.Completed;
@@ -517,7 +576,6 @@ namespace Fun
                 if (ar.Error != null)
                 {
                     DebugUtils.Log("Exception Error: {0}", ar.Error);
-                    DebugUtils.Assert(false);
                     failed = true;
                 }
                 else
@@ -618,7 +676,6 @@ namespace Fun
                 if (ar.Error != null)
                 {
                     DebugUtils.Log("Exception Error: {0}", ar.Error);
-                    DebugUtils.Assert(false);
                     failed = true;
                 }
                 else
@@ -661,7 +718,8 @@ namespace Fun
                 if (retry_download_count_ < kMaxRetryCount)
                 {
                     ++retry_download_count_;
-                    FunapiManager.instance.StartCoroutine(AsyncDownloadFile());
+                    manager_.AddEvent(() =>
+                        manager_.StartCoroutine(RetryDownloadFile()));
                 }
                 else
                 {
@@ -670,7 +728,7 @@ namespace Fun
             }
         }
 
-        IEnumerator AsyncDownloadFile ()
+        IEnumerator RetryDownloadFile ()
         {
             float time = 1f;
             for (int i = 0; i < retry_download_count_; ++i)
@@ -690,9 +748,10 @@ namespace Fun
         enum State
         {
             None,
-            Ready,
             Start,
+            Ready,
             Downloading,
+            Paused,
             Completed
         }
 
@@ -725,6 +784,7 @@ namespace Fun
         private FunapiManager manager_ = null;
         private Mutex mutex_ = new Mutex();
         private DateTime check_time_;
+        private long downloading_ticks_ = 0;
         private WebClient web_client_ = new WebClient();
         private List<DownloadFileInfo> cached_list_ = new List<DownloadFileInfo>();
         private List<DownloadFileInfo> download_list_ = new List<DownloadFileInfo>();

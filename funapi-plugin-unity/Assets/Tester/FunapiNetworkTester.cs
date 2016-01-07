@@ -316,7 +316,7 @@ public class FunapiNetworkTester : MonoBehaviour
         if (network_ == null || !network_.SessionReliability)
         {
             network_ = new FunapiNetwork(with_session_reliability_);
-            // network_.ResponseTimeout = 10f;
+            //network_.ResponseTimeout = 10f;
 
             network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
             network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
