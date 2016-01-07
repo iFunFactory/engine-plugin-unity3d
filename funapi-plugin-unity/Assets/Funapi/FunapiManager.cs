@@ -55,6 +55,16 @@ namespace Fun
             }
         }
 
+        void Start()
+        {
+            forced_quit_ = false;
+        }
+
+        void OnApplicationQuit()
+        {
+            forced_quit_ = true;
+        }
+
         void Update()
         {
             // Gets delta time
@@ -82,9 +92,15 @@ namespace Fun
             queue = null;
         }
 
+
         public static float deltaTime
         {
             get { return deltaTime_; }
+        }
+
+        public bool IsForcedQuit
+        {
+            get { return forced_quit_; }
         }
 
 
@@ -99,5 +115,8 @@ namespace Fun
         // Delta time
         private long prev_ticks_ = 0;
         private static float deltaTime_ = 0f;
+
+        // member variables.
+        private bool forced_quit_ = false;
     }
 }

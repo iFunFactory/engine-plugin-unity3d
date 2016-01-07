@@ -360,6 +360,11 @@ namespace Fun
             return timer_list_.ContainsKey(name) || pending_list_.ContainsKey(name);
         }
 
+        public int Count
+        {
+            get { return timer_list_.Count + pending_list_.Count; }
+        }
+
         public void Clear ()
         {
             is_all_clear_ = true;
@@ -369,7 +374,9 @@ namespace Fun
         {
             if (is_all_clear_)
             {
+                DebugUtils.DebugLog("Clear all timer. ({0})", Count);
                 timer_list_.Clear();
+                pending_list_.Clear();
                 remove_list_.Clear();
                 is_all_clear_ = false;
                 return;

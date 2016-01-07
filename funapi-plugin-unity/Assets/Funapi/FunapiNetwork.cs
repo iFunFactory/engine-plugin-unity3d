@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 124;
+        public static readonly int kPluginVersion = 125;
     }
 
     // Sending message-related class.
@@ -198,14 +198,21 @@ namespace Fun
         // Starts FunapiNetwork
         public void Start()
         {
+            if (Started)
+            {
+                DebugUtils.LogWarning("FunapiNetwork.Start() called, but the network already started. This request has ignored.\n{0}",
+                                      "If you want to reconnect, call FunapiNetwork.Stop() first and wait for it to stop.");
+                return;
+            }
+
+            lock (state_lock_)
+            {
+                state_ = State.kStarted;
+            }
+
             FunapiManager.instance.AddEvent(() =>
             {
                 DebugUtils.Log("Starting a network module.");
-
-                lock (state_lock_)
-                {
-                    state_ = State.kStarted;
-                }
 
                 lock (transports_lock_)
                 {
@@ -222,7 +229,25 @@ namespace Fun
         {
             stop_with_clear_ = clear_all;
 
+            // Checks transport state
+            if (!FunapiManager.instance.IsForcedQuit)
+            {
+                lock (transports_lock_)
+                {
+                    foreach (FunapiTransport transport in transports_.Values)
+                    {
+                        if (transport.IsConnecting)
+                        {
+                            state_ = State.kWaitForStop;
+                            DebugUtils.Log("Wait the connection is complete...");
+                            return;
+                        }
+                    }
+                }
+            }
+
             // Waits for unsent messages.
+            // If the response time is exceeded, don't check the remaining unsent packets.
             if (response_timer_ <= 0f || response_timer_ < ResponseTimeout)
             {
                 lock (transports_lock_)
@@ -246,6 +271,7 @@ namespace Fun
 
             DebugUtils.Log("Stopping a network module.");
 
+            // Stops all transport
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
@@ -254,6 +280,7 @@ namespace Fun
                 }
             }
 
+            // Closes session
             if (stop_with_clear_)
             {
                 CloseSession();
@@ -589,7 +616,7 @@ namespace Fun
                     bool all_stopped = true;
                     foreach (FunapiTransport t in transports_.Values)
                     {
-                        if (t.IsConnecting || t.Started)
+                        if (t.IsReconnecting || t.Started)
                         {
                             all_stopped = false;
                             break;

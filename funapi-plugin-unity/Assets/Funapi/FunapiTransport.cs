@@ -162,6 +162,11 @@ namespace Fun
 
         public bool IsConnecting
         {
+            get { return state_ == State.kConnecting; }
+        }
+
+        public bool IsReconnecting
+        {
             get { return cstate_ == ConnectState.kConnecting ||
                          cstate_ == ConnectState.kReconnecting ||
                          cstate_ == ConnectState.kRedirecting; }
@@ -266,7 +271,7 @@ namespace Fun
         // Checks connection list
         internal void CheckConnectList ()
         {
-            if (!AutoReconnect || IsConnecting)
+            if (!AutoReconnect || IsReconnecting)
                 return;
 
             cstate_ = ConnectState.kConnecting;
@@ -337,10 +342,13 @@ namespace Fun
             DebugUtils.Log("Wait {0} seconds for reconnect to {1} transport.",
                            delay_time, str_protocol);
 
-            timer_.AddTimer(kTryReconnectTimerId, delay_time,
-                delegate (object param) {
-                    DebugUtils.Log("'{0}' Try to reconnect to server.", str_protocol);
-                    Start();
+            AddToEventQueue(delegate {
+                    timer_.AddTimer(kTryReconnectTimerId, delay_time,
+                        delegate (object param) {
+                            DebugUtils.Log("'{0}' Try to reconnect to server.", str_protocol);
+                            Start();
+                        }
+                    );
                 }
             );
 
@@ -390,12 +398,10 @@ namespace Fun
 
         internal void AddFailureCallback (FunapiMessage fun_msg)
         {
-            AddToEventQueue(
-                delegate
-                {
-                OnMessageFailureCallback(fun_msg);
-                OnFailureCallback();
-            }
+            AddToEventQueue(delegate {
+                    OnMessageFailureCallback(fun_msg);
+                    OnFailureCallback();
+                }
             );
         }
 
@@ -627,6 +633,13 @@ namespace Fun
         {
             try
             {
+                if (state_ != State.kUnknown)
+                {
+                    DebugUtils.LogWarning("{0} Transport.Start() called, but the state is {1}. This request has ignored.\n{2}",
+                                          str_protocol, state_, "If you want to reconnect, call Transport.Stop() first and wait for it to stop.");
+                    return;
+                }
+
                 // Resets states.
                 first_receiving_ = true;
                 header_decoded_ = false;
@@ -642,7 +655,7 @@ namespace Fun
                     timer_.KillTimer(kConnectTimeoutTimerId);
                     timer_.AddTimer(kConnectTimeoutTimerId, ConnectTimeout,
                         delegate (object param) {
-                            if (state_ == State.kEstablished)
+                            if (state_ == State.kUnknown || state_ == State.kEstablished)
                                 return;
 
                             DebugUtils.Log("{0} Connection waiting time has been exceeded.", str_protocol);
@@ -1192,7 +1205,7 @@ namespace Fun
         {
             lock (sending_lock_)
             {
-                if (IsSendable)
+                if (Started && IsSendable)
                 {
                     if (pending_.Count > 0)
                     {
