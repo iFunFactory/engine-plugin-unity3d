@@ -11,6 +11,13 @@ Funapi plugin
 
 Funapi plugin의 업데이트 내용입니다.
 
+### 01/12/2016 (ver.125)
+- 리소스 업데이트가 중단되었을 경우 이어서 시작할 수 있도록 Continue 기능 추가
+- Connect 도중에 Stop이 호출될 경우 연결이 완료된 후에 종료 (IL2CPP 관련 버그)
+- FunapiNetwork나 Transport의 Start() 함수가 중복 호출될 경우 로그를 출력하고 요청은 무시
+- 연결 도중 Stop이 호출된 후에도 ConnectionTimeout 콜백이 호출되는 버그 수정
+- 재시도 타이머가 FunapiTransport.Stop 호출로 삭제되어 재시도가 멈추는 버그 수정
+
 ### 01/04/2016 (ver.123)
 - AutoReconnect 옵션이 적용 안되는 버그 수정
 
