@@ -118,6 +118,12 @@ namespace Fun
                 network_.SendMessage(kMulticastMsgType, fun_msg);
             }
 
+            OnLeftCallback(channel_id, sender_);
+
+            lock (channel_lock_) {
+                channels_.Remove(channel_id);
+            }
+
             return true;
         }
 
@@ -287,19 +293,11 @@ namespace Fun
 
             if (join)
             {
-                DebugUtils.Log("{0} joined the '{1}' channel", sender, channel_id);
-                if (JoinedCallback != null)
-                    JoinedCallback(channel_id, sender);
+                OnJoinedCallback(channel_id, sender);
             }
             else if (leave)
             {
-                DebugUtils.Log("{0} left the '{1}' channel", sender, channel_id);
-                if (LeftCallback != null)
-                    LeftCallback(channel_id, sender);
-
-                lock (channel_lock_) {
-                    channels_.Remove(channel_id);
-                }
+                OnLeftCallback(channel_id, sender);
             }
             else
             {
@@ -312,6 +310,21 @@ namespace Fun
                 }
             }
         }
+
+        private void OnJoinedCallback (string channel_id, string sender)
+        {
+            DebugUtils.Log("{0} joined the '{1}' channel", sender, channel_id);
+            if (JoinedCallback != null)
+                JoinedCallback(channel_id, sender);
+        }
+
+        private void OnLeftCallback (string channel_id, string sender)
+        {
+            DebugUtils.Log("{0} left the '{1}' channel", sender, channel_id);
+            if (LeftCallback != null)
+                LeftCallback(channel_id, sender);
+        }
+
 
         protected static readonly string kMulticastMsgType = "_multicast";
         protected static readonly string kChannelId = "_channel";
