@@ -11,6 +11,9 @@ Funapi plugin
 
 Funapi plugin의 업데이트 내용입니다.
 
+### 01/27/2016 (ver.135)
+- Multicast 채널에서 누군가 퇴장해서 Leave 메시지를 받으면 무조건 채널 메시지 핸들러가 삭제되는 버그 수정
+
 ### 01/12/2016 (ver.125)
 - 리소스 업데이트가 중단되었을 경우 이어서 시작할 수 있도록 Continue 기능 추가
 - Connect 도중에 Stop이 호출될 경우 연결이 완료된 후에 종료 (IL2CPP 관련 버그)
@@ -34,6 +37,7 @@ Funapi plugin의 업데이트 내용입니다.
 - additioal plugins 패키지의 원본 파일 추가
 
 ### 12/02/2015 (ver.120)
+- 맥 실행파일 창모드에서 배경색 초기화가 안 되어서 깜빡이는 문제 수정
 - Multicasting 채널 입/퇴장 콜백 추가 및 오류 처리
 - Multicasting 메시지에 기본 정보로 sender 추가
 
@@ -45,9 +49,6 @@ public delegate void ChannelMessage(string channel_id, string sender, object bod
 
 멀티캐스팅 관련 인터페이스가 변경되어 메뉴얼의 설명이 업데이트 되었습니다. 자세한 내용은 [멀티캐스팅 설명](http://www.ifunfactory.com/engine/documents/reference/ko/client-plugin.html#client-plugin-multicasting)
 에서 확인해주세요.
-
-### 12/02/2015 (ver.119)
-- 맥 실행파일 창모드에서 배경색 초기화가 안 되어서 깜빡이는 문제 수정
 
 ### 11/18/2015 (ver.118)
 - Time.timeScale 값이 0이어도 플러그인 타이머는 돌아가도록 하기 위해 플러그인 자체 deltaTime
