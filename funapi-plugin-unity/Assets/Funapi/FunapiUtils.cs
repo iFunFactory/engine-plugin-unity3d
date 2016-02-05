@@ -12,9 +12,334 @@ using System.Collections.Generic;
 using UnityEngine;
 #endif
 
+// Utility classes
 namespace Fun
 {
-    // Utility class
+    public class FunapiUpdater
+    {
+        protected void CreateUpdater ()
+        {
+            if (game_object_ != null)
+            {
+                DebugUtils.Log("'{0}' GameObject is already exist.", game_object_.name);
+                return;
+            }
+
+            game_object_ = new GameObject(GetType().ToString());
+            if (game_object_ != null)
+            {
+                FunapiObject obj = game_object_.AddComponent(typeof(FunapiObject)) as FunapiObject;
+                if (obj != null)
+                {
+                    funapi_object_ = obj;
+                    obj.Updater = Update;
+                }
+
+                DebugUtils.DebugLog("'{0}' GameObject was created.", game_object_.name);
+            }
+        }
+
+        protected void ReleaseUpdater ()
+        {
+            if (game_object_ == null)
+                return;
+
+            DebugUtils.DebugLog("'{0}' GameObject was destroyed", game_object_.name);
+            GameObject.Destroy(game_object_);
+            game_object_ = null;
+            funapi_object_ = null;
+        }
+
+        protected virtual bool Update (float deltaTime)
+        {
+            event_.Update(deltaTime);
+            return true;
+        }
+
+        protected MonoBehaviour mono
+        {
+            get { return funapi_object_; }
+        }
+
+        protected ThreadSafeEventList event_list
+        {
+            get { return event_; }
+        }
+
+        protected bool is_application_quit
+        {
+            get
+            {
+                if (funapi_object_ == null)
+                    return false;
+
+                return funapi_object_.is_application_quit;
+            }
+        }
+
+
+        // For use a MonoBehaviour
+        class FunapiObject : MonoBehaviour
+        {
+            void Awake ()
+            {
+                prev_ticks_ = DateTime.UtcNow.Ticks;
+                deltaTime_ = 0.03f;
+
+                DontDestroyOnLoad(gameObject);
+            }
+
+            void Update ()
+            {
+                long now = DateTime.UtcNow.Ticks;
+                int milliseconds = (int)((now - prev_ticks_) / 10000);
+                deltaTime_ = (float)milliseconds / 1000f;
+                prev_ticks_ = now;
+
+                Updater(deltaTime_);
+            }
+
+            void OnApplicationQuit()
+            {
+                is_application_quit_ = true;
+            }
+
+            public Func<float, bool> Updater
+            {
+                set; private get;
+            }
+
+            public bool is_application_quit
+            {
+                get { return is_application_quit_; }
+            }
+
+            private long prev_ticks_ = 0;
+            private float deltaTime_ = 0f;
+            private bool is_application_quit_ = false;
+        }
+
+        private GameObject game_object_ = null;
+        private FunapiObject funapi_object_ = null;
+        private ThreadSafeEventList event_ = new ThreadSafeEventList();
+    }
+
+
+    public class ThreadSafeEventList
+    {
+        public int Add (Action callback, float start_delay = 0f)
+        {
+            return AddItem(callback, start_delay);
+        }
+
+        public int Add (Action callback, bool repeat, float repeat_time)
+        {
+            return AddItem(callback, 0f, repeat, repeat_time);
+        }
+
+        public int Add (Action callback, float start_delay, bool repeat, float repeat_time)
+        {
+            return AddItem(callback, start_delay, repeat, repeat_time);
+        }
+
+        public void Remove (int key)
+        {
+            if (key <= 0)
+                return;
+
+            lock (lock_)
+            {
+                if (!original_.ContainsKey(key) && !pending_.ContainsKey(key))
+                    return;
+
+                if (pending_.ContainsKey(key))
+                {
+                    pending_.Remove(key);
+                }
+                else if (!removing_.Contains(key))
+                {
+                    removing_.Add(key);
+                }
+                else
+                {
+                    return;
+                }
+            }
+        }
+
+        public bool ContainsKey (int key)
+        {
+            lock (lock_)
+            {
+                return original_.ContainsKey(key) || pending_.ContainsKey(key);
+            }
+        }
+
+        public int Count
+        {
+            get
+            {
+                lock (lock_)
+                {
+                    return original_.Count + pending_.Count;
+                }
+            }
+        }
+
+        public void Clear ()
+        {
+            is_all_clear_ = true;
+        }
+
+        public void Update (float deltaTime)
+        {
+            if (Count <= 0)
+                return;
+
+            lock (lock_)
+            {
+                if (is_all_clear_)
+                {
+                    original_.Clear();
+                    pending_.Clear();
+                    removing_.Clear();
+                    is_all_clear_ = false;
+                    return;
+                }
+
+                CheckRemoveList();
+
+                // Adds timer
+                if (pending_.Count > 0)
+                {
+                    foreach (KeyValuePair<int, Item> p in pending_)
+                    {
+                        original_.Add(p.Key, p.Value);
+                    }
+
+                    pending_.Clear();
+                }
+
+                if (original_.Count <= 0)
+                    return;
+
+                foreach (KeyValuePair<int, Item> p in original_)
+                {
+                    if (removing_.Contains(p.Key))
+                        continue;
+
+                    Item item = p.Value;
+                    if (item.remaining_time > 0f)
+                    {
+                        item.remaining_time -= deltaTime;
+                        if (item.remaining_time <= 0f)
+                        {
+                            if (item.repeat)
+                                item.remaining_time = item.repeat_time;
+                            else
+                                removing_.Add(p.Key);
+
+                            item.callback();
+                        }
+                    }
+                    else
+                    {
+                        if (!item.repeat)
+                            removing_.Add(p.Key);
+
+                        item.callback();
+                    }
+                }
+
+                CheckRemoveList();
+            }
+        }
+
+
+        // Gets new id
+        private int GetNewId ()
+        {
+            do
+            {
+                ++next_id_;
+                if (next_id_ >= int.MaxValue)
+                    next_id_ = 1;
+            }
+            while (ContainsKey(next_id_));
+
+            return next_id_;
+        }
+
+        // Adds a action
+        private int AddItem (Action callback, float start_delay = 0f,
+                             bool repeat = false, float repeat_time = 0f)
+        {
+            if (callback == null)
+            {
+                throw new ArgumentNullException ("callback");
+            }
+
+            lock (lock_)
+            {
+                int key = GetNewId();
+                pending_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
+                return key;
+            }
+        }
+
+        // Removes actions from remove list
+        private void CheckRemoveList ()
+        {
+            lock (lock_)
+            {
+                if (removing_.Count <= 0)
+                    return;
+
+                foreach (int key in removing_)
+                {
+                    if (original_.ContainsKey(key))
+                    {
+                        original_.Remove(key);
+                    }
+                    else if (pending_.ContainsKey(key))
+                    {
+                        pending_.Remove(key);
+                    }
+                }
+
+                removing_.Clear();
+            }
+        }
+
+
+        class Item
+        {
+            public bool repeat;
+            public float repeat_time;
+            public float remaining_time;
+            public Action callback;
+
+            public Item (Action callback, float start_delay = 0f,
+                         bool repeat = false, float repeat_time = 0f)
+            {
+                this.callback = callback;
+                this.repeat = repeat;
+                this.repeat_time = repeat_time;
+                this.remaining_time = start_delay;
+            }
+        }
+
+
+        // member variables.
+        private static int next_id_ = 0;
+        private object lock_ = new object();
+        private Dictionary<int, Item> original_ = new Dictionary<int, Item>();
+        private Dictionary<int, Item> pending_ = new Dictionary<int, Item>();
+        private List<int> removing_ = new List<int>();
+        private bool is_all_clear_ = false;
+    }
+
+
     internal class FunapiUtils
     {
 #if !NO_UNITY
@@ -277,183 +602,5 @@ namespace Fun
         private static string announcement_url_ = null;
         private static int ping_interval_ = -1;
         private static float ping_timeout_seconds_ = -1f;
-    }
-
-
-    // Timer
-    internal class FunapiTimer
-    {
-        public void AddTimer (string name, float delay, bool loop, EventHandler callback, object param = null)
-        {
-            AddTimer(name, 0f, delay, loop, callback, param);
-        }
-
-        public void AddTimer (string name, float start, EventHandler callback, object param = null)
-        {
-            AddTimer(name, start, 0f, false, callback, param);
-        }
-
-        public void AddTimer (string name, float start, float delay, bool loop, EventHandler callback, object param = null)
-        {
-            if (callback == null)
-            {
-                DebugUtils.LogWarning("AddTimer - '{0}' timer's callback is null.", name);
-                return;
-            }
-
-            if (pending_list_.ContainsKey(name))
-            {
-                DebugUtils.LogWarning("AddTimer - '{0}' timer already exists.", name);
-                return;
-            }
-
-            if (timer_list_.ContainsKey(name))
-            {
-                if (!is_all_clear_ && !remove_list_.Contains(name))
-                {
-                    DebugUtils.LogWarning("AddTimer - '{0}' timer already exists.", name);
-                    return;
-                }
-            }
-
-            pending_list_.Add(name, new Event(name, start, delay, loop, callback, param));
-            DebugUtils.DebugLog("AddTimer - '{0}' timer added.", name);
-        }
-
-        public void KillTimer (string name)
-        {
-            if (!timer_list_.ContainsKey(name) && !pending_list_.ContainsKey(name))
-                return;
-
-            if (pending_list_.ContainsKey(name))
-            {
-                pending_list_.Remove(name);
-            }
-            else if (!remove_list_.Contains(name))
-            {
-                remove_list_.Add(name);
-            }
-            else
-            {
-                return;
-            }
-
-            DebugUtils.DebugLog("KillTimer - '{0}' timer removed.", name);
-        }
-
-        public bool ContainTimer (string name)
-        {
-            return timer_list_.ContainsKey(name) || pending_list_.ContainsKey(name);
-        }
-
-        public int Count
-        {
-            get { return timer_list_.Count + pending_list_.Count; }
-        }
-
-        public void Clear ()
-        {
-            is_all_clear_ = true;
-        }
-
-        public void Update ()
-        {
-            if (is_all_clear_)
-            {
-                DebugUtils.DebugLog("Clear all timer. ({0})", Count);
-                timer_list_.Clear();
-                pending_list_.Clear();
-                remove_list_.Clear();
-                is_all_clear_ = false;
-                return;
-            }
-
-            CheckRemoveList();
-
-            // Adds timer
-            if (pending_list_.Count > 0)
-            {
-                foreach (Event e in pending_list_.Values)
-                {
-                    timer_list_.Add(e.name, e);
-                }
-
-                pending_list_.Clear();
-            }
-
-            if (timer_list_.Count <= 0)
-                return;
-
-            // Updates timer
-            float delta = FunapiManager.deltaTime;
-            foreach (Event e in timer_list_.Values)
-            {
-                e.remaining -= delta;
-                if (e.remaining <= 0f)
-                {
-                    if (remove_list_.Contains(e.name))
-                        continue;
-
-                    if (e.loop)
-                        e.remaining = e.interval;
-                    else
-                        remove_list_.Add(e.name);
-
-                    e.callback(e.param);
-                }
-            }
-
-            CheckRemoveList();
-        }
-
-        // Removes timer
-        private void CheckRemoveList ()
-        {
-            if (remove_list_.Count <= 0)
-                return;
-
-            foreach (string name in remove_list_)
-            {
-                if (timer_list_.ContainsKey(name))
-                {
-                    timer_list_.Remove(name);
-                }
-                else if (pending_list_.ContainsKey(name))
-                {
-                    pending_list_.Remove(name);
-                }
-            }
-
-            remove_list_.Clear();
-        }
-
-
-        public delegate void EventHandler (object param);
-
-        class Event
-        {
-            public string name;
-            public bool loop;
-            public float remaining;
-            public float interval;
-            public EventHandler callback;
-            public object param;
-
-            public Event (string name, float start, float delay, bool loop, EventHandler callback, object param)
-            {
-                this.name = name;
-                this.loop = loop;
-                this.interval = delay;
-                this.remaining = start;
-                this.callback = callback;
-                this.param = param;
-            }
-        }
-
-
-        private Dictionary<string, Event> timer_list_ = new Dictionary<string, Event>();
-        private Dictionary<string, Event> pending_list_ = new Dictionary<string, Event>();
-        private List<string> remove_list_ = new List<string>();
-        private bool is_all_clear_ = false;
     }
 }

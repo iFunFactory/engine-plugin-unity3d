@@ -35,12 +35,10 @@ namespace Fun
     }
 
 
-    public class FunapiHttpDownloader
+    public class FunapiHttpDownloader : FunapiUpdater
     {
         public FunapiHttpDownloader ()
         {
-            manager_ = FunapiManager.instance;
-
             // List file handler
             web_client_.DownloadDataCompleted += new DownloadDataCompletedEventHandler(DownloadDataCompleteCb);
 
@@ -96,6 +94,7 @@ namespace Fun
                 total_download_count_ = 0;
                 total_download_size_ = 0;
 
+                CreateUpdater();
                 LoadCachedList();
 
                 // Gets list file
@@ -164,6 +163,9 @@ namespace Fun
                 {
                     state_ = State.Downloading;
                     check_time_ = DateTime.Now;
+                    retry_download_count_ = 0;
+
+                    CreateUpdater();
                     DownloadResourceFile();
                 }
             }
@@ -188,14 +190,14 @@ namespace Fun
                     web_client_.CancelAsync();
                     downloading_ticks_ += (DateTime.Now.Ticks - check_time_.Ticks);
                     DebugUtils.Log("Downloading paused.");
-
-                    OnFinishedCallback(DownloadResult.FAILED);
                 }
                 else
                 {
                     state_ = State.None;
                     DebugUtils.Log("Downloading stopped.");
                 }
+
+                OnFinishedCallback(DownloadResult.FAILED);
             }
             finally
             {
@@ -361,7 +363,7 @@ namespace Fun
 
                             verify_file_list.Add(file.path);
 
-                            MD5Async.Compute(ref path, ref item, delegate (string p, DownloadFileInfo f, bool is_match)
+                            MD5Async.Compute(mono, ref path, ref item, delegate (string p, DownloadFileInfo f, bool is_match)
                             {
                                 if (VerifyCallback != null)
                                     VerifyCallback(p);
@@ -413,7 +415,7 @@ namespace Fun
                         verify_file_list.Add(file.path);
 
                         string path = target_path_ + file.path;
-                        MD5Async.Compute(ref path, ref item, delegate (string p, DownloadFileInfo f, bool is_match)
+                        MD5Async.Compute(mono, ref path, ref item, delegate (string p, DownloadFileInfo f, bool is_match)
                         {
                             if (VerifyCallback != null)
                                 VerifyCallback(p);
@@ -557,7 +559,6 @@ namespace Fun
 
                 // Requests a file.
                 DebugUtils.Log("Download file - {0}", file_path);
-                retry_download_count_ = 0;
                 cur_download_path_ = Path.GetDirectoryName(file_path);
                 cur_download_path_ += "/" + Path.GetRandomFileName();
 
@@ -627,8 +628,7 @@ namespace Fun
                         }
 
                         // Checks files
-                        manager_.AddEvent(() =>
-                            manager_.StartCoroutine(CheckFileList(download_list_)));
+                        event_list.Add(() => mono.StartCoroutine(CheckFileList(download_list_)));
                     }
                 }
             }
@@ -692,6 +692,7 @@ namespace Fun
                         File.Move(cur_download_path_, path);
 
                         ++cur_download_count_;
+                        retry_download_count_ = 0;
                         cur_download_size_ += info.size;
                         download_list_.Remove(info);
                         cached_list_.Add(info);
@@ -718,8 +719,7 @@ namespace Fun
                 if (retry_download_count_ < kMaxRetryCount)
                 {
                     ++retry_download_count_;
-                    manager_.AddEvent(() =>
-                        manager_.StartCoroutine(RetryDownloadFile()));
+                    event_list.Add(() => mono.StartCoroutine(RetryDownloadFile()));
                 }
                 else
                 {
@@ -740,6 +740,8 @@ namespace Fun
 
         private void OnFinishedCallback (DownloadResult code)
         {
+            event_list.Add(ReleaseUpdater);
+
             if (FinishedCallback != null)
                 FinishedCallback(code);
         }
@@ -781,7 +783,6 @@ namespace Fun
         private UInt64 total_download_size_ = 0;
         private int retry_download_count_ = 0;
 
-        private FunapiManager manager_ = null;
         private Mutex mutex_ = new Mutex();
         private DateTime check_time_;
         private long downloading_ticks_ = 0;

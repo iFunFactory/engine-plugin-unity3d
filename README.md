@@ -11,6 +11,12 @@ Funapi plugin
 
 Funapi plugin의 업데이트 내용입니다.
 
+### 02/15/2016 (ver.136)
+- 매 프레임마다 업데이트가 필요한 객체들이 스스로 업데이트할 수 있도록 변경 (FunapiNetwork, FunapiDownloader 등)
+- FunapiNetwork.Update를 Obsolete 처리 함 (May 2016 에 삭제 예정)
+- Thread에 안전한 이벤트 콜백 함수를 관리하기 위해 ThreadSafeEventList 추가 (기존 FunapiTimer 삭제)
+- FunapiManager 삭제
+
 ### 01/27/2016 (ver.135)
 - Multicast 채널에서 누군가 퇴장해서 Leave 메시지를 받으면 무조건 채널 메시지 핸들러가 삭제되는 버그 수정
 
