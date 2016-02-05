@@ -15,11 +15,11 @@ using Fun;
 
 public class MD5Async
 {
-    public static void Compute (ref string path, ref DownloadFileInfo file, OnResult on_result)
+    public static void Compute (MonoBehaviour mono, ref string path, ref DownloadFileInfo file, OnResult on_result)
     {
         if (File.Exists(path))
         {
-            FunapiManager.instance.StartCoroutine(AsyncCompute(path, file, on_result));
+            mono.StartCoroutine(AsyncCompute(path, file, on_result));
             return;
         }
 

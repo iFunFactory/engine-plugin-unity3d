@@ -260,7 +260,7 @@ namespace Fun
                 Stop();
             }
 
-            AddToEventQueue(
+            event_.Add(
                 delegate {
                     cstate_ = ConnectState.kRedirecting;
                     Connect(addr);
@@ -312,12 +312,12 @@ namespace Fun
             DebugUtils.Log("Wait {0} seconds for connect to {1} transport.",
                            delay_time, str_protocol);
 
-            timer_.AddTimer(kTryConnectTimerId, delay_time,
-                delegate (object param) {
+            event_.Add (delegate {
                     DebugUtils.Log("'{0}' Try to connect to server.", str_protocol);
                     SetNextAddress();
                     Connect();
-                }
+                },
+                delay_time
             );
 
             return true;
@@ -342,63 +342,27 @@ namespace Fun
             DebugUtils.Log("Wait {0} seconds for reconnect to {1} transport.",
                            delay_time, str_protocol);
 
-            AddToEventQueue(delegate {
-                    timer_.AddTimer(kTryReconnectTimerId, delay_time,
-                        delegate (object param) {
-                            DebugUtils.Log("'{0}' Try to reconnect to server.", str_protocol);
-                            Start();
-                        }
-                    );
-                }
+            event_.Add (delegate {
+                    DebugUtils.Log("'{0}' Try to reconnect to server.", str_protocol);
+                    Start();
+                },
+                delay_time
             );
 
             return true;
         }
 
         // Update
-        internal virtual void Update()
+        public void Update (float deltaTime)
         {
-            // Timer
-            timer_.Update();
-
             // Events
-            Queue<DelegateEventHandler> queue = null;
-
-            lock (event_lock_)
-            {
-                if (event_queue_.Count > 0)
-                {
-                    queue = event_queue_;
-                    event_queue_ = new Queue<DelegateEventHandler>();
-                }
-            }
-
-            if (queue != null)
-            {
-                foreach (DelegateEventHandler func in queue)
-                {
-                    func();
-                }
-            }
-        }
-
-        internal void AddToEventQueue (DelegateEventHandler handler)
-        {
-            if (handler == null)
-            {
-                DebugUtils.Log("AddToEventQueue - handler is null.");
-                return;
-            }
-
-            lock (event_lock_)
-            {
-                event_queue_.Enqueue(handler);
-            }
+            event_.Update(deltaTime);
+            timer_.Update(deltaTime);
         }
 
         internal void AddFailureCallback (FunapiMessage fun_msg)
         {
-            AddToEventQueue(delegate {
+            event_.Add(delegate {
                     OnMessageFailureCallback(fun_msg);
                     OnFailureCallback();
                 }
@@ -414,6 +378,7 @@ namespace Fun
         {
             get { return last_error_message_; }
         }
+
 
         //---------------------------------------------------------------------
         // Callback-related functions
@@ -461,7 +426,7 @@ namespace Fun
                 StoppedCallback(protocol_);
             }
 
-            AddToEventQueue(CheckConnectState);
+            event_.Add(CheckConnectState);
         }
 
         internal void OnDisconnected ()
@@ -568,12 +533,7 @@ namespace Fun
         }
 
 
-        internal delegate void DelegateEventHandler();
-
         // constants.
-        private static readonly string kTryConnectTimerId = "try_connect";
-        private static readonly string kTryReconnectTimerId = "try_reconnect";
-
         private static readonly int kMaxReconnectCount = 3;
         private static readonly float kMaxConnectingTime = 120f;
         private static readonly float kFixedConnectWaitTime = 10f;
@@ -613,9 +573,8 @@ namespace Fun
         // member variables.
         internal State state_;
         internal TransportProtocol protocol_;
-        internal FunapiTimer timer_ = new FunapiTimer();
-        internal object event_lock_ = new object();
-        internal Queue<DelegateEventHandler> event_queue_ = new Queue<DelegateEventHandler>();
+        internal ThreadSafeEventList event_ = new ThreadSafeEventList();
+        internal ThreadSafeEventList timer_ = new ThreadSafeEventList();
     }
 
 
@@ -652,15 +611,15 @@ namespace Fun
 
                 if (ConnectTimeout > 0f)
                 {
-                    timer_.KillTimer(kConnectTimeoutTimerId);
-                    timer_.AddTimer(kConnectTimeoutTimerId, ConnectTimeout,
-                        delegate (object param) {
+                    timer_.Remove(connect_timeout_id_);
+                    connect_timeout_id_ = timer_.Add (delegate {
                             if (state_ == State.kUnknown || state_ == State.kEstablished)
                                 return;
 
                             DebugUtils.Log("{0} Connection waiting time has been exceeded.", str_protocol);
                             OnConnectionTimeout();
-                        }
+                        },
+                        ConnectTimeout
                     );
                 }
 
@@ -671,7 +630,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kConnectFailed;
                 last_error_message_ = "Failure in Start: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -684,7 +643,9 @@ namespace Fun
             state_ = State.kUnknown;
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
+
             timer_.Clear();
+            connect_timeout_id_ = 0;
 
             OnStopped();
         }
@@ -708,7 +669,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kInvalidEncryption;
                 last_error_message_ = "Failed to create encryptor: " + encryption;
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
                 return;
             }
 
@@ -1138,7 +1099,7 @@ namespace Fun
                     state_ = State.kConnected;
                     DebugUtils.Log("Ready to receive.");
 
-                    AddToEventQueue(OnHandshakeComplete);
+                    event_.Add(OnHandshakeComplete);
                 }
             }
 
@@ -1185,6 +1146,9 @@ namespace Fun
                 {
                     first_receiving_ = false;
                     cstate_ = ConnectState.kConnected;
+
+                    timer_.Remove(connect_timeout_id_);
+                    connect_timeout_id_ = 0;
                 }
 
                 ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
@@ -1264,9 +1228,6 @@ namespace Fun
         }
 
 
-        // Timer-related constants
-        private static readonly string kConnectTimeoutTimerId = "connect_timeout";
-
         // Buffer-related constants.
         internal static readonly int kUnitBufferSize = 65536;
 
@@ -1293,6 +1254,7 @@ namespace Fun
         internal Dictionary<EncryptionType, Encryptor> encryptors_ = new Dictionary<EncryptionType, Encryptor>();
 
         // Message-related.
+        private int connect_timeout_id_ = 0;
         private bool first_sending_ = true;
         private bool first_receiving_ = true;
         internal bool header_decoded_ = false;
@@ -1418,7 +1380,7 @@ namespace Fun
                     last_error_code_ = ErrorCode.kConnectFailed;
                     last_error_message_ = "Failed to connect.";
                     DebugUtils.Log(last_error_message_);
-                    AddToEventQueue(OnFailure);
+                    event_.Add(OnFailure);
                     return;
                 }
                 DebugUtils.Log("Connected.");
@@ -1444,7 +1406,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kConnectFailed;
                 last_error_message_ = "Failure in StartCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -1523,7 +1485,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -1582,7 +1544,7 @@ namespace Fun
                         last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         DebugUtils.Log(last_error_message_);
-                        AddToEventQueue(OnDisconnected);
+                        event_.Add(OnDisconnected);
                     }
                 }
             }
@@ -1602,7 +1564,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -1765,7 +1727,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -1823,7 +1785,7 @@ namespace Fun
                         last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         DebugUtils.Log(last_error_message_);
-                        AddToEventQueue(OnFailure);
+                        event_.Add(OnFailure);
                     }
                 }
             }
@@ -1837,7 +1799,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -1860,6 +1822,8 @@ namespace Fun
             ip_list_.Add(hostname_or_ip, port, https);
             SetNextAddress();
         }
+
+        internal MonoBehaviour mono { set; private get; }
 
         internal override void Stop()
         {
@@ -1978,11 +1942,15 @@ namespace Fun
                         headers.Add(kCookieHeaderField, str_cookie_);
 
                     // Sets timeout timer
-                    timer_.KillTimer(kTimeoutTimerId);
-                    timer_.AddTimer(kTimeoutTimerId, kTimeoutSeconds, OnRequestTimeout, body.msg_type);
+                    timer_.Remove(request_timeout_id_);
+                    request_timeout_id_ = timer_.Add (delegate {
+                            OnRequestTimeout(body.msg_type);
+                        },
+                        kTimeoutSeconds
+                    );
 
-                    // Sending a message
 #if !NO_UNITY
+                    // Sending a message
                     if (using_www_)
                     {
                         SendWWWRequest(headers, body);
@@ -1999,7 +1967,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -2010,13 +1978,11 @@ namespace Fun
 
             if (body.buffer.Count > 0)
             {
-                FunapiManager.instance.StartCoroutine(
-                    WWWPost(new WWW(host_url_, body.buffer.Array, headers)));
+                mono.StartCoroutine(WWWPost(new WWW(host_url_, body.buffer.Array, headers)));
             }
             else
             {
-                FunapiManager.instance.StartCoroutine(
-                    WWWPost(new WWW(host_url_, null, headers)));
+                mono.StartCoroutine(WWWPost(new WWW(host_url_, null, headers)));
             }
         }
 #endif
@@ -2140,7 +2106,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -2171,7 +2137,7 @@ namespace Fun
                 else
                 {
                     DebugUtils.Log("Failed response. status:{0}", response.StatusDescription);
-                    AddToEventQueue(OnFailure);
+                    event_.Add(OnFailure);
                 }
             }
             catch (WebException e)
@@ -2185,7 +2151,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -2218,7 +2184,7 @@ namespace Fun
                     if (ws.response == null)
                     {
                         DebugUtils.LogWarning("Response instance is null.");
-                        AddToEventQueue(OnFailure);
+                        event_.Add(OnFailure);
                         return;
                     }
 
@@ -2245,7 +2211,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 
@@ -2302,7 +2268,7 @@ namespace Fun
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in WWWPost: " + e.ToString();
                 DebugUtils.Log(last_error_message_);
-                AddToEventQueue(OnFailure);
+                event_.Add(OnFailure);
             }
         }
 #endif
@@ -2342,13 +2308,14 @@ namespace Fun
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
-            timer_.KillTimer(kTimeoutTimerId);
+            timer_.Remove(request_timeout_id_);
+            request_timeout_id_ = 0;
         }
 
-        private void OnRequestTimeout (object param)
+        private void OnRequestTimeout (string msg_type)
         {
             last_error_code_ = ErrorCode.kRequestTimeout;
-            last_error_message_ = string.Format("Http Request timeout - msg_type:{0}", (string)param);
+            last_error_message_ = string.Format("Http Request timeout - msg_type:{0}", msg_type);
             DebugUtils.Log(last_error_message_);
             OnFailure();
         }
@@ -2367,7 +2334,6 @@ namespace Fun
         private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
 
         // waiting time for response
-        private static readonly string kTimeoutTimerId = "http_request_timeout";
         private static readonly float kTimeoutSeconds = 30f;
 
         // Response-related.
@@ -2387,6 +2353,7 @@ namespace Fun
         // member variables.
         private string host_url_;
         private string str_cookie_;
+        private int request_timeout_id_ = 0;
 
         // WWW-related member variables.
 #if !NO_UNITY

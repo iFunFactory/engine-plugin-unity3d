@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 135;
+        public static readonly int kPluginVersion = 136;
     }
 
     // Sending message-related class.
@@ -65,7 +65,7 @@ namespace Fun
 
 
     // Driver to use Funapi network plugin.
-    public class FunapiNetwork
+    public class FunapiNetwork : FunapiUpdater
     {
         public FunapiNetwork (bool session_reliability = false)
         {
@@ -80,7 +80,6 @@ namespace Fun
             message_handlers_[kSessionClosedMessageType] = this.OnSessionTimedout;
             message_handlers_[kMaintenanceMessageType] = this.OnMaintenanceMessage;
 
-            FunapiManager.instance.Create();
             InitSession();
         }
 
@@ -208,10 +207,10 @@ namespace Fun
             lock (state_lock_)
             {
                 state_ = State.kStarted;
+                CreateUpdater();
             }
 
-            FunapiManager.instance.AddEvent(() =>
-            {
+            event_list.Add (delegate {
                 DebugUtils.Log("Starting a network module.");
 
                 lock (transports_lock_)
@@ -230,7 +229,7 @@ namespace Fun
             stop_with_clear_ = clear_all;
 
             // Checks transport state
-            if (!FunapiManager.instance.IsForcedQuit)
+            if (!is_application_quit)
             {
                 lock (transports_lock_)
                 {
@@ -239,7 +238,7 @@ namespace Fun
                         if (transport.IsConnecting)
                         {
                             state_ = State.kWaitForStop;
-                            DebugUtils.Log("Wait the connection is complete...");
+                            DebugUtils.DebugLog("Wait the connection is complete...");
                             return;
                         }
                     }
@@ -288,6 +287,7 @@ namespace Fun
                 lock (state_lock_)
                 {
                     state_ = State.kUnknown;
+                    ReleaseUpdater();
                 }
             }
         }
@@ -319,14 +319,18 @@ namespace Fun
             StopTransport(protocol);
         }
 
-
-        //---------------------------------------------------------------------
-        // Updates FunapiNetwork
-        // Please call this Update function inside your Unity3d Update.
-        //---------------------------------------------------------------------
-        public void Update()
+        // This function is no longer used.
+        [System.Obsolete("This will be deprecated May 2016. " +
+                         "FunapiNetwork will update itself. You don't have to call this function anymore.")]
+        public void Update ()
         {
-            timer_.Update();
+        }
+
+        // Updates FunapiNetwork
+        protected override bool Update (float deltaTime)
+        {
+            if (!base.Update(deltaTime))
+                return false;
 
             lock (transports_lock_)
             {
@@ -335,7 +339,7 @@ namespace Fun
                     foreach (FunapiTransport transport in transports_.Values)
                     {
                         if (transport != null)
-                            transport.Update();
+                            transport.Update(deltaTime);
                     }
                 }
             }
@@ -355,13 +359,13 @@ namespace Fun
                         if (expected_replies_.Count > 0)
                             expected_replies_.Clear();
                     }
-                    return;
+                    return true;
                 }
 
                 if (state_ == State.kWaitForStop)
                 {
                     Stop(stop_with_clear_);
-                    return;
+                    return true;
                 }
             }
 
@@ -381,12 +385,12 @@ namespace Fun
                 }
                 else if (state_ == State.kConnected && ResponseTimeout > 0f)
                 {
-                    response_timer_ += FunapiManager.deltaTime;
+                    response_timer_ += deltaTime;
                     if (response_timer_ >= ResponseTimeout)
                     {
                         DebugUtils.LogWarning("Response timeout. disconnect to server...");
                         Stop(!session_reliability_);
-                        return;
+                        return true;
                     }
                 }
             }
@@ -404,7 +408,7 @@ namespace Fun
                         int remove_count = 0;
                         foreach (FunapiMessage exp in item.Value)
                         {
-                            exp.reply_timeout -= FunapiManager.deltaTime;
+                            exp.reply_timeout -= deltaTime;
                             if (exp.reply_timeout <= 0f)
                             {
                                 DebugUtils.Log("'{0}' message waiting time has been exceeded.", exp.msg_type);
@@ -449,6 +453,8 @@ namespace Fun
                     }
                 }
             }
+
+            return true;
         }
 
 
@@ -468,6 +474,11 @@ namespace Fun
                     strlog.Append(" You should call DetachTransport first.");
                     DebugUtils.LogWarning(strlog.ToString());
                     return;
+                }
+
+                if (transport.Protocol == TransportProtocol.kHttp)
+                {
+                    ((FunapiHttpTransport)transport).mono = mono;
                 }
 
                 // Callback functions
@@ -1553,8 +1564,8 @@ namespace Fun
             if (transport.Protocol != TransportProtocol.kTcp)
                 return;
 
-            string timer_id = string.Format("{0}_ping", transport.str_protocol);
-            timer_.AddTimer(timer_id, transport.PingIntervalSeconds, true, OnPingTimerEvent, transport.Protocol);
+            ping_timer_id_ = event_list.Add (() => OnPingTimerEvent(transport.Protocol),
+                                             true, transport.PingIntervalSeconds);
             transport.PingWaitTime = 0f;
 
             DebugUtils.Log("Start ping - interval seconds: {0}, timeout seconds: {1}",
@@ -1566,11 +1577,9 @@ namespace Fun
             if (transport.Protocol != TransportProtocol.kTcp)
                 return;
 
+            event_list.Remove(ping_timer_id_);
+            ping_timer_id_ = 0;
             transport.PingTime = 0;
-
-            string timer_id = string.Format("{0}_ping", transport.str_protocol);
-            if (timer_.ContainTimer(timer_id))
-                timer_.KillTimer(timer_id);
         }
 
         private void SendPingMessage (FunapiTransport transport)
@@ -1600,9 +1609,9 @@ namespace Fun
             DebugUtils.DebugLog("Send {0} ping - timestamp: {1}", transport.str_protocol, timestamp);
         }
 
-        private void OnPingTimerEvent (object param)
+        private void OnPingTimerEvent (TransportProtocol protocol)
         {
-            FunapiTransport transport = GetTransport((TransportProtocol)param);
+            FunapiTransport transport = GetTransport(protocol);
             if (transport == null)
                 return;
 
@@ -1762,7 +1771,6 @@ namespace Fun
         private State state_;
         private string session_id_ = "";
         private object state_lock_ = new object();
-        private FunapiTimer timer_ = new FunapiTimer();
         private float response_timer_ = 0f;
         private bool stop_with_clear_ = false;
 
@@ -1785,6 +1793,7 @@ namespace Fun
         private FunMessageSerializer serializer_;
         private Type recv_type_;
         private DateTime last_received_ = DateTime.Now;
+        private int ping_timer_id_ = 0;
         private object message_lock_ = new object();
         private object expected_reply_lock = new object();
         private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();

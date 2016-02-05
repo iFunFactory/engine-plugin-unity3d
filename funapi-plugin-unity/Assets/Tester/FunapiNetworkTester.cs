@@ -29,12 +29,6 @@ public class FunapiNetworkTester : MonoBehaviour
         //FunapiConfig.Load("Config.json");
     }
 
-    void Update()
-    {
-        if (network_ != null)
-            network_.Update();
-    }
-
     void OnApplicationQuit()
     {
         if (network_ != null)
