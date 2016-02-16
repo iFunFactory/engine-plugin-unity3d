@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 138;
+        public static readonly int kPluginVersion = 139;
     }
 
     // Sending message-related class.
@@ -204,8 +204,9 @@ namespace Fun
             lock (state_lock_)
             {
                 state_ = State.kStarted;
-                CreateUpdater();
             }
+
+            CreateUpdater();
 
             event_list.Add (delegate {
                 DebugUtils.Log("Starting a network module.");
@@ -267,6 +268,8 @@ namespace Fun
 
             DebugUtils.Log("Stopping a network module.");
 
+            ReleaseUpdater();
+
             // Stops all transport
             lock (transports_lock_)
             {
@@ -284,7 +287,6 @@ namespace Fun
                 lock (state_lock_)
                 {
                     state_ = State.kUnknown;
-                    ReleaseUpdater();
                 }
             }
         }
