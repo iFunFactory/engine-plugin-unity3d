@@ -8,7 +8,11 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Security.Cryptography;
+#if !NO_UNITY
 using UnityEngine;
+#else
+using System.Threading;
+#endif
 
 using Fun;
 
@@ -19,7 +23,13 @@ public class MD5Async
     {
         if (File.Exists(path))
         {
+#if !NO_UNITY
             mono.StartCoroutine(AsyncCompute(path, file, on_result));
+#else
+            string path_ = path;
+            DownloadFileInfo file_ = file;
+            mono.StartCoroutine(delegate { AsyncCompute(path_, file_, on_result); });
+#endif
             return;
         }
 
@@ -28,7 +38,11 @@ public class MD5Async
             on_result(path, file, false);
     }
 
+#if !NO_UNITY
     static IEnumerator AsyncCompute (string path, DownloadFileInfo file, OnResult on_result)
+#else
+    static void AsyncCompute (string path, DownloadFileInfo file, OnResult on_result)
+#endif
     {
         MD5 md5 = MD5.Create();
         int length, read_bytes;
@@ -51,14 +65,20 @@ public class MD5Async
                     if (on_result != null)
                         on_result(path, file, md5hash == file.hash_front && md5hash == file.hash);
 
+#if !NO_UNITY
                     yield break;
+#else
+                    return;
+#endif
                 }
 
                 md5.Clear();
                 md5 = MD5.Create();
                 stream.Position = 0;
 
+#if !NO_UNITY
                 yield return new WaitForEndOfFrame();
+#endif
             }
 
             int sleep_count = 0;
@@ -79,7 +99,11 @@ public class MD5Async
 
                 ++sleep_count;
                 if (sleep_count % kMaxSleepCount == 0)
+#if !NO_UNITY
                     yield return new WaitForEndOfFrame();
+#else
+                    Thread.Sleep(30);
+#endif
             }
         }
         else

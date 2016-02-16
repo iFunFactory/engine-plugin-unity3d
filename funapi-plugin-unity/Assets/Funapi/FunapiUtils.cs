@@ -19,9 +19,10 @@ namespace Fun
     {
         protected void CreateUpdater ()
         {
+#if !NO_UNITY
             if (game_object_ != null)
             {
-                DebugUtils.Log("'{0}' GameObject is already exists.", game_object_.name);
+                DebugUtils.DebugLog("'{0}' GameObject is already exists.", game_object_.name);
                 return;
             }
 
@@ -37,18 +38,32 @@ namespace Fun
 
                 DebugUtils.DebugLog("'{0}' GameObject was created.", game_object_.name);
             }
+#else
+            funapi_object_ = new FunapiObject();
+            funapi_object_.Updater = Update;
+#endif
         }
 
         protected void ReleaseUpdater ()
         {
+#if !NO_UNITY
             if (game_object_ == null)
                 return;
 
             DebugUtils.DebugLog("'{0}' GameObject was destroyed", game_object_.name);
             GameObject.Destroy(game_object_);
             game_object_ = null;
+#endif
             funapi_object_ = null;
         }
+
+#if NO_UNITY
+        public void UpdateFrame ()
+        {
+            if (funapi_object_ != null)
+                funapi_object_.Update();
+        }
+#endif
 
         protected virtual bool Update (float deltaTime)
         {
@@ -81,6 +96,7 @@ namespace Fun
         // For use a MonoBehaviour
         class FunapiObject : MonoBehaviour
         {
+#if !NO_UNITY
             void Awake ()
             {
                 prev_ticks_ = DateTime.UtcNow.Ticks;
@@ -103,6 +119,12 @@ namespace Fun
             {
                 is_application_quit_ = true;
             }
+#else
+            public void Update ()
+            {
+                Updater(0.03f);
+            }
+#endif
 
             public Func<float, bool> Updater
             {
@@ -114,12 +136,16 @@ namespace Fun
                 get { return is_application_quit_; }
             }
 
+#if !NO_UNITY
             private long prev_ticks_ = 0;
             private float deltaTime_ = 0f;
+#endif
             private bool is_application_quit_ = false;
         }
 
+#if !NO_UNITY
         private GameObject game_object_ = null;
+#endif
         private FunapiObject funapi_object_ = null;
         private ThreadSafeEventList event_ = new ThreadSafeEventList();
     }
@@ -342,7 +368,6 @@ namespace Fun
 
     internal class FunapiUtils
     {
-#if !NO_UNITY
         // Gets local path
         public static string GetLocalDataPath
         {
@@ -350,6 +375,7 @@ namespace Fun
             {
                 if (path_ == null)
                 {
+#if !NO_UNITY
                     if (Application.platform == RuntimePlatform.IPhonePlayer)
                     {
                         string path = Application.dataPath.Substring(0, Application.dataPath.Length - 5); // Strip "/Data" from path
@@ -365,6 +391,9 @@ namespace Fun
                         string path = Application.dataPath;
                         path_ = path.Substring(0, path.LastIndexOf('/'));
                     }
+#else
+                    path_ = "";
+#endif
                 }
 
                 return path_;
@@ -372,7 +401,6 @@ namespace Fun
         }
 
         private static string path_ = null;
-#endif
     }
 
 
@@ -603,4 +631,14 @@ namespace Fun
         private static int ping_interval_ = -1;
         private static float ping_timeout_seconds_ = -1f;
     }
+
+#if NO_UNITY
+    public class MonoBehaviour
+    {
+        public void StartCoroutine (Action func)
+        {
+            func();
+        }
+    }
+#endif
 }
