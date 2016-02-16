@@ -14,7 +14,9 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 
 namespace Fun
@@ -305,7 +307,11 @@ namespace Fun
         }
 
         // Checks download file list
+#if !NO_UNITY
         private IEnumerator CheckFileList (List<DownloadFileInfo> list)
+#else
+        private void CheckFileList (List<DownloadFileInfo> list)
+#endif
         {
             List<DownloadFileInfo> tmp_list = new List<DownloadFileInfo>(list);
             List<string> verify_file_list = new List<string>();
@@ -397,7 +403,11 @@ namespace Fun
 
             while (verify_file_list.Count > 0)
             {
+#if !NO_UNITY
                 yield return new WaitForSeconds(0.1f);
+#else
+                Thread.Sleep(100);
+#endif
             }
 
             RemoveCachedList(remove_list);
@@ -435,7 +445,11 @@ namespace Fun
 
                 while (verify_file_list.Count > 0)
                 {
+#if !NO_UNITY
                     yield return new WaitForSeconds(0.1f);
+#else
+                    Thread.Sleep(100);
+#endif
                 }
 
                 RemoveCachedList(remove_list);
@@ -628,7 +642,11 @@ namespace Fun
                         }
 
                         // Checks files
+#if !NO_UNITY
                         event_list.Add(() => mono.StartCoroutine(CheckFileList(download_list_)));
+#else
+                        event_list.Add(() => mono.StartCoroutine(() => CheckFileList(download_list_)));
+#endif
                     }
                 }
             }
@@ -719,7 +737,11 @@ namespace Fun
                 if (retry_download_count_ < kMaxRetryCount)
                 {
                     ++retry_download_count_;
+#if !NO_UNITY
                     event_list.Add(() => mono.StartCoroutine(RetryDownloadFile()));
+#else
+                    event_list.Add(() => mono.StartCoroutine(() => RetryDownloadFile()));
+#endif
                 }
                 else
                 {
@@ -728,6 +750,7 @@ namespace Fun
             }
         }
 
+#if !NO_UNITY
         IEnumerator RetryDownloadFile ()
         {
             float time = 1f;
@@ -737,6 +760,17 @@ namespace Fun
 
             DownloadResourceFile();
         }
+#else
+        void RetryDownloadFile ()
+        {
+            int time = 1000;
+            for (int i = 0; i < retry_download_count_; ++i)
+                time *= 2;
+            Thread.Sleep(time);
+
+            DownloadResourceFile();
+        }
+#endif
 
         private void OnFinishedCallback (DownloadResult code)
         {
