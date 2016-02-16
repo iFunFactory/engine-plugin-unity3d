@@ -21,7 +21,7 @@ namespace Fun
         {
             if (game_object_ != null)
             {
-                DebugUtils.Log("'{0}' GameObject is already exist.", game_object_.name);
+                DebugUtils.Log("'{0}' GameObject is already exists.", game_object_.name);
                 return;
             }
 

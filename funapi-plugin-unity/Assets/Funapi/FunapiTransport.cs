@@ -1343,7 +1343,7 @@ namespace Fun
             }
 
             connect_ep_ = new IPEndPoint(ip, addr.port);
-            DebugUtils.Log("SetAddress - {0}:{1}", ip, addr.port);
+            DebugUtils.Log("TCP transport - {0}:{1}", ip, addr.port);
         }
 
         internal override void WireSend()
@@ -1398,7 +1398,7 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.Log("BeginConnect operation has been Cancelled.");
+                DebugUtils.DebugLog("BeginConnect operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)
@@ -1420,7 +1420,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    DebugUtils.DebugLog(last_error_message_);
                     return;
                 }
 
@@ -1477,7 +1477,7 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.Log("BeginSend operation has been Cancelled.");
+                DebugUtils.DebugLog("BeginSend operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)
@@ -1499,7 +1499,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    DebugUtils.DebugLog(last_error_message_);
                     return;
                 }
 
@@ -1550,13 +1550,13 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.Log("BeginReceive operation has been Cancelled.");
+                DebugUtils.DebugLog("BeginReceive operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (NullReferenceException e)
             {
                 // When Stop is called Socket.EndReceive may return a NullReferenceException
-                DebugUtils.Log("BeginReceive operation has been Cancelled.");
+                DebugUtils.DebugLog("BeginReceive operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)
@@ -1638,7 +1638,7 @@ namespace Fun
 
             send_ep_ = new IPEndPoint(ip, addr.port);
             receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr.port);
-            DebugUtils.Log("SetAddress - {0}:{1}", ip, addr.port);
+            DebugUtils.Log("UDP transport - {0}:{1}", ip, addr.port);
         }
 
         // Send a packet.
@@ -1688,7 +1688,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    DebugUtils.DebugLog(last_error_message_);
                     return;
                 }
 
@@ -1719,7 +1719,7 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.Log("BeginSendTo operation has been Cancelled.");
+                DebugUtils.DebugLog("BeginSendTo operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)
@@ -1741,7 +1741,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    DebugUtils.DebugLog(last_error_message_);
                     return;
                 }
 
@@ -1791,7 +1791,7 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.Log("BeginReceiveFrom operation has been Cancelled.");
+                DebugUtils.DebugLog("BeginReceiveFrom operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)
@@ -1889,7 +1889,7 @@ namespace Fun
                                       (http.https ? "https" : "http"), http.host, http.port,
                                       FunapiVersion.kProtocolVersion);
 
-            DebugUtils.Log("SetAddress - {0}:{1}", http.host, http.port);
+            DebugUtils.Log("HTTP transport - {0}:{1}", http.host, http.port);
         }
 
         internal override bool IsSendable
@@ -2098,7 +2098,7 @@ namespace Fun
             catch (WebException e)
             {
                 // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
-                DebugUtils.Log("Http request operation has been Cancelled.");
+                DebugUtils.DebugLog("Http request operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)
@@ -2143,7 +2143,7 @@ namespace Fun
             catch (WebException e)
             {
                 // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
-                DebugUtils.Log("Http request operation has been Cancelled.");
+                DebugUtils.DebugLog("Http request operation has been Cancelled.");
                 DebugUtils.DebugLog(e.ToString());
             }
             catch (Exception e)

@@ -64,7 +64,7 @@ namespace Fun
                 addr_list_.Add(new HostIP(hostname, ip, port));
             }
 
-            DebugUtils.Log("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
+            DebugUtils.DebugLog("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
         }
 
         internal void Add (string hostname, UInt16 port, bool https)
@@ -80,7 +80,7 @@ namespace Fun
                 addr_list_.Add(new HostHttp(ip.ToString(), port, https));
             }
 
-            DebugUtils.Log("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
+            DebugUtils.DebugLog("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
         }
 
         internal void Add (List<HostAddr> list)
