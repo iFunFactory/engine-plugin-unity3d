@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 136;
+        public static readonly int kPluginVersion = 137;
     }
 
     // Sending message-related class.
@@ -116,7 +116,7 @@ namespace Fun
             DebugUtils.Assert(protocol != TransportProtocol.kDefault);
 
             default_protocol_ = protocol;
-            DebugUtils.Log("SetProtocol - default protocol is '{0}'.", protocol);
+            DebugUtils.Log("The default protocol is '{0}'", protocol);
         }
 
         public TransportProtocol GetDefaultProtocol()
@@ -501,7 +501,7 @@ namespace Fun
                     StartTransport(transport);
                 }
 
-                DebugUtils.Log("{0} transport attached.", transport.Protocol);
+                DebugUtils.DebugLog("{0} transport attached.", transport.Protocol);
             }
         }
 
@@ -516,7 +516,7 @@ namespace Fun
                         StopTransport(transport);
 
                     transports_.Remove(protocol);
-                    DebugUtils.Log("{0} transport detached.", protocol);
+                    DebugUtils.DebugLog("{0} transport detached.", protocol);
 
                     if (protocol == default_protocol_)
                     {
@@ -573,7 +573,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            DebugUtils.Log("Stopping {0} transport.", transport.Protocol);
+            DebugUtils.DebugLog("Stopping {0} transport.", transport.Protocol);
 
             StopPingTimer(transport);
 
