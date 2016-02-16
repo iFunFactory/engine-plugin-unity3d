@@ -21,10 +21,7 @@ namespace Fun
         {
 #if !NO_UNITY
             if (game_object_ != null)
-            {
-                DebugUtils.DebugLog("'{0}' GameObject is already exists.", game_object_.name);
                 return;
-            }
 
             game_object_ = new GameObject(GetType().ToString());
             if (game_object_ != null)
@@ -214,7 +211,11 @@ namespace Fun
 
         public void Clear ()
         {
-            is_all_clear_ = true;
+            lock (lock_)
+            {
+                pending_.Clear();
+                is_all_clear_ = true;
+            }
         }
 
         public void Update (float deltaTime)
@@ -227,7 +228,6 @@ namespace Fun
                 if (is_all_clear_)
                 {
                     original_.Clear();
-                    pending_.Clear();
                     removing_.Clear();
                     is_all_clear_ = false;
                     return;
@@ -258,23 +258,16 @@ namespace Fun
                     if (item.remaining_time > 0f)
                     {
                         item.remaining_time -= deltaTime;
-                        if (item.remaining_time <= 0f)
-                        {
-                            if (item.repeat)
-                                item.remaining_time = item.repeat_time;
-                            else
-                                removing_.Add(p.Key);
-
-                            item.callback();
-                        }
+                        if (item.remaining_time > 0f)
+                            continue;
                     }
+
+                    if (item.repeat)
+                        item.remaining_time = item.repeat_time;
                     else
-                    {
-                        if (!item.repeat)
-                            removing_.Add(p.Key);
+                        removing_.Add(p.Key);
 
-                        item.callback();
-                    }
+                    item.callback();
                 }
 
                 CheckRemoveList();
