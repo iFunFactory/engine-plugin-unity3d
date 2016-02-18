@@ -9,7 +9,7 @@ Temp
 *.apk
 *.exe
 *.mdb
-maps.meta
-setting.dat
+*.zip
+plugin-test/*.dll
 funapi-plugin-unity/client_data
 funapi-plugin-unity/announce

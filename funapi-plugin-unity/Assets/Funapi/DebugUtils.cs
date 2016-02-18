@@ -83,22 +83,25 @@ namespace Fun
             Console.WriteLine("Error: " + string.Format(message, args));
         }
 
-        [Conditional("DEBUG_LOG")]
         public static void DebugLog (string message, params object[] args)
         {
+#if DEBUG_LOG
             Console.WriteLine(string.Format(message, args));
+#endif
         }
 
-        [Conditional("DEBUG_LOG")]
         public static void DebugLogWarning (string message, params object[] args)
         {
+#if DEBUG_LOG
             Console.WriteLine("Warning: " + string.Format(message, args));
+#endif
         }
 
-        [Conditional("DEBUG_LOG")]
         public static void DebugLogError (string message, params object[] args)
         {
+#if DEBUG_LOG
             Console.WriteLine("Error: " + string.Format(message, args));
+#endif
         }
 #endif
     }
