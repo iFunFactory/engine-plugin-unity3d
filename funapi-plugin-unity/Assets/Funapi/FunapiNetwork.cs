@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 139;
+        public static readonly int kPluginVersion = 140;
     }
 
     // Sending message-related class.
@@ -1608,7 +1608,11 @@ namespace Fun
             }
 
             transport.PingWaitTime += transport.PingIntervalSeconds;
+#if NO_UNITY
+            DebugUtils.Log("Send {0} ping - timestamp: {1}", transport.str_protocol, timestamp);
+#else
             DebugUtils.DebugLog("Send {0} ping - timestamp: {1}", transport.str_protocol, timestamp);
+#endif
         }
 
         private void OnPingTimerEvent (TransportProtocol protocol)
@@ -1702,8 +1706,13 @@ namespace Fun
 
             transport.PingTime = (int)((DateTime.Now.Ticks - timestamp) / 10000);
 
+#if NO_UNITY
+            DebugUtils.Log("Receive {0} ping - timestamp:{1} time={2} ms",
+                           transport.str_protocol, timestamp, transport.PingTime);
+#else
             DebugUtils.DebugLog("Receive {0} ping - timestamp:{1} time={2} ms",
                                 transport.str_protocol, timestamp, transport.PingTime);
+#endif
         }
 
 
