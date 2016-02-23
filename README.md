@@ -11,11 +11,28 @@ Funapi plugin
 
 Funapi plugin의 업데이트 내용입니다.
 
+```
+기존에는 FunapiNetwork나 FunapiDownloader를 사용할 때 MonoBehaviour 객체의 Update 함수에서 FunapiNetwork와
+FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 136 부터는 Update 함수를 호출할 필요가 없습니다.
+버전 141 부터는 OnApplicationQuit 함수에서 호출해야 했던 Stop 함수도 호출하지 않아도 됩니다.
+현재 136 이전 버전을 사용하고 Update 함수나 OnApplicationQuit 함수에서 Stop 함수를 호출하고 있다면
+플러그인을 업데이트한 후 호출 코드를 삭제해 주시기 바랍니다.
+```
+
+### 02/25/2016 (ver.141)
+- 유니티 에디터 종료시 자동으로 Stop 호출
+  - FunapiNetwork, FunapiDownloader 에 적용
+- C# Runtime Unit Test Code
+- ThreadSafeEventList 업데이트 버그 수정
+- 로그 정리
+
 ### 02/15/2016 (ver.136)
-- 매 프레임마다 업데이트가 필요한 객체들이 스스로 업데이트할 수 있도록 변경 (FunapiNetwork, FunapiDownloader 등)
+- 매 프레임마다 업데이트가 필요한 객체들이 스스로 업데이트할 수 있도록 변경
+  - FunapiUpdater 클래스 추가 (MonoBehaviour 오브젝트를 갖고 있음)
+  - FunapiNetwork, FunapiDownloader 에 적용
 - FunapiNetwork.Update를 Obsolete 처리 함 (May 2016 에 삭제 예정)
-- Thread에 안전한 이벤트 콜백 함수를 관리하기 위해 ThreadSafeEventList 추가 (기존 FunapiTimer 삭제)
-- FunapiManager 삭제
+- Thread에 안전한 이벤트 콜백 함수를 관리하기 위해 ThreadSafeEventList 추가
+- FunapiManager, FunapiTimer 삭제
 
 ### 01/27/2016 (ver.135)
 - Multicast 채널에서 누군가 퇴장해서 Leave 메시지를 받으면 무조건 채널 메시지 핸들러가 삭제되는 버그 수정
@@ -67,26 +84,16 @@ public delegate void ChannelMessage(string channel_id, string sender, object bod
 ### 11/11/2015 (ver.116)
 - Http header 파싱 버그 수정
 
-### 11/09/2015 (ver.115)
+### 11/10/2015 (ver.115)
 - 다운로드 실패시 파일당 3회까지 재시도
 - 파일을 임시 파일로 다운로드 후 다운로드가 완료되면 원래 파일명으로 변경
 - 다운로드 실패로 중지되었을 때 중지된 파일부터 재시도 하는 ContinueDownload 함수 추가
-
-### 11/06/2015 (ver.114)
 - 서버와 연결 후 응답이 지정된 시간 이상 없을 경우 연결을 끊음
 - 문자열에 값을 더하는 방식의 로그를 String format 방식으로 변경
-
-### 10/29/2015 (ver.113)
 - 핑 관련 시간 설정 인터페이스 추가
 - 핑 대기시간 초과시 재연결을 시도하는 코드 삭제 (사용자가 원하는 시점에 재연결을 할 수 있도록 하기 위해)
-
-### 10/08/2015 (ver.112)
 - 서버에서 세션 연결을 끊으면 플러그인도 연결 종료 처리
-
-### 10/05/2015 (ver.111)
 - 로그에 시간 정보 출력, 로그 함수에 String.Format 파라미터 추가
-
-### 10/02/2015 (ver.110)
 - Transport 종료시 더 이상의 재시도를 하지 않을 경우 재시도 카운트 초기화
 - Transport 별로 타이머 생성해서 사용하도록 변경 (기존: 하나의 타이머 공유)
 - Transport 연결 종료시 타이머 목록 초기화

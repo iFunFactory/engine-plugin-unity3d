@@ -207,6 +207,11 @@ namespace Fun
             }
         }
 
+        protected override void OnQuit ()
+        {
+            Stop();
+        }
+
         public bool IsPaused
         {
             get { return state_ == State.Paused; }

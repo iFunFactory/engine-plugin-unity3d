@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 140;
+        public static readonly int kPluginVersion = 141;
     }
 
     // Sending message-related class.
@@ -222,12 +222,12 @@ namespace Fun
         }
 
         // Stops FunapiNetwork
-        public void Stop (bool clear_all = true)
+        public void Stop (bool clear_all = true, bool force_stop = false)
         {
             stop_with_clear_ = clear_all;
 
             // Checks transport state
-            if (!is_application_quit)
+            if (!force_stop)
             {
                 lock (transports_lock_)
                 {
@@ -454,6 +454,11 @@ namespace Fun
             }
 
             return true;
+        }
+
+        protected override void OnQuit ()
+        {
+            Stop(true, true);
         }
 
 
