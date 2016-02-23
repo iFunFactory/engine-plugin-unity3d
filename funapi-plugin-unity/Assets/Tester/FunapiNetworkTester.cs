@@ -29,15 +29,6 @@ public class FunapiNetworkTester : MonoBehaviour
         //FunapiConfig.Load("Config.json");
     }
 
-    void OnApplicationQuit()
-    {
-        if (network_ != null)
-            network_.Stop();
-
-        if (downloader_ != null)
-            downloader_.Stop();
-    }
-
     public void OnGUI()
     {
         //----------------------------------------------------------------------------
@@ -357,25 +348,6 @@ public class FunapiNetworkTester : MonoBehaviour
         else
         {
             network_.Stop();
-        }
-    }
-
-    private void CheckConnection ()
-    {
-        if (network_ == null)
-        {
-            DebugUtils.Log("Failed to make a connection. Network instance was not generated.");
-        }
-        else if (!network_.Connected)
-        {
-            DebugUtils.Log("Failed to make a connection. Stopping the network module.");
-            DebugUtils.Log("Maybe the server is down? Otherwise check out the encryption type.");
-
-            network_.Stop();
-        }
-        else
-        {
-            DebugUtils.Log("Seems network succeeded to make a connection to a server.");
         }
     }
 

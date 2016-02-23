@@ -31,6 +31,7 @@ namespace Fun
                 {
                     funapi_object_ = obj;
                     obj.Updater = Update;
+                    obj.OnQuit = OnQuit;
                 }
 
                 DebugUtils.DebugLog("'{0}' GameObject was created.", game_object_.name);
@@ -38,6 +39,7 @@ namespace Fun
 #else
             funapi_object_ = new FunapiObject();
             funapi_object_.Updater = Update;
+            funapi_object_.OnQuit = OnQuit;
 #endif
         }
 
@@ -68,6 +70,10 @@ namespace Fun
             return true;
         }
 
+        protected virtual void OnQuit ()
+        {
+        }
+
         protected MonoBehaviour mono
         {
             get { return funapi_object_; }
@@ -76,17 +82,6 @@ namespace Fun
         protected ThreadSafeEventList event_list
         {
             get { return event_; }
-        }
-
-        protected bool is_application_quit
-        {
-            get
-            {
-                if (funapi_object_ == null)
-                    return false;
-
-                return funapi_object_.is_application_quit;
-            }
         }
 
 
@@ -114,7 +109,7 @@ namespace Fun
 
             void OnApplicationQuit()
             {
-                is_application_quit_ = true;
+                OnQuit();
             }
 #else
             public void Update ()
@@ -128,16 +123,15 @@ namespace Fun
                 set; private get;
             }
 
-            public bool is_application_quit
+            public Action OnQuit
             {
-                get { return is_application_quit_; }
+                set; private get;
             }
 
 #if !NO_UNITY
             private long prev_ticks_ = 0;
             private float deltaTime_ = 0f;
 #endif
-            private bool is_application_quit_ = false;
         }
 
 #if !NO_UNITY
