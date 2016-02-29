@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 141;
+        public static readonly int kPluginVersion = 142;
     }
 
     // Sending message-related class.
@@ -1266,7 +1266,7 @@ namespace Fun
                 return;
             }
 
-            if (state_ == State.kStopped)
+            if (state_ != State.kConnected)
                 return;
 
             DebugUtils.DebugLog("{0} send ack message - ack:{1}", transport.Protocol, ack);
@@ -1343,16 +1343,18 @@ namespace Fun
 
         private void OnAckReceived (FunapiTransport transport, UInt32 ack)
         {
-            DebugUtils.Assert(session_reliability_);
             if (transport == null)
             {
-                DebugUtils.LogError("OnAckReceived - transport is null.");
+                DebugUtils.LogWarning("OnAckReceived - transport is null.");
                 return;
             }
 
+            if (state_ != State.kConnected)
+                return;
+
+            UInt32 seq = 0;
             while (send_queue_.Count > 0)
             {
-                UInt32 seq;
                 FunapiMessage last_msg = send_queue_.Peek();
                 if (transport.Encoding == FunEncoding.kJson)
                 {
@@ -1384,19 +1386,25 @@ namespace Fun
                 {
                     if (transport.Encoding == FunEncoding.kJson)
                     {
-                        UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
-                        DebugUtils.Assert(seq == ack || SeqLess(seq, ack));
-                        transport.SendMessage(msg);
+                        seq = (UInt32)transport.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
                     }
                     else if (transport.Encoding == FunEncoding.kProtobuf)
                     {
-                        UInt32 seq = (msg.message as FunMessage).seq;
-                        DebugUtils.Assert(seq == ack || SeqLess (seq, ack));
-                        transport.SendMessage(msg);
+                        seq = (msg.message as FunMessage).seq;
                     }
                     else
                     {
                         DebugUtils.Assert(false);
+                        seq = 0;
+                    }
+
+                    if (seq == ack || SeqLess(seq, ack))
+                    {
+                        transport.SendMessage(msg);
+                    }
+                    else
+                    {
+                        DebugUtils.LogWarning("OnAckReceived({0}) - wrong sequence number {1}. ", ack, seq);
                     }
                 }
 
