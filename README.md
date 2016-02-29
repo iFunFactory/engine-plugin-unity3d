@@ -19,6 +19,10 @@ FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 
 플러그인을 업데이트한 후 호출 코드를 삭제해 주시기 바랍니다.
 ```
 
+### 02/29/2016 (ver.142)
+재접속시 이전 메시지의 응답 메시지 처리에 관한 버그 수정
+(session reliability 옵션을 사용하는 tcp 연결에서만 발생)
+
 ### 02/25/2016 (ver.141)
 - 유니티 에디터 종료시 자동으로 Stop 호출
   - FunapiNetwork, FunapiDownloader 에 적용
