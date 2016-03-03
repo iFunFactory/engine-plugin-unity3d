@@ -1579,6 +1579,9 @@ namespace Fun
             if (transport.Protocol != TransportProtocol.kTcp)
                 return;
 
+            if (ping_timer_id_ != 0)
+                event_list.Remove(ping_timer_id_);
+
             ping_timer_id_ = event_list.Add (() => OnPingTimerEvent(transport.Protocol),
                                              true, transport.PingIntervalSeconds);
             transport.PingWaitTime = 0f;
