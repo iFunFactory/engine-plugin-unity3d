@@ -35,9 +35,38 @@ namespace Fun
             set { sender_ = value; }
         }
 
+        public FunEncoding encoding
+        {
+            get { return encoding_; }
+        }
+
         public bool Connected
         {
             get { return network_ != null && network_.Connected; }
+        }
+
+        public void RequestChannelList ()
+        {
+            if (!Connected)
+            {
+                DebugUtils.Log("Not connected. First connect before join a multicast channel.");
+                return;
+            }
+
+            if (encoding_ == FunEncoding.kJson)
+            {
+                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
+                mcast_msg[kSender] = sender_;
+                network_.SendMessage(kMulticastMsgType, mcast_msg);
+            }
+            else
+            {
+                FunMulticastMessage mcast_msg = new FunMulticastMessage ();
+                mcast_msg.sender = sender_;
+
+                FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
+                network_.SendMessage (kMulticastMsgType, fun_msg);
+            }
         }
 
         public bool JoinChannel (string channel_id, ChannelMessage handler)
@@ -254,7 +283,8 @@ namespace Fun
                 DebugUtils.Assert(body is Dictionary<string, object>);
                 Dictionary<string, object> msg = body as Dictionary<string, object>;
 
-                channel_id = msg[kChannelId] as string;
+                if (msg.ContainsKey(kChannelId))
+                    channel_id = msg[kChannelId] as string;
 
                 if (msg.ContainsKey(kSender))
                     sender = msg[kSender] as String;
@@ -262,7 +292,13 @@ namespace Fun
                 if (msg.ContainsKey(kErrorCode))
                     error_code = Convert.ToInt32(msg[kErrorCode]);
 
-                if (msg.ContainsKey(kJoin))
+                if (msg.ContainsKey(kChannels))
+                {
+                    if (ChannelListCallback != null)
+                        ChannelListCallback(msg[kChannels]);
+                    return;
+                }
+                else if (msg.ContainsKey(kJoin))
                 {
                     join = (bool)msg[kJoin];
                 }
@@ -280,7 +316,9 @@ namespace Fun
                 DebugUtils.Assert(obj != null);
 
                 FunMulticastMessage mcast_msg = obj as FunMulticastMessage;
-                channel_id = mcast_msg.channel;
+
+                if (mcast_msg.channelSpecified)
+                    channel_id = mcast_msg.channel;
 
                 if (mcast_msg.senderSpecified)
                     sender = mcast_msg.sender;
@@ -288,7 +326,13 @@ namespace Fun
                 if (mcast_msg.error_codeSpecified)
                     error_code = (int)mcast_msg.error_code;
 
-                if (mcast_msg.joinSpecified)
+                if (mcast_msg.channels.Count > 0)
+                {
+                    if (ChannelListCallback != null)
+                        ChannelListCallback(mcast_msg.channels);
+                    return;
+                }
+                else if (mcast_msg.joinSpecified)
                 {
                     join = mcast_msg.join;
                 }
@@ -366,12 +410,14 @@ namespace Fun
 
 
         protected static readonly string kMulticastMsgType = "_multicast";
+        protected static readonly string kChannels = "_channels";
         protected static readonly string kChannelId = "_channel";
         protected static readonly string kSender = "_sender";
         protected static readonly string kJoin = "_join";
         protected static readonly string kLeave = "_leave";
         protected static readonly string kErrorCode = "_error_code";
 
+        public delegate void ChannelList(object channel_list);
         public delegate void ChannelNotify(string channel_id, string sender);
         public delegate void ChannelMessage(string channel_id, string sender, object body);
         public delegate void ErrorNotify(FunMulticastMessage.ErrorCode code);
@@ -383,6 +429,7 @@ namespace Fun
         protected FunEncoding encoding_;
         protected string sender_ = "";
 
+        public event ChannelList ChannelListCallback;
         public event ChannelNotify JoinedCallback;
         public event ChannelNotify LeftCallback;
         public event ErrorNotify ErrorCallback;

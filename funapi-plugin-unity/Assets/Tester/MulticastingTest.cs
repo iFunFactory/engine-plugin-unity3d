@@ -9,6 +9,7 @@
 using Fun;
 using ProtoBuf;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 // protobuf
@@ -35,8 +36,10 @@ public class MulticastingTest : MonoBehaviour
 
             multicast_ = new FunapiMulticastClient(network_, transport.Encoding);
             multicast_.sender = "player" + UnityEngine.Random.Range(1, 100);
-            multicast_encoding_ = transport.Encoding;
 
+            multicast_.ChannelListCallback += delegate(object channel_list) {
+                OnMulticastChannelList(multicast_.encoding, channel_list);
+            };
             multicast_.JoinedCallback += delegate(string channel_id, string sender) {
                 DebugUtils.DebugLog("JoinedCallback called. player:{0}", sender);
             };
@@ -44,6 +47,12 @@ public class MulticastingTest : MonoBehaviour
                 DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
             };
             multicast_.ErrorCallback += new FunapiMulticastClient.ErrorNotify(OnMulticastError);
+        }
+
+        GUI.enabled = (multicast_ != null && multicast_.Connected);
+        if (GUI.Button(new Rect(530, 60, 100, 40), "Get List"))
+        {
+            multicast_.RequestChannelList();
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && !multicast_.InChannel(kMulticastTestChannel));
@@ -57,7 +66,7 @@ public class MulticastingTest : MonoBehaviour
         multicast_title = "Send a message";
         if (GUI.Button(new Rect(30, 150, 240, 40), multicast_title))
         {
-            if (multicast_encoding_ == FunEncoding.kJson)
+            if (multicast_.encoding == FunEncoding.kJson)
             {
                 Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
                 mcast_msg["_channel"] = kMulticastTestChannel;
@@ -99,12 +108,21 @@ public class MulticastingTest : MonoBehaviour
             chat_ = new FunapiChatClient(network_, transport.Encoding);
             chat_.sender = "player" + UnityEngine.Random.Range(1, 100);
 
+            chat_.ChannelListCallback += delegate(object channel_list) {
+                OnMulticastChannelList(chat_.encoding, channel_list);
+            };
             chat_.JoinedCallback += delegate(string channel_id, string sender) {
                 DebugUtils.DebugLog("JoinedCallback called. player:{0}", sender);
             };
             chat_.LeftCallback += delegate(string channel_id, string sender) {
                 DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
             };
+        }
+
+        GUI.enabled = (chat_ != null && chat_.Connected);
+        if (GUI.Button(new Rect(530, 270, 100, 40), "Get List"))
+        {
+            chat_.RequestChannelList();
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && !chat_.InChannel(kChatTestChannel));
@@ -231,9 +249,42 @@ public class MulticastingTest : MonoBehaviour
         DebugUtils.Log("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol));
     }
 
+    private void OnMulticastChannelList (FunEncoding encoding, object channel_list)
+    {
+        if (encoding == FunEncoding.kJson)
+        {
+            List<object> list = channel_list as List<object>;
+            if (list.Count <= 0)
+                return;
+
+            StringBuilder data = new StringBuilder();
+            foreach (Dictionary<string, object> info in list)
+            {
+                foreach (KeyValuePair <string, object> item in info)
+                    data.AppendFormat("{0}:{1}  ", item.Key, item.Value);
+                data.AppendLine();
+            }
+            DebugUtils.Log(data.ToString());
+        }
+        else
+        {
+            List<FunMulticastChannelListMessage> list = channel_list as List<FunMulticastChannelListMessage>;
+            if (list.Count <= 0)
+                return;
+
+            StringBuilder data = new StringBuilder();
+            foreach (FunMulticastChannelListMessage info in list)
+            {
+                data.AppendFormat("name:{0}  members:{1}  ", info.channel_name, info.num_members);
+                data.AppendLine();
+            }
+            DebugUtils.Log(data.ToString());
+        }
+    }
+
     private void OnMulticastChannelSignalled(string channel_id, string sender, object body)
     {
-        if (multicast_encoding_ == FunEncoding.kJson)
+        if (multicast_.encoding == FunEncoding.kJson)
         {
             DebugUtils.Assert(body is Dictionary<string, object>);
             Dictionary<string, object> mcast_msg = body as Dictionary<string, object>;
@@ -279,5 +330,4 @@ public class MulticastingTest : MonoBehaviour
     private FunapiNetwork network_ = null;
     private FunapiMulticastClient multicast_ = null;
     private FunapiChatClient chat_ = null;
-    private FunEncoding multicast_encoding_;
 }
