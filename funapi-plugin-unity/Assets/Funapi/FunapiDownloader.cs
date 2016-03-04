@@ -473,8 +473,11 @@ namespace Fun
             if (total_download_count_ > 0)
             {
                 state_ = State.Ready;
-                if (ReadyCallback != null)
-                    ReadyCallback(total_download_count_, total_download_size_);
+
+                event_list.Add(delegate {
+                    if (ReadyCallback != null)
+                        ReadyCallback(total_download_count_, total_download_size_);
+                });
             }
             else
             {
@@ -779,10 +782,12 @@ namespace Fun
 
         private void OnFinishedCallback (DownloadResult code)
         {
-            event_list.Add(ReleaseUpdater);
+            event_list.Add(delegate {
+                ReleaseUpdater();
 
-            if (FinishedCallback != null)
-                FinishedCallback(code);
+                if (FinishedCallback != null)
+                    FinishedCallback(code);
+            });
         }
 
 
