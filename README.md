@@ -19,9 +19,17 @@ FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 
 플러그인을 업데이트한 후 호출 코드를 삭제해 주시기 바랍니다.
 ```
 
+### 03/10/2016 (ver.143)
+- Ping 이벤트가 중복해서 등록되는 버그 수정
+- 서버 메시지에 대한 ack를 이미 보낸 경우 ack를 다시 보내지 않도록 수정
+- FunapiDownloader의 Callback 함수가 Main Update 시점에 호출되도록 수정
+- Http Transport 에 Request timeout 시간을 설정할 수 있는 인터페이스 추가
+- Http Transport 의 CancelRequest 함수를 public 으로 변경.
+  - 현재 요청 중인 Request 를 취소 (**마지막으로 보낸 메시지가 취소되는 것이 아님에 주의!**)
+
 ### 02/29/2016 (ver.142)
-재접속시 이전 메시지의 응답 메시지 처리에 관한 버그 수정
-(session reliability 옵션을 사용하는 tcp 연결에서만 발생)
+- 재접속시 이전 메시지의 응답 메시지 처리에 관한 버그 수정
+  - session reliability 옵션을 사용하는 tcp 연결에서만 발생
 
 ### 02/25/2016 (ver.141)
 - 유니티 에디터 종료시 자동으로 Stop 호출
