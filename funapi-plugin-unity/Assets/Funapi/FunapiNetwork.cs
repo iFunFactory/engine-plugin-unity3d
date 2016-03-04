@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 142;
+        public static readonly int kPluginVersion = 143;
     }
 
     // Sending message-related class.
@@ -1046,9 +1046,7 @@ namespace Fun
                         {
                             UInt32 seq = (UInt32)transport.JsonHelper.GetIntegerField(json, kSeqNumberField);
                             if (!OnSeqReceived(transport, seq))
-                            {
                                 return;
-                            }
                             transport.JsonHelper.RemoveStringField(json, kSeqNumberField);
                         }
                     }
@@ -1114,9 +1112,7 @@ namespace Fun
                         if (message.seqSpecified)
                         {
                             if (!OnSeqReceived(transport, message.seq))
-                            {
                                 return;
-                            }
                         }
                     }
 
@@ -1253,8 +1249,10 @@ namespace Fun
 
         private bool SeqLess (UInt32 x, UInt32 y)
         {
-            Int32 dist = (Int32)(x - y);
-            return dist > 0;
+            // 아래 참고
+            //  - http://en.wikipedia.org/wiki/Serial_number_arithmetic
+            //  - RFC 1982
+            return (Int32)(y - x) > 0;
         }
 
         private void SendAck (FunapiTransport transport, UInt32 ack)
@@ -1313,23 +1311,26 @@ namespace Fun
 
         private bool OnSeqReceived (FunapiTransport transport, UInt32 seq)
         {
+            if (transport == null)
+            {
+                DebugUtils.LogWarning("OnSeqReceived - transport is null.");
+                return false;
+            }
+
             if (first_receiving_)
             {
                 first_receiving_ = false;
             }
             else
             {
-                UInt32 seq_interval = seq - seq_recvd_;
-                if (seq_interval < 1 && Math.Abs(seq_interval) < kStableSequenceInterval)
+                if (!SeqLess(seq_recvd_, seq))
                 {
-                    DebugUtils.Log("Received previous sequence number {0}. Skipping message.", seq);
-                    SendAck(transport, seq_recvd_ + 1);
+                    DebugUtils.Log("Last sequence number is {0} but {1} received. Skipping message.", seq_recvd_, seq);
                     return false;
                 }
-                else if (seq_interval != 1)
+                else if (seq != seq_recvd_ + 1)
                 {
-                    DebugUtils.LogWarning("Received wrong sequence number {0}. {1} expected.",
-                                          seq, seq_recvd_ + 1);
+                    DebugUtils.LogError("Received wrong sequence number {0}. {1} expected.", seq, seq_recvd_ + 1);
                     StopTransport(transport);
                     return false;
                 }
@@ -1370,7 +1371,7 @@ namespace Fun
                     seq = 0;
                 }
 
-                if (SeqLess(ack, seq))
+                if (SeqLess(seq, ack))
                 {
                     send_queue_.Dequeue();
                 }
@@ -1382,30 +1383,35 @@ namespace Fun
 
             if (transport.state == FunapiTransport.State.kWaitForAck)
             {
-                foreach (FunapiMessage msg in send_queue_)
+                if (send_queue_.Count > 0)
                 {
-                    if (transport.Encoding == FunEncoding.kJson)
+                    foreach (FunapiMessage msg in send_queue_)
                     {
-                        seq = (UInt32)transport.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
-                    }
-                    else if (transport.Encoding == FunEncoding.kProtobuf)
-                    {
-                        seq = (msg.message as FunMessage).seq;
-                    }
-                    else
-                    {
-                        DebugUtils.Assert(false);
-                        seq = 0;
+                        if (transport.Encoding == FunEncoding.kJson)
+                        {
+                            seq = (UInt32)transport.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
+                        }
+                        else if (transport.Encoding == FunEncoding.kProtobuf)
+                        {
+                            seq = (msg.message as FunMessage).seq;
+                        }
+                        else
+                        {
+                            DebugUtils.Assert(false);
+                            seq = 0;
+                        }
+
+                        if (seq == ack || SeqLess(ack, seq))
+                        {
+                            transport.SendMessage(msg);
+                        }
+                        else
+                        {
+                            DebugUtils.LogWarning("OnAckReceived({0}) - wrong sequence number {1}. ", ack, seq);
+                        }
                     }
 
-                    if (seq == ack || SeqLess(seq, ack))
-                    {
-                        transport.SendMessage(msg);
-                    }
-                    else
-                    {
-                        DebugUtils.LogWarning("OnAckReceived({0}) - wrong sequence number {1}. ", ack, seq);
-                    }
+                    DebugUtils.Log("Resend {0} messages.", send_queue_.Count);
                 }
 
                 SetTransportStarted(transport);
@@ -1787,7 +1793,6 @@ namespace Fun
         private static readonly string kNewSessionMessageType = "_session_opened";
         private static readonly string kSessionClosedMessageType = "_session_closed";
         private static readonly string kMaintenanceMessageType = "_maintenance";
-        private static readonly int kStableSequenceInterval = 20;
 
         // Ping message-related constants.
         private static readonly string kServerPingMessageType = "_ping_s";
