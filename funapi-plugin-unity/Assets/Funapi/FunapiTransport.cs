@@ -1545,6 +1545,7 @@ namespace Fun
             protocol_ = TransportProtocol.kHttp;
             str_protocol = "Http";
             encoding_ = type;
+            RequestTimeout = kTimeoutSeconds;
 
             ip_list_.Add(hostname_or_ip, port, https);
             SetNextAddress();
@@ -1597,6 +1598,11 @@ namespace Fun
             set { using_www_ = value; }
         }
 #endif
+
+        public float RequestTimeout
+        {
+            set; get;
+        }
 
         internal override void Init()
         {
@@ -1670,7 +1676,7 @@ namespace Fun
                     request_timeout_id_ = timer_.Add (delegate {
                             OnRequestTimeout(body.msg_type);
                         },
-                        kTimeoutSeconds
+                        RequestTimeout
                     );
 
 #if !NO_UNITY
@@ -1997,7 +2003,7 @@ namespace Fun
         }
 #endif
 
-        private void CancelRequest ()
+        public void CancelRequest ()
         {
 #if !NO_UNITY
             if (cur_www_ != null)
