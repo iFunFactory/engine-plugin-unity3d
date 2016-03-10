@@ -96,15 +96,6 @@ namespace Tester
             network_.EnablePing = enable;
         }
 
-        public void SetEncryption (TransportProtocol protocol, EncryptionType enc)
-        {
-            FunapiTransport transport = network_.GetTransport(protocol);
-            if (transport == null)
-                return;
-
-            ((FunapiEncryptedTransport)transport).SetEncryption(enc);
-        }
-
         private void AddTransport (TransportProtocol protocol, FunEncoding type, string addr)
         {
             FunapiTransport transport = null;
@@ -153,16 +144,14 @@ namespace Tester
             {
                 Dictionary<string, object> echo = new Dictionary<string, object>();
                 echo["message"] = message;
-                network_.SendMessage("echo", echo,
-                                     EncryptionType.kDefaultEncryption, protocol);
+                network_.SendMessage("echo", echo, protocol);
             }
             else if (encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = message;
                 FunMessage fmsg = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
-                network_.SendMessage(MessageType.pbuf_echo, fmsg,
-                                     EncryptionType.kDefaultEncryption, protocol);
+                network_.SendMessage(MessageType.pbuf_echo, fmsg, protocol);
             }
         }
 
