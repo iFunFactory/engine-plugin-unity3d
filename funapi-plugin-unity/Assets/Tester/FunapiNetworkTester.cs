@@ -337,6 +337,9 @@ public class FunapiNetworkTester : MonoBehaviour
     {
         CancelInvoke();
 
+        if (multicast_ != null)
+            multicast_.LeaveAllChannels();
+
         if (network_.Started == false)
         {
             DebugUtils.Log("You should connect first.");
