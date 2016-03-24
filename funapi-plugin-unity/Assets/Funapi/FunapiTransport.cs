@@ -82,6 +82,9 @@ namespace Fun
         // Disconnection
         internal abstract void Stop();
 
+        // Set Encryption type
+        internal abstract void SetEncryption (EncryptionType encryption);
+
         // Check connection
         internal abstract bool Started { get; }
 
@@ -661,7 +664,7 @@ namespace Fun
             }
         }
 
-        internal void SetEncryption (EncryptionType encryption)
+        internal override void SetEncryption (EncryptionType encryption)
         {
             Encryptor encryptor = Encryptor.Create(encryption);
             if (encryptor == null)
