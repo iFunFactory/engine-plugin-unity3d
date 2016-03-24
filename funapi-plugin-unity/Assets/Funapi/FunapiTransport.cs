@@ -59,21 +59,9 @@ namespace Fun
         {
             state_ = State.kUnknown;
             protocol_ = TransportProtocol.kDefault;
-            PingIntervalSeconds = 0;
-            PingTimeoutSeconds = 0f;
+            PingIntervalSeconds = kPingIntervalSecond;
+            PingTimeoutSeconds = kPingTimeoutSeconds;
             ConnectTimeout = 10f;
-
-            if (FunapiConfig.IsValid)
-            {
-                PingIntervalSeconds = FunapiConfig.PingInterval;
-                PingTimeoutSeconds = FunapiConfig.PingTimeoutSeconds;
-            }
-
-            if (PingIntervalSeconds <= 0)
-                PingIntervalSeconds = kPingIntervalSecond;
-
-            if (PingTimeoutSeconds <= 0f)
-                PingTimeoutSeconds = kPingTimeoutSeconds;
         }
 
         // Start connecting

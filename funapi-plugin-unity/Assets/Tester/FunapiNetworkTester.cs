@@ -24,11 +24,6 @@ using plugin_messages;
 
 public class FunapiNetworkTester : MonoBehaviour
 {
-    void Start()
-    {
-        //FunapiConfig.Load("Config.json");
-    }
-
     public void OnGUI()
     {
         //----------------------------------------------------------------------------
@@ -75,16 +70,7 @@ public class FunapiNetworkTester : MonoBehaviour
                 announcement_ = new FunapiAnnouncement();
                 announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
 
-                string url = "";
-                if (FunapiConfig.IsValid)
-                    url = FunapiConfig.AnnouncementUrl;
-
-                if (url.Length <= 0)
-                    url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
-
-                if (url.Length <= 0)
-                    return;
-
+                string url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
                 announcement_.Init(url);
             }
 
@@ -98,15 +84,7 @@ public class FunapiNetworkTester : MonoBehaviour
         GUI.Label(new Rect(30, 380, 300, 20), string.Format("[Downloader] - {0}:{1}", kDownloadServerIp, kDownloadServerPort));
         if (GUI.Button(new Rect(30, 400, 240, 40), "Resource downloader (HTTP)"))
         {
-            string download_url = "";
-
-            if (FunapiConfig.IsValid) {
-                FunapiConfig.GetDownloaderUrl(out download_url);
-            }
-
-            if (download_url == "") {
-                download_url = string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort);
-            }
+            string download_url = string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort);
 
             downloader_ = new FunapiHttpDownloader();
             downloader_.VerifyCallback += new FunapiHttpDownloader.VerifyEventHandler(OnDownloadVerify);
@@ -234,40 +212,32 @@ public class FunapiNetworkTester : MonoBehaviour
         FunapiTransport transport = null;
         FunEncoding encoding = with_protobuf_ ? FunEncoding.kProtobuf : FunEncoding.kJson;
 
-        if (FunapiConfig.IsValid)
+        if (protocol == TransportProtocol.kTcp)
         {
-            transport = FunapiConfig.CreateTransport(protocol, encoding);
+            transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
+            transport.AutoReconnect = true;
+            //transport.EnablePing = true;
+            //transport.DisableNagle = true;
+
+            // Please set the same encryption type as the encryption type of server.
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
         }
-
-        if (transport == null)
+        else if (protocol == TransportProtocol.kUdp)
         {
-            if (protocol == TransportProtocol.kTcp)
-            {
-                transport = new FunapiTcpTransport(kServerIp, (ushort)(with_protobuf_ ? 8022 : 8012), encoding);
-                transport.AutoReconnect = true;
-                //transport.EnablePing = true;
-                //transport.DisableNagle = true;
+            transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), encoding);
 
-                // Please set the same encryption type as the encryption type of server.
-                //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-            }
-            else if (protocol == TransportProtocol.kUdp)
-            {
-                transport = new FunapiUdpTransport(kServerIp, (ushort)(with_protobuf_ ? 8023 : 8013), encoding);
+            // Please set the same encryption type as the encryption type of server.
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+        }
+        else if (protocol == TransportProtocol.kHttp)
+        {
+            transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
 
-                // Please set the same encryption type as the encryption type of server.
-                //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-            }
-            else if (protocol == TransportProtocol.kHttp)
-            {
-                transport = new FunapiHttpTransport(kServerIp, (ushort)(with_protobuf_ ? 8028 : 8018), false, encoding);
+            // Send messages using WWW class
+            //((FunapiHttpTransport)transport).UseWWW = true;
 
-                // Send messages using WWW class
-                //((FunapiHttpTransport)transport).UseWWW = true;
-
-                // Please set the same encryption type as the encryption type of server.
-                //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-            }
+            // Please set the same encryption type as the encryption type of server.
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
         }
 
         if (transport != null)
