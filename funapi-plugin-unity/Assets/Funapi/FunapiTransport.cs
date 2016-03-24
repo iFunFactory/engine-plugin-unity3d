@@ -44,9 +44,6 @@ namespace Fun
         kConnectFailed,
         kSendFailed,
         kReceiveFailed,
-        kEncryptionFailed,
-        kInvalidEncryption,
-        kUnknownEncryption,
         kRequestTimeout,
         kDisconnected,
         kExceptionError
@@ -61,21 +58,9 @@ namespace Fun
         {
             state_ = State.kUnknown;
             protocol_ = TransportProtocol.kDefault;
-            PingIntervalSeconds = 0;
-            PingTimeoutSeconds = 0f;
+            PingIntervalSeconds = kPingIntervalSecond;
+            PingTimeoutSeconds = kPingTimeoutSeconds;
             ConnectTimeout = 10f;
-
-            if (FunapiConfig.IsValid)
-            {
-                PingIntervalSeconds = FunapiConfig.PingInterval;
-                PingTimeoutSeconds = FunapiConfig.PingTimeoutSeconds;
-            }
-
-            if (PingIntervalSeconds <= 0)
-                PingIntervalSeconds = kPingIntervalSecond;
-
-            if (PingTimeoutSeconds <= 0f)
-                PingTimeoutSeconds = kPingTimeoutSeconds;
         }
 
         // Start connecting
@@ -973,7 +958,6 @@ namespace Fun
         internal static readonly string kPluginVersionHeaderField = "PVER";
         internal static readonly string kVersionHeaderField = "VER";
         internal static readonly string kLengthHeaderField = "LEN";
-        internal static readonly string kEncryptionHeaderField = "ENC";
 
         // for speed-up.
         private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
@@ -1767,9 +1751,6 @@ namespace Fun
                         break;
                     case "content-length":
                         headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
-                        break;
-                    case "x-ifun-enc":
-                        headers.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     default:
                         headers.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, value, kHeaderDelimeter);
