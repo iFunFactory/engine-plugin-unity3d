@@ -27,7 +27,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 143;
+        public static readonly int kPluginVersion = 144;
     }
 
     // Sending message-related class.
@@ -86,6 +86,11 @@ namespace Fun
         public bool SessionReliability
         {
             get { return session_reliability_; }
+        }
+
+        public bool SequenceNumberValidation
+        {
+            set; private get;
         }
 
         public float ResponseTimeout
@@ -883,6 +888,9 @@ namespace Fun
             {
                 FunapiMessage fun_msg = null;
 
+                bool sending_sequence = SequenceNumberValidation &&
+                    (protocol == TransportProtocol.kTcp || protocol == TransportProtocol.kHttp);
+
                 if (transport.Encoding == FunEncoding.kJson)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, transport.JsonHelper.Clone(message), encryption);
@@ -896,13 +904,15 @@ namespace Fun
                         transport.JsonHelper.SetStringField(fun_msg.message, kSessionIdBodyField, session_id_);
                     }
 
-                    if (transport_reliability)
+                    if (transport_reliability || sending_sequence)
                     {
-                        transport.JsonHelper.SetIntegerField(fun_msg.message, kSeqNumberField, seq_);
-                        ++seq_;
+                        UInt32 seq = GetNextSeq(protocol);
+                        transport.JsonHelper.SetIntegerField(fun_msg.message, kSeqNumberField, seq);
 
-                        send_queue_.Enqueue(fun_msg);
-                        DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, seq_ - 1);
+                        if (transport_reliability)
+                            send_queue_.Enqueue(fun_msg);
+
+                        DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, seq);
                     }
                     else
                     {
@@ -922,12 +932,13 @@ namespace Fun
                         pbuf.sid = session_id_;
                     }
 
-                    if (transport_reliability)
+                    if (transport_reliability || sending_sequence)
                     {
-                        pbuf.seq = seq_;
-                        ++seq_;
+                        pbuf.seq = GetNextSeq(protocol);
 
-                        send_queue_.Enqueue(fun_msg);
+                        if (transport_reliability)
+                            send_queue_.Enqueue(fun_msg);
+
                         DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, pbuf.seq);
                     }
                     else
@@ -1190,6 +1201,10 @@ namespace Fun
                     continue;
                 }
 
+                bool transport_reliability = (transport.Protocol == TransportProtocol.kTcp && session_reliability_);
+                bool sending_sequence = SequenceNumberValidation &&
+                    (transport.Protocol == TransportProtocol.kTcp || transport.Protocol == TransportProtocol.kHttp);
+
                 if (transport.Encoding == FunEncoding.kJson)
                 {
                     object json = msg.message;
@@ -1200,14 +1215,16 @@ namespace Fun
                     if (session_id_.Length > 0)
                         transport.JsonHelper.SetStringField(json, kSessionIdBodyField, session_id_);
 
-                    if (session_reliability_ && transport.Protocol == TransportProtocol.kTcp)
+                    if (transport_reliability || sending_sequence)
                     {
-                        transport.JsonHelper.SetIntegerField(json, kSeqNumberField, seq_);
-                        ++seq_;
+                        UInt32 seq = GetNextSeq(transport.Protocol);
+                        transport.JsonHelper.SetIntegerField(json, kSeqNumberField, seq);
 
-                        send_queue_.Enqueue(msg);
+                        if (transport_reliability)
+                            send_queue_.Enqueue(msg);
+
                         DebugUtils.Log("{0} send unsent message - msgtype:{1} seq:{2}",
-                                       transport.Protocol, msg.msg_type, seq_ - 1);
+                                       transport.Protocol, msg.msg_type, seq);
                     }
                     else
                     {
@@ -1223,12 +1240,13 @@ namespace Fun
                     if (session_id_.Length > 0)
                         pbuf.sid = session_id_;
 
-                    if (session_reliability_ && transport.Protocol == TransportProtocol.kTcp)
+                    if (transport_reliability || sending_sequence)
                     {
-                        pbuf.seq = seq_;
-                        ++seq_;
+                        pbuf.seq = GetNextSeq(transport.Protocol);
 
-                        send_queue_.Enqueue(msg);
+                        if (transport_reliability)
+                            send_queue_.Enqueue(msg);
+
                         DebugUtils.Log("{0} send unsent message - msgtype:{1} seq:{2}",
                                        transport.Protocol, msg.msg_type, pbuf.seq);
                     }
@@ -1434,8 +1452,23 @@ namespace Fun
                 seq_recvd_ = 0;
                 send_queue_.Clear();
                 first_receiving_ = true;
-                seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
             }
+
+            tcp_seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+            http_seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
+        }
+
+        internal UInt32 GetNextSeq (TransportProtocol protocol)
+        {
+            if (protocol == TransportProtocol.kTcp) {
+                return ++tcp_seq_;
+            }
+            else if (protocol == TransportProtocol.kHttp) {
+                return ++http_seq_;
+            }
+
+            DebugUtils.Assert(false);
+            return 0;
         }
 
         private void PrepareSession(string session_id)
@@ -1472,6 +1505,11 @@ namespace Fun
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
+                    if (transport.Protocol == TransportProtocol.kHttp)
+                    {
+                        ((FunapiHttpTransport)transport).secure_id = session_id;
+                    }
+
                     if (transport.state == FunapiTransport.State.kWaitForSession)
                     {
                         SetTransportStarted(transport, false);
@@ -1810,9 +1848,10 @@ namespace Fun
         private bool stop_with_clear_ = false;
 
         // Reliability-releated member variables.
-        private bool session_reliability_;
-        private UInt32 seq_ = 0;
+        private bool session_reliability_ = false;
         private UInt32 seq_recvd_ = 0;
+        private UInt32 tcp_seq_ = 0;
+        private UInt32 http_seq_ = 0;
         private bool first_receiving_ = false;
         private TransportProtocol session_protocol_;
         private Queue<FunapiMessage> send_queue_ = new Queue<FunapiMessage>();
@@ -1827,10 +1866,10 @@ namespace Fun
         // Message-releated member variables.
         private FunMessageSerializer serializer_;
         private Type recv_type_;
-        private DateTime last_received_ = DateTime.Now;
         private int ping_timer_id_ = 0;
         private object message_lock_ = new object();
         private object expected_reply_lock = new object();
+        private DateTime last_received_ = DateTime.Now;
         private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
         private Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
         private Dictionary<string, List<FunapiMessage>> expected_replies_ = new Dictionary<string, List<FunapiMessage>>();
