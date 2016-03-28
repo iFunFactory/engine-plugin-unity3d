@@ -19,7 +19,11 @@ FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 
 플러그인을 업데이트한 후 호출 코드를 삭제해 주시기 바랍니다.
 ```
 
-### 03/21/2016 (ver.144)
+### 04/05/2016 (ver.144)
+- TCP, HTTP 메시지에 sequence number 옵션 추가 (FunapiNetwork.SequenceNumberValidation)
+- protobuf.net 으로 enum 타입의 메시지를 보낼 때 int32 타입으로 변환해서 전송
+- 테스트 항목을 구분하여 테스트 Scene 과 코드 분리
+- FunapiConfig 관련 코드 및 파일 삭제
 - 멀티캐스트 에러코드 처리 및 LeaveAllChannels 함수 추가
 
 ### 03/10/2016 (ver.143)

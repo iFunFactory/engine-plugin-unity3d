@@ -52,6 +52,45 @@ public class FunapiNetworkTest : MonoBehaviour
         }
     }
 
+    private void Connect (TransportProtocol protocol)
+    {
+        DebugUtils.Log("-------- Connect --------");
+
+        if (network_ == null || network_.SessionReliability != with_session_reliability_)
+        {
+            network_ = new FunapiNetwork(with_session_reliability_);
+            //network_.SequenceNumberValidation = true;
+            //network_.ResponseTimeout = 10f;
+
+            network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
+            network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
+            network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
+            network_.StoppedAllTransportCallback += new FunapiNetwork.NotifyHandler(OnStoppedAllTransport);
+            network_.TransportConnectFailedCallback += new TransportEventHandler(OnTransportConnectFailed);
+            network_.TransportDisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
+
+            network_.RegisterHandler("echo", this.OnEcho);
+            network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
+
+            //network_.SetMessageProtocol(TransportProtocol.kTcp, "echo");
+            //network_.SetMessageProtocol(TransportProtocol.kUdp, "pbuf_echo");
+
+            FunapiTransport transport = GetNewTransport(protocol);
+            network_.AttachTransport(transport);
+        }
+        else
+        {
+            if (!network_.HasTransport(protocol))
+            {
+                FunapiTransport transport = GetNewTransport(protocol);
+                network_.AttachTransport(transport);
+            }
+
+            network_.SetDefaultProtocol(protocol);
+        }
+
+        network_.Start();
+    }
 
     private FunapiTransport GetNewTransport (TransportProtocol protocol)
     {
@@ -100,45 +139,6 @@ public class FunapiNetworkTest : MonoBehaviour
         }
 
         return transport;
-    }
-
-    private void Connect (TransportProtocol protocol)
-    {
-        DebugUtils.Log("-------- Connect --------");
-
-        if (network_ == null || !network_.SessionReliability)
-        {
-            network_ = new FunapiNetwork(with_session_reliability_);
-            //network_.ResponseTimeout = 10f;
-
-            network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
-            network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
-            network_.MaintenanceCallback += new FunapiNetwork.MessageEventHandler(OnMaintenanceMessage);
-            network_.StoppedAllTransportCallback += new FunapiNetwork.NotifyHandler(OnStoppedAllTransport);
-            network_.TransportConnectFailedCallback += new TransportEventHandler(OnTransportConnectFailed);
-            network_.TransportDisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
-
-            network_.RegisterHandler("echo", this.OnEcho);
-            network_.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
-
-            //network_.SetMessageProtocol(TransportProtocol.kTcp, "echo");
-            //network_.SetMessageProtocol(TransportProtocol.kUdp, "pbuf_echo");
-
-            FunapiTransport transport = GetNewTransport(protocol);
-            network_.AttachTransport(transport);
-        }
-        else
-        {
-            if (!network_.HasTransport(protocol))
-            {
-                FunapiTransport transport = GetNewTransport(protocol);
-                network_.AttachTransport(transport);
-            }
-
-            network_.SetDefaultProtocol(protocol);
-        }
-
-        network_.Start();
     }
 
     private void Disconnect ()
@@ -200,7 +200,7 @@ public class FunapiNetworkTest : MonoBehaviour
     private void OnSessionClosed ()
     {
         DebugUtils.Log("Session closed.");
-        network_ = null;
+        //network_ = null;
     }
 
     private void OnConnectTimeout (TransportProtocol protocol)

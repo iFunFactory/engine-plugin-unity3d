@@ -561,12 +561,6 @@ namespace Fun
     // Transport class for socket
     public abstract class FunapiDecodedTransport : FunapiTransport
     {
-        // Create a socket.
-        internal abstract void Init();
-
-        // Sends a packet.
-        internal abstract void WireSend();
-
         // Starts a socket.
         internal override void Start()
         {
@@ -603,7 +597,7 @@ namespace Fun
                     );
                 }
 
-                Init();
+                StartConnect();
             }
             catch (Exception e)
             {
@@ -613,6 +607,12 @@ namespace Fun
                 event_.Add(OnFailure);
             }
         }
+
+        // Create a socket.
+        protected abstract void StartConnect();
+
+        // Sends a packet.
+        protected abstract void WireSend();
 
         // Stops a socket.
         internal override void Stop()
@@ -1028,7 +1028,7 @@ namespace Fun
         }
 
         // Create a socket.
-        internal override void Init()
+        protected override void StartConnect()
         {
             state_ = State.kConnecting;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -1056,7 +1056,7 @@ namespace Fun
             DebugUtils.Log("TCP transport - {0}:{1}", ip, addr.port);
         }
 
-        internal override void WireSend()
+        protected override void WireSend()
         {
             List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
             lock (sending_lock_)
@@ -1323,7 +1323,7 @@ namespace Fun
         }
 
         // Create a socket.
-        internal override void Init()
+        protected override void StartConnect()
         {
             state_ = State.kConnected;
             sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
@@ -1353,7 +1353,7 @@ namespace Fun
         }
 
         // Send a packet.
-        internal override void WireSend()
+        protected override void WireSend()
         {
             int offset = 0;
 
@@ -1537,6 +1537,8 @@ namespace Fun
 
         internal MonoBehaviour mono { set; private get; }
 
+        public string secure_id { set; private get; }
+
         internal override void Stop()
         {
             if (state_ == State.kUnknown)
@@ -1588,7 +1590,7 @@ namespace Fun
             set; get;
         }
 
-        internal override void Init()
+        protected override void StartConnect()
         {
             state_ = State.kConnected;
             str_cookie_ = "";
@@ -1625,7 +1627,7 @@ namespace Fun
             }
         }
 
-        internal override void WireSend()
+        protected override void WireSend()
         {
             DebugUtils.DebugLog("Send a Message.");
 
@@ -1705,6 +1707,7 @@ namespace Fun
         {
             // Request
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
+            request.ConnectionGroupName = secure_id;
             request.Method = "POST";
             request.ContentType = "application/x-www-form-urlencoded";
             request.ContentLength = body.buffer.Count;
