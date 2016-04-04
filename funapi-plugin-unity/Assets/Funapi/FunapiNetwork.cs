@@ -812,6 +812,9 @@ namespace Fun
 
         public FunMessage CreateFunMessage (object msg, MessageType msg_type)
         {
+            if (msg is Enum)
+                msg = (Int32)msg;
+
             FunMessage _msg = new FunMessage();
             Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
             return _msg;
