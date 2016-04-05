@@ -23,8 +23,9 @@ namespace Fun
         public FunapiChatClient (FunapiNetwork network, FunEncoding encoding)
             : base(network, encoding)
         {
-            JoinedCallback += new ChannelNotify(OnJoinedCallback);
-            LeftCallback += new ChannelNotify(OnLeftCallback);
+            JoinedCallback += OnJoinedCallback;
+            LeftCallback += OnLeftCallback;
+            ErrorCallback += OnErrorCallback;
         }
 
         public bool JoinChannel (string channel_id, string my_name, OnChatMessage handler)
@@ -51,6 +52,19 @@ namespace Fun
             }
 
             return true;
+        }
+
+        public override void LeaveAllChannels ()
+        {
+            if (!Connected)
+                return;
+
+            base.LeaveAllChannels();
+
+            lock (chat_channel_lock_)
+            {
+                chat_channels_.Clear();
+            }
         }
 
         private void OnJoinedCallback (string channel_id, string sender)
@@ -131,6 +145,20 @@ namespace Fun
                     {
                         chat_channels_[channel_id](channel_id, sender, chat_msg.text);
                     }
+                }
+            }
+        }
+
+        private void OnErrorCallback (string channel_id, FunMulticastMessage.ErrorCode code)
+        {
+            if (code == FunMulticastMessage.ErrorCode.EC_FULL_MEMBER ||
+                code == FunMulticastMessage.ErrorCode.EC_ALREADY_LEFT ||
+                code == FunMulticastMessage.ErrorCode.EC_CLOSED)
+            {
+                lock (chat_channel_lock_)
+                {
+                    if (chat_channels_.ContainsKey(channel_id))
+                        chat_channels_.Remove(channel_id);
                 }
             }
         }

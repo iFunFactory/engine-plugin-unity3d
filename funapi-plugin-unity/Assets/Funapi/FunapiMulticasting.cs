@@ -108,6 +108,8 @@ namespace Fun
                 network_.SendMessage(kMulticastMsgType, fun_msg);
             }
 
+            DebugUtils.Log("Request to join '{0}' channel", channel_id);
+
             return true;
         }
 
@@ -140,7 +142,7 @@ namespace Fun
             return true;
         }
 
-        public void LeaveAllChannels ()
+        public virtual void LeaveAllChannels ()
         {
             if (!Connected)
                 return;
@@ -158,7 +160,7 @@ namespace Fun
 
                 channels_.Clear();
 
-                DebugUtils.Log("Leave all multicast channels.");
+                DebugUtils.Log("Leave all channels.");
             }
         }
 
@@ -347,10 +349,11 @@ namespace Fun
             if (error_code != 0)
             {
                 FunMulticastMessage.ErrorCode code = (FunMulticastMessage.ErrorCode)error_code;
-                DebugUtils.LogWarning("Multicast error - code: {0}", code);
+                DebugUtils.LogWarning("Multicast error - channel: {0} code: {1}", channel_id, code);
 
-                if (code == FunMulticastMessage.ErrorCode.EC_ALREADY_LEFT ||
-                    code == FunMulticastMessage.ErrorCode.EC_FULL_MEMBER)
+                if (code == FunMulticastMessage.ErrorCode.EC_FULL_MEMBER ||
+                    code == FunMulticastMessage.ErrorCode.EC_ALREADY_LEFT ||
+                    code == FunMulticastMessage.ErrorCode.EC_CLOSED)
                 {
                     lock (channel_lock_)
                     {
@@ -360,7 +363,7 @@ namespace Fun
                 }
 
                 if (ErrorCallback != null)
-                    ErrorCallback(code);
+                    ErrorCallback(channel_id, code);
 
                 return;
             }
@@ -387,9 +390,7 @@ namespace Fun
                 lock (channel_lock_)
                 {
                     if (channels_.ContainsKey(channel_id))
-                    {
                         channels_[channel_id](channel_id, sender, body);
-                    }
                 }
             }
         }
@@ -420,7 +421,7 @@ namespace Fun
         public delegate void ChannelList(object channel_list);
         public delegate void ChannelNotify(string channel_id, string sender);
         public delegate void ChannelMessage(string channel_id, string sender, object body);
-        public delegate void ErrorNotify(FunMulticastMessage.ErrorCode code);
+        public delegate void ErrorNotify(string channel_id, FunMulticastMessage.ErrorCode code);
 
         private FunapiNetwork network_ = null;
         private object channel_lock_ = new object();
