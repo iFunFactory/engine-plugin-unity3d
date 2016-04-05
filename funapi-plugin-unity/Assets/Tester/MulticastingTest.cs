@@ -19,7 +19,7 @@ using plugin_messages;
 
 public class MulticastingTest : MonoBehaviour
 {
-    public void OnGUI()
+    public void OnGUI ()
     {
         GUI.Label(new Rect(30, 8, 300, 20), "Server - " + kServerIp);
         GUI.Label(new Rect(30, 40, 300, 20), "[Muticast Test]");
@@ -46,20 +46,14 @@ public class MulticastingTest : MonoBehaviour
             multicast_.LeftCallback += delegate(string channel_id, string sender) {
                 DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
             };
-            multicast_.ErrorCallback += new FunapiMulticastClient.ErrorNotify(OnMulticastError);
-        }
-
-        GUI.enabled = (multicast_ != null && multicast_.Connected);
-        if (GUI.Button(new Rect(530, 60, 100, 40), "Get List"))
-        {
-            multicast_.RequestChannelList();
+            multicast_.ErrorCallback += OnMulticastError;
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && !multicast_.InChannel(kMulticastTestChannel));
         multicast_title = "Join a channel";
         if (GUI.Button(new Rect(30, 105, 240, 40), multicast_title))
         {
-            multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelSignalled);
+            multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelReceived);
         }
 
         GUI.enabled = (multicast_ != null && multicast_.Connected && multicast_.InChannel(kMulticastTestChannel));
@@ -71,7 +65,7 @@ public class MulticastingTest : MonoBehaviour
                 Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
                 mcast_msg["_channel"] = kMulticastTestChannel;
                 mcast_msg["_bounce"] = true;
-                mcast_msg["message"] = "multicast test message";
+                mcast_msg["_message"] = "multicast test message";
 
                 multicast_.SendToChannel(mcast_msg);
             }
@@ -96,6 +90,13 @@ public class MulticastingTest : MonoBehaviour
             multicast_.LeaveChannel(kMulticastTestChannel);
         }
 
+        GUI.enabled = (multicast_ != null && multicast_.Connected);
+        if (GUI.Button(new Rect(30, 240, 240, 40), "Get List"))
+        {
+            multicast_.RequestChannelList();
+        }
+
+
         GUI.enabled = (chat_ == null);
         string chat_title = "Create 'chat'";
         if (GUI.Button(new Rect(300, 60, 240, 40), chat_title))
@@ -117,12 +118,7 @@ public class MulticastingTest : MonoBehaviour
             chat_.LeftCallback += delegate(string channel_id, string sender) {
                 DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
             };
-        }
-
-        GUI.enabled = (chat_ != null && chat_.Connected);
-        if (GUI.Button(new Rect(530, 270, 100, 40), "Get List"))
-        {
-            chat_.RequestChannelList();
+            chat_.ErrorCallback += OnChatError;
         }
 
         GUI.enabled = (chat_ != null && chat_.Connected && !chat_.InChannel(kChatTestChannel));
@@ -145,6 +141,12 @@ public class MulticastingTest : MonoBehaviour
         {
             chat_.LeaveChannel(kChatTestChannel);
         }
+
+        GUI.enabled = (chat_ != null && chat_.Connected);
+        if (GUI.Button(new Rect(300, 240, 240, 40), "Get List"))
+        {
+            chat_.RequestChannelList();
+        }
     }
 
 
@@ -156,14 +158,6 @@ public class MulticastingTest : MonoBehaviour
         transport = new FunapiTcpTransport(kServerIp, 8012, encoding);
         transport.AutoReconnect = true;
 
-        transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
-        transport.StoppedCallback += new TransportEventHandler(OnTransportClosed);
-        transport.FailureCallback += new TransportEventHandler(OnTransportFailure);
-
-        // Connect timeout.
-        transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
-        transport.ConnectTimeout = 10f;
-
         return transport;
     }
 
@@ -172,13 +166,7 @@ public class MulticastingTest : MonoBehaviour
         DebugUtils.Log("-------- Connect --------");
 
         network_ = new FunapiNetwork(false);
-        //network_.ResponseTimeout = 10f;
-
-        network_.OnSessionInitiated += new FunapiNetwork.SessionInitHandler(OnSessionInitiated);
-        network_.OnSessionClosed += new FunapiNetwork.SessionCloseHandler(OnSessionClosed);
-        network_.StoppedAllTransportCallback += new FunapiNetwork.NotifyHandler(OnStoppedAllTransport);
-        network_.TransportConnectFailedCallback += new TransportEventHandler(OnTransportConnectFailed);
-        network_.TransportDisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
+        network_.StoppedAllTransportCallback += OnStoppedAllTransport;
 
         FunapiTransport transport = GetNewTransport();
         network_.AttachTransport(transport);
@@ -195,58 +183,12 @@ public class MulticastingTest : MonoBehaviour
             network_.Stop();
     }
 
-    private void OnSessionInitiated (string session_id)
+    private void OnStoppedAllTransport ()
     {
-        DebugUtils.Log("Session initiated. Session id:{0}", session_id);
-    }
-
-    private void OnSessionClosed ()
-    {
-        DebugUtils.Log("Session closed.");
+        DebugUtils.Log("OnStoppedAllTransport called.");
         network_ = null;
         multicast_ = null;
         chat_ = null;
-    }
-
-    private void OnConnectTimeout (TransportProtocol protocol)
-    {
-        DebugUtils.Log("{0} Transport Connection timed out.", protocol);
-    }
-
-    private void OnTransportStarted (TransportProtocol protocol)
-    {
-        DebugUtils.Log("{0} Transport started.", protocol);
-    }
-
-    private void OnTransportClosed (TransportProtocol protocol)
-    {
-        DebugUtils.Log("{0} Transport closed.", protocol);
-    }
-
-    private void OnStoppedAllTransport()
-    {
-        DebugUtils.Log("OnStoppedAllTransport called.");
-    }
-
-    private void OnTransportConnectFailed (TransportProtocol protocol)
-    {
-        DebugUtils.Log("OnTransportConnectFailed called.");
-
-        // If you want to try to reconnect, call 'Connect' or 'Reconnect' function.
-        // Be careful to avoid falling into an infinite loop.
-
-        //network_.Connect(protocol, new HostHttp("127.0.0.1", 8018));
-        //network_.Reconnect(protocol);
-    }
-
-    private void OnTransportDisconnected (TransportProtocol protocol)
-    {
-        DebugUtils.Log("OnTransportDisconnected called.");
-    }
-
-    private void OnTransportFailure (TransportProtocol protocol)
-    {
-        DebugUtils.Log("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol));
     }
 
     private void OnMulticastChannelList (FunEncoding encoding, object channel_list)
@@ -282,7 +224,7 @@ public class MulticastingTest : MonoBehaviour
         }
     }
 
-    private void OnMulticastChannelSignalled(string channel_id, string sender, object body)
+    private void OnMulticastChannelReceived (string channel_id, string sender, object body)
     {
         if (multicast_.encoding == FunEncoding.kJson)
         {
@@ -290,7 +232,7 @@ public class MulticastingTest : MonoBehaviour
             Dictionary<string, object> mcast_msg = body as Dictionary<string, object>;
             DebugUtils.Assert (channel_id == (mcast_msg["_channel"] as string));
 
-            string message = mcast_msg["message"] as string;
+            string message = mcast_msg["_message"] as string;
             DebugUtils.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
                            channel_id, message);
         }
@@ -309,15 +251,30 @@ public class MulticastingTest : MonoBehaviour
         }
     }
 
-    private void OnChatChannelReceived(string chat_channel, string sender, string text)
+    private void OnChatChannelReceived (string chat_channel, string sender, string text)
     {
         DebugUtils.Log("Received a chat channel message.\nChannel={0}, sender={1}, text={2}",
                        chat_channel, sender, text);
     }
 
-    private void OnMulticastError (FunMulticastMessage.ErrorCode code)
+    private void OnMulticastError (string channel_id, FunMulticastMessage.ErrorCode code)
     {
-        // do something..
+        if (code == FunMulticastMessage.ErrorCode.EC_CLOSED)
+        {
+            // If the server is closed, try to rejoin the channel.
+            if (multicast_ != null && multicast_.Connected)
+                multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelReceived);
+        }
+    }
+
+    private void OnChatError (string channel_id, FunMulticastMessage.ErrorCode code)
+    {
+        if (code == FunMulticastMessage.ErrorCode.EC_CLOSED)
+        {
+            // If the server is closed, try to rejoin the channel.
+            if (chat_ != null && chat_.Connected)
+                chat_.JoinChannel(kChatTestChannel, OnChatChannelReceived);
+        }
     }
 
 
