@@ -468,15 +468,8 @@ namespace Fun
                     OnConnectFailureCallback();
                 }
             }
-            else if (cstate_ == ConnectState.kReconnecting)
-            {
-                if (!TryToReconnect())
-                {
-                    cstate_ = ConnectState.kUnknown;
-                    OnDisconnectedCallback();
-                }
-            }
-            else if (cstate_ == ConnectState.kRedirecting)
+            else if (cstate_ == ConnectState.kReconnecting ||
+                     cstate_ == ConnectState.kRedirecting)
             {
                 if (!TryToReconnect())
                 {
