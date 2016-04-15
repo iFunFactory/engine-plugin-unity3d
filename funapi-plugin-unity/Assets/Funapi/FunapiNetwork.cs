@@ -513,7 +513,7 @@ namespace Fun
                     StartTransport(transport);
                 }
 
-                DebugUtils.DebugLog("{0} transport attached.", transport.Protocol);
+                DebugUtils.Log("{0} transport attached.", transport.Protocol);
             }
         }
 
@@ -528,7 +528,7 @@ namespace Fun
                         StopTransport(transport);
 
                     transports_.Remove(protocol);
-                    DebugUtils.DebugLog("{0} transport detached.", protocol);
+                    DebugUtils.Log("{0} transport detached.", protocol);
 
                     if (protocol == default_protocol_)
                     {
@@ -585,7 +585,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            DebugUtils.DebugLog("Stopping {0} transport.", transport.Protocol);
+            DebugUtils.Log("Stopping {0} transport.", transport.Protocol);
 
             StopPingTimer(transport);
 
@@ -934,7 +934,8 @@ namespace Fun
                         if (transport_reliability)
                             send_queue_.Enqueue(fun_msg);
 
-                        DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}", protocol, msg_type, pbuf.seq);
+                        DebugUtils.DebugLog("{0} send message - msgtype:{1} seq:{2}",
+                                            protocol, msg_type, pbuf.seq);
                     }
                     else
                     {
@@ -991,7 +992,8 @@ namespace Fun
 
                 fun_msg.SetReply(reply_type, reply_time, onReplyMissed);
                 expected_replies_[reply_type].Add(fun_msg);
-                DebugUtils.Log("Adds expected reply message - {0} > {1}", fun_msg.msg_type, reply_type);
+                DebugUtils.Log("Adds expected reply message - {0} > {1} ({2})",
+                               fun_msg.msg_type, reply_type, reply_time);
             }
         }
 
@@ -1062,8 +1064,7 @@ namespace Fun
 
                     if (transport.JsonHelper.HasField(json, kMsgTypeBodyField))
                     {
-                        string msg_type_node = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
-                        msg_type = msg_type_node;
+                        msg_type = transport.JsonHelper.GetStringField(json, kMsgTypeBodyField) as string;
                         transport.JsonHelper.RemoveStringField(json, kMsgTypeBodyField);
                     }
 
@@ -1368,6 +1369,8 @@ namespace Fun
 
             if (state_ != State.kConnected)
                 return;
+
+            DebugUtils.DebugLog("received ack message - ack:{0}", ack);
 
             UInt32 seq = 0;
             while (send_queue_.Count > 0)

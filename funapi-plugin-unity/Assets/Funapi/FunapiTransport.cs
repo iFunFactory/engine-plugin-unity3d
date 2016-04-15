@@ -835,14 +835,14 @@ namespace Fun
                 {
                     // End of header.
                     header_decoded_ = true;
-                    DebugUtils.DebugLog("End of header reached. Will decode body from now.");
+                    //DebugUtils.DebugLog("End of header reached. Will decode body from now.");
                     return true;
                 }
 
-                DebugUtils.DebugLog("Header line: {0}", line);
+                DebugUtils.DebugLog("> {0}", line);
                 string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
                 tuple[0] = tuple[0].ToUpper();
-                DebugUtils.DebugLog("Decoded header field '{0}' => '{1}'", tuple[0], tuple[1]);
+                //DebugUtils.DebugLog("Decoded header field '{0}' => '{1}'", tuple[0], tuple[1]);
                 DebugUtils.Assert(tuple.Length == 2);
                 header_fields_[tuple[0]] = tuple[1];
             }
@@ -1203,7 +1203,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.DebugLog(last_error_message_);
+                    DebugUtils.Log(last_error_message_);
                     return;
                 }
 
@@ -1392,7 +1392,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.DebugLog(last_error_message_);
+                    DebugUtils.Log(last_error_message_);
                     return;
                 }
 
@@ -1445,7 +1445,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.DebugLog(last_error_message_);
+                    DebugUtils.Log(last_error_message_);
                     return;
                 }
 
@@ -1657,6 +1657,9 @@ namespace Fun
                         },
                         RequestTimeout
                     );
+                    DebugUtils.DebugLog("Set http request timeout - msg_type:{0} time:{1}",
+                                        body.msg_type, RequestTimeout);
+
 
 #if !NO_UNITY
                     // Sending a message

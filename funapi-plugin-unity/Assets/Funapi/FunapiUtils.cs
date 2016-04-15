@@ -101,7 +101,7 @@ namespace Fun
             {
                 long now = DateTime.UtcNow.Ticks;
                 int milliseconds = (int)((now - prev_ticks_) / 10000);
-                deltaTime_ = (float)milliseconds / 1000f;
+                deltaTime_ = Math.Min((float)milliseconds / 1000f, kDeltaTimeMax);
                 prev_ticks_ = now;
 
                 Updater(deltaTime_);
@@ -129,6 +129,8 @@ namespace Fun
             }
 
 #if !NO_UNITY
+            private static readonly float kDeltaTimeMax = 0.3f;
+
             private long prev_ticks_ = 0;
             private float deltaTime_ = 0f;
 #endif
