@@ -19,6 +19,11 @@ FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 
 플러그인을 업데이트한 후 호출 코드를 삭제해 주시기 바랍니다.
 ```
 
+### 04/27/2016 (ver.145)
+- Tester Scene 수정, 불필요한 파일 삭제
+- Delta time limit 값 추가, 로그 정리
+- Reconnect 실패시 콜백 함수를 ConnectFailedCallback 함수로 변경
+
 ### 04/05/2016 (ver.144)
 - TCP, HTTP 메시지에 sequence number 옵션 추가 (FunapiNetwork.SequenceNumberValidation)
 - protobuf.net 으로 enum 타입의 메시지를 보낼 때 int32 타입으로 변환해서 전송

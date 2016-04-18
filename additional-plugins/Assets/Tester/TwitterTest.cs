@@ -7,7 +7,7 @@
 using Fun;
 using UnityEngine;
 
-public class TwitterTester : MonoBehaviour
+public class TwitterTest : MonoBehaviour
 {
     public void Awake()
     {
