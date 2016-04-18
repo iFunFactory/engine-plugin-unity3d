@@ -8,7 +8,7 @@ using Fun;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class FacebookTester : MonoBehaviour
+public class FacebookTest : MonoBehaviour
 {
     void Awake ()
     {
