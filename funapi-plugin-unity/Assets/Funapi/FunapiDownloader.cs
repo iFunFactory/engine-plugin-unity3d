@@ -212,6 +212,11 @@ namespace Fun
             Stop();
         }
 
+        public string DownloadPath
+        {
+            get {  return target_path_; }
+        }
+
         public bool IsPaused
         {
             get { return state_ == State.Paused; }
