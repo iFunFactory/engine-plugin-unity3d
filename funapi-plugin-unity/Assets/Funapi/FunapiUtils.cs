@@ -365,20 +365,20 @@ namespace Fun
                 if (path_ == null)
                 {
 #if !NO_UNITY
-                    if (Application.platform == RuntimePlatform.IPhonePlayer)
-                    {
-                        string path = Application.dataPath.Substring(0, Application.dataPath.Length - 5); // Strip "/Data" from path
-                        path = path.Substring(0, path.LastIndexOf('/'));
-                        path_ = path + "/Documents";
-                    }
-                    else if (Application.platform == RuntimePlatform.Android)
+                    if (Application.platform == RuntimePlatform.Android ||
+                        Application.platform == RuntimePlatform.IPhonePlayer)
                     {
                         path_ = Application.persistentDataPath;
                     }
-                    else
+                    else if (Application.platform == RuntimePlatform.OSXEditor ||
+                             Application.platform == RuntimePlatform.WindowsEditor)
                     {
                         string path = Application.dataPath;
-                        path_ = path.Substring(0, path.LastIndexOf('/'));
+                        path_ = path.Substring(0, path.LastIndexOf('/')) + "/Data";
+                    }
+                    else
+                    {
+                        path_ = Application.dataPath;
                     }
 #else
                     path_ = "";

@@ -11,5 +11,4 @@ Temp
 *.mdb
 *.zip
 plugin-test/*.dll
-funapi-plugin-unity/client_data
-funapi-plugin-unity/announce
+funapi-plugin-unity/Data
