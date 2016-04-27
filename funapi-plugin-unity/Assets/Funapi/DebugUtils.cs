@@ -4,8 +4,10 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-#define DEBUG
-//#define DEBUG_LOG
+#if UNITY_EDITOR || NO_UNITY
+#define ENABLE_LOG
+#endif
+//#define ENABLE_DEBUG
 
 using System;
 using System.Diagnostics;
@@ -16,7 +18,7 @@ namespace Fun
     // Utility class
     public class DebugUtils
     {
-        [Conditional("DEBUG")]
+        [Conditional("ENABLE_DEBUG")]
         public static void Assert (bool condition)
         {
             if (!condition)
@@ -25,7 +27,7 @@ namespace Fun
             }
         }
 
-        [Conditional("DEBUG")]
+        [Conditional("ENABLE_DEBUG")]
         public static void Assert (bool condition, string message)
         {
             if (!condition)
@@ -35,34 +37,37 @@ namespace Fun
         }
 
 #if !NO_UNITY
+        [Conditional("ENABLE_LOG")]
         public static void Log (string message, params object[] args)
         {
             UnityEngine.Debug.Log(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
+        [Conditional("ENABLE_LOG")]
         public static void LogWarning (string message, params object[] args)
         {
             UnityEngine.Debug.LogWarning(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
+        [Conditional("ENABLE_LOG")]
         public static void LogError (string message, params object[] args)
         {
             UnityEngine.Debug.LogError(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
-        [Conditional("DEBUG_LOG")]
+        [Conditional("ENABLE_DEBUG")]
         public static void DebugLog (string message, params object[] args)
         {
             UnityEngine.Debug.Log(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
-        [Conditional("DEBUG_LOG")]
+        [Conditional("ENABLE_DEBUG")]
         public static void DebugLogWarning (string message, params object[] args)
         {
             UnityEngine.Debug.LogWarning(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
         }
 
-        [Conditional("DEBUG_LOG")]
+        [Conditional("ENABLE_DEBUG")]
         public static void DebugLogError (string message, params object[] args)
         {
             UnityEngine.Debug.LogError(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
@@ -70,60 +75,45 @@ namespace Fun
 #else
         public static void Log (string message, params object[] args)
         {
+#if ENABLE_LOG
             Console.WriteLine(string.Format(message, args));
+#endif
         }
 
         public static void LogWarning (string message, params object[] args)
         {
+#if ENABLE_LOG
             Console.WriteLine("Warning: " + string.Format(message, args));
+#endif
         }
 
         public static void LogError (string message, params object[] args)
         {
+#if ENABLE_LOG
             Console.WriteLine("Error: " + string.Format(message, args));
+#endif
         }
 
         public static void DebugLog (string message, params object[] args)
         {
-#if DEBUG_LOG
+#if ENABLE_DEBUG
             Console.WriteLine(string.Format(message, args));
 #endif
         }
 
         public static void DebugLogWarning (string message, params object[] args)
         {
-#if DEBUG_LOG
+#if ENABLE_DEBUG
             Console.WriteLine("Warning: " + string.Format(message, args));
 #endif
         }
 
         public static void DebugLogError (string message, params object[] args)
         {
-#if DEBUG_LOG
+#if ENABLE_DEBUG
             Console.WriteLine("Error: " + string.Format(message, args));
 #endif
         }
 #endif
     }
-
-
-#if NO_UNITY
-    class Debug
-    {
-        public static void Log(object message)
-        {
-            Console.WriteLine(message);
-        }
-
-        public static void LogWarning(object message)
-        {
-            Console.WriteLine("Warning: " + message);
-        }
-
-        public static void LogError(object message)
-        {
-            Console.WriteLine("Error: " + message);
-        }
-    }
-#endif
 }
