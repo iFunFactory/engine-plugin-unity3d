@@ -32,7 +32,7 @@ public class DownloaderTest : MonoBehaviour
 
     private void OnDownloadVerify (string path)
     {
-        DebugUtils.DebugLog("Check file - {0}", path);
+        FunDebug.DebugLog("Check file - {0}", path);
     }
 
     private void OnDownloadReady (int total_count, UInt64 total_size)
@@ -42,7 +42,7 @@ public class DownloaderTest : MonoBehaviour
 
     private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
-        DebugUtils.DebugLog("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+        FunDebug.DebugLog("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
                             path, bytes_received, total_bytes, percentage);
     }
 

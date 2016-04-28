@@ -49,7 +49,7 @@ namespace Fun
         {
             if (string.IsNullOrEmpty(host_url_))
             {
-                DebugUtils.Log("url is null or empty.");
+                FunDebug.Log("url is null or empty.");
                 OnResultCallback(AnnounceResult.kInvalidUrl);
                 return;
             }
@@ -88,9 +88,9 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    DebugUtils.Log("Exception Error: {0}", ar.Error);
+                    FunDebug.Log("Exception Error: {0}", ar.Error);
                     OnResultCallback(AnnounceResult.kExceptionError);
-                    DebugUtils.Assert(false);
+                    FunDebug.Assert(false);
                 }
                 else
                 {
@@ -99,16 +99,16 @@ namespace Fun
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
                     if (json == null)
                     {
-                        DebugUtils.Log("Deserialize json failed. json: {0}", data);
+                        FunDebug.Log("Deserialize json failed. json: {0}", data);
                         OnResultCallback(AnnounceResult.kInvalidJson);
                         return;
                     }
 
-                    DebugUtils.Assert(json.ContainsKey("list"));
+                    FunDebug.Assert(json.ContainsKey("list"));
                     List<object> list = json["list"] as List<object>;
                     if (list == null || list.Count <= 0)
                     {
-                        DebugUtils.Log("Invalid announcement list. list: {0}", list);
+                        FunDebug.Log("Invalid announcement list. list: {0}", list);
                         OnResultCallback(AnnounceResult.kListIsNullOrEmpty);
                         return;
                     }
@@ -126,14 +126,14 @@ namespace Fun
                         }
                     }
 
-                    DebugUtils.Log("Announcement has been updated. total count: {0}", announce_list_.Count);
+                    FunDebug.Log("Announcement has been updated. total count: {0}", announce_list_.Count);
 
                     if (image_list_.Count > 0)
                     {
                         // Request a file.
                         KeyValuePair<string, string> item = image_list_[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                        DebugUtils.Log("Download url: {0}", item.Key);
+                        FunDebug.Log("Download url: {0}", item.Key);
                     }
                     else
                     {
@@ -143,7 +143,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in DownloadDataCompleteCb: {0}", e.ToString());
+                FunDebug.Log("Failure in DownloadDataCompleteCb: {0}", e.ToString());
                 OnResultCallback(AnnounceResult.kExceptionError);
             }
         }
@@ -154,9 +154,9 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    DebugUtils.Log("Exception Error: {0}", ar.Error);
+                    FunDebug.Log("Exception Error: {0}", ar.Error);
                     OnResultCallback(AnnounceResult.kExceptionError);
-                    DebugUtils.Assert(false);
+                    FunDebug.Assert(false);
                 }
                 else
                 {
@@ -165,18 +165,18 @@ namespace Fun
                     {
                         KeyValuePair<string, string> item = image_list_[0];
                         web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                        DebugUtils.Log("Download url: {0}", item.Key);
+                        FunDebug.Log("Download url: {0}", item.Key);
                     }
                     else
                     {
-                        DebugUtils.Log("Download file completed.");
+                        FunDebug.Log("Download file completed.");
                         OnResultCallback(AnnounceResult.kSuccess);
                     }
                 }
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failure in DownloadFileCompleteCb: {0}", e.ToString());
+                FunDebug.Log("Failure in DownloadFileCompleteCb: {0}", e.ToString());
                 OnResultCallback(AnnounceResult.kExceptionError);
             }
         }

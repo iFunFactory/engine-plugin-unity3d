@@ -54,7 +54,7 @@ public class FunapiNetworkTest : MonoBehaviour
 
     private void Connect (TransportProtocol protocol)
     {
-        DebugUtils.Log("-------- Connect --------");
+        FunDebug.Log("-------- Connect --------");
 
         if (network_ == null || network_.SessionReliability != with_session_reliability_)
         {
@@ -145,7 +145,7 @@ public class FunapiNetworkTest : MonoBehaviour
     {
         if (network_.Started == false)
         {
-            DebugUtils.Log("You should connect first.");
+            FunDebug.Log("You should connect first.");
         }
         else if (network_.SessionReliability)
         {
@@ -161,14 +161,14 @@ public class FunapiNetworkTest : MonoBehaviour
     {
         if (network_.Started == false && !network_.SessionReliability)
         {
-            DebugUtils.Log("You should connect first.");
+            FunDebug.Log("You should connect first.");
         }
         else
         {
             FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
             if (encoding == FunEncoding.kNone)
             {
-                DebugUtils.Log("You should attach transport first.");
+                FunDebug.Log("You should attach transport first.");
                 return;
             }
 
@@ -194,47 +194,47 @@ public class FunapiNetworkTest : MonoBehaviour
 
     private void OnSessionInitiated (string session_id)
     {
-        DebugUtils.Log("Session initiated. Session id:{0}", session_id);
+        FunDebug.Log("Session initiated. Session id:{0}", session_id);
     }
 
     private void OnSessionClosed ()
     {
-        DebugUtils.Log("Session closed.");
+        FunDebug.Log("Session closed.");
         //network_ = null;
     }
 
     private void OnConnectTimeout (TransportProtocol protocol)
     {
-        DebugUtils.Log("{0} Transport Connection timed out.", protocol);
+        FunDebug.Log("{0} Transport Connection timed out.", protocol);
     }
 
     private void OnTransportStarted (TransportProtocol protocol)
     {
-        DebugUtils.Log("{0} Transport started.", protocol);
+        FunDebug.Log("{0} Transport started.", protocol);
     }
 
     private void OnTransportClosed (TransportProtocol protocol)
     {
-        DebugUtils.Log("{0} Transport closed.", protocol);
+        FunDebug.Log("{0} Transport closed.", protocol);
     }
 
     private void OnEcho (string msg_type, object body)
     {
-        DebugUtils.Assert(body is Dictionary<string, object>);
+        FunDebug.Assert(body is Dictionary<string, object>);
         string strJson = Json.Serialize(body as Dictionary<string, object>);
-        DebugUtils.Log("Received an echo message: {0}", strJson);
+        FunDebug.Log("Received an echo message: {0}", strJson);
     }
 
     private void OnEchoWithProtobuf (string msg_type, object body)
     {
-        DebugUtils.Assert(body is FunMessage);
+        FunDebug.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
         object obj = network_.GetMessage(msg, MessageType.pbuf_echo);
         if (obj == null)
             return;
 
         PbufEchoMessage echo = obj as PbufEchoMessage;
-        DebugUtils.Log("Received an echo message: {0}", echo.msg);
+        FunDebug.Log("Received an echo message: {0}", echo.msg);
     }
 
     private void OnMaintenanceMessage (string msg_type, object body)
@@ -242,7 +242,7 @@ public class FunapiNetworkTest : MonoBehaviour
         FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
         if (encoding == FunEncoding.kNone)
         {
-            DebugUtils.Log("Can't find a FunEncoding type for maintenance message.");
+            FunDebug.Log("Can't find a FunEncoding type for maintenance message.");
             return;
         }
 
@@ -254,26 +254,26 @@ public class FunapiNetworkTest : MonoBehaviour
                 return;
 
             MaintenanceMessage maintenance = obj as MaintenanceMessage;
-            DebugUtils.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
+            FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
                            maintenance.date_start, maintenance.date_end, maintenance.messages);
         }
         else if (encoding == FunEncoding.kJson)
         {
-            DebugUtils.Assert(body is Dictionary<string, object>);
+            FunDebug.Assert(body is Dictionary<string, object>);
             Dictionary<string, object> msg = body as Dictionary<string, object>;
-            DebugUtils.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
+            FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
                            msg["date_start"], msg["date_end"], msg["messages"]);
         }
     }
 
     private void OnStoppedAllTransport()
     {
-        DebugUtils.Log("OnStoppedAllTransport called.");
+        FunDebug.Log("OnStoppedAllTransport called.");
     }
 
     private void OnTransportConnectFailed (TransportProtocol protocol)
     {
-        DebugUtils.Log("OnTransportConnectFailed called.");
+        FunDebug.Log("OnTransportConnectFailed called.");
 
         // If you want to try to reconnect, call 'Connect' or 'Reconnect' function.
         // Be careful to avoid falling into an infinite loop.
@@ -284,12 +284,12 @@ public class FunapiNetworkTest : MonoBehaviour
 
     private void OnTransportDisconnected (TransportProtocol protocol)
     {
-        DebugUtils.Log("OnTransportDisconnected called.");
+        FunDebug.Log("OnTransportDisconnected called.");
     }
 
     private void OnTransportFailure (TransportProtocol protocol)
     {
-        DebugUtils.Log("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol));
+        FunDebug.Log("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol));
     }
 
 

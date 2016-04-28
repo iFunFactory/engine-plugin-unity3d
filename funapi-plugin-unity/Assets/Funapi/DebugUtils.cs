@@ -16,7 +16,7 @@ using System.Diagnostics;
 namespace Fun
 {
     // Utility class
-    public class DebugUtils
+    public class FunDebug
     {
         [Conditional("ENABLE_DEBUG")]
         public static void Assert (bool condition)
