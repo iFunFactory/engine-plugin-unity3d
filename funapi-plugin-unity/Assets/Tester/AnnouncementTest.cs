@@ -35,7 +35,7 @@ public class AnnouncementTest : MonoBehaviour
 
     private void OnAnnouncementResult (AnnounceResult result)
     {
-        DebugUtils.Log("OnAnnouncementResult - result: {0}", result);
+        FunDebug.Log("OnAnnouncementResult - result: {0}", result);
         if (result != AnnounceResult.kSuccess)
             return;
 
@@ -51,10 +51,10 @@ public class AnnouncementTest : MonoBehaviour
                     buffer += string.Format("{0}: {1}\n", item.Key, item.Value);
                 }
 
-                DebugUtils.Log("announcement ({0}) >> {1}", i + 1, buffer);
+                FunDebug.Log("announcement ({0}) >> {1}", i + 1, buffer);
 
                 if (list.ContainsKey("image_url"))
-                    DebugUtils.Log("image path > {0}", announcement_.GetImagePath(i));
+                    FunDebug.Log("image path > {0}", announcement_.GetImagePath(i));
             }
         }
     }

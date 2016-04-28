@@ -34,7 +34,7 @@ namespace Fun
                     obj.OnQuit = OnQuit;
                 }
 
-                DebugUtils.DebugLog("'{0}' GameObject was created.", game_object_.name);
+                FunDebug.DebugLog("'{0}' GameObject was created.", game_object_.name);
             }
 #else
             funapi_object_ = new FunapiObject();
@@ -49,7 +49,7 @@ namespace Fun
             if (game_object_ == null)
                 return;
 
-            DebugUtils.DebugLog("'{0}' GameObject was destroyed", game_object_.name);
+            FunDebug.DebugLog("'{0}' GameObject was destroyed", game_object_.name);
             GameObject.Destroy(game_object_);
             game_object_ = null;
 #endif

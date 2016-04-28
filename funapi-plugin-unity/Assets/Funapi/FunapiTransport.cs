@@ -208,7 +208,7 @@ namespace Fun
             {
                 HostAddr extra = extra_list_.GetNextAddress();
                 if (extra == null) {
-                    DebugUtils.Log("SetAvailableAddress - There's no available address.");
+                    FunDebug.Log("SetAvailableAddress - There's no available address.");
                     return false;
                 }
 
@@ -223,7 +223,7 @@ namespace Fun
         // Connect functions
         internal void Connect ()
         {
-            DebugUtils.Log("'{0}' Try to connect to server.", str_protocol);
+            FunDebug.Log("'{0}' Try to connect to server.", str_protocol);
             exponential_time_ = 1f;
             reconnect_count_ = 0;
 
@@ -238,14 +238,14 @@ namespace Fun
 
         internal void Reconnect ()
         {
-            DebugUtils.Log("'{0}' Try to reconnect to server.", str_protocol);
+            FunDebug.Log("'{0}' Try to reconnect to server.", str_protocol);
             cstate_ = ConnectState.kReconnecting;
             Connect();
         }
 
         internal void Redirect (HostAddr addr)
         {
-            DebugUtils.Log("Redirect {0} [{1}:{2}]", str_protocol, addr.host, addr.port);
+            FunDebug.Log("Redirect {0} [{1}:{2}]", str_protocol, addr.host, addr.port);
 
             if (Started) {
                 Stop();
@@ -300,11 +300,11 @@ namespace Fun
                     return false;
             }
 
-            DebugUtils.Log("Wait {0} seconds for connect to {1} transport.",
+            FunDebug.Log("Wait {0} seconds for connect to {1} transport.",
                            delay_time, str_protocol);
 
             event_.Add (delegate {
-                    DebugUtils.Log("'{0}' Try to connect to server.", str_protocol);
+                    FunDebug.Log("'{0}' Try to connect to server.", str_protocol);
                     SetNextAddress();
                     Connect();
                 },
@@ -330,11 +330,11 @@ namespace Fun
             if (delay_time <= 0f)
                 return false;
 
-            DebugUtils.Log("Wait {0} seconds for reconnect to {1} transport.",
+            FunDebug.Log("Wait {0} seconds for reconnect to {1} transport.",
                            delay_time, str_protocol);
 
             event_.Add (delegate {
-                    DebugUtils.Log("'{0}' Try to reconnect to server.", str_protocol);
+                    FunDebug.Log("'{0}' Try to reconnect to server.", str_protocol);
                     Start();
                 },
                 delay_time
@@ -572,7 +572,7 @@ namespace Fun
             {
                 if (state_ != State.kUnknown)
                 {
-                    DebugUtils.LogWarning("{0} Transport.Start() called, but the state is {1}. This request has ignored.\n{2}",
+                    FunDebug.LogWarning("{0} Transport.Start() called, but the state is {1}. This request has ignored.\n{2}",
                                           str_protocol, state_, "If you want to reconnect, call Transport.Stop() first and wait for it to stop.");
                     return;
                 }
@@ -594,7 +594,7 @@ namespace Fun
                             if (state_ == State.kUnknown || state_ == State.kEstablished)
                                 return;
 
-                            DebugUtils.Log("{0} Connection waiting time has been exceeded.", str_protocol);
+                            FunDebug.Log("{0} Connection waiting time has been exceeded.", str_protocol);
                             OnConnectionTimeout();
                         },
                         ConnectTimeout
@@ -607,7 +607,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kConnectFailed;
                 last_error_message_ = "Failure in Start: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
@@ -652,14 +652,14 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kInvalidEncryption;
                 last_error_message_ = "Failed to create encryptor: " + encryption;
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
                 return;
             }
 
             default_encryptor_ = (int)encryption;
             encryptors_[encryption] = encryptor;
-            DebugUtils.Log("Set encryption type - {0}", default_encryptor_);
+            FunDebug.Log("Set encryption type - {0}", default_encryptor_);
         }
 
         internal virtual bool IsSendable
@@ -674,7 +674,7 @@ namespace Fun
                 string str = this.JsonHelper.Serialize(fun_msg.message);
                 byte[] body = System.Text.Encoding.UTF8.GetBytes(str);
 
-                DebugUtils.DebugLog("JSON to send : {0}", str);
+                FunDebug.DebugLog("JSON to send : {0}", str);
 
                 SendMessage(fun_msg, body);
             }
@@ -691,7 +691,7 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Log("SendMessage - Invalid FunEncoding type: {0}", encoding_);
+                FunDebug.Log("SendMessage - Invalid FunEncoding type: {0}", encoding_);
             }
         }
 
@@ -718,15 +718,15 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendMessage: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 AddFailureCallback(fun_msg);
             }
         }
 
         internal bool EncryptThenSendMessage()
         {
-            DebugUtils.Assert((int)state_ >= (int)State.kConnected);
-            DebugUtils.Assert(sending_.Count > 0);
+            FunDebug.Assert((int)state_ >= (int)State.kConnected);
+            FunDebug.Assert(sending_.Count > 0);
 
             for (int i = 0; i < sending_.Count; i+=2)
             {
@@ -745,7 +745,7 @@ namespace Fun
                     {
                         last_error_code_ = ErrorCode.kUnknownEncryption;
                         last_error_message_ = "Unknown encryption: " + encryption;
-                        DebugUtils.Log(last_error_message_);
+                        FunDebug.Log(last_error_message_);
                         AddFailureCallback(message);
                         return false;
                     }
@@ -754,7 +754,7 @@ namespace Fun
                     {
                         last_error_code_ = ErrorCode.kInvalidEncryption;
                         last_error_message_ = string.Format("'{0}' is invalid encryption type. Check out the encryption type of server.", encryptor.name);
-                        DebugUtils.Log(last_error_message_);
+                        FunDebug.Log(last_error_message_);
                         AddFailureCallback(message);
                         return false;
                     }
@@ -766,12 +766,12 @@ namespace Fun
                         {
                             last_error_code_ = ErrorCode.kEncryptionFailed;
                             last_error_message_ = "Encrypt failure: " + encryptor.name;
-                            DebugUtils.Log(last_error_message_);
+                            FunDebug.Log(last_error_message_);
                             AddFailureCallback(message);
                             return false;
                         }
 
-                        DebugUtils.Assert(nSize == message.buffer.Count);
+                        FunDebug.Assert(nSize == message.buffer.Count);
                     }
                 }
 
@@ -785,8 +785,8 @@ namespace Fun
                 header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, message.buffer.Count, kHeaderDelimeter);
                 if ((int)encryption != kNoneEncryption)
                 {
-                    DebugUtils.Assert(encryptor != null);
-                    DebugUtils.Assert(encryptor.encryption == encryption);
+                    FunDebug.Assert(encryptor != null);
+                    FunDebug.Assert(encryptor.encryption == encryption);
                     header.AppendFormat("{0}{1}{2}", kEncryptionHeaderField, kHeaderFieldDelimeter, Convert.ToInt32(encryption));
                     header.AppendFormat("-{0}{1}", encryption_header, kHeaderDelimeter);
                 }
@@ -796,7 +796,7 @@ namespace Fun
                 header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                 sending_.Insert(i, header_buffer);
 
-                DebugUtils.DebugLog("Header to send: {0} body length: {1}", header, message.buffer.Count);
+                FunDebug.DebugLog("Header to send: {0} body length: {1}", header, message.buffer.Count);
             }
 
             WireSend();
@@ -811,7 +811,7 @@ namespace Fun
                 if (sending_.Count > 0)
                 {
                     // If we have more segments to send, we process more.
-                    DebugUtils.Log("Retrying unsent messages.");
+                    FunDebug.Log("Retrying unsent messages.");
                     WireSend();
                 }
                 else if (IsSendable && pending_.Count > 0)
@@ -847,7 +847,7 @@ namespace Fun
                 // Otherwise, increase the receiving buffer size.
                 if (next_decoding_offset_ > 0)
                 {
-                    DebugUtils.Log("Compacting a receive buffer to save {0} bytes.", next_decoding_offset_);
+                    FunDebug.Log("Compacting a receive buffer to save {0} bytes.", next_decoding_offset_);
                     // calc copy_length first to make sure
                     // src range[next_decoding_offset_ .. next_decoding_offset_ + copy_length)
                     // fit in src buffer boundary
@@ -859,7 +859,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugUtils.Log("Increasing a receive buffer to {0} bytes.", receive_buffer_.Length + kUnitBufferSize);
+                    FunDebug.Log("Increasing a receive buffer to {0} bytes.", receive_buffer_.Length + kUnitBufferSize);
                     Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, receive_buffer_.Length);
                     receive_buffer_ = new_buffer;
                 }
@@ -897,21 +897,21 @@ namespace Fun
                 {
                     if (TryToDecodeBody() == false)
                     {
-                        DebugUtils.LogWarning("Failed to decode body.");
-                        DebugUtils.Assert(false);
+                        FunDebug.LogWarning("Failed to decode body.");
+                        FunDebug.Assert(false);
                     }
                 }
                 else
                 {
-                    DebugUtils.LogWarning("Failed to decode header.");
-                    DebugUtils.Assert(false);
+                    FunDebug.LogWarning("Failed to decode header.");
+                    FunDebug.Assert(false);
                 }
             }
         }
 
         internal bool TryToDecodeHeader()
         {
-            DebugUtils.DebugLog("Trying to decode header fields.");
+            FunDebug.DebugLog("Trying to decode header fields.");
 
             for (; next_decoding_offset_ < received_size_; )
             {
@@ -920,7 +920,7 @@ namespace Fun
                 if (offset < 0)
                 {
                     // Not enough bytes. Wait for more bytes to come.
-                    DebugUtils.Log("We need more bytes for a header field. Waiting.");
+                    FunDebug.Log("We need more bytes for a header field. Waiting.");
                     return false;
                 }
 
@@ -931,15 +931,15 @@ namespace Fun
                 {
                     // End of header.
                     header_decoded_ = true;
-                    //DebugUtils.DebugLog("End of header reached. Will decode body from now.");
+                    //FunDebug.DebugLog("End of header reached. Will decode body from now.");
                     return true;
                 }
 
-                DebugUtils.DebugLog("> {0}", line);
+                FunDebug.DebugLog("> {0}", line);
                 string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
                 tuple[0] = tuple[0].ToUpper();
-                //DebugUtils.DebugLog("Decoded header field '{0}' => '{1}'", tuple[0], tuple[1]);
-                DebugUtils.Assert(tuple.Length == 2);
+                //FunDebug.DebugLog("Decoded header field '{0}' => '{1}'", tuple[0], tuple[1]);
+                FunDebug.Assert(tuple.Length == 2);
                 header_fields_[tuple[0]] = tuple[1];
             }
 
@@ -949,20 +949,20 @@ namespace Fun
         internal bool TryToDecodeBody()
         {
             // Header version
-            DebugUtils.Assert(header_fields_.ContainsKey(kVersionHeaderField));
+            FunDebug.Assert(header_fields_.ContainsKey(kVersionHeaderField));
             int version = Convert.ToUInt16(header_fields_[kVersionHeaderField]);
-            DebugUtils.Assert(version == FunapiVersion.kProtocolVersion);
+            FunDebug.Assert(version == FunapiVersion.kProtocolVersion);
 
             // Header length
-            DebugUtils.Assert(header_fields_.ContainsKey(kLengthHeaderField));
+            FunDebug.Assert(header_fields_.ContainsKey(kLengthHeaderField));
             int body_length = Convert.ToInt32(header_fields_[kLengthHeaderField]);
-            DebugUtils.DebugLog("We need {0} bytes for a message body. Buffer has {1} bytes.",
+            FunDebug.DebugLog("We need {0} bytes for a message body. Buffer has {1} bytes.",
                                 body_length, received_size_ - next_decoding_offset_);
 
             if (received_size_ - next_decoding_offset_ < body_length)
             {
                 // Need more bytes.
-                DebugUtils.Log("We need more bytes for a message body. Waiting.");
+                FunDebug.Log("We need more bytes for a message body. Waiting.");
                 return false;
             }
 
@@ -986,7 +986,7 @@ namespace Fun
 
             if (state_ == State.kEncryptionHandshaking)
             {
-                DebugUtils.Assert(body_length == 0);
+                FunDebug.Assert(body_length == 0);
 
                 if (encryption_str == kEncryptionHandshakeBegin)
                 {
@@ -1016,7 +1016,7 @@ namespace Fun
                     if (default_encryptor_ == kNoneEncryption && encryption_list.Count > 0)
                     {
                         default_encryptor_ = (int)encryption_list[0];
-                        DebugUtils.Log("Set default encryption: {0}", default_encryptor_);
+                        FunDebug.Log("Set default encryption: {0}", default_encryptor_);
                     }
 
                     // Create encryptors
@@ -1025,7 +1025,7 @@ namespace Fun
                         Encryptor encryptor = Encryptor.Create(type);
                         if (encryptor == null)
                         {
-                            DebugUtils.Log("Failed to create encryptor: {0}", type);
+                            FunDebug.Log("Failed to create encryptor: {0}", type);
                             return false;
                         }
 
@@ -1039,31 +1039,31 @@ namespace Fun
                     Encryptor encryptor = encryptors_[encryption];
                     if (encryptor == null)
                     {
-                        DebugUtils.Log("Unknown encryption: {0}", encryption_str);
+                        FunDebug.Log("Unknown encryption: {0}", encryption_str);
                         return false;
                     }
 
                     if (encryptor.state != Encryptor.State.kHandshaking)
                     {
-                        DebugUtils.Log("Unexpected handshake message: {0}", encryptor.name);
+                        FunDebug.Log("Unexpected handshake message: {0}", encryptor.name);
                         return false;
                     }
 
                     string out_header = "";
                     if (!encryptor.Handshake(encryption_header, ref out_header))
                     {
-                        DebugUtils.Log("Encryption handshake failure: {0}", encryptor.name);
+                        FunDebug.Log("Encryption handshake failure: {0}", encryptor.name);
                         return false;
                     }
 
                     if (out_header.Length > 0)
                     {
                         // TODO: Implementation
-                        DebugUtils.Assert(false);
+                        FunDebug.Assert(false);
                     }
                     else
                     {
-                        DebugUtils.Assert(encryptor.state == Encryptor.State.kEstablished);
+                        FunDebug.Assert(encryptor.state == Encryptor.State.kEstablished);
                     }
                 }
 
@@ -1081,7 +1081,7 @@ namespace Fun
                 {
                     // Makes a state transition.
                     state_ = State.kConnected;
-                    DebugUtils.Log("Ready to receive.");
+                    FunDebug.Log("Ready to receive.");
 
                     event_.Add(OnHandshakeComplete);
                 }
@@ -1091,13 +1091,13 @@ namespace Fun
             {
                 if ((int)state_ < (int)State.kConnected)
                 {
-                    DebugUtils.Log("Unexpected message. state:{0}", state_);
+                    FunDebug.Log("Unexpected message. state:{0}", state_);
                     return false;
                 }
 
                 if ((encryptors_.Count == 0) != (encryption_str.Length == 0))
                 {
-                    DebugUtils.Log("Unknown encryption: {0}", encryption_str);
+                    FunDebug.Log("Unknown encryption: {0}", encryption_str);
                     return false;
                 }
 
@@ -1108,22 +1108,22 @@ namespace Fun
 
                     if (encryptor == null)
                     {
-                        DebugUtils.Log("Unknown encryption: {0}", encryption_str);
+                        FunDebug.Log("Unknown encryption: {0}", encryption_str);
                         return false;
                     }
 
                     ArraySegment<byte> body_bytes = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
-                    DebugUtils.Assert(body_bytes.Count == body_length);
+                    FunDebug.Assert(body_bytes.Count == body_length);
 
                     Int64 nSize = encryptor.Decrypt(body_bytes, body_bytes, encryption_header);
                     if (nSize <= 0)
                     {
-                        DebugUtils.Log("Failed to decrypt.");
+                        FunDebug.Log("Failed to decrypt.");
                         return false;
                     }
 
                     // TODO: Implementation
-                    DebugUtils.Assert(body_length == nSize);
+                    FunDebug.Assert(body_length == nSize);
                 }
 
                 if (first_receiving_)
@@ -1157,7 +1157,7 @@ namespace Fun
                 {
                     if (pending_.Count > 0)
                     {
-                        DebugUtils.DebugLog("Flushing pending messages.");
+                        FunDebug.DebugLog("Flushing pending messages.");
                         List<FunapiMessage> tmp = sending_;
                         sending_ = pending_;
                         pending_ = tmp;
@@ -1172,7 +1172,7 @@ namespace Fun
 
         internal virtual void OnFailure()
         {
-            DebugUtils.Log("OnFailure({0}) - state: {1}\n{2}:{3}",
+            FunDebug.Log("OnFailure({0}) - state: {1}\n{2}:{3}",
                            str_protocol, state_, last_error_code_, last_error_message_);
 
             OnFailureCallback();
@@ -1322,12 +1322,12 @@ namespace Fun
             else
             {
                 IPHostEntry host_info = Dns.GetHostEntry(addr.host);
-                DebugUtils.Assert(host_info.AddressList.Length > 0);
+                FunDebug.Assert(host_info.AddressList.Length > 0);
                 ip = host_info.AddressList[0];
             }
 
             connect_ep_ = new IPEndPoint(ip, addr.port);
-            DebugUtils.Log("TCP transport - {0}:{1}", ip, addr.port);
+            FunDebug.Log("TCP transport - {0}:{1}", ip, addr.port);
         }
 
         protected override void WireSend()
@@ -1346,7 +1346,7 @@ namespace Fun
 
         private void StartCb(IAsyncResult ar)
         {
-            DebugUtils.DebugLog("StartCb called.");
+            FunDebug.DebugLog("StartCb called.");
 
             try
             {
@@ -1354,7 +1354,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kConnectFailed;
                     last_error_message_ = "Failed to connect. socket is null.";
-                    DebugUtils.Log(last_error_message_);
+                    FunDebug.Log(last_error_message_);
                     return;
                 }
 
@@ -1363,11 +1363,11 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kConnectFailed;
                     last_error_message_ = "Failed to connect.";
-                    DebugUtils.Log(last_error_message_);
+                    FunDebug.Log(last_error_message_);
                     event_.Add(OnFailure);
                     return;
                 }
-                DebugUtils.Log("Connected.");
+                FunDebug.Log("Connected.");
 
                 state_ = State.kEncryptionHandshaking;
 
@@ -1382,21 +1382,21 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.DebugLog("BeginConnect operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("BeginConnect operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kConnectFailed;
                 last_error_message_ = "Failure in StartCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
 
         private void SendBytesCb(IAsyncResult ar)
         {
-            DebugUtils.DebugLog("SendBytesCb called.");
+            FunDebug.DebugLog("SendBytesCb called.");
 
             try
             {
@@ -1404,30 +1404,30 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.DebugLog(last_error_message_);
+                    FunDebug.DebugLog(last_error_message_);
                     return;
                 }
 
                 int nSent = sock_.EndSend(ar);
-                DebugUtils.DebugLog("Sent {0}bytes", nSent);
-                DebugUtils.Assert(nSent > 0, "Failed to transfer tcp messages.");
+                FunDebug.DebugLog("Sent {0}bytes", nSent);
+                FunDebug.Assert(nSent > 0, "Failed to transfer tcp messages.");
 
                 lock (sending_lock_)
                 {
                     // Removes any segment fully sent.
                     while (nSent > 0)
                     {
-                        DebugUtils.Assert(sending_.Count > 0);
+                        FunDebug.Assert(sending_.Count > 0);
 
                         if (sending_[0].buffer.Count > nSent)
                         {
                             // partial data
-                            DebugUtils.Log("Partially sent. Will resume.");
+                            FunDebug.Log("Partially sent. Will resume.");
                             break;
                         }
                         else
                         {
-                            DebugUtils.DebugLog("Discarding a fully sent message. ({0}bytes)",
+                            FunDebug.DebugLog("Discarding a fully sent message. ({0}bytes)",
                                                 sending_[0].buffer.Count);
 
                             // fully sent.
@@ -1438,17 +1438,17 @@ namespace Fun
 
                     while (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
                     {
-                        DebugUtils.DebugLog("Remove empty buffer.");
+                        FunDebug.DebugLog("Remove empty buffer.");
                         sending_.RemoveAt(0);
                     }
 
                     // If the first segment has been sent partially, we need to reconstruct the first segment.
                     if (nSent > 0)
                     {
-                        DebugUtils.Assert(sending_.Count > 0);
+                        FunDebug.Assert(sending_.Count > 0);
                         ArraySegment<byte> original = sending_[0].buffer;
 
-                        DebugUtils.Assert(nSent <= sending_[0].buffer.Count);
+                        FunDebug.Assert(nSent <= sending_[0].buffer.Count);
                         ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
                         sending_[0].buffer = adjusted;
                     }
@@ -1461,21 +1461,21 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.DebugLog("BeginSend operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("BeginSend operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
 
         private void ReceiveBytesCb(IAsyncResult ar)
         {
-            DebugUtils.DebugLog("ReceiveBytesCb called.");
+            FunDebug.DebugLog("ReceiveBytesCb called.");
 
             try
             {
@@ -1483,7 +1483,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    FunDebug.Log(last_error_message_);
                     return;
                 }
 
@@ -1493,7 +1493,7 @@ namespace Fun
                     if (nRead > 0)
                     {
                         received_size_ += nRead;
-                        DebugUtils.DebugLog("Received {0} bytes. Buffer has {1} bytes.",
+                        FunDebug.DebugLog("Received {0} bytes. Buffer has {1} bytes.",
                                             nRead, received_size_ - next_decoding_offset_);
                     }
 
@@ -1510,7 +1510,7 @@ namespace Fun
                         List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                         buffer.Add(residual);
                         sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
-                        DebugUtils.DebugLog("Ready to receive more. We can receive upto {0} more bytes",
+                        FunDebug.DebugLog("Ready to receive more. We can receive upto {0} more bytes",
                                             receive_buffer_.Length - received_size_);
 
                         last_error_code_ = ErrorCode.kNone;
@@ -1518,36 +1518,36 @@ namespace Fun
                     }
                     else
                     {
-                        DebugUtils.Log("Socket closed");
+                        FunDebug.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has {0} bytes. But they failed to decode. Discarding.",
+                            FunDebug.Log("Buffer has {0} bytes. But they failed to decode. Discarding.",
                                            receive_buffer_.Length - received_size_);
                         }
 
                         last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
-                        DebugUtils.Log(last_error_message_);
+                        FunDebug.Log(last_error_message_);
                         event_.Add(OnDisconnected);
                     }
                 }
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.DebugLog("BeginReceive operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("BeginReceive operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (NullReferenceException e)
             {
                 // When Stop is called Socket.EndReceive may return a NullReferenceException
-                DebugUtils.DebugLog("BeginReceive operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("BeginReceive operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
@@ -1616,13 +1616,13 @@ namespace Fun
             else
             {
                 IPHostEntry host_info = Dns.GetHostEntry(addr.host);
-                DebugUtils.Assert(host_info.AddressList.Length > 0);
+                FunDebug.Assert(host_info.AddressList.Length > 0);
                 ip = host_info.AddressList[0];
             }
 
             send_ep_ = new IPEndPoint(ip, addr.port);
             receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr.port);
-            DebugUtils.Log("UDP transport - {0}:{1}", ip, addr.port);
+            FunDebug.Log("UDP transport - {0}:{1}", ip, addr.port);
         }
 
         // Send a packet.
@@ -1632,7 +1632,7 @@ namespace Fun
 
             lock (sending_lock_)
             {
-                DebugUtils.Assert(sending_.Count >= 2);
+                FunDebug.Assert(sending_.Count >= 2);
 
                 int length = sending_[0].buffer.Count + sending_[1].buffer.Count;
                 if (length > send_buffer_.Length)
@@ -1653,8 +1653,8 @@ namespace Fun
             {
                 if (offset > kUnitBufferSize)
                 {
-                    DebugUtils.Log("Message is greater than 64KB. It will be truncated.");
-                    DebugUtils.Assert(false);
+                    FunDebug.Log("Message is greater than 64KB. It will be truncated.");
+                    FunDebug.Assert(false);
                 }
 
                 sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
@@ -1664,7 +1664,7 @@ namespace Fun
 
         private void SendBytesCb(IAsyncResult ar)
         {
-            DebugUtils.DebugLog("SendBytesCb called.");
+            FunDebug.DebugLog("SendBytesCb called.");
 
             try
             {
@@ -1672,17 +1672,17 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kSendFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    FunDebug.Log(last_error_message_);
                     return;
                 }
 
                 lock (sending_lock_)
                 {
                     int nSent = sock_.EndSend(ar);
-                    DebugUtils.DebugLog("Sent {0}bytes", nSent);
-                    DebugUtils.Assert(nSent > 0, "Failed to transfer udp messages.");
+                    FunDebug.DebugLog("Sent {0}bytes", nSent);
+                    FunDebug.Assert(nSent > 0, "Failed to transfer udp messages.");
 
-                    DebugUtils.Assert(sending_.Count >= 2);
+                    FunDebug.Assert(sending_.Count >= 2);
 
                     // Removes header and body segment
                     int nToSend = 0;
@@ -1692,7 +1692,7 @@ namespace Fun
                         sending_.RemoveAt(0);
                     }
 
-                    DebugUtils.Assert(nSent == nToSend,
+                    FunDebug.Assert(nSent == nToSend,
                         string.Format("Failed to sending whole messages. {0}:{1}", nToSend, nSent));
 
                     last_error_code_ = ErrorCode.kNone;
@@ -1703,21 +1703,21 @@ namespace Fun
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.DebugLog("BeginSendTo operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("BeginSendTo operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
 
         private void ReceiveBytesCb(IAsyncResult ar)
         {
-            DebugUtils.DebugLog("ReceiveBytesCb called.");
+            FunDebug.DebugLog("ReceiveBytesCb called.");
 
             try
             {
@@ -1725,7 +1725,7 @@ namespace Fun
                 {
                     last_error_code_ = ErrorCode.kReceiveFailed;
                     last_error_message_ = "sock is null.";
-                    DebugUtils.Log(last_error_message_);
+                    FunDebug.Log(last_error_message_);
                     return;
                 }
 
@@ -1735,7 +1735,7 @@ namespace Fun
                     if (nRead > 0)
                     {
                         received_size_ += nRead;
-                        DebugUtils.DebugLog("Received {0} bytes. Buffer has {1} bytes.",
+                        FunDebug.DebugLog("Received {0} bytes. Buffer has {1} bytes.",
                                             nRead, received_size_ - next_decoding_offset_);
                     }
 
@@ -1752,37 +1752,37 @@ namespace Fun
                         // Starts another async receive
                         sock_.BeginReceiveFrom(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
                                                SocketFlags.None, ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
-                        DebugUtils.DebugLog("Ready to receive more. We can receive upto {0} more bytes", receive_buffer_.Length);
+                        FunDebug.DebugLog("Ready to receive more. We can receive upto {0} more bytes", receive_buffer_.Length);
 
                         last_error_code_ = ErrorCode.kNone;
                         last_error_message_ = "";
                     }
                     else
                     {
-                        DebugUtils.Log("Socket closed");
+                        FunDebug.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            DebugUtils.Log("Buffer has {0} bytes. But they failed to decode. Discarding.",
+                            FunDebug.Log("Buffer has {0} bytes. But they failed to decode. Discarding.",
                                            receive_buffer_.Length - received_size_);
                         }
 
                         last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
-                        DebugUtils.Log(last_error_message_);
+                        FunDebug.Log(last_error_message_);
                         event_.Add(OnFailure);
                     }
                 }
             }
             catch (ObjectDisposedException e)
             {
-                DebugUtils.DebugLog("BeginReceiveFrom operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("BeginReceiveFrom operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReceiveBytesCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
@@ -1873,7 +1873,7 @@ namespace Fun
 
         internal override void SetAddress (HostAddr addr)
         {
-            DebugUtils.Assert(addr is HostHttp);
+            FunDebug.Assert(addr is HostHttp);
             HostHttp http = (HostHttp)addr;
 
             // Url
@@ -1881,7 +1881,7 @@ namespace Fun
                                       (http.https ? "https" : "http"), http.host, http.port,
                                       FunapiVersion.kProtocolVersion);
 
-            DebugUtils.Log("HTTP transport - {0}:{1}", http.host, http.port);
+            FunDebug.Log("HTTP transport - {0}:{1}", http.host, http.port);
         }
 
         internal override bool IsSendable
@@ -1902,14 +1902,14 @@ namespace Fun
 
         protected override void WireSend()
         {
-            DebugUtils.DebugLog("Send a Message.");
+            FunDebug.DebugLog("Send a Message.");
 
             try
             {
                 lock (sending_lock_)
                 {
-                    DebugUtils.Assert(sending_.Count >= 2);
-                    DebugUtils.DebugLog("Host Url: {0}", host_url_);
+                    FunDebug.Assert(sending_.Count >= 2);
+                    FunDebug.DebugLog("Host Url: {0}", host_url_);
 
                     FunapiMessage header = sending_[0];
                     FunapiMessage body = sending_[1];
@@ -1940,7 +1940,7 @@ namespace Fun
                         },
                         RequestTimeout
                     );
-                    DebugUtils.DebugLog("Set http request timeout - msg_type:{0} time:{1}",
+                    FunDebug.DebugLog("Set http request timeout - msg_type:{0} time:{1}",
                                         body.msg_type, RequestTimeout);
 
 
@@ -1961,7 +1961,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in WireSend: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
@@ -2029,7 +2029,7 @@ namespace Fun
                         break;
                     case "set-cookie":
                         str_cookie_ = value;
-                        DebugUtils.DebugLog("Set Cookie : {0}", str_cookie_);
+                        FunDebug.DebugLog("Set Cookie : {0}", str_cookie_);
                         break;
                     case "content-length":
                         headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
@@ -2068,7 +2068,7 @@ namespace Fun
 
         private void RequestStreamCb (IAsyncResult ar)
         {
-            DebugUtils.DebugLog("RequestStreamCb called.");
+            FunDebug.DebugLog("RequestStreamCb called.");
 
             try
             {
@@ -2078,11 +2078,11 @@ namespace Fun
                 Stream stream = request.EndGetRequestStream(ar);
                 stream.Write(ws.sending.Array, 0, ws.sending.Count);
                 stream.Close();
-                DebugUtils.DebugLog("Sent {0}bytes.", ws.sending.Count);
+                FunDebug.DebugLog("Sent {0}bytes.", ws.sending.Count);
 
                 lock (sending_lock_)
                 {
-                    DebugUtils.Assert(sending_.Count >= 2);
+                    FunDebug.Assert(sending_.Count >= 2);
 
                     // Removes header and body segment
                     sending_.RemoveAt(0);
@@ -2094,21 +2094,21 @@ namespace Fun
             catch (WebException e)
             {
                 // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
-                DebugUtils.DebugLog("Http request operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("Http request operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
 
         private void ResponseCb (IAsyncResult ar)
         {
-            DebugUtils.DebugLog("ResponseCb called.");
+            FunDebug.DebugLog("ResponseCb called.");
 
             try
             {
@@ -2132,28 +2132,28 @@ namespace Fun
                 }
                 else
                 {
-                    DebugUtils.Log("Failed response. status:{0}", response.StatusDescription);
+                    FunDebug.Log("Failed response. status:{0}", response.StatusDescription);
                     event_.Add(OnFailure);
                 }
             }
             catch (WebException e)
             {
                 // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
-                DebugUtils.DebugLog("Http request operation has been Cancelled.");
-                DebugUtils.DebugLog(e.ToString());
+                FunDebug.DebugLog("Http request operation has been Cancelled.");
+                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
 
         private void ReadCb (IAsyncResult ar)
         {
-            DebugUtils.DebugLog("ReadCb called.");
+            FunDebug.DebugLog("ReadCb called.");
 
             try
             {
@@ -2162,7 +2162,7 @@ namespace Fun
 
                 if (nRead > 0)
                 {
-                    DebugUtils.DebugLog("We need more bytes for response. Waiting.");
+                    FunDebug.DebugLog("We need more bytes for response. Waiting.");
                     if (ws.read_offset + nRead > ws.read_data.Length)
                     {
                         byte[] temp = new byte[ws.read_data.Length + kUnitBufferSize];
@@ -2179,7 +2179,7 @@ namespace Fun
                 {
                     if (ws.response == null)
                     {
-                        DebugUtils.LogWarning("Response instance is null.");
+                        FunDebug.LogWarning("Response instance is null.");
                         event_.Add(OnFailure);
                         return;
                     }
@@ -2206,7 +2206,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ReadCb: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
@@ -2231,7 +2231,7 @@ namespace Fun
             {
                 lock (sending_lock_)
                 {
-                    DebugUtils.Assert(sending_.Count >= 2);
+                    FunDebug.Assert(sending_.Count >= 2);
 
                     // Removes header and body segment
                     sending_.RemoveAt(0);
@@ -2263,7 +2263,7 @@ namespace Fun
             {
                 last_error_code_ = ErrorCode.kExceptionError;
                 last_error_message_ = "Failure in WWWPost: " + e.ToString();
-                DebugUtils.Log(last_error_message_);
+                FunDebug.Log(last_error_message_);
                 event_.Add(OnFailure);
             }
         }
@@ -2312,7 +2312,7 @@ namespace Fun
         {
             last_error_code_ = ErrorCode.kRequestTimeout;
             last_error_message_ = string.Format("Http Request timeout - msg_type:{0}", msg_type);
-            DebugUtils.Log(last_error_message_);
+            FunDebug.Log(last_error_message_);
             OnFailure();
         }
 

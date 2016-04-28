@@ -32,7 +32,7 @@ namespace Fun
         public override string Serialize(object json_obj)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert(d != null);
+            FunDebug.Assert(d != null);
             return Json.Serialize(d);
         }
 
@@ -44,49 +44,49 @@ namespace Fun
         public override string GetStringField(object json_obj, string field_name)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert(d != null);
+            FunDebug.Assert(d != null);
             return d[field_name] as string;
         }
 
         public override void SetStringField(object json_obj, string field_name, string value)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert(d != null);
+            FunDebug.Assert(d != null);
             d[field_name] = value;
         }
 
         public override Int64 GetIntegerField(object json_obj, string field_name)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert(d != null);
+            FunDebug.Assert(d != null);
             return Convert.ToInt64(d [field_name]);
         }
 
         public override void SetIntegerField(object json_obj, string field_name, Int64 value)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert (d != null);
+            FunDebug.Assert (d != null);
             d [field_name] = value;
         }
 
         public override bool HasField(object json_obj, string field_name)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert (d != null);
+            FunDebug.Assert (d != null);
             return d.ContainsKey (field_name);
         }
 
         public override void RemoveStringField(object json_obj, string field_name)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert(d != null);
+            FunDebug.Assert(d != null);
             d.Remove(field_name);
         }
 
         public override object Clone(object json_obj)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            DebugUtils.Assert(d != null);
+            FunDebug.Assert(d != null);
             return new Dictionary<string, object>(d);
 
         }

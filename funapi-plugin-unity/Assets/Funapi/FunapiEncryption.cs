@@ -35,8 +35,8 @@ namespace Fun
             else if (type == EncryptionType.kIFunEngine2Encryption)
                 return new Encryptor2();
 
-            DebugUtils.LogWarning("Unknown encryptor: {0}", type);
-            DebugUtils.Assert(false);
+            FunDebug.LogWarning("Unknown encryptor: {0}", type);
+            FunDebug.Assert(false);
 
             return null;
         }
@@ -50,8 +50,8 @@ namespace Fun
             else if (name == Encryptor2.kName)
                 return new Encryptor2();
 
-            DebugUtils.LogWarning("Unknown encryptor: {0}", name);
-            DebugUtils.Assert(false);
+            FunDebug.LogWarning("Unknown encryptor: {0}", name);
+            FunDebug.Assert(false);
 
             return null;
         }
@@ -65,7 +65,7 @@ namespace Fun
 
         public virtual bool Handshake (string in_header, ref string out_header)
         {
-            DebugUtils.Assert(false);
+            FunDebug.Assert(false);
             return true;
         }
 
@@ -126,7 +126,7 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            DebugUtils.Assert(state == State.kEstablished);
+            FunDebug.Assert(state == State.kEstablished);
 
             if (dst.Count < src.Count)
                 return -1;
@@ -141,7 +141,7 @@ namespace Fun
         {
             if (in_header.Length > 0)
             {
-                DebugUtils.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("Wrong encryptor header.");
                 return -1;
             }
 
@@ -164,7 +164,7 @@ namespace Fun
 
         public override bool Handshake (string in_header, ref string out_header)
         {
-            DebugUtils.Assert(state == State.kHandshaking);
+            FunDebug.Assert(state == State.kHandshaking);
 
             enc_key_ = Convert.ToUInt32(in_header);
             dec_key_ = enc_key_;
@@ -176,18 +176,18 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            DebugUtils.Assert(state == State.kEstablished);
+            FunDebug.Assert(state == State.kEstablished);
 
             return Encrypt(src, dst, ref enc_key_);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
         {
-            DebugUtils.Assert(state == State.kEstablished);
+            FunDebug.Assert(state == State.kEstablished);
 
             if (in_header.Length > 0)
             {
-                DebugUtils.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("Wrong encryptor header.");
                 return -1;
             }
 
@@ -210,7 +210,7 @@ namespace Fun
             {
                 UInt32 s = BitConverter.ToUInt32(src.Array, src.Offset + i * kBlockSize);
                 byte[] d = BitConverter.GetBytes(s ^ key32);
-                DebugUtils.Assert(d.Length == kBlockSize);
+                FunDebug.Assert(d.Length == kBlockSize);
 
                 for (int j = 0; j < d.Length; ++j) {
                     dst.Array[dst.Offset + i * kBlockSize + j] = d[j];
@@ -250,18 +250,18 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            DebugUtils.Assert(state == State.kEstablished);
+            FunDebug.Assert(state == State.kEstablished);
 
             return Encrypt(src, dst, true);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
         {
-            DebugUtils.Assert(state == State.kEstablished);
+            FunDebug.Assert(state == State.kEstablished);
 
             if (in_header.Length > 0)
             {
-                DebugUtils.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("Wrong encryptor header.");
                 return -1;
             }
 

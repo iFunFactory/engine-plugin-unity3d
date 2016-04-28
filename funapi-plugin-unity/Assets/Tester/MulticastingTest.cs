@@ -41,10 +41,10 @@ public class MulticastingTest : MonoBehaviour
                 OnMulticastChannelList(multicast_.encoding, channel_list);
             };
             multicast_.JoinedCallback += delegate(string channel_id, string sender) {
-                DebugUtils.DebugLog("JoinedCallback called. player:{0}", sender);
+                FunDebug.DebugLog("JoinedCallback called. player:{0}", sender);
             };
             multicast_.LeftCallback += delegate(string channel_id, string sender) {
-                DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
+                FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
             };
             multicast_.ErrorCallback += OnMulticastError;
         }
@@ -113,10 +113,10 @@ public class MulticastingTest : MonoBehaviour
                 OnMulticastChannelList(chat_.encoding, channel_list);
             };
             chat_.JoinedCallback += delegate(string channel_id, string sender) {
-                DebugUtils.DebugLog("JoinedCallback called. player:{0}", sender);
+                FunDebug.DebugLog("JoinedCallback called. player:{0}", sender);
             };
             chat_.LeftCallback += delegate(string channel_id, string sender) {
-                DebugUtils.DebugLog("LeftCallback called. player:{0}", sender);
+                FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
             };
             chat_.ErrorCallback += OnChatError;
         }
@@ -163,7 +163,7 @@ public class MulticastingTest : MonoBehaviour
 
     private void Connect ()
     {
-        DebugUtils.Log("-------- Connect --------");
+        FunDebug.Log("-------- Connect --------");
 
         network_ = new FunapiNetwork(false);
         network_.StoppedAllTransportCallback += OnStoppedAllTransport;
@@ -185,7 +185,7 @@ public class MulticastingTest : MonoBehaviour
 
     private void OnStoppedAllTransport ()
     {
-        DebugUtils.Log("OnStoppedAllTransport called.");
+        FunDebug.Log("OnStoppedAllTransport called.");
         network_ = null;
         multicast_ = null;
         chat_ = null;
@@ -206,7 +206,7 @@ public class MulticastingTest : MonoBehaviour
                     data.AppendFormat("{0}:{1}  ", item.Key, item.Value);
                 data.AppendLine();
             }
-            DebugUtils.Log(data.ToString());
+            FunDebug.Log(data.ToString());
         }
         else
         {
@@ -220,7 +220,7 @@ public class MulticastingTest : MonoBehaviour
                 data.AppendFormat("name:{0}  members:{1}  ", info.channel_name, info.num_members);
                 data.AppendLine();
             }
-            DebugUtils.Log(data.ToString());
+            FunDebug.Log(data.ToString());
         }
     }
 
@@ -228,32 +228,32 @@ public class MulticastingTest : MonoBehaviour
     {
         if (multicast_.encoding == FunEncoding.kJson)
         {
-            DebugUtils.Assert(body is Dictionary<string, object>);
+            FunDebug.Assert(body is Dictionary<string, object>);
             Dictionary<string, object> mcast_msg = body as Dictionary<string, object>;
-            DebugUtils.Assert (channel_id == (mcast_msg["_channel"] as string));
+            FunDebug.Assert (channel_id == (mcast_msg["_channel"] as string));
 
             string message = mcast_msg["_message"] as string;
-            DebugUtils.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
+            FunDebug.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
                            channel_id, message);
         }
         else
         {
-            DebugUtils.Assert (body is FunMulticastMessage);
+            FunDebug.Assert (body is FunMulticastMessage);
             FunMulticastMessage mcast_msg = body as FunMulticastMessage;
-            DebugUtils.Assert (channel_id == mcast_msg.channel);
+            FunDebug.Assert (channel_id == mcast_msg.channel);
 
             PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, (int)MulticastMessageType.pbuf_hello);
             if (hello_msg == null)
                 return;
 
-            DebugUtils.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
+            FunDebug.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
                            channel_id, hello_msg.message);
         }
     }
 
     private void OnChatChannelReceived (string chat_channel, string sender, string text)
     {
-        DebugUtils.Log("Received a chat channel message.\nChannel={0}, sender={1}, text={2}",
+        FunDebug.Log("Received a chat channel message.\nChannel={0}, sender={1}, text={2}",
                        chat_channel, sender, text);
     }
 

@@ -44,7 +44,7 @@ namespace Fun
             {
                 if (chat_channels_.ContainsKey(channel_id))
                 {
-                    DebugUtils.Log("Already joined the '{0}' channel.", channel_id);
+                    FunDebug.Log("Already joined the '{0}' channel.", channel_id);
                     return false;
                 }
 
@@ -79,7 +79,7 @@ namespace Fun
                 {
                     if (!chat_channels_.ContainsKey(channel_id))
                     {
-                        DebugUtils.Log("You are not in the '{0}' channel.", channel_id);
+                        FunDebug.Log("You are not in the '{0}' channel.", channel_id);
                         return;
                     }
 
@@ -122,7 +122,7 @@ namespace Fun
         {
             if (encoding_ == FunEncoding.kJson)
             {
-                DebugUtils.Assert(data is Dictionary<string, object>);
+                FunDebug.Assert(data is Dictionary<string, object>);
                 Dictionary<string, object> mcast_msg = data as Dictionary<string, object>;
 
                 lock (chat_channel_lock_)
@@ -135,7 +135,7 @@ namespace Fun
             }
             else
             {
-                DebugUtils.Assert (data is FunMulticastMessage);
+                FunDebug.Assert (data is FunMulticastMessage);
                 FunMulticastMessage mcast_msg = data as FunMulticastMessage;
                 FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage> (mcast_msg, (int)MulticastMessageType.chat);
 
