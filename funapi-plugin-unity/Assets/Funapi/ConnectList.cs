@@ -69,18 +69,7 @@ namespace Fun
 
         internal void Add (string hostname, UInt16 port, bool https)
         {
-            IPAddress[] list = Dns.GetHostAddresses(hostname);
-            if (list == null) {
-                FunDebug.Log("ConnectList - Can't find any ip address with hostname [{0}].", hostname);
-                return;
-            }
-
-            foreach (IPAddress ip in list)
-            {
-                addr_list_.Add(new HostHttp(ip.ToString(), port, https));
-            }
-
-            FunDebug.DebugLog("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
+            addr_list_.Add(new HostHttp(hostname, port, https));
         }
 
         internal void Add (List<HostAddr> list)
