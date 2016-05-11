@@ -676,7 +676,7 @@ namespace Fun
                 string str = this.JsonHelper.Serialize(fun_msg.message);
                 byte[] body = System.Text.Encoding.UTF8.GetBytes(str);
 
-                FunDebug.DebugLog("JSON to send : {0}", str);
+                //FunDebug.DebugLog("JSON to send : {0}", str);
 
                 SendMessage(fun_msg, body);
             }
@@ -798,7 +798,7 @@ namespace Fun
                 header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                 sending_.Insert(i, header_buffer);
 
-                FunDebug.DebugLog("Header to send: {0} body length: {1}", header, message.buffer.Count);
+                //FunDebug.DebugLog("Header to send: {0}", header.ToString());
             }
 
             WireSend();
@@ -1382,10 +1382,9 @@ namespace Fun
                     sock_.BeginReceive(buffer, 0, new AsyncCallback(this.ReceiveBytesCb), this);
                 }
             }
-            catch (ObjectDisposedException e)
+            catch (ObjectDisposedException)
             {
                 FunDebug.DebugLog("BeginConnect operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
@@ -1461,10 +1460,9 @@ namespace Fun
                     SendUnsentMessages();
                 }
             }
-            catch (ObjectDisposedException e)
+            catch (ObjectDisposedException)
             {
                 FunDebug.DebugLog("BeginSend operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
@@ -1534,16 +1532,14 @@ namespace Fun
                     }
                 }
             }
-            catch (ObjectDisposedException e)
+            catch (ObjectDisposedException)
             {
                 FunDebug.DebugLog("BeginReceive operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
             }
-            catch (NullReferenceException e)
+            catch (NullReferenceException)
             {
                 // When Stop is called Socket.EndReceive may return a NullReferenceException
                 FunDebug.DebugLog("BeginReceive operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
@@ -1703,10 +1699,9 @@ namespace Fun
                     SendUnsentMessages();
                 }
             }
-            catch (ObjectDisposedException e)
+            catch (ObjectDisposedException)
             {
                 FunDebug.DebugLog("BeginSendTo operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
@@ -1775,10 +1770,9 @@ namespace Fun
                     }
                 }
             }
-            catch (ObjectDisposedException e)
+            catch (ObjectDisposedException)
             {
                 FunDebug.DebugLog("BeginReceiveFrom operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
             }
             catch (Exception e)
             {
