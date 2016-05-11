@@ -40,80 +40,86 @@ namespace Fun
         [Conditional("ENABLE_LOG")]
         public static void Log (string message, params object[] args)
         {
-            UnityEngine.Debug.Log(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+            UnityEngine.Debug.Log(GetTimeLog(string.Format(message, args)));
         }
 
         [Conditional("ENABLE_LOG")]
         public static void LogWarning (string message, params object[] args)
         {
-            UnityEngine.Debug.LogWarning(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+            UnityEngine.Debug.LogWarning(GetTimeLog(string.Format(message, args)));
         }
 
         [Conditional("ENABLE_LOG")]
         public static void LogError (string message, params object[] args)
         {
-            UnityEngine.Debug.LogError(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+            UnityEngine.Debug.LogError(GetTimeLog(string.Format(message, args)));
         }
 
         [Conditional("ENABLE_DEBUG")]
         public static void DebugLog (string message, params object[] args)
         {
-            UnityEngine.Debug.Log(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+            UnityEngine.Debug.Log(GetTimeLog(string.Format(message, args)));
         }
 
         [Conditional("ENABLE_DEBUG")]
         public static void DebugLogWarning (string message, params object[] args)
         {
-            UnityEngine.Debug.LogWarning(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+            UnityEngine.Debug.LogWarning(GetTimeLog(string.Format(message, args)));
         }
 
         [Conditional("ENABLE_DEBUG")]
         public static void DebugLogError (string message, params object[] args)
         {
-            UnityEngine.Debug.LogError(string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), string.Format(message, args)));
+            UnityEngine.Debug.LogError(GetTimeLog(string.Format(message, args)));
         }
 #else
         public static void Log (string message, params object[] args)
         {
 #if ENABLE_LOG
-            Console.WriteLine(string.Format(message, args));
+            Console.WriteLine(GetTimeLog(string.Format(message, args)));
 #endif
         }
 
         public static void LogWarning (string message, params object[] args)
         {
 #if ENABLE_LOG
-            Console.WriteLine("Warning: " + string.Format(message, args));
+            Console.WriteLine(GetTimeLog(string.Format(message, args)));
 #endif
         }
 
         public static void LogError (string message, params object[] args)
         {
 #if ENABLE_LOG
-            Console.WriteLine("Error: " + string.Format(message, args));
+            Console.WriteLine(GetTimeLog(string.Format(message, args)));
 #endif
         }
 
         public static void DebugLog (string message, params object[] args)
         {
 #if ENABLE_DEBUG
-            Console.WriteLine(string.Format(message, args));
+            Console.WriteLine(GetTimeLog(string.Format(message, args)));
 #endif
         }
 
         public static void DebugLogWarning (string message, params object[] args)
         {
 #if ENABLE_DEBUG
-            Console.WriteLine("Warning: " + string.Format(message, args));
+            Console.WriteLine(GetTimeLog(string.Format(message, args)));
 #endif
         }
 
         public static void DebugLogError (string message, params object[] args)
         {
 #if ENABLE_DEBUG
-            Console.WriteLine("Error: " + string.Format(message, args));
+            Console.WriteLine(GetTimeLog(string.Format(message, args)));
 #endif
         }
 #endif
+
+        private static string GetTimeLog (string message)
+        {
+            string log = string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), message);
+            return log;
+        }
     }
 }
