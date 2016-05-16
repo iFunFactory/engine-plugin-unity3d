@@ -4,11 +4,12 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-#if UNITY_EDITOR || NO_UNITY
-#define ENABLE_LOG
-#endif
 //#define ENABLE_DEBUG
 //#define ENABLE_SAVE_LOG
+
+#if ENABLE_DEBUG || UNITY_EDITOR || NO_UNITY
+#define ENABLE_LOG
+#endif
 
 using System;
 using System.Diagnostics;
