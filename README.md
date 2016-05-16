@@ -12,12 +12,16 @@ Funapi plugin
 Funapi plugin의 업데이트 내용입니다.
 
 ```
-기존에는 FunapiNetwork나 FunapiDownloader를 사용할 때 MonoBehaviour 객체의 Update 함수에서 FunapiNetwork와
-FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 136 부터는 Update 함수를 호출할 필요가 없습니다.
-버전 141 부터는 OnApplicationQuit 함수에서 호출해야 했던 Stop 함수도 호출하지 않아도 됩니다.
-현재 136 이전 버전을 사용하고 Update 함수나 OnApplicationQuit 함수에서 Stop 함수를 호출하고 있다면
-플러그인을 업데이트한 후 호출 코드를 삭제해 주시기 바랍니다.
+플러그인 버전 141 부터는 플러그인에서 필요한 MonoBehaviour를 자체적으로 생성해서 사용하므로
+FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
 ```
+
+### 05/17/2016 (ver.148)
+- TCP, UDP 에서 IPv4와 IPv6 구분해서 처리하도록 수정
+- ENABLE_DEBUG 가 활성화되면 ENABLE_LOG 도 활성화
+- 로그를 문자열, 파일로 저장하는 기능 추가
+- C# 런타임 로그에도 시간 표시 추가
+- 샘플코드 수정
 
 ### 05/11/2016 (ver.147)
 - HTTPs 인증서 검증 기능 추가
@@ -27,6 +31,9 @@ FunapiDownloader의 Update 함수를 호출해야 했으나 플러그인 버전 
 - 플랫폼별 데이터 파일 저장 경로 정리 및 수정 (안드로이드 환경은 변경사항 없음)
 
 ### 05/03/2016 (ver.146)
+```
+플러그인 버전 146 이상을 사용하려면 서버 버전 1514 이상이 필요하며 protobuf dll을 새로 빌드해야 합니다.
+```
 - 멀티캐스트 채널 목록을 요청하는 함수 추가
 - 멀티캐스트 서버에 의해 강제로 채널에서 퇴장되었을 때 처리 추가
 
