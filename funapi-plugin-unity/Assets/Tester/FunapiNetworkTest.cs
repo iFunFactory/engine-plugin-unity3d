@@ -39,6 +39,9 @@ public class FunapiNetworkTest : MonoBehaviour
         if (GUI.Button(new Rect(30, 220, 240, 40), "Disconnect"))
         {
             handler_.Disconnect();
+
+            if (!network_.SessionReliability)
+                network_ = null;
         }
 
         if (GUI.Button(new Rect(30, 265, 240, 40), "Send a message"))
@@ -71,14 +74,17 @@ public class FunapiNetworkTest : MonoBehaviour
             network_.SetDefaultProtocol(protocol);
         }
 
-        if (network_ == null || transport == null)
+        if (network_ == null)
         {
             FunDebug.Log("Failed to create the network instance.");
             return;
         }
 
-        //transport.EnablePing = true;
-        //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+        if (transport != null)
+        {
+            //transport.EnablePing = true;
+            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+        }
 
         network_.Start();
     }
