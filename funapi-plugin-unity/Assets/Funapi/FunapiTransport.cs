@@ -1026,7 +1026,7 @@ namespace Fun
         protected override void StartConnect()
         {
             state_ = State.kConnecting;
-            sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            sock_ = new Socket(ip_af_, SocketType.Stream, ProtocolType.Tcp);
             if (DisableNagle)
                 sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
@@ -1047,6 +1047,7 @@ namespace Fun
                 ip = host_info.AddressList[0];
             }
 
+            ip_af_ = ip.AddressFamily;
             connect_ep_ = new IPEndPoint(ip, addr.port);
             FunDebug.Log("TCP transport - {0}:{1}", ip, addr.port);
         }
@@ -1271,6 +1272,7 @@ namespace Fun
         }
 
         internal Socket sock_;
+        private AddressFamily ip_af_;
         private IPEndPoint connect_ep_;
     }
 
@@ -1317,7 +1319,7 @@ namespace Fun
         protected override void StartConnect()
         {
             state_ = State.kConnected;
-            sock_ = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
             sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                    ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
 
@@ -1338,8 +1340,12 @@ namespace Fun
                 ip = host_info.AddressList[0];
             }
 
+            ip_af_ = ip.AddressFamily;
             send_ep_ = new IPEndPoint(ip, addr.port);
-            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr.port);
+            if (ip_af_ == AddressFamily.InterNetwork)
+                receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr.port);
+            else
+                receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr.port);
             FunDebug.Log("UDP transport - {0}:{1}", ip, addr.port);
         }
 
@@ -1505,6 +1511,7 @@ namespace Fun
 
 
         internal Socket sock_;
+        private AddressFamily ip_af_;
         private IPEndPoint send_ep_;
         private EndPoint receive_ep_;
     }
