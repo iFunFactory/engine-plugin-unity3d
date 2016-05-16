@@ -62,6 +62,7 @@ namespace Fun
             foreach (IPAddress ip in list)
             {
                 addr_list_.Add(new HostIP(hostname, ip, port));
+                FunDebug.DebugLog("address > " + ip + " : " + ip.AddressFamily);
             }
 
             FunDebug.DebugLog("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
