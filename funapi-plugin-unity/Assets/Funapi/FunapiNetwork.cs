@@ -323,13 +323,6 @@ namespace Fun
             StopTransport(protocol);
         }
 
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated May 2016. " +
-                         "FunapiNetwork will update itself. You don't have to call this function anymore.")]
-        public void Update ()
-        {
-        }
-
         // Updates FunapiNetwork
         protected override bool Update (float deltaTime)
         {
