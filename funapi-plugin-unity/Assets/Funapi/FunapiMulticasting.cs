@@ -131,13 +131,13 @@ namespace Fun
                 }
             }
 
-            SendLeaveMessage(channel_id);
-            OnLeftCallback(channel_id, sender_);
-
             lock (channel_lock_)
             {
                 channels_.Remove(channel_id);
             }
+
+            SendLeaveMessage(channel_id);
+            OnLeftCallback(channel_id, sender_);
 
             return true;
         }
@@ -328,7 +328,7 @@ namespace Fun
                 if (mcast_msg.error_codeSpecified)
                     error_code = (int)mcast_msg.error_code;
 
-                if (mcast_msg.channels.Count > 0)
+                if (mcast_msg.channels.Count > 0 || (channel_id == "" && sender == ""))
                 {
                     if (ChannelListCallback != null)
                         ChannelListCallback(mcast_msg.channels);

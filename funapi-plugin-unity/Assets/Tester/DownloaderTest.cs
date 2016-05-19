@@ -9,52 +9,64 @@
 using Fun;
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 
 
 public class DownloaderTest : MonoBehaviour
 {
-    public void OnGUI()
+    void Awake ()
     {
-        GUI.enabled = downloader_ == null;
-        GUI.Label(new Rect(30, 8, 300, 20), string.Format("Server - {0}:{1}", kDownloadServerIp, kDownloadServerPort));
-        if (GUI.Button(new Rect(30, 35, 240, 40), "Start downloading"))
-        {
-            string download_url = string.Format("http://{0}:{1}", kDownloadServerIp, kDownloadServerPort);
+        GameObject.Find("ServerIP").GetComponent<Text>().text =
+            string.Format("Server - {0}:{1}", kServerIp, kServerPort);
 
-            downloader_ = new FunapiHttpDownloader();
-            downloader_.VerifyCallback += new FunapiHttpDownloader.VerifyEventHandler(OnDownloadVerify);
-            downloader_.ReadyCallback += new FunapiHttpDownloader.ReadyEventHandler(OnDownloadReady);
-            downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
-            downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
-            downloader_.GetDownloadList(download_url, FunapiUtils.GetLocalDataPath);
-        }
+        button_start_ = GameObject.Find("ButtonStart").GetComponent<Button>();
+        button_start_.interactable = true;
     }
 
-    private void OnDownloadVerify (string path)
+    public void OnStartDownloading ()
+    {
+        if (downloader_ != null)
+            return;
+
+        string download_url = string.Format("http://{0}:{1}", kServerIp, kServerPort);
+
+        downloader_ = new FunapiHttpDownloader();
+        downloader_.VerifyCallback += new FunapiHttpDownloader.VerifyEventHandler(OnDownloadVerify);
+        downloader_.ReadyCallback += new FunapiHttpDownloader.ReadyEventHandler(OnDownloadReady);
+        downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
+        downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
+        downloader_.GetDownloadList(download_url, FunapiUtils.GetLocalDataPath);
+
+        button_start_.interactable = false;
+    }
+
+    void OnDownloadVerify (string path)
     {
         FunDebug.DebugLog("Check file - {0}", path);
     }
 
-    private void OnDownloadReady (int total_count, UInt64 total_size)
+    void OnDownloadReady (int total_count, UInt64 total_size)
     {
         downloader_.StartDownload();
     }
 
-    private void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
+    void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
         FunDebug.DebugLog("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
                             path, bytes_received, total_bytes, percentage);
     }
 
-    private void OnDownloadFinished (DownloadResult code)
+    void OnDownloadFinished (DownloadResult code)
     {
         downloader_ = null;
+        button_start_.interactable = true;
     }
 
 
     // Please change this address for test.
-    private const string kDownloadServerIp = "127.0.0.1";
-    private const UInt16 kDownloadServerPort = 8020;
+    private const string kServerIp = "127.0.0.1";
+    private const UInt16 kServerPort = 8020;
 
     private FunapiHttpDownloader downloader_ = null;
+    private Button button_start_;
 }
