@@ -7,67 +7,91 @@
 // consent of iFunFactory Inc.
 
 using Fun;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 
 public class FunapiNetworkTest : MonoBehaviour
 {
-    public void OnGUI()
+    void Awake ()
     {
-        with_session_reliability_ = GUI.Toggle(new Rect(30, 38, 250, 20),
-                                               with_session_reliability_,
-                                               " use session reliability (only tcp)");
+        GameObject.Find("ServerIP").GetComponent<Text>().text = kServerIp;
+        with_session_reliability_ = GameObject.Find("ToggleSR").GetComponent<Toggle>();
+        with_protobuf_ = GameObject.Find("ToggleProtobuf").GetComponent<Toggle>();
 
-        with_protobuf_ = GUI.Toggle(new Rect(30, 58, 150, 20), with_protobuf_, " use protobuf-net");
+        buttons_["connect_tcp"] = GameObject.Find("ButtonTCP").GetComponent<Button>();
+        buttons_["connect_udp"] = GameObject.Find("ButtonUDP").GetComponent<Button>();
+        buttons_["connect_http"] = GameObject.Find("ButtonHTTP").GetComponent<Button>();
+        buttons_["disconnect"] = GameObject.Find("ButtonSendMessage").GetComponent<Button>();
+        buttons_["send"] = GameObject.Find("ButtonDisconnect").GetComponent<Button>();
 
-        GUI.Label(new Rect(30, 8, 300, 20), "Server - " + kServerIp);
-        GUI.enabled = (network_ == null || !network_.Started);
-        if (GUI.Button(new Rect(30, 85, 240, 40), "Connect (TCP)"))
-        {
-            Connect(TransportProtocol.kTcp);
-        }
-        if (GUI.Button(new Rect(30, 130, 240, 40), "Connect (UDP)"))
-        {
-            Connect(TransportProtocol.kUdp);
-        }
-        if (GUI.Button(new Rect(30, 175, 240, 40), "Connect (HTTP)"))
-        {
-            Connect(TransportProtocol.kHttp);
-        }
-
-        GUI.enabled = (network_ != null && network_.Connected);
-        if (GUI.Button(new Rect(30, 220, 240, 40), "Disconnect"))
-        {
-            handler_.Disconnect();
-
-            if (!network_.SessionReliability)
-                network_ = null;
-        }
-
-        if (GUI.Button(new Rect(30, 265, 240, 40), "Send a message"))
-        {
-            handler_.SendEchoMessage();
-        }
+        UpdateButtonState();
     }
 
-    private void Connect (TransportProtocol protocol)
+    void UpdateButtonState ()
+    {
+        bool enable = network_ == null || !network_.Started;
+        buttons_["connect_tcp"].interactable = enable;
+        buttons_["connect_udp"].interactable = enable;
+        buttons_["connect_http"].interactable = enable;
+
+        enable = network_ != null && network_.Connected;
+        buttons_["disconnect"].interactable = enable;
+        buttons_["send"].interactable = enable;
+    }
+
+    public void OnConnectTCP ()
+    {
+        Connect(TransportProtocol.kTcp);
+    }
+
+    public void OnConnectUDP ()
+    {
+        Connect(TransportProtocol.kUdp);
+    }
+
+    public void OnConnectHTTP ()
+    {
+        Connect(TransportProtocol.kHttp);
+    }
+
+    public void OnDisconnect ()
+    {
+        handler_.Disconnect();
+
+        if (!network_.SessionReliability)
+            network_ = null;
+
+        UpdateButtonState();
+    }
+
+    public void OnSendMessage ()
+    {
+        handler_.SendEchoMessage();
+    }
+
+
+    void Connect (TransportProtocol protocol)
     {
         FunDebug.Log("-------- Connect --------");
 
         FunapiTransport transport = null;
-        if (network_ == null || network_.SessionReliability != with_session_reliability_)
+        if (network_ == null || network_.SessionReliability != with_session_reliability_.isOn)
         {
             handler_ = new TestNetwork();
-            network_ = handler_.CreateNetwork(with_session_reliability_);
+            network_ = handler_.CreateNetwork(with_session_reliability_.isOn);
 
-            FunEncoding encoding = with_protobuf_ ? FunEncoding.kProtobuf : FunEncoding.kJson;
+            network_.StoppedAllTransportCallback += OnStoppedAllTransport;
+
+            FunEncoding encoding = with_protobuf_.isOn ? FunEncoding.kProtobuf : FunEncoding.kJson;
             transport = handler_.AddTransport(protocol, kServerIp, encoding);
         }
         else
         {
             if (!network_.HasTransport(protocol))
             {
-                FunEncoding encoding = with_protobuf_ ? FunEncoding.kProtobuf : FunEncoding.kJson;
+                FunEncoding encoding = with_protobuf_.isOn ? FunEncoding.kProtobuf : FunEncoding.kJson;
                 transport = handler_.AddTransport(protocol, kServerIp, encoding);
             }
 
@@ -82,11 +106,25 @@ public class FunapiNetworkTest : MonoBehaviour
 
         if (transport != null)
         {
+            transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
+
             //transport.EnablePing = true;
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
         }
 
         network_.Start();
+
+        UpdateButtonState();
+    }
+
+    void OnTransportStarted (TransportProtocol protocol)
+    {
+        UpdateButtonState();
+    }
+
+    void OnStoppedAllTransport()
+    {
+        UpdateButtonState();
     }
 
 
@@ -94,8 +132,11 @@ public class FunapiNetworkTest : MonoBehaviour
     private const string kServerIp = "127.0.0.1";
 
     // member variables.
-    private bool with_protobuf_ = false;
-    private bool with_session_reliability_ = false;
+    private Toggle with_protobuf_;
+    private Toggle with_session_reliability_;
+
     private TestNetwork handler_ = null;
     private FunapiNetwork network_ = null;
+
+    private Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
 }

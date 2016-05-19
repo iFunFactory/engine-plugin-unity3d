@@ -10,30 +10,32 @@ using Fun;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 
 public class AnnouncementTest : MonoBehaviour
 {
-    public void OnGUI()
+    void Awake ()
     {
-        GUI.enabled = true;
-        GUI.Label(new Rect(30, 8, 300, 20), string.Format("Server - {0}:{1}", kAnnouncementIp, kAnnouncementPort));
-        if (GUI.Button(new Rect(30, 35, 240, 40), "Request announcements"))
-        {
-            if (announcement_ == null)
-            {
-                announcement_ = new FunapiAnnouncement();
-                announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
-
-                string url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
-                announcement_.Init(url);
-            }
-
-            announcement_.UpdateList(5);
-        }
+        GameObject.Find("ServerIP").GetComponent<Text>().text =
+            string.Format("Server - {0}:{1}", kAnnouncementIp, kAnnouncementPort);
     }
 
-    private void OnAnnouncementResult (AnnounceResult result)
+    public void OnStartRequest ()
+    {
+        if (announcement_ == null)
+        {
+            announcement_ = new FunapiAnnouncement();
+            announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+
+            string url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
+            announcement_.Init(url);
+        }
+
+        announcement_.UpdateList(5);
+    }
+
+    void OnAnnouncementResult (AnnounceResult result)
     {
         FunDebug.Log("OnAnnouncementResult - result: {0}", result);
         if (result != AnnounceResult.kSuccess)
