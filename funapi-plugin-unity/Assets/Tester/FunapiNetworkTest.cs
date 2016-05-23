@@ -82,6 +82,14 @@ public class FunapiNetworkTest : MonoBehaviour
             handler_ = new TestNetwork();
             network_ = handler_.CreateNetwork(with_session_reliability_.isOn);
 
+            // If you want to have sequence number with your messages, Set 'SequenceNumberValidation' to true.
+            // The server also must set the same value with this option.
+            //network.SequenceNumberValidation = true;
+
+            // If you set this option, If there is no response from the server, It disconnects from the server.
+            // So this option is recommended for use with the ping.
+            //network.ResponseTimeout = 10f;
+
             network_.StoppedAllTransportCallback += OnStoppedAllTransport;
 
             FunEncoding encoding = with_protobuf_.isOn ? FunEncoding.kProtobuf : FunEncoding.kJson;
@@ -108,8 +116,45 @@ public class FunapiNetworkTest : MonoBehaviour
         {
             transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
 
-            //transport.EnablePing = true;
+            if (protocol == TransportProtocol.kTcp)
+            {
+                // If you want to use the ping of client side. Set 'EnablePing' to true.
+                // If you want to use the ping of server side. You don't have to anything.
+                //transport.EnablePing = true;
+
+                // You can turn the nagle option on/off. The default value is false.
+                //transport.DisableNagle = true;
+            }
+            else if (protocol == TransportProtocol.kHttp)
+            {
+                // If you want to use the UnityEngine.WWW for the HTTP transport,
+                // or you have trouble with the HttpWebRequest class.
+                // (The HttpWebRequest may have blocking in the Unity Editor Windows version)
+                // Set 'UseWWW' to true and then HTTP transport will use the WWW instead of the HttpWebRequest.
+                //((FunapiHttpTransport)transport).UseWWW = true;
+            }
+
+            // If you want to use encryption, Set encryption type.
+            // Please set the same encryption type as the encryption type of server.
+            // TCP protocol can use both of two encryption types.
+            //transport.SetEncryption(EncryptionType.kIFunEngine1Encryption);
+            //
+            // In the case of UDP and HTTP can use only kIFunEngine2Encryption type.
             //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
+
+            // If you prefer use specific Json implementation other than Dictionary,
+            // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
+            //transport.JsonHelper = new YourJsonAccessorClass
+
+            // You can add a extra server address.
+            // If you want to add a server address for HTTP transport, use HostHttp.
+            //transport.AddServerList(new List<HostAddr>{
+            //    new HostAddr("127.0.0.1", 8012), new HostAddr("127.0.0.1", 8012),
+            //    new HostAddr("127.0.0.1", 8013), new HostAddr("127.0.0.1", 8018)
+            //});
+            //transport.AddServerList(new List<HostHttp>{
+            //    new HostHttp("your.address", 8018, false), new HostHttp("your.address", 8018, false)
+            //});
         }
 
         network_.Start();

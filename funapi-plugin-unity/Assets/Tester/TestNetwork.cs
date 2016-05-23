@@ -23,8 +23,6 @@ public class TestNetwork
     public FunapiNetwork CreateNetwork (bool session_reliability)
     {
         FunapiNetwork network = new FunapiNetwork(session_reliability);
-        //network.SequenceNumberValidation = true;
-        //network.ResponseTimeout = 10f;
 
         network.OnSessionInitiated += OnSessionInitiated;
         network.OnSessionClosed += OnSessionClosed;
@@ -54,8 +52,6 @@ public class TestNetwork
         {
             transport = new FunapiTcpTransport(ip, port, encoding);
             transport.AutoReconnect = true;
-            //transport.EnablePing = true;
-            //transport.DisableNagle = true;
         }
         else if (protocol == TransportProtocol.kUdp)
         {
@@ -64,16 +60,10 @@ public class TestNetwork
         else if (protocol == TransportProtocol.kHttp)
         {
             transport = new FunapiHttpTransport(ip, port, false, encoding);
-
-            // Send messages using WWW class
-            //((FunapiHttpTransport)transport).UseWWW = true;
         }
 
         if (transport == null)
             return null;
-
-        // Please set the same encryption type as the encryption type of server.
-        //transport.SetEncryption(EncryptionType.kIFunEngine1Encryption);
 
         transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
         transport.StoppedCallback += new TransportEventHandler(OnTransportClosed);
@@ -82,17 +72,6 @@ public class TestNetwork
         // Connect timeout.
         transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
         transport.ConnectTimeout = 10f;
-
-        // If you prefer use specific Json implementation other than Dictionary,
-        // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
-        //transport.JsonHelper = new YourJsonAccessorClass
-
-        // Adds extra server list
-        // Use HostHttp for http transport.
-        //transport.AddServerList(new List<HostAddr>{
-        //    new HostAddr("127.0.0.1", 8012), new HostAddr("127.0.0.1", 8012),
-        //    new HostAddr("127.0.0.1", 8013), new HostAddr("127.0.0.1", 8018)
-        //});
 
         network_.AttachTransport(transport);
 
@@ -142,7 +121,6 @@ public class TestNetwork
                 // In this example, we are using Dictionary<string, object>.
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
                 // by changing JsonHelper member in FunapiTransport.
-                // Please refer to comments inside Connect() function.
                 Dictionary<string, object> message = new Dictionary<string, object>();
                 message["message"] = "hello world";
                 network_.SendMessage("echo", message);
