@@ -1532,7 +1532,9 @@ namespace Fun
 
             if (https)
             {
+#if !NO_UNITY
                 MozRoots.LoadRootCertificates();
+#endif
                 ServicePointManager.ServerCertificateValidationCallback = CertificateValidationCallback;
             }
         }
@@ -2048,6 +2050,7 @@ namespace Fun
         private static bool CertificateValidationCallback (System.Object sender, X509Certificate certificate,
                                                            X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
+#if !NO_UNITY
             if (sslPolicyErrors == SslPolicyErrors.None)
                 return true;
 
@@ -2074,6 +2077,7 @@ namespace Fun
                         return false;
                 }
             }
+#endif
 
             return true;
         }
