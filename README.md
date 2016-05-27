@@ -16,9 +16,13 @@ Funapi plugin의 업데이트 내용입니다.
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
 ```
 
+### 06/01/2016 (ver.150)
+- Ping 응답 속도 개선
+
 ### 05/24/2016 (ver.149)
 - FunapiNetwork.Update() Obsolete 함수 삭제
 - 샘플 코드 UI를 GUI에서 UnityEngine UI로 변경
+- C# 런타임에서 MozRoots 관련 컴파일 오류 수정
 
 ### 05/17/2016 (ver.148)
 - TCP, UDP 에서 IPv4와 IPv6 구분해서 처리하도록 수정

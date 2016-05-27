@@ -19,6 +19,11 @@ using System.Text;
 using UnityEngine;
 #endif
 
+// Protobuf
+using ProtoBuf;
+using funapi.network.fun_message;
+using funapi.network.ping_message;
+
 
 namespace Fun
 {
@@ -74,13 +79,17 @@ namespace Fun
         // Check connection
         internal abstract bool Started { get; }
 
-        internal float PingWaitTime { get; set; }
+        internal float PingWaitTime
+        {
+            get { return ping_wait_time_; }
+            set { ping_wait_time_ = value; }
+        }
 
         // Check unsent messages
         internal abstract bool HasUnsentMessages { get; }
 
         // Send a message
-        internal abstract void SendMessage(FunapiMessage fun_msg);
+        internal abstract void SendMessage (FunapiMessage fun_msg);
 
         internal State state
         {
@@ -161,17 +170,13 @@ namespace Fun
                          cstate_ == ConnectState.kRedirecting; }
         }
 
-        // Encoding/Decoding related
+        // This function is no longer used.
+        [System.Obsolete("This will be deprecated Oct 2016. " +
+                         "You can use FunapiMessage.JsonHelper instead of this function.")]
         public JsonAccessor JsonHelper
         {
-            get { return json_accessor_; }
-            set { json_accessor_ = value; }
-        }
-
-        // FunMessage serializer/deserializer
-        public FunMessageSerializer ProtobufHelper {
-            get { return serializer_; }
-            set { serializer_ = value; }
+            get { return FunapiMessage.JsonHelper; }
+            set { FunapiMessage.JsonHelper = value; }
         }
 
         public void AddServerList (List<HostAddr> list)
@@ -384,15 +389,75 @@ namespace Fun
 
         internal void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
+            object message = FunapiMessage.Deserialize(body, encoding_);
+            if (message == null)
+            {
+                FunDebug.Log("OnReceived - message is null.");
+                return;
+            }
+
+            string msg_type = "";
+
+            if (encoding_ == FunEncoding.kJson)
+            {
+                if (FunapiMessage.JsonHelper.HasField(message, kMsgTypeBodyField))
+                {
+                    msg_type = FunapiMessage.JsonHelper.GetStringField(message, kMsgTypeBodyField) as string;
+                    FunapiMessage.JsonHelper.RemoveStringField(message, kMsgTypeBodyField);
+                }
+
+                if (msg_type.Length > 0)
+                {
+                    if (msg_type == kServerPingMessageType)
+                    {
+                        OnServerPingMessage(message);
+                        return;
+                    }
+                    else if (msg_type == kClientPingMessageType)
+                    {
+                        OnClientPingMessage(message);
+                        return;
+                    }
+                }
+            }
+            else if (encoding_ == FunEncoding.kProtobuf)
+            {
+                FunMessage funmsg = (FunMessage)message;
+
+                if (funmsg.msgtype != null)
+                {
+                    msg_type = funmsg.msgtype;
+                }
+
+                if (msg_type.Length > 0)
+                {
+                    if (msg_type == kServerPingMessageType)
+                    {
+                        OnServerPingMessage(funmsg);
+                        return;
+                    }
+                    else if (msg_type == kClientPingMessageType)
+                    {
+                        OnClientPingMessage(funmsg);
+                        return;
+                    }
+                }
+            }
+
             if (ReceivedCallback != null)
             {
-                ReceivedCallback(protocol_, header, body);
+                ReceivedCallback(new FunapiMessage(protocol_, msg_type, message));
             }
         }
 
         internal void OnStarted ()
         {
             state_ = State.kEstablished;
+
+            if (EnablePing && PingIntervalSeconds > 0)
+            {
+                StartPingTimer();
+            }
 
             if (StartedCallback != null)
             {
@@ -410,6 +475,8 @@ namespace Fun
 
         internal void OnStopped ()
         {
+            StopPingTimer();
+
             if (StoppedCallback != null)
             {
                 StoppedCallback(protocol_);
@@ -487,6 +554,147 @@ namespace Fun
             }
         }
 
+        //---------------------------------------------------------------------
+        // Ping-related functions
+        //---------------------------------------------------------------------
+        private void StartPingTimer ()
+        {
+            if (protocol_ != TransportProtocol.kTcp)
+                return;
+
+            if (ping_timer_id_ != 0)
+                timer_.Remove(ping_timer_id_);
+
+            ping_timer_id_ = timer_.Add (() => OnPingTimerEvent(), true, PingIntervalSeconds);
+            ping_wait_time_ = 0f;
+
+            FunDebug.Log("Start ping - interval seconds: {0}, timeout seconds: {1}",
+                         PingIntervalSeconds, PingTimeoutSeconds);
+        }
+
+        private void StopPingTimer ()
+        {
+            if (protocol_ != TransportProtocol.kTcp)
+                return;
+
+            timer_.Remove(ping_timer_id_);
+            ping_timer_id_ = 0;
+            PingTime = 0;
+        }
+
+        private void OnPingTimerEvent ()
+        {
+            if (ping_wait_time_ > PingTimeoutSeconds)
+            {
+                FunDebug.LogWarning("Network seems disabled. Stopping the transport.");
+                OnDisconnected();
+                return;
+            }
+
+            SendPingMessage();
+        }
+
+        private void SendPingMessage ()
+        {
+            long timestamp = DateTime.Now.Ticks;
+
+            // Send response
+            if (encoding_ == FunEncoding.kJson)
+            {
+                object msg = FunapiMessage.Deserialize("{}");
+                FunapiMessage.JsonHelper.SetStringField(msg, kMsgTypeBodyField, kClientPingMessageType);
+                FunapiMessage.JsonHelper.SetStringField(msg, kSessionIdBodyField, session_id_);
+                FunapiMessage.JsonHelper.SetIntegerField(msg, kPingTimestampField, timestamp);
+                SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
+            }
+            else if (encoding_ == FunEncoding.kProtobuf)
+            {
+                FunPingMessage ping = new FunPingMessage();
+                ping.timestamp = timestamp;
+                FunMessage msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
+                msg.msgtype = kClientPingMessageType;
+                msg.sid = session_id_;
+                SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
+            }
+
+            ping_wait_time_ += PingIntervalSeconds;
+#if NO_UNITY
+            FunDebug.DebugLog("Send {0} ping - timestamp: {1}", str_protocol, timestamp);
+#else
+            FunDebug.DebugLog("Send {0} ping - timestamp: {1}", str_protocol, timestamp);
+#endif
+        }
+
+        private void OnServerPingMessage (object body)
+        {
+            // Send response
+            if (encoding_ == FunEncoding.kJson)
+            {
+                FunapiMessage.JsonHelper.SetStringField(body, kMsgTypeBodyField, kServerPingMessageType);
+
+                if (session_id_.Length > 0)
+                    FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+
+                SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, FunapiMessage.JsonHelper.Clone(body)));
+            }
+            else if (encoding_ == FunEncoding.kProtobuf)
+            {
+                FunMessage msg = body as FunMessage;
+                FunPingMessage obj = (FunPingMessage)FunapiMessage.GetMessage(msg, MessageType.cs_ping);
+                if (obj == null)
+                    return;
+
+                FunPingMessage ping = new FunPingMessage();
+                ping.timestamp = obj.timestamp;
+                if (obj.data.Length > 0) {
+                    ping.data = new byte[obj.data.Length];
+                    Buffer.BlockCopy(ping.data, 0, obj.data, 0, obj.data.Length);
+                }
+
+                FunMessage send_msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
+                send_msg.msgtype = msg.msgtype;
+                send_msg.sid = session_id_;
+
+                SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, send_msg));
+            }
+        }
+
+        private void OnClientPingMessage (object body)
+        {
+            long timestamp = 0;
+
+            if (encoding_ == FunEncoding.kJson)
+            {
+                if (FunapiMessage.JsonHelper.HasField(body, kPingTimestampField))
+                {
+                    timestamp = (long)FunapiMessage.JsonHelper.GetIntegerField(body, kPingTimestampField);
+                }
+            }
+            else if (encoding_ == FunEncoding.kProtobuf)
+            {
+                FunMessage msg = body as FunMessage;
+                object obj = FunapiMessage.GetMessage(msg, MessageType.cs_ping);
+                if (obj == null)
+                    return;
+
+                FunPingMessage ping = obj as FunPingMessage;
+                timestamp = ping.timestamp;
+            }
+
+            if (ping_wait_time_ > 0)
+                ping_wait_time_ -= PingIntervalSeconds;
+
+            PingTime = (int)((DateTime.Now.Ticks - timestamp) / 10000);
+
+#if NO_UNITY
+            FunDebug.DebugLog("Receive {0} ping - timestamp:{1} time={2} ms",
+                              str_protocol, timestamp, PingTime);
+#else
+            FunDebug.DebugLog("Receive {0} ping - timestamp:{1} time={2} ms",
+                              str_protocol, timestamp, PingTime);
+#endif
+        }
+
 
         internal enum State
         {
@@ -512,10 +720,15 @@ namespace Fun
         private static readonly int kMaxReconnectCount = 3;
         private static readonly float kMaxConnectingTime = 120f;
         private static readonly float kFixedConnectWaitTime = 10f;
+        private static readonly string kMsgTypeBodyField = "_msgtype";
+        private static readonly string kSessionIdBodyField = "_sid";
 
         // Ping message-related constants.
         private static readonly int kPingIntervalSecond = 3;
         private static readonly float kPingTimeoutSeconds = 20f;
+        private static readonly string kServerPingMessageType = "_ping_s";
+        private static readonly string kClientPingMessageType = "_ping_c";
+        private static readonly string kPingTimestampField = "timestamp";
 
         // Event handlers
         public event TransportEventHandler ConnectTimeoutCallback;
@@ -536,10 +749,13 @@ namespace Fun
         internal float exponential_time_ = 0f;
         internal int reconnect_count_ = 0;
 
+        // Ping-related variables.
+        private int ping_timer_id_ = 0;
+        private float ping_wait_time_ = 0f;
+
         // Encoding-serializer-releated member variables.
         internal FunEncoding encoding_ = FunEncoding.kNone;
-        internal JsonAccessor json_accessor_ = new DictionaryJsonAccessor();
-        internal FunMessageSerializer serializer_ = null;
+        internal string session_id_ = "";
 
         // Error-releated member variables.
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
@@ -641,40 +857,14 @@ namespace Fun
             get { return sending_.Count == 0; }
         }
 
-        internal override void SendMessage (FunapiMessage fun_msg)
-        {
-            if (encoding_ == FunEncoding.kJson)
-            {
-                string str = this.JsonHelper.Serialize(fun_msg.message);
-                byte[] body = System.Text.Encoding.UTF8.GetBytes(str);
-
-                //FunDebug.DebugLog("JSON to send : {0}", str);
-
-                SendMessage(fun_msg, body);
-            }
-            else if (encoding_ == FunEncoding.kProtobuf)
-            {
-                MemoryStream stream = new MemoryStream();
-                this.ProtobufHelper.Serialize (stream, fun_msg.message);
-
-                byte[] body = new byte[stream.Length];
-                stream.Seek(0, SeekOrigin.Begin);
-                stream.Read(body, 0, body.Length);
-
-                SendMessage(fun_msg, body);
-            }
-            else
-            {
-                FunDebug.Log("SendMessage - Invalid FunEncoding type: {0}", encoding_);
-            }
-        }
-
-        private void SendMessage (FunapiMessage msg_body, byte[] buffer)
+        internal override void SendMessage (FunapiMessage msg_body)
         {
             try
             {
                 lock (sending_lock_)
                 {
+                    byte[] buffer = msg_body.GetBytes(encoding_);
+
                     StringBuilder header = new StringBuilder();
                     header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
                 	if (first_sending_)
@@ -1541,8 +1731,6 @@ namespace Fun
 
         internal MonoBehaviour mono { set; private get; }
 
-        public string secure_id { set; private get; }
-
         internal override void Stop()
         {
             if (state_ == State.kUnknown)
@@ -1714,7 +1902,7 @@ namespace Fun
         {
             // Request
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-            request.ConnectionGroupName = secure_id;
+            request.ConnectionGroupName = session_id_;
             request.Method = "POST";
             request.ContentType = "application/x-www-form-urlencoded";
             request.ContentLength = body.buffer.Count;
@@ -2126,7 +2314,6 @@ namespace Fun
     public delegate void TransportEventHandler(TransportProtocol protocol);
     public delegate void TimeoutEventHandler(string msg_type);
     internal delegate void TransportMessageHandler(TransportProtocol protocol, FunapiMessage fun_msg);
-    internal delegate void TransportReceivedHandler(TransportProtocol protocol,
-                                                    Dictionary<string, string> header, ArraySegment<byte> body);
+    internal delegate void TransportReceivedHandler(FunapiMessage message);
 
 }  // namespace Fun

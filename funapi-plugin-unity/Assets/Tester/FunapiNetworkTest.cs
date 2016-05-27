@@ -134,18 +134,6 @@ public class FunapiNetworkTest : MonoBehaviour
                 //((FunapiHttpTransport)transport).UseWWW = true;
             }
 
-            // If you want to use encryption, Set encryption type.
-            // Please set the same encryption type as the encryption type of server.
-            // TCP protocol can use both of two encryption types.
-            //transport.SetEncryption(EncryptionType.kIFunEngine1Encryption);
-            //
-            // In the case of UDP and HTTP can use only kIFunEngine2Encryption type.
-            //transport.SetEncryption(EncryptionType.kIFunEngine2Encryption);
-
-            // If you prefer use specific Json implementation other than Dictionary,
-            // you need to register json accessors to handle the Json implementation before FunapiNetwork::Start().
-            //transport.JsonHelper = new YourJsonAccessorClass
-
             // You can add a extra server address.
             // If you want to add a server address for HTTP transport, use HostHttp.
             //transport.AddServerList(new List<HostAddr>{
@@ -156,6 +144,10 @@ public class FunapiNetworkTest : MonoBehaviour
             //    new HostHttp("your.address", 8018, false), new HostHttp("your.address", 8018, false)
             //});
         }
+
+        // If you prefer use specific Json implementation other than Dictionary,
+        // you need to register json accessors to handle the Json implementation before FunapiNetwork.Start().
+        //FunapiMessage.JsonHelper = new YourJsonAccessorClass
 
         network_.Start();
 
