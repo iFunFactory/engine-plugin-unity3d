@@ -5,7 +5,6 @@
 // consent of iFunFactory Inc.
 
 using Fun;
-using ProtoBuf;
 using System;
 using System.Collections.Generic;
 #if !NO_UNITY
@@ -13,6 +12,7 @@ using UnityEngine;
 #endif
 
 // protobuf
+using ProtoBuf;
 using funapi.network.fun_message;
 using funapi.service.multicast_message;
 
@@ -64,7 +64,7 @@ namespace Fun
                 FunMulticastMessage mcast_msg = new FunMulticastMessage ();
                 mcast_msg.sender = sender_;
 
-                FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
                 network_.SendMessage (kMulticastMsgType, fun_msg);
             }
         }
@@ -104,7 +104,7 @@ namespace Fun
                 mcast_msg.sender = sender_;
                 mcast_msg.join = true;
 
-                FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
                 network_.SendMessage(kMulticastMsgType, fun_msg);
             }
 
@@ -204,7 +204,7 @@ namespace Fun
 
             mcast_msg.sender = sender_;
 
-            FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
+            FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
             network_.SendMessage(kMulticastMsgType, fun_msg);
             return true;
         }
@@ -265,7 +265,7 @@ namespace Fun
                 mcast_msg.sender = sender_;
                 mcast_msg.leave = true;
 
-                FunMessage fun_msg = network_.CreateFunMessage(mcast_msg, MessageType.multicast);
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
                 network_.SendMessage(kMulticastMsgType, fun_msg);
             }
         }
@@ -314,7 +314,7 @@ namespace Fun
                 FunDebug.Assert(body is FunMessage);
                 FunMessage msg = body as FunMessage;
 
-                object obj = network_.GetMessage(msg, MessageType.multicast);
+                object obj = FunapiMessage.GetMessage(msg, MessageType.multicast);
                 FunDebug.Assert(obj != null);
 
                 FunMulticastMessage mcast_msg = obj as FunMulticastMessage;

@@ -179,10 +179,6 @@ namespace Fun
                 {
                     removing_.Add(key);
                 }
-                else
-                {
-                    return;
-                }
             }
         }
 

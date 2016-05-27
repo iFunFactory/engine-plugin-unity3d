@@ -113,7 +113,7 @@ public class TestNetwork
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = "hello proto";
-                FunMessage message = network_.CreateFunMessage(echo, MessageType.pbuf_echo);
+                FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
                 network_.SendMessage(MessageType.pbuf_echo, message);
             }
             if (encoding == FunEncoding.kJson)
@@ -178,7 +178,7 @@ public class TestNetwork
     {
         FunDebug.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
-        object obj = network_.GetMessage(msg, MessageType.pbuf_echo);
+        object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_echo);
         if (obj == null)
             return;
 
@@ -198,7 +198,7 @@ public class TestNetwork
         if (encoding == FunEncoding.kProtobuf)
         {
             FunMessage msg = body as FunMessage;
-            object obj = network_.GetMessage(msg, MessageType.pbuf_maintenance);
+            object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_maintenance);
             if (obj == null)
                 return;
 
