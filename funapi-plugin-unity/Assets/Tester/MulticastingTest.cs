@@ -239,7 +239,7 @@ public class MulticastingTest : MonoBehaviour
     }
 
 
-    // Please change this address for test.
+    // Please change this address to your server.
     private const string kServerIp = "127.0.0.1";
     private const string kMulticastTestChannel = "multicast";
 

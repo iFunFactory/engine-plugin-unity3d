@@ -105,7 +105,7 @@ public class TestNetwork
             FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
             if (encoding == FunEncoding.kNone)
             {
-                FunDebug.Log("You should attach transport first.");
+                FunDebug.Log("You should attach the transport first.");
                 return;
             }
 

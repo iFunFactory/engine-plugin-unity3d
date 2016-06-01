@@ -16,6 +16,9 @@ Funapi plugin의 업데이트 내용입니다.
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
 ```
 
+### 06/07/2016 (ver.151)
+- 주석 설명 수정
+
 ### 06/01/2016 (ver.150)
 - Ping 응답 속도 개선
 

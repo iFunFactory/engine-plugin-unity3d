@@ -598,7 +598,6 @@ namespace Fun
         {
             long timestamp = DateTime.Now.Ticks;
 
-            // Send response
             if (encoding_ == FunEncoding.kJson)
             {
                 object msg = FunapiMessage.Deserialize("{}");
@@ -742,7 +741,7 @@ namespace Fun
         internal event TransportMessageHandler MessageFailureCallback;
         internal event TransportEventHandler ConnectFailureCallback;
 
-        // Connect-releated member variables.
+        // Connect-related member variables.
         internal ConnectState cstate_ = ConnectState.kUnknown;
         internal ConnectList ip_list_ = new ConnectList();
         internal ConnectList extra_list_ = new ConnectList();
@@ -753,11 +752,11 @@ namespace Fun
         private int ping_timer_id_ = 0;
         private float ping_wait_time_ = 0f;
 
-        // Encoding-serializer-releated member variables.
+        // Encoding-serializer-related member variables.
         internal FunEncoding encoding_ = FunEncoding.kNone;
         internal string session_id_ = "";
 
-        // Error-releated member variables.
+        // Error-related member variables.
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
         internal string last_error_message_ = "";
 

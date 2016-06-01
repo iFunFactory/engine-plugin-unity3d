@@ -25,7 +25,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 150;
+        public static readonly int kPluginVersion = 151;
     }
 
 
@@ -1538,7 +1538,7 @@ namespace Fun
         private float response_timer_ = 0f;
         private bool stop_with_clear_ = false;
 
-        // Reliability-releated member variables.
+        // Reliability-related member variables.
         private bool session_reliability_ = false;
         private UInt32 seq_recvd_ = 0;
         private UInt32 tcp_seq_ = 0;
@@ -1549,12 +1549,12 @@ namespace Fun
         private Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
         private System.Random rnd_ = new System.Random();
 
-        // Transport-releated member variables.
+        // Transport-related member variables.
         private object transports_lock_ = new object();
         private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
 
-        // Message-releated member variables.
+        // Message-related member variables.
         private FunMessageSerializer serializer_;
         private object message_lock_ = new object();
         private object expected_reply_lock = new object();

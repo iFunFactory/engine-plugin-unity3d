@@ -62,7 +62,7 @@ public class AnnouncementTest : MonoBehaviour
     }
 
 
-    // Please change this address for test.
+    // Please change this address and port to your server.
     private const string kAnnouncementIp = "127.0.0.1";
     private const UInt16 kAnnouncementPort = 8080;
 
