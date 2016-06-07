@@ -58,8 +58,12 @@ public class DownloaderTest : MonoBehaviour
 
     void OnDownloadFinished (DownloadResult code)
     {
-        downloader_ = null;
         button_start_.interactable = true;
+
+        // If the code is DownloadResult.PAUSED, you can continue to download
+        // by calling the 'FunapiHttpDownloader.ContinueDownload' function.
+        if (code != DownloadResult.PAUSED)
+            downloader_ = null;
     }
 
 
