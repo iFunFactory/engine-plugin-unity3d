@@ -9,6 +9,7 @@ using System;
 using System.ComponentModel;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography;
@@ -33,6 +34,7 @@ namespace Fun
     public enum DownloadResult
     {
         SUCCESS,
+        PAUSED,
         FAILED
     }
 
@@ -139,9 +141,8 @@ namespace Fun
                 }
 
                 state_ = State.Downloading;
-                check_time_ = DateTime.Now;
-                downloading_ticks_ = 0;
                 retry_download_count_ = 0;
+                download_time_.Start();
 
                 // Deletes files
                 DeleteLocalFiles();
@@ -164,8 +165,8 @@ namespace Fun
                 if (state_ == State.Paused && download_list_.Count > 0)
                 {
                     state_ = State.Downloading;
-                    check_time_ = DateTime.Now;
                     retry_download_count_ = 0;
+                    download_time_.Start();
 
                     CreateUpdater();
                     DownloadResourceFile();
@@ -190,16 +191,18 @@ namespace Fun
                 {
                     state_ = State.Paused;
                     web_client_.CancelAsync();
-                    downloading_ticks_ += (DateTime.Now.Ticks - check_time_.Ticks);
+                    download_time_.Stop();
                     FunDebug.Log("Downloading paused.");
+
+                    OnFinishedCallback(DownloadResult.PAUSED);
                 }
                 else
                 {
                     state_ = State.None;
                     FunDebug.Log("Downloading stopped.");
-                }
 
-                OnFinishedCallback(DownloadResult.FAILED);
+                    OnFinishedCallback(DownloadResult.FAILED);
+                }
             }
             finally
             {
@@ -331,7 +334,8 @@ namespace Fun
             int rnd_index = -1;
 
             DateTime cached_time = File.GetLastWriteTime(target_path_ + kCachedFileName);
-            check_time_ = DateTime.Now;
+            Stopwatch elapsed_time = new Stopwatch();
+            elapsed_time.Start();
 
             delete_file_list_.Clear();
 
@@ -465,8 +469,8 @@ namespace Fun
                 RemoveCachedList(remove_list);
             }
 
-            TimeSpan span = new TimeSpan(DateTime.Now.Ticks - check_time_.Ticks);
-            FunDebug.Log("File check total time - {0:F2}s", span.TotalMilliseconds / 1000f);
+            elapsed_time.Stop();
+            FunDebug.Log("File check total time - {0:F2}s", elapsed_time.ElapsedMilliseconds / 1000f);
 
             total_download_count_ = list.Count;
 
@@ -559,9 +563,8 @@ namespace Fun
             {
                 UpdateCachedList();
 
-                downloading_ticks_ += (DateTime.Now.Ticks - check_time_.Ticks);
-                TimeSpan span = new TimeSpan(downloading_ticks_);
-                FunDebug.Log("File download total time - {0:F2}s", span.TotalMilliseconds / 1000f);
+                download_time_.Stop();
+                FunDebug.Log("File download total time - {0:F2}s", download_time_.ElapsedMilliseconds / 1000f);
 
                 state_ = State.Completed;
                 FunDebug.Log("Download completed.");
@@ -702,7 +705,10 @@ namespace Fun
             {
                 // It can be true when CancelAsync() called in Stop().
                 if (ar.Cancelled)
+                {
+                    File.Delete(cur_download_path_);
                     return;
+                }
 
                 if (ar.Error != null)
                 {
@@ -833,11 +839,10 @@ namespace Fun
         private int retry_download_count_ = 0;
 
         private Mutex mutex_ = new Mutex();
-        private DateTime check_time_;
-        private long downloading_ticks_ = 0;
         private WebClient web_client_ = new WebClient();
         private List<DownloadFileInfo> cached_list_ = new List<DownloadFileInfo>();
         private List<DownloadFileInfo> download_list_ = new List<DownloadFileInfo>();
         private List<string> delete_file_list_ = new List<string>();
+        private Stopwatch download_time_ = new Stopwatch();
     }
 }
