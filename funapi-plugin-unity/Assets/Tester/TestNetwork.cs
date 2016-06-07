@@ -65,12 +65,12 @@ public class TestNetwork
         if (transport == null)
             return null;
 
-        transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
-        transport.StoppedCallback += new TransportEventHandler(OnTransportClosed);
-        transport.FailureCallback += new TransportEventHandler(OnTransportFailure);
+        transport.StartedCallback += OnTransportStarted;
+        transport.StoppedCallback += OnTransportClosed;
+        transport.FailureCallback += OnTransportFailure;
 
         // Connect timeout.
-        transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
+        transport.ConnectTimeoutCallback += OnConnectTimeout;
         transport.ConnectTimeout = 10f;
 
         network_.AttachTransport(transport);

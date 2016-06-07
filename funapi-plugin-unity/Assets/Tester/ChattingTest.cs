@@ -114,7 +114,7 @@ public class ChattingTest : MonoBehaviour
         network_.StoppedAllTransportCallback += OnStoppedAllTransport;
 
         FunapiTransport transport = GetNewTransport();
-        transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
+        transport.StartedCallback += OnTransportStarted;
         network_.AttachTransport(transport);
 
         network_.Start();

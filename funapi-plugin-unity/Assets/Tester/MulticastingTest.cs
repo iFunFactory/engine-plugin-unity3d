@@ -134,7 +134,7 @@ public class MulticastingTest : MonoBehaviour
         network_.StoppedAllTransportCallback += OnStoppedAllTransport;
 
         FunapiTransport transport = GetNewTransport();
-        transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
+        transport.StartedCallback += OnTransportStarted;
         network_.AttachTransport(transport);
 
         network_.Start();
@@ -217,7 +217,8 @@ public class MulticastingTest : MonoBehaviour
             FunMulticastMessage mcast_msg = body as FunMulticastMessage;
             FunDebug.Assert (channel_id == mcast_msg.channel);
 
-            PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(mcast_msg, (int)MulticastMessageType.pbuf_hello);
+            PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(
+                mcast_msg, (int)MulticastMessageType.pbuf_hello);
             if (hello_msg == null)
                 return;
 

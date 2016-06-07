@@ -31,10 +31,10 @@ public class DownloaderTest : MonoBehaviour
         string download_url = string.Format("http://{0}:{1}", kServerIp, kServerPort);
 
         downloader_ = new FunapiHttpDownloader();
-        downloader_.VerifyCallback += new FunapiHttpDownloader.VerifyEventHandler(OnDownloadVerify);
-        downloader_.ReadyCallback += new FunapiHttpDownloader.ReadyEventHandler(OnDownloadReady);
-        downloader_.UpdateCallback += new FunapiHttpDownloader.UpdateEventHandler(OnDownloadUpdate);
-        downloader_.FinishedCallback += new FunapiHttpDownloader.FinishEventHandler(OnDownloadFinished);
+        downloader_.VerifyCallback += OnDownloadVerify;
+        downloader_.ReadyCallback += OnDownloadReady;
+        downloader_.UpdateCallback += OnDownloadUpdate;
+        downloader_.FinishedCallback += OnDownloadFinished;
         downloader_.GetDownloadList(download_url, FunapiUtils.GetLocalDataPath);
 
         button_start_.interactable = false;

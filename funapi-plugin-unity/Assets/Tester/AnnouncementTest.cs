@@ -26,7 +26,7 @@ public class AnnouncementTest : MonoBehaviour
         if (announcement_ == null)
         {
             announcement_ = new FunapiAnnouncement();
-            announcement_.ResultCallback += new FunapiAnnouncement.EventHandler(OnAnnouncementResult);
+            announcement_.ResultCallback += OnAnnouncementResult;
 
             string url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
             announcement_.Init(url);

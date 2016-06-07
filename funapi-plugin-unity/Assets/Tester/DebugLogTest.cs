@@ -83,7 +83,7 @@ public class DebugLogTest : MonoBehaviour
             network_.StoppedAllTransportCallback += OnStoppedAllTransport;
 
             FunapiTransport transport = handler_.AddTransport(protocol, kServerIp, FunEncoding.kJson);
-            transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
+            transport.StartedCallback += OnTransportStarted;
         }
 
         network_.Start();

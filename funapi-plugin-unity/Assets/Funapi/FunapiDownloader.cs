@@ -42,11 +42,11 @@ namespace Fun
         public FunapiHttpDownloader ()
         {
             // List file handler
-            web_client_.DownloadDataCompleted += new DownloadDataCompletedEventHandler(DownloadDataCompleteCb);
+            web_client_.DownloadDataCompleted += DownloadDataCompleteCb;
 
             // Download file handler
-            web_client_.DownloadProgressChanged += new DownloadProgressChangedEventHandler(DownloadProgressChangedCb);
-            web_client_.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCompleteCb);
+            web_client_.DownloadProgressChanged += DownloadProgressChangedCb;
+            web_client_.DownloadFileCompleted += DownloadFileCompleteCb;
         }
 
         // Start downloading
