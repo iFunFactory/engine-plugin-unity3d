@@ -450,13 +450,13 @@ namespace Fun
                 }
 
                 // Callback functions
-                transport.ConnectTimeoutCallback += new TransportEventHandler(OnConnectTimeout);
-                transport.StartedInternalCallback += new TransportEventHandler(OnTransportStarted);
-                transport.StoppedCallback += new TransportEventHandler(OnTransportStopped);
-                transport.ConnectFailureCallback += new TransportEventHandler(OnTransportConnectFailure);
-                transport.DisconnectedCallback += new TransportEventHandler(OnTransportDisconnected);
-                transport.ReceivedCallback += new TransportReceivedHandler(OnTransportReceived);
-                transport.MessageFailureCallback += new TransportMessageHandler(OnTransportFailure);
+                transport.ConnectTimeoutCallback += OnConnectTimeout;
+                transport.StartedInternalCallback += OnTransportStarted;
+                transport.StoppedCallback += OnTransportStopped;
+                transport.ConnectFailureCallback += OnTransportConnectFailure;
+                transport.DisconnectedCallback += OnTransportDisconnected;
+                transport.ReceivedCallback += OnTransportReceived;
+                transport.MessageFailureCallback += OnTransportFailure;
 
                 transports_[transport.Protocol] = transport;
 

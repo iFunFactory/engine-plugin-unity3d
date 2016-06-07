@@ -41,8 +41,8 @@ namespace Fun
                 Directory.CreateDirectory(local_path_);
 
             // Download handler
-            web_client_.DownloadDataCompleted += new DownloadDataCompletedEventHandler(DownloadDataCompleteCb);
-            web_client_.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCompleteCb);
+            web_client_.DownloadDataCompleted += DownloadDataCompleteCb;
+            web_client_.DownloadFileCompleted += DownloadFileCompleteCb;
         }
 
         public void UpdateList (int max_count)

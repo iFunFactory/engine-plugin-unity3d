@@ -114,7 +114,7 @@ public class FunapiNetworkTest : MonoBehaviour
 
         if (transport != null)
         {
-            transport.StartedCallback += new TransportEventHandler(OnTransportStarted);
+            transport.StartedCallback += OnTransportStarted;
 
             if (protocol == TransportProtocol.kTcp)
             {
