@@ -2029,8 +2029,11 @@ namespace Fun
                     ws.request.Abort();
                 }
 
-                if (ws.stream != null)
+                if (ws.response != null)
+                {
                     ws.stream.Close();
+                    ws.response.Close();
+                }
             }
 
             list_.Clear();
@@ -2359,9 +2362,10 @@ namespace Fun
 
                 if (nRead > 0)
                 {
-                    FunDebug.DebugLog("We need more bytes for response. Waiting.");
-                    if (ws.read_offset + nRead > ws.read_data.Length)
+                    int read_bytes = ws.read_offset + nRead;
+                    if (read_bytes > ws.read_data.Length)
                     {
+                        FunDebug.DebugLog("We need to increase the buffer for response. ({0} bytes)", read_bytes);
                         byte[] temp = new byte[ws.read_data.Length + kUnitBufferSize];
                         Buffer.BlockCopy(ws.read_data, 0, temp, 0, ws.read_offset);
                         ws.read_data = temp;
@@ -2389,7 +2393,8 @@ namespace Fun
                         DecodeMessage(str_header, new ArraySegment<byte>(ws.read_data, 0, ws.read_offset));
 
                         ws.stream.Close();
-                        ws.stream = null;
+                        ws.response.Close();
+                        ws.response = null;
                         list_.Remove(ws);
 
                         ClearRequest();
@@ -2482,8 +2487,11 @@ namespace Fun
                     ws.request.Abort();
                 }
 
-                if (ws.stream != null)
+                if (ws.response != null)
+                {
                     ws.stream.Close();
+                    ws.response.Close();
+                }
 
                 if (list_.Contains(ws))
                     list_.Remove(ws);
