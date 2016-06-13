@@ -16,6 +16,22 @@ Funapi plugin의 업데이트 내용입니다.
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
 ```
 
+### 06/28/2016 (ver.152)
+- event 콜백 등록시 new 삭제
+- Http Request 종료시 Response object 도 Close 호출
+- FunapiDownloader 관련 수정 사항
+  - 파일 다운로드 시간 체크에 Stopwatch 클래스 사용
+  - 일시정지 상태일 경우 콜백 함수 호출시 PAUSED 상태 전달
+  - 일시정지시 다운받던 임시파일 삭제
+- HTTPs MozRoots 인증서 다운로드 기능 추가
+```
+HTTPs를 사용하기 위해서는 루트 인증서가 필요한데 Mono에는 기본 루트 인증서가 포함되어 있지 않습니다.
+이를 해결하기 위해 Mozilla에서 제공하는 루트 인증서를 사용할 수 있도록 인증서 다운로드 기능이 추가되었습니다.
+Assets/Editor/iFunPlugin.cs 파일을 프로젝트에 포함하면 유니티 에디터의 메뉴에 [iFun Plugin]이 추가됩니다.
+[iFun Plugin][Download MozRoots] 항목을 실행하면 Assets/Resources/Funapi/ 폴더에 인증서가 저장됩니다.
+HTTPs를 사용하실 경우 인증서 파일(MozRoots.bytes)을 프로젝트에 동일한 위치에 포함시켜 주시면 됩니다.
+```
+
 ### 06/07/2016 (ver.151)
 - 주석 설명 수정
 
