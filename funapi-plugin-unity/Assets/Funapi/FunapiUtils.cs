@@ -353,6 +353,21 @@ namespace Fun
 
     internal class FunapiUtils
     {
+        // Gets assets path
+        public static string GetAssetsPath
+        {
+            get
+            {
+                if (Application.platform == RuntimePlatform.OSXEditor ||
+                    Application.platform == RuntimePlatform.WindowsEditor)
+                {
+                    return Application.dataPath;
+                }
+
+                return "";
+            }
+        }
+
         // Gets local path
         public static string GetLocalDataPath
         {
