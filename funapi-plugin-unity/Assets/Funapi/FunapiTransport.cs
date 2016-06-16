@@ -891,7 +891,6 @@ namespace Fun
                 lock (sending_lock_)
                 {
                     fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
-
                     pending_.Add(fun_msg);
 
                     if (Started && IsSendable)
@@ -1019,40 +1018,36 @@ namespace Fun
             return true;
         }
 
-        // Checks buffer space before starting another async receive.
-        internal void CheckReceiveBuffer()
+        // Checking the buffer space before starting another async receive.
+        internal void CheckReceiveBuffer (int additional_size = 0)
         {
-            int remaining_size = receive_buffer_.Length - received_size_;
+            int remaining_size = receive_buffer_.Length - (received_size_ + additional_size);
+            if (remaining_size > 0)
+                return;
 
-            if (remaining_size <= 0)
+            int retain_size = received_size_ - next_decoding_offset_ + additional_size;
+            int new_length = receive_buffer_.Length;
+            while (new_length <= retain_size)
+                new_length += kUnitBufferSize;
+
+            byte[] new_buffer = new byte[new_length];
+
+            // If there are spaces that can be collected, compact it first.
+            // Otherwise, increase the receiving buffer size.
+            if (next_decoding_offset_ > 0)
             {
-                byte[] new_buffer = null;
-
-                if (remaining_size == 0 && next_decoding_offset_ > 0)
-                    new_buffer = new byte[receive_buffer_.Length];
-                else
-                    new_buffer = new byte[receive_buffer_.Length + kUnitBufferSize];
-
-                // If there are space can be collected, compact it first.
-                // Otherwise, increase the receiving buffer size.
-                if (next_decoding_offset_ > 0)
-                {
-                    FunDebug.Log("Compacting a receive buffer to save {0} bytes.", next_decoding_offset_);
-                    // calc copy_length first to make sure
-                    // src range[next_decoding_offset_ .. next_decoding_offset_ + copy_length)
-                    // fit in src buffer boundary
-                    int copy_length = Math.Min (receive_buffer_.Length, received_size_) - next_decoding_offset_;
-                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, copy_length);
-                    receive_buffer_ = new_buffer;
-                    received_size_ -= next_decoding_offset_;
-                    next_decoding_offset_ = 0;
-                }
-                else
-                {
-                    FunDebug.Log("Increasing a receive buffer to {0} bytes.", receive_buffer_.Length + kUnitBufferSize);
-                    Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, receive_buffer_.Length);
-                    receive_buffer_ = new_buffer;
-                }
+                FunDebug.Log("Compacting the receive buffer to save {0} bytes.", next_decoding_offset_);
+                // fit in the receive buffer boundary.
+                Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                receive_buffer_ = new_buffer;
+                received_size_ -= next_decoding_offset_;
+                next_decoding_offset_ = 0;
+            }
+            else
+            {
+                FunDebug.Log("Increasing the receive buffer to {0} bytes.", new_length);
+                Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
+                receive_buffer_ = new_buffer;
             }
         }
 
@@ -1710,7 +1705,7 @@ namespace Fun
                         FunDebug.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            FunDebug.Log("Buffer has {0} bytes. But they failed to decode. Discarding.",
+                            FunDebug.Log("Buffer has {0} bytes but they failed to decode. Discarding.",
                                            receive_buffer_.Length - received_size_);
                         }
 
@@ -1788,8 +1783,12 @@ namespace Fun
         {
             state_ = State.kConnected;
             sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
-            sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
-                                   ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+
+            lock (receive_lock_)
+            {
+                sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
+                                       ref receive_ep_, new AsyncCallback(this.ReceiveBytesCb), this);
+            }
 
             OnStartedInternal();
         }
@@ -1936,7 +1935,6 @@ namespace Fun
                     if (nRead > 0)
                     {
                         // Resets buffer
-                        receive_buffer_ = new byte[kUnitBufferSize];
                         received_size_ = 0;
                         next_decoding_offset_ = 0;
 
@@ -1953,8 +1951,8 @@ namespace Fun
                         FunDebug.Log("Socket closed");
                         if (received_size_ - next_decoding_offset_ > 0)
                         {
-                            FunDebug.Log("Buffer has {0} bytes. But they failed to decode. Discarding.",
-                                           receive_buffer_.Length - received_size_);
+                            FunDebug.Log("Buffer has {0} bytes but they failed to decode. Discarding.",
+                                         receive_buffer_.Length - received_size_);
                         }
 
                         last_error_code_ = ErrorCode.kDisconnected;
@@ -2014,29 +2012,7 @@ namespace Fun
             if (state_ == State.kUnknown)
                 return;
 
-#if !NO_UNITY
-            if (cur_www_ != null)
-                cancel_www_ = true;
-#endif
-
-            ClearRequest();
-
-            foreach (WebState ws in list_)
-            {
-                if (ws.request != null)
-                {
-                    ws.aborted = true;
-                    ws.request.Abort();
-                }
-
-                if (ws.response != null)
-                {
-                    ws.stream.Close();
-                    ws.response.Close();
-                }
-            }
-
-            list_.Clear();
+            CancelRequest();
 
             base.Stop();
         }
@@ -2092,8 +2068,7 @@ namespace Fun
                 if (cur_www_ != null)
                     return false;
 #endif
-
-                if (cur_request_ != null)
+                if (web_request_ != null || web_response_ != null)
                     return false;
 
                 return true;
@@ -2195,23 +2170,20 @@ namespace Fun
                 request.Headers[item.Key] = item.Value;
             }
 
-            // Response
-            WebState ws = new WebState();
-            ws.request = request;
-            ws.msg_type = body.msg_type;
-            ws.sending = body.buffer;
-            list_.Add(ws);
+            web_request_ = request;
+            was_aborted_ = false;
 
-            cur_request_ = ws;
-            request.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), ws);
+            web_request_.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), body);
         }
 
-        private void DecodeMessage (string header, ArraySegment<byte> body)
+        private void OnReceiveHeader (string headers)
         {
-            StringBuilder headers = new StringBuilder();
-            headers.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
+            StringBuilder buffer = new StringBuilder();
+            string[] lines = headers.Replace("\r", "").Split('\n');
+            int body_length = 0;
 
-            string[] lines = header.Replace("\r", "").Split('\n');
+            buffer.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
+
             foreach (string n in lines)
             {
                 if (n.Length > 0)
@@ -2232,13 +2204,14 @@ namespace Fun
                         FunDebug.DebugLog("Set Cookie : {0}", str_cookie_);
                         break;
                     case "content-length":
-                        headers.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                        body_length = Convert.ToInt32(value);
+                        buffer.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     case "x-ifun-enc":
-                        headers.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                        buffer.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     default:
-                        headers.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                        buffer.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     }
                 }
@@ -2246,24 +2219,18 @@ namespace Fun
                     break;
                 }
             }
-            headers.Append(kHeaderDelimeter);
+            buffer.Append(kHeaderDelimeter);
 
-            byte[] header_bytes = System.Text.Encoding.ASCII.GetBytes(headers.ToString());
+            byte[] header_bytes = System.Text.Encoding.ASCII.GetBytes(buffer.ToString());
 
-            // Checks buffer space
-            int total_size = header_bytes.Length + body.Count;
-            received_size_ += total_size;
-            CheckReceiveBuffer();
+            // Checks buffer's space
+            received_size_ = 0;
+            next_decoding_offset_ = 0;
+            CheckReceiveBuffer(header_bytes.Length + body_length);
 
             // Copy to buffer
-            // NOTE: offset should be calculated after CheckReceiveBuffer()
-            //       (CheckReceiveBuffer() may change received_size_)
-            int offset = received_size_ - total_size;
-            Buffer.BlockCopy(header_bytes, 0, receive_buffer_, offset, header_bytes.Length);
-            Buffer.BlockCopy(body.Array, 0, receive_buffer_, offset + header_bytes.Length, body.Count);
-
-            // Decoding a message
-            TryToDecodeMessage();
+            Buffer.BlockCopy(header_bytes, 0, receive_buffer_, 0, header_bytes.Length);
+            received_size_ += header_bytes.Length;
         }
 
         private void RequestStreamCb (IAsyncResult ar)
@@ -2272,13 +2239,12 @@ namespace Fun
 
             try
             {
-                WebState ws = (WebState)ar.AsyncState;
-                HttpWebRequest request = ws.request;
+                FunapiMessage body = (FunapiMessage)ar.AsyncState;
 
-                Stream stream = request.EndGetRequestStream(ar);
-                stream.Write(ws.sending.Array, 0, ws.sending.Count);
+                Stream stream = web_request_.EndGetRequestStream(ar);
+                stream.Write(body.buffer.Array, 0, body.buffer.Count);
                 stream.Close();
-                FunDebug.DebugLog("Sent {0}bytes.", ws.sending.Count);
+                FunDebug.DebugLog("Sent {0}bytes.", body.buffer.Count);
 
                 lock (sending_lock_)
                 {
@@ -2289,7 +2255,7 @@ namespace Fun
                     sending_.RemoveAt(0);
                 }
 
-                request.BeginGetResponse(new AsyncCallback(ResponseCb), ws);
+                web_request_.BeginGetResponse(new AsyncCallback(ResponseCb), null);
             }
             catch (WebException e)
             {
@@ -2312,27 +2278,28 @@ namespace Fun
 
             try
             {
-                WebState ws = (WebState)ar.AsyncState;
-                if (ws.aborted)
+                if (was_aborted_)
                     return;
 
-                HttpWebResponse response = (HttpWebResponse)ws.request.EndGetResponse(ar);
-                ws.request = null;
-                ws.response = response;
+                web_response_ = (HttpWebResponse)web_request_.EndGetResponse(ar);
+                web_request_ = null;
 
-                if (response.StatusCode == HttpStatusCode.OK)
+                if (web_response_.StatusCode == HttpStatusCode.OK)
                 {
-                    Stream stream = response.GetResponseStream();
-                    ws.stream = stream;
-                    ws.buffer = new byte[kUnitBufferSize];
-                    ws.read_data = new byte[kUnitBufferSize];
-                    ws.read_offset = 0;
+                    lock (receive_lock_)
+                    {
+                        byte[] header = web_response_.Headers.ToByteArray();
+                        string str_header = System.Text.Encoding.ASCII.GetString(header, 0, header.Length);
+                        OnReceiveHeader(str_header);
 
-                    stream.BeginRead(ws.buffer, 0, ws.buffer.Length, new AsyncCallback(ReadCb), ws);
+                        read_stream_ = web_response_.GetResponseStream();
+                        read_stream_.BeginRead(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
+                                               new AsyncCallback(ReadCb), null);
+                    }
                 }
                 else
                 {
-                    FunDebug.Log("Failed response. status:{0}", response.StatusDescription);
+                    FunDebug.Log("Failed response. status:{0}", web_response_.StatusDescription);
                     event_.Add(OnFailure);
                 }
             }
@@ -2357,28 +2324,19 @@ namespace Fun
 
             try
             {
-                WebState ws = (WebState)ar.AsyncState;
-                int nRead = ws.stream.EndRead(ar);
-
+                int nRead = read_stream_.EndRead(ar);
                 if (nRead > 0)
                 {
-                    int read_bytes = ws.read_offset + nRead;
-                    if (read_bytes > ws.read_data.Length)
+                    lock (receive_lock_)
                     {
-                        FunDebug.DebugLog("We need to increase the buffer for response. ({0} bytes)", read_bytes);
-                        byte[] temp = new byte[ws.read_data.Length + kUnitBufferSize];
-                        Buffer.BlockCopy(ws.read_data, 0, temp, 0, ws.read_offset);
-                        ws.read_data = temp;
+                        received_size_ += nRead;
+                        read_stream_.BeginRead(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
+                                               new AsyncCallback(ReadCb), null);
                     }
-
-                    Buffer.BlockCopy(ws.buffer, 0, ws.read_data, ws.read_offset, nRead);
-                    ws.read_offset += nRead;
-
-                    ws.stream.BeginRead(ws.buffer, 0, ws.buffer.Length, new AsyncCallback(ReadCb), ws);
                 }
                 else
                 {
-                    if (ws.response == null)
+                    if (web_response_ == null)
                     {
                         FunDebug.LogWarning("Response instance is null.");
                         event_.Add(OnFailure);
@@ -2387,21 +2345,16 @@ namespace Fun
 
                     lock (receive_lock_)
                     {
-                        // Decodes message
-                        byte[] header = ws.response.Headers.ToByteArray();
-                        string str_header = System.Text.Encoding.ASCII.GetString(header, 0, header.Length);
-                        DecodeMessage(str_header, new ArraySegment<byte>(ws.read_data, 0, ws.read_offset));
-
-                        ws.stream.Close();
-                        ws.response.Close();
-                        ws.response = null;
-                        list_.Remove(ws);
-
-                        ClearRequest();
-
-                        // Sends unsent messages
-                        SendUnsentMessages();
+                        // Decoding a message
+                        TryToDecodeMessage();
                     }
+
+                    read_stream_.Close();
+                    web_response_.Close();
+                    ClearRequest();
+
+                    // Sends unsent messages
+                    SendUnsentMessages();
                 }
             }
             catch (Exception e)
@@ -2454,7 +2407,16 @@ namespace Fun
                 }
                 headers.Append(kHeaderDelimeter);
 
-                DecodeMessage(headers.ToString(), new ArraySegment<byte>(www.bytes));
+                lock (receive_lock_)
+                {
+                    OnReceiveHeader(headers.ToString());
+
+                    Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
+                    received_size_ += www.bytes.Length;
+
+                    // Decoding a message
+                    TryToDecodeMessage();
+                }
 
                 ClearRequest();
 
@@ -2477,24 +2439,16 @@ namespace Fun
             if (cur_www_ != null)
                 cancel_www_ = true;
 #endif
-            if (cur_request_ != null)
+            if (web_request_ != null)
             {
-                WebState ws = cur_request_;
+                was_aborted_ = true;
+                web_request_.Abort();
+            }
 
-                if (ws.request != null)
-                {
-                    ws.aborted = true;
-                    ws.request.Abort();
-                }
-
-                if (ws.response != null)
-                {
-                    ws.stream.Close();
-                    ws.response.Close();
-                }
-
-                if (list_.Contains(ws))
-                    list_.Remove(ws);
+            if (web_response_ != null)
+            {
+                read_stream_.Close();
+                web_response_.Close();
             }
 
             ClearRequest();
@@ -2505,7 +2459,9 @@ namespace Fun
 #if !NO_UNITY
             cur_www_ = null;
 #endif
-            cur_request_ = null;
+            web_request_ = null;
+            web_response_ = null;
+
             last_error_code_ = ErrorCode.kNone;
             last_error_message_ = "";
 
@@ -2572,24 +2528,16 @@ namespace Fun
         // waiting time for response
         private static readonly float kTimeoutSeconds = 30f;
 
-        // Response-related.
-        class WebState
-        {
-            public HttpWebRequest request = null;
-            public HttpWebResponse response = null;
-            public Stream stream = null;
-            public byte[] buffer = null;
-            public byte[] read_data = null;
-            public int read_offset = 0;
-            public bool aborted = false;
-            public string msg_type;
-            public ArraySegment<byte> sending;
-        }
-
         // member variables.
         private string host_url_;
         private string str_cookie_;
         private int request_timeout_id_ = 0;
+
+        // WebRequest-related member variables.
+        private HttpWebRequest web_request_ = null;
+        private HttpWebResponse web_response_ = null;
+        private Stream read_stream_ = null;
+        private bool was_aborted_ = false;
 
         // WWW-related member variables.
 #if !NO_UNITY
@@ -2597,10 +2545,6 @@ namespace Fun
         private bool cancel_www_ = false;
         private WWW cur_www_ = null;
 #endif
-
-        // WebRequest-related member variables.
-        private WebState cur_request_ = null;
-        private List<WebState> list_ = new List<WebState>();
     }
 
 

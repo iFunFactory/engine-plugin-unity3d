@@ -25,7 +25,7 @@ namespace Fun
     internal class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 152;
+        public static readonly int kPluginVersion = 153;
     }
 
 
@@ -444,11 +444,6 @@ namespace Fun
                     return;
                 }
 
-                if (transport.Protocol == TransportProtocol.kHttp)
-                {
-                    ((FunapiHttpTransport)transport).mono = mono;
-                }
-
                 // Callback functions
                 transport.ConnectTimeoutCallback += OnConnectTimeout;
                 transport.StartedInternalCallback += OnTransportStarted;
@@ -527,6 +522,11 @@ namespace Fun
                     Start();
                     return;
                 }
+            }
+
+            if (transport.Protocol == TransportProtocol.kHttp)
+            {
+                ((FunapiHttpTransport)transport).mono = mono;
             }
 
             transport.Start();
