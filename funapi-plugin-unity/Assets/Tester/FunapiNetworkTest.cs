@@ -60,9 +60,6 @@ public class FunapiNetworkTest : MonoBehaviour
     {
         handler_.Disconnect();
 
-        if (!network_.SessionReliability)
-            network_ = null;
-
         UpdateButtonState();
     }
 
@@ -169,6 +166,9 @@ public class FunapiNetworkTest : MonoBehaviour
 
     void OnStoppedAllTransport()
     {
+        if (!network_.SessionReliability)
+            network_ = null;
+
         UpdateButtonState();
     }
 

@@ -307,31 +307,6 @@ namespace Fun
                 }
             }
 
-            lock (state_lock_)
-            {
-                if (state_ == State.kUnknown || state_ == State.kStopped)
-                {
-                    lock (message_lock_)
-                    {
-                        if (message_buffer_.Count > 0)
-                            message_buffer_.Clear();
-                    }
-
-                    lock (expected_reply_lock)
-                    {
-                        if (expected_replies_.Count > 0)
-                            expected_replies_.Clear();
-                    }
-                    return true;
-                }
-
-                if (state_ == State.kWaitForStop)
-                {
-                    Stop(stop_with_clear_);
-                    return true;
-                }
-            }
-
             lock (message_lock_)
             {
                 if (message_buffer_.Count > 0)
@@ -355,6 +330,31 @@ namespace Fun
                         Stop(!session_reliability_);
                         return true;
                     }
+                }
+            }
+
+            lock (state_lock_)
+            {
+                if (state_ == State.kUnknown || state_ == State.kStopped)
+                {
+                    lock (message_lock_)
+                    {
+                        if (message_buffer_.Count > 0)
+                            message_buffer_.Clear();
+                    }
+
+                    lock (expected_reply_lock)
+                    {
+                        if (expected_replies_.Count > 0)
+                            expected_replies_.Clear();
+                    }
+                    return true;
+                }
+
+                if (state_ == State.kWaitForStop)
+                {
+                    Stop(stop_with_clear_);
+                    return true;
                 }
             }
 
