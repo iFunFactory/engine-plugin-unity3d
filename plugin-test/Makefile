@@ -9,38 +9,47 @@ SRC_ROOT=src
 
 tester.exe: ${SRC_ROOT}/main.cs \
 		${SRC_ROOT}/client.cs \
-		FunMessageSerializer.dll messages.dll protobuf-net.dll \
-		${PLUGIN_ROOT}/Funapi/ConnectList.cs \
-		${PLUGIN_ROOT}/Funapi/DebugUtils.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiAnnouncement.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiChat.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiDownloader.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiMulticasting.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiNetwork.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiTransport.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
-		${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
-		${PLUGIN_ROOT}/Funapi/MD5Async.cs \
-		${PLUGIN_ROOT}/plugins/MiniJSON.cs
+        FunMessageSerializer.dll messages.dll protobuf-net.dll \
+        ${PLUGIN_ROOT}/Funapi/ConnectList.cs \
+        ${PLUGIN_ROOT}/Funapi/DebugUtils.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiAnnouncement.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiChat.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiDownloader.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiEncryption.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiMulticasting.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiMessage.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiNetwork.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.Transport.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiTransport.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
+        ${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
+        ${PLUGIN_ROOT}/Funapi/MD5Async.cs \
+        ${PLUGIN_ROOT}/plugins/MiniJSON.cs
+
 	mcs /debug -define:NO_UNITY \
-		-target:exe -out:$@ \
-		${SRC_ROOT}/main.cs \
-		${SRC_ROOT}/client.cs \
-		${PLUGIN_ROOT}/Funapi/ConnectList.cs \
-		${PLUGIN_ROOT}/Funapi/DebugUtils.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiAnnouncement.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiChat.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiDownloader.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiMulticasting.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiNetwork.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiTransport.cs \
-		${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
-		${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
-		${PLUGIN_ROOT}/Funapi/MD5Async.cs \
-		${PLUGIN_ROOT}/plugins/MiniJSON.cs \
-		/r:FunMessageSerializer.dll \
-		/r:messages.dll \
-		/r:protobuf-net.dll
+        -target:exe -out:$@ \
+        ${SRC_ROOT}/main.cs \
+        ${SRC_ROOT}/client.cs \
+        ${PLUGIN_ROOT}/Funapi/ConnectList.cs \
+        ${PLUGIN_ROOT}/Funapi/DebugUtils.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiAnnouncement.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiChat.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiDownloader.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiEncryption.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiMulticasting.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiMessage.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiNetwork.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.Transport.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiTransport.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
+        ${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
+        ${PLUGIN_ROOT}/Funapi/MD5Async.cs \
+        ${PLUGIN_ROOT}/plugins/MiniJSON.cs \
+        /r:FunMessageSerializer.dll \
+        /r:messages.dll \
+        /r:protobuf-net.dll
 
 
 FunMessageSerializer.dll: ${PLUGIN_ROOT}/FunMessageSerializer.dll

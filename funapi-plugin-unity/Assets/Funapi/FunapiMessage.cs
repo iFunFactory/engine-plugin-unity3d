@@ -7,7 +7,9 @@
 using System;
 using System.IO;
 using System.Collections;
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 using ProtoBuf;
 using funapi.network.fun_message;
@@ -17,9 +19,11 @@ namespace Fun
 {
     public class FunapiMessage
     {
-        public FunapiMessage (TransportProtocol protocol, string msg_type, object message)
+        public FunapiMessage (TransportProtocol protocol, string msg_type, object message,
+                              EncryptionType enc = EncryptionType.kDefaultEncryption)
         {
             this.protocol = protocol;
+            this.enc_type = enc;
             this.msg_type = msg_type;
             this.message = message;
         }
@@ -109,6 +113,7 @@ namespace Fun
 
         // member variables.
         public TransportProtocol protocol;
+        public EncryptionType enc_type;
         public string msg_type;
         public object message;
         public ArraySegment<byte> buffer;

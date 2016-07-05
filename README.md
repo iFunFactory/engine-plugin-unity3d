@@ -16,6 +16,10 @@ Funapi plugin의 업데이트 내용입니다.
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
 ```
 
+### 07/29/2016 (ver.158)
+- FunapiSession 클래스 및 예제 추가
+- C# Runtime 테스트 코드 FunapiSession으로 변경
+
 ### 07/22/2016 (ver.156)
 - 예제 UI 폰트 변경 (DroidSansMono -> Arial)
 - Failure 콜백이 호출되기 전에 Stop이 먼저 처리되도록 수정
