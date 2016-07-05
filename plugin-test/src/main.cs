@@ -16,10 +16,10 @@ namespace Tester
 {
     class TesterMain
     {
-        private const string kServerIp = "127.0.0.1";
-        private const int kNumberOfClient = 3;
+        const int max_client = 3;
+        const bool reliability = true;
 
-        private List<Client> list_ = new List<Client>();
+        List<Client> list_ = new List<Client>();
 
 
         public static void Main ()
@@ -27,15 +27,14 @@ namespace Tester
             new TesterMain().Start();
         }
 
-        private void Start ()
+        void Start ()
         {
             WriteTitle("START");
+            FunDebug.Log("Client count is {0}.", max_client);
 
-            bool reliability = true;
-            for (int i = 0; i < kNumberOfClient; ++i)
+            for (int i = 0; i < max_client; ++i)
             {
-                Client client = new Client(i, reliability);
-                client.Init(kServerIp);
+                Client client = new Client(i);
                 list_.Add(client);
             }
 
@@ -45,12 +44,11 @@ namespace Tester
             ConnectTest();
             StartStopTest();
             SendReceiveTest();
-            PingTest();
 
             t.Abort();
         }
 
-        private void Update ()
+        void Update ()
         {
             while (true)
             {
@@ -63,11 +61,11 @@ namespace Tester
             }
         }
 
-        private void Connect ()
+        void Connect ()
         {
             foreach (Client c in list_)
             {
-                c.Connect();
+                c.Connect(reliability);
             }
 
             while (true)
@@ -75,7 +73,7 @@ namespace Tester
                 bool keep_check = false;
                 foreach (Client c in list_)
                 {
-                    if (c.Connecting && !c.Connected)
+                    if (!c.Connected)
                     {
                         keep_check = true;
                         break;
@@ -88,15 +86,17 @@ namespace Tester
             }
         }
 
-        private void Stop ()
+        void Stop ()
         {
             foreach (Client c in list_)
             {
                 c.Stop();
             }
+
+            Thread.Sleep(100);
         }
 
-        private void SendMessage ()
+        void SendMessage ()
         {
             foreach (Client c in list_)
             {
@@ -108,15 +108,18 @@ namespace Tester
             Thread.Sleep(33);
         }
 
-        private void ConnectTest ()
+        void ConnectTest ()
         {
             WriteTitle("CONNECT TEST");
 
-            Connect();
-            Stop();
+            for (int i = 0; i < 10; ++i)
+            {
+                Connect();
+                Stop();
+            }
         }
 
-        private void StartStopTest ()
+        void StartStopTest ()
         {
             WriteTitle("START / STOP TEST");
 
@@ -124,12 +127,12 @@ namespace Tester
             {
                 Connect();
                 SendMessage();
-                Thread.Sleep(100);
+                Thread.Sleep(200);
                 Stop();
             }
         }
 
-        private void SendReceiveTest ()
+        void SendReceiveTest ()
         {
             WriteTitle("SEND / RECEIVE TEST");
 
@@ -142,22 +145,7 @@ namespace Tester
             Stop();
         }
 
-        private void PingTest ()
-        {
-            WriteTitle("PING TEST");
-
-            foreach (Client c in list_)
-                c.SetPing(true);
-
-            Connect();
-            Thread.Sleep(5000);
-            Stop();
-
-            foreach (Client c in list_)
-                c.SetPing(false);
-        }
-
-        private void WriteTitle (string message)
+        void WriteTitle (string message)
         {
             Console.WriteLine("\n---------------------- "
                               + message

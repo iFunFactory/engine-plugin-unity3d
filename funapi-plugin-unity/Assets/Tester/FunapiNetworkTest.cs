@@ -81,7 +81,7 @@ public class FunapiNetworkTest : MonoBehaviour
 
             // If you want to have a sequence number with your messages, set the 'SequenceNumberValidation' to true.
             // The server must also set the same value with this option.
-            //network.SequenceNumberValidation = true;
+            //network_.SequenceNumberValidation = true;
 
             // If you set this option and there is no response from the server, it disconnects from the server.
             // So this option is recommended for use with the ping.
@@ -120,7 +120,7 @@ public class FunapiNetworkTest : MonoBehaviour
                 //transport.EnablePing = true;
 
                 // You can turn the nagle option on/off. The default value is false.
-                //transport.DisableNagle = true;
+                //((FunapiTcpTransport)transport).DisableNagle = true;
             }
             else if (protocol == TransportProtocol.kHttp)
             {

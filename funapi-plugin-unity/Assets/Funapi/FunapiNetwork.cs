@@ -21,14 +21,6 @@ using funapi.network.fun_message;
 
 namespace Fun
 {
-    // Funapi version
-    internal class FunapiVersion
-    {
-        public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 156;
-    }
-
-
     // Driver to use Funapi network plugin.
     public class FunapiNetwork : FunapiUpdater
     {
@@ -1557,7 +1549,6 @@ namespace Fun
         private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
 
         // Message-related member variables.
-        private FunMessageSerializer serializer_;
         private object message_lock_ = new object();
         private object expected_reply_lock = new object();
         private DateTime last_received_ = DateTime.Now;

@@ -17,7 +17,10 @@ tester.exe: ${SRC_ROOT}/main.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiDownloader.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiEncryption.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiMulticasting.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiMessage.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiNetwork.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.Transport.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiTransport.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
         ${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
@@ -35,7 +38,10 @@ tester.exe: ${SRC_ROOT}/main.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiDownloader.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiEncryption.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiMulticasting.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiMessage.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiNetwork.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.cs \
+        ${PLUGIN_ROOT}/Funapi/FunapiSession.Transport.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiTransport.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
         ${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \

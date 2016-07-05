@@ -15,6 +15,14 @@ using UnityEngine;
 // Utility classes
 namespace Fun
 {
+    // Funapi plugin version
+    internal class FunapiVersion
+    {
+        public static readonly int kProtocolVersion = 1;
+        public static readonly int kPluginVersion = 157;
+    }
+
+
     public class FunapiUpdater
     {
         protected void CreateUpdater ()
@@ -358,11 +366,13 @@ namespace Fun
         {
             get
             {
+#if !NO_UNITY
                 if (Application.platform == RuntimePlatform.OSXEditor ||
                     Application.platform == RuntimePlatform.WindowsEditor)
                 {
                     return Application.dataPath;
                 }
+#endif
 
                 return "";
             }

@@ -1,0 +1,220 @@
+// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+//
+// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
+//
+// This work is confidential and proprietary to iFunFactory Inc. and
+// must not be used, disclosed, copied, or distributed without the prior
+// consent of iFunFactory Inc.
+
+using Fun;
+using MiniJSON;
+using ProtoBuf;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+// protobuf
+using funapi.network.fun_message;
+using funapi.management.maintenance_message;
+using plugin_messages;
+
+
+public class FunapiSessionTest : MonoBehaviour
+{
+    void Awake ()
+    {
+        GameObject.Find("ServerIP").GetComponent<Text>().text = kServerIp;
+        with_session_reliability_ = GameObject.Find("ToggleSR").GetComponent<Toggle>();
+        with_protobuf_ = GameObject.Find("ToggleProtobuf").GetComponent<Toggle>();
+
+        buttons_["connect_tcp"] = GameObject.Find("ButtonTCP").GetComponent<Button>();
+        buttons_["connect_udp"] = GameObject.Find("ButtonUDP").GetComponent<Button>();
+        buttons_["connect_http"] = GameObject.Find("ButtonHTTP").GetComponent<Button>();
+        buttons_["disconnect"] = GameObject.Find("ButtonSendMessage").GetComponent<Button>();
+        buttons_["send"] = GameObject.Find("ButtonDisconnect").GetComponent<Button>();
+
+        // If you prefer using specific Json implementation rather than Dictionary,
+        // you need to register Json accessors to handle the Json implementation before the FunapiSession.Connect().
+        //FunapiMessage.JsonHelper = new YourJsonAccessorClass;
+
+        UpdateButtonState();
+    }
+
+    void UpdateButtonState ()
+    {
+        bool enable = session_ == null || !session_.Started;
+        buttons_["connect_tcp"].interactable = enable;
+        buttons_["connect_udp"].interactable = enable;
+        buttons_["connect_http"].interactable = enable;
+
+        enable = session_ != null && session_.Connected;
+        buttons_["disconnect"].interactable = enable;
+        buttons_["send"].interactable = enable;
+    }
+
+    public void OnConnectTCP ()
+    {
+        Connect(TransportProtocol.kTcp);
+    }
+
+    public void OnConnectUDP ()
+    {
+        Connect(TransportProtocol.kUdp);
+    }
+
+    public void OnConnectHTTP ()
+    {
+        Connect(TransportProtocol.kHttp);
+    }
+
+    public void OnDisconnect ()
+    {
+        if (!session_.Connected)
+        {
+            FunDebug.Log("You should connect first.");
+            return;
+        }
+
+        session_.Close();
+        session_ = null;
+
+        UpdateButtonState();
+    }
+
+    public void OnSendMessage ()
+    {
+        if (message_helper_ != null)
+            message_helper_.SendEchoMessage();
+    }
+
+
+    void Connect (TransportProtocol protocol)
+    {
+        FunDebug.Log("-------- Connect --------");
+
+        FunEncoding encoding = with_protobuf_.isOn ? FunEncoding.kProtobuf : FunEncoding.kJson;
+
+        session_ = FunapiSession.Create(kServerIp, with_session_reliability_.isOn);
+
+        session_.SessionEventCallback += OnSessionEvent;
+        session_.TransportEventCallback += OnTransportEvent;
+        session_.TransportErrorCallback += OnTransportError;
+
+        message_helper_ = new MessageHelper(session_, encoding);
+        session_.ReceivedMessageCallback += message_helper_.OnReceivedMessage;
+        session_.ResponseTimeoutCallback += message_helper_.OnResponseTimedOut;
+
+        ushort port = GetPort(protocol, encoding);
+        TransportOption option = MakeOption(protocol);
+
+        session_.Connect(protocol, encoding, port, option);
+
+        UpdateButtonState();
+    }
+
+    TransportOption MakeOption (TransportProtocol protocol)
+    {
+        TransportOption option = null;
+
+        if (protocol == TransportProtocol.kTcp)
+        {
+            TcpTransportOption tcp_option = new TcpTransportOption();
+            //tcp_option.AutoReconnect = true;
+
+            // If you want to use the ping of client side. Set 'enable_ping' to true.
+            // If you want to use the ping of server side. You don't have to anything.
+            //tcp_option.EnablePing = true;
+            //tcp_option.PingIntervalSeconds = 3;
+            //tcp_option.PingTimeoutSeconds = 20;
+
+            // You can turn the nagle option on/off. The default value is false.
+            //tcp_option.DisableNagle = true;
+
+            option = tcp_option;
+        }
+        else if (protocol == TransportProtocol.kHttp)
+        {
+            HttpTransportOption http_option = new HttpTransportOption();
+
+            // If you want to use the UnityEngine.WWW for the HTTP transport,
+            // or if you have trouble with the HttpWebRequest class.
+            // (The HttpWebRequest may have blocking in the Unity Editor Windows version)
+            // Set 'use_www' to true and then HTTP transport will use the WWW instead of the HttpWebRequest.
+            //http_option.UseWWW = true;
+
+            option = http_option;
+        }
+        else
+        {
+            option = new TransportOption();
+        }
+
+        // If you want to have a sequence number with your messages, set the 'sequence_validation' to true.
+        // The server must also set the same value with this option.
+        //option.SequenceValidation = true;
+
+        // If you want to use encryption, set the encryption type.
+        // Please set the same encryption type as the encryption type of the server.
+        // TCP protocol can use both the encryption types.
+        //option.EncType = EncryptionType.kIFunEngine1Encryption;
+        //
+        // In the case of UDP and HTTP, you can use only the kIFunEngine2Encryption type.
+        //option.EncType = EncryptionType.kIFunEngine2Encryption;
+
+        // Connection timeout.
+        option.ConnectTimeout = 10f;
+
+        return option;
+    }
+
+    ushort GetPort (TransportProtocol protocol, FunEncoding encoding)
+    {
+        ushort port = 0;
+        if (protocol == TransportProtocol.kTcp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8022);
+        else if (protocol == TransportProtocol.kUdp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
+        else if (protocol == TransportProtocol.kHttp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
+
+        return port;
+    }
+
+    void OnSessionEvent (SessionEventType type, string session_id)
+    {
+        FunDebug.Log("[EVENT] Session - {0}.", type);
+
+        UpdateButtonState();
+    }
+
+    void OnTransportEvent (TransportProtocol protocol, TransportEventType type)
+    {
+        FunDebug.Log("[EVENT] {0} transport - {1}.",
+                     protocol.ToString().Substring(1).ToUpper(), type);
+
+        if (session_ != null && !session_.Started)
+            session_ = null;
+
+        UpdateButtonState();
+    }
+
+    void OnTransportError (TransportProtocol protocol, TransportError error)
+    {
+        FunDebug.Log("[ERROR] {0} transport - {1}\n{2}.",
+                     protocol.ToString().Substring(1).ToUpper(), error.type, error.message);
+
+        UpdateButtonState();
+    }
+
+
+    // Please change this address to your server.
+    const string kServerIp = "127.0.0.1";
+
+    // member variables.
+    FunapiSession session_ = null;
+    MessageHelper message_helper_ = null;
+
+    Toggle with_protobuf_;
+    Toggle with_session_reliability_;
+    Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
+}

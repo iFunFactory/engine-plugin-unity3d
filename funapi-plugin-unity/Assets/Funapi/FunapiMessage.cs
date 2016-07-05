@@ -7,7 +7,9 @@
 using System;
 using System.IO;
 using System.Collections;
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 using ProtoBuf;
 using funapi.network.fun_message;
