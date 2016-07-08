@@ -895,11 +895,7 @@ namespace Fun
 
                     if (Started && IsSendable)
                     {
-                        List<FunapiMessage> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-
-                        EncryptThenSendMessage();
+                        SendPendingMessages();
                     }
                 }
             }
@@ -993,7 +989,7 @@ namespace Fun
             return true;
         }
 
-        internal bool SendUnsentMessages ()
+        internal void SendPendingMessages ()
         {
             lock (sending_lock_)
             {
@@ -1010,12 +1006,9 @@ namespace Fun
                     sending_ = pending_;
                     pending_ = tmp;
 
-                    if (!EncryptThenSendMessage())
-                        return false;
+                    EncryptThenSendMessage();
                 }
             }
-
-            return true;
         }
 
         // Checking the buffer space before starting another async receive.
@@ -1340,16 +1333,7 @@ namespace Fun
             {
                 if (Started && IsSendable)
                 {
-                    if (pending_.Count > 0)
-                    {
-                        FunDebug.DebugLog("Flushing pending messages.");
-                        List<FunapiMessage> tmp = sending_;
-                        sending_ = pending_;
-                        pending_ = tmp;
-
-                        EncryptThenSendMessage();
-                    }
-
+                    SendPendingMessages();
                     OnStartedInternal();
                 }
             }
@@ -1641,7 +1625,7 @@ namespace Fun
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
 
-                    SendUnsentMessages();
+                    SendPendingMessages();
                 }
             }
             catch (ObjectDisposedException)
@@ -1889,7 +1873,7 @@ namespace Fun
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
 
-                    SendUnsentMessages();
+                    SendPendingMessages();
                 }
             }
             catch (ObjectDisposedException)
@@ -2257,14 +2241,17 @@ namespace Fun
 
                 web_request_.BeginGetResponse(new AsyncCallback(ResponseCb), null);
             }
-            catch (WebException e)
-            {
-                // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
-                FunDebug.DebugLog("Http request operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
-            }
             catch (Exception e)
             {
+                WebException we = e as WebException;
+                if (we != null && we.Status == WebExceptionStatus.RequestCanceled)
+                {
+                    // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
+                    FunDebug.DebugLog("Http request operation has been Cancelled.");
+                    FunDebug.DebugLog(e.ToString());
+                    return;
+                }
+
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in RequestStreamCb: " + e.ToString();
                 FunDebug.Log(last_error_message_);
@@ -2303,14 +2290,17 @@ namespace Fun
                     event_.Add(OnFailure);
                 }
             }
-            catch (WebException e)
-            {
-                // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
-                FunDebug.DebugLog("Http request operation has been Cancelled.");
-                FunDebug.DebugLog(e.ToString());
-            }
             catch (Exception e)
             {
+                WebException we = e as WebException;
+                if (we != null && we.Status == WebExceptionStatus.RequestCanceled)
+                {
+                    // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
+                    FunDebug.DebugLog("Http request operation has been Cancelled.");
+                    FunDebug.DebugLog(e.ToString());
+                    return;
+                }
+
                 last_error_code_ = ErrorCode.kReceiveFailed;
                 last_error_message_ = "Failure in ResponseCb: " + e.ToString();
                 FunDebug.Log(last_error_message_);
@@ -2354,7 +2344,7 @@ namespace Fun
                     ClearRequest();
 
                     // Sends unsent messages
-                    SendUnsentMessages();
+                    SendPendingMessages();
                 }
             }
             catch (Exception e)
@@ -2421,7 +2411,7 @@ namespace Fun
                 ClearRequest();
 
                 // Sends unsent messages
-                SendUnsentMessages();
+                SendPendingMessages();
             }
             catch (Exception e)
             {
