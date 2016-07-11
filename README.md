@@ -16,6 +16,10 @@ Funapi plugin의 업데이트 내용입니다.
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
 ```
 
+### 07/22/2016 (ver.156)
+- 예제 UI 폰트 변경 (DroidSansMono -> Arial)
+- Failure 콜백이 호출되기 전에 Stop이 먼저 처리되도록 수정
+
 ### 07/08/2016 (ver.155)
 - 재연결시 메시지 전송 관련 버그 수정
 - UnityVS 플러그인 관련 파일을 무시하도록 설정

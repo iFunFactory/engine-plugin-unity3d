@@ -1086,14 +1086,14 @@ namespace Fun
             FunDebug.Log("OnFailure({0}) - state: {1}\n{2}:{3}",
                          str_protocol, state_, last_error_code_, last_error_message_);
 
-            OnFailureCallback();
-
             if (state_ != State.kEstablished)
             {
                 CheckConnectList();
 
                 Stop();
             }
+
+            OnFailureCallback();
         }
 
         private static int BytePatternMatch (ArraySegment<byte> haystack, ArraySegment<byte> needle)
