@@ -6,9 +6,7 @@
 
 using Fun;
 using MiniJSON;
-using ProtoBuf;
 using System.Collections.Generic;
-using UnityEngine;
 
 // protobuf
 using funapi.network.fun_message;
@@ -43,6 +41,7 @@ namespace Fun
 
         public void OnResponseTimedOut (string type)
         {
+            FunDebug.Log("Response timed out. type: {0}", type);
         }
 
         public void SendEchoMessage ()

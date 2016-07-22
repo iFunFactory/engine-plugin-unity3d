@@ -7,9 +7,6 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
 
 namespace Fun
@@ -26,18 +23,7 @@ namespace Fun
         public UInt16 port;
     }
 
-    public class HostHttp : HostAddr
-    {
-        public HostHttp (string host, UInt16 port, bool https = false)
-            : base(host, port)
-        {
-            this.https = https;
-        }
-
-        public bool https;
-    }
-
-    internal class HostIP : HostAddr
+    public class HostIP : HostAddr
     {
         public HostIP (string host, IPAddress ip, UInt16 port)
             : base(host, port)
@@ -48,10 +34,20 @@ namespace Fun
         public IPAddress ip;
     }
 
-
-    internal class ConnectList
+    public class HostHttp : HostAddr
     {
-        internal void Add (string hostname, UInt16 port)
+        public HostHttp (string host, UInt16 port, bool https = false)
+            : base(host, port)
+        {
+            this.https = https;
+        }
+
+        public bool https;    }
+
+
+    public class ConnectList
+    {
+        public void Add (string hostname, UInt16 port)
         {
             IPAddress[] list = Dns.GetHostAddresses(hostname);
             if (list == null) {
@@ -68,12 +64,12 @@ namespace Fun
             FunDebug.DebugLog("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
         }
 
-        internal void Add (string hostname, UInt16 port, bool https)
+        public void Add (string hostname, UInt16 port, bool https)
         {
             addr_list_.Add(new HostHttp(hostname, port, https));
         }
 
-        internal void Add (List<HostAddr> list)
+        public void Add (List<HostAddr> list)
         {
             if (list == null || list.Count <= 0) {
                 FunDebug.Log("ConnectList - Invalid connect list parameter.");
@@ -83,30 +79,30 @@ namespace Fun
             addr_list_.AddRange(list);
         }
 
-        internal void Add (HostAddr addr)
+        public void Add (HostAddr addr)
         {
             addr_list_.Add(addr);
         }
 
-        internal void Clear ()
+        public void Clear ()
         {
             addr_list_.Clear();
             addr_list_index_ = 0;
             first_ = true;
         }
 
-        internal void SetFirst ()
+        public void SetFirst ()
         {
             addr_list_index_ = 0;
             first_ = true;
         }
 
-        internal void SetLast ()
+        public void SetLast ()
         {
             addr_list_index_ = addr_list_.Count;
         }
 
-        internal HostAddr GetCurAddress ()
+        public HostAddr GetCurAddress ()
         {
             if (!IsCurAvailable)
                 return null;
@@ -114,7 +110,7 @@ namespace Fun
             return addr_list_[addr_list_index_];
         }
 
-        internal HostAddr GetNextAddress ()
+        public HostAddr GetNextAddress ()
         {
             if (first_)
             {
@@ -129,21 +125,21 @@ namespace Fun
             return addr_list_[addr_list_index_];
         }
 
-        internal bool IsCurAvailable
+        public bool IsCurAvailable
         {
             get { return addr_list_.Count > 0 && addr_list_index_ < addr_list_.Count; }
         }
 
-        internal bool IsNextAvailable
+        public bool IsNextAvailable
         {
             get { return addr_list_.Count > 0 && addr_list_index_ + 1 < addr_list_.Count; }
         }
 
 
         // member variables.
-        private List<HostAddr> addr_list_ = new List<HostAddr>();
-        private int addr_list_index_ = 0;
-        private bool first_ = true;
+        List<HostAddr> addr_list_ = new List<HostAddr>();
+        int addr_list_index_ = 0;
+        bool first_ = true;
     }
 
 }  // namespace Fun

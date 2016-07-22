@@ -18,6 +18,7 @@ namespace Tester
     {
         const int max_client = 3;
         const bool reliability = true;
+        const string kServerIp = "127.0.0.1";
 
         List<Client> list_ = new List<Client>();
 
@@ -34,7 +35,7 @@ namespace Tester
 
             for (int i = 0; i < max_client; ++i)
             {
-                Client client = new Client(i);
+                Client client = new Client(i, kServerIp);
                 list_.Add(client);
             }
 

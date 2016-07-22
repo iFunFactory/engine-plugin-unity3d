@@ -122,7 +122,7 @@ namespace Fun
         }
 #endif
 
-        private static string GetTimeLog (string message)
+        static string GetTimeLog (string message)
         {
             string log = string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), message);
 #if ENABLE_SAVE_LOG
@@ -183,9 +183,9 @@ namespace Fun
         }
 
 
-        private static readonly string kLogPath = "/Logs/";
-        private static readonly int kLogBufferMax = 1024 * 1024;
-        private static StringBuilder log_buffer_ = new StringBuilder(kLogBufferMax);
+        static readonly string kLogPath = "/Logs/";
+        static readonly int kLogBufferMax = 1024 * 1024;
+        static StringBuilder log_buffer_ = new StringBuilder(kLogBufferMax);
 #else
         public static void SaveLogs () {}
         public static int GetLogLength() { return 0; }

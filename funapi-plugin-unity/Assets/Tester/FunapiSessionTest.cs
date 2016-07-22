@@ -7,16 +7,9 @@
 // consent of iFunFactory Inc.
 
 using Fun;
-using MiniJSON;
-using ProtoBuf;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-
-// protobuf
-using funapi.network.fun_message;
-using funapi.management.maintenance_message;
-using plugin_messages;
 
 
 public class FunapiSessionTest : MonoBehaviour
@@ -156,13 +149,13 @@ public class FunapiSessionTest : MonoBehaviour
         // If you want to use encryption, set the encryption type.
         // Please set the same encryption type as the encryption type of the server.
         // TCP protocol can use both the encryption types.
-        //option.EncType = EncryptionType.kIFunEngine1Encryption;
+        //option.Encryption = EncryptionType.kIFunEngine1Encryption;
         //
         // In the case of UDP and HTTP, you can use only the kIFunEngine2Encryption type.
-        //option.EncType = EncryptionType.kIFunEngine2Encryption;
+        //option.Encryption = EncryptionType.kIFunEngine2Encryption;
 
         // Connection timeout.
-        option.ConnectTimeout = 10f;
+        option.ConnectionTimeout = 10f;
 
         return option;
     }

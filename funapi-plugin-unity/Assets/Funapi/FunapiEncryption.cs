@@ -5,17 +5,14 @@
 // consent of iFunFactory Inc.
 
 using System;
-using System.Collections;
-
-#if !NO_UNITY
-using UnityEngine;
-#endif
+using System.Collections.Generic;
 
 
 namespace Fun
 {
     public enum EncryptionType
     {
+        kNoneEncryption = 0,
         kDefaultEncryption = 100,
         kDummyEncryption,
         kIFunEngine1Encryption,
@@ -24,7 +21,7 @@ namespace Fun
 
 
     // Abstract class
-    public abstract class Encryptor
+    abstract class Encryptor
     {
         public static Encryptor Create (EncryptionType type)
         {
@@ -111,14 +108,14 @@ namespace Fun
 
         protected static readonly int kBlockSize = sizeof(UInt32);
 
-        private EncryptionType encryption_;
-        private string name_;
-        private State state_;
+        EncryptionType encryption_;
+        string name_;
+        State state_;
     }
 
 
     // encryption - dummy
-    public class Encryptor0 : Encryptor
+    class Encryptor0 : Encryptor
     {
         public Encryptor0 () : base(EncryptionType.kDummyEncryption, kName, State.kEstablished)
         {
@@ -149,12 +146,12 @@ namespace Fun
             return Encrypt(src, dst, ref out_header);
         }
 
-        internal static readonly string kName = "dummy";
+        public static readonly string kName = "dummy";
     }
 
 
     // encryption - ife1
-    public class Encryptor1 : Encryptor
+    class Encryptor1 : Encryptor
     {
         public Encryptor1 () : base(EncryptionType.kIFunEngine1Encryption, kName, State.kHandshaking)
         {
@@ -194,7 +191,7 @@ namespace Fun
             return Encrypt(src, dst, ref dec_key_);
         }
 
-        private static Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref UInt32 key)
+        static Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref UInt32 key)
         {
             if (dst.Count < src.Count)
                 return -1;
@@ -234,15 +231,15 @@ namespace Fun
             return src.Count;
         }
 
-        internal static readonly string kName = "ife1";
+        public static readonly string kName = "ife1";
 
-        private UInt32 enc_key_;
-        private UInt32 dec_key_;
+        UInt32 enc_key_;
+        UInt32 dec_key_;
     }
 
 
     // encryption - ife2
-    public class Encryptor2 : Encryptor
+    class Encryptor2 : Encryptor
     {
         public Encryptor2 () : base(EncryptionType.kIFunEngine2Encryption, kName, State.kEstablished)
         {
@@ -268,7 +265,7 @@ namespace Fun
             return Encrypt(src, dst, false);
         }
 
-        private static Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, bool encrypt)
+        static Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, bool encrypt)
         {
             byte key = (byte)src.Count;
             int shift_len = 0;
@@ -293,6 +290,205 @@ namespace Fun
             return src.Count;
         }
 
-        internal static readonly string kName = "ife2";
+        public static readonly string kName = "ife2";
+    }
+
+
+    public class FunapiEncryptor
+    {
+        bool CreateEncryptor (EncryptionType type)
+        {
+            if (encryptors_.ContainsKey(type))
+                return true;
+
+            Encryptor encryptor = Encryptor.Create(type);
+            if (encryptor == null)
+            {
+                FunDebug.LogWarning("Failed to create encryptor: {0}", type);
+                return false;
+            }
+
+            encryptors_[type] = encryptor;
+
+            if (default_encryptor_ == EncryptionType.kNoneEncryption)
+                SetDefaultEncryption(type);
+
+            return true;
+        }
+
+        void SetDefaultEncryption (EncryptionType type)
+        {
+            if (default_encryptor_ == type)
+                return;
+
+            default_encryptor_ = type;
+            FunDebug.Log("Set default encryption: {0}", (int)type);
+        }
+
+        protected void SetEncryption (EncryptionType type)
+        {
+            if (!CreateEncryptor(type))
+                return;
+
+            SetDefaultEncryption(type);
+        }
+
+        protected EncryptionType GetEncryption (FunapiMessage message)
+        {
+            if (message.enc_type != EncryptionType.kDefaultEncryption)
+                return message.enc_type;
+
+            return default_encryptor_;
+        }
+
+        protected void ParseEncryptionHeader (ref string encryption_type, ref string encryption_header)
+        {
+            int index = encryption_header.IndexOf(kDelim1);
+            if (index != -1)
+            {
+                encryption_type = encryption_header.Substring(0, index);
+                encryption_header = encryption_header.Substring(index + 1);
+            }
+            else if (encryption_header != " ") // for HTTP header's blank
+            {
+                encryption_type = encryption_header;
+            }
+        }
+
+        protected bool Handshake (string encryption_type, string encryption_header)
+        {
+            if (encryption_type == kEncryptionHandshakeBegin)
+            {
+                // encryption list
+                List<EncryptionType> encryption_list = new List<EncryptionType>();
+
+                if (encryption_header.Length > 0)
+                {
+                    int begin = 0;
+                    int end = encryption_header.IndexOf(kDelim2);
+                    EncryptionType encryption;
+
+                    while (end != -1)
+                    {
+                        encryption = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin, end - begin));
+                        encryption_list.Add(encryption);
+                        begin = end + 1;
+                        end = encryption_header.IndexOf(kDelim2, begin);
+                    }
+
+                    encryption = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin));
+                    encryption_list.Add(encryption);
+                }
+
+                // Create encryptors
+                foreach (EncryptionType type in encryption_list)
+                {
+                    if (!CreateEncryptor(type))
+                        return false;
+                }
+            }
+            else
+            {
+                // Encryption handshake message
+                EncryptionType encryption = (EncryptionType)Convert.ToInt32(encryption_type);
+                Encryptor encryptor = encryptors_[encryption];
+                if (encryptor == null)
+                {
+                    FunDebug.Log("Unknown encryption: {0}", encryption_type);
+                    return false;
+                }
+
+                if (encryptor.state != Encryptor.State.kHandshaking)
+                {
+                    FunDebug.Log("Unexpected handshake message: {0}", encryptor.name);
+                    return false;
+                }
+
+                string out_header = "";
+                if (!encryptor.Handshake(encryption_header, ref out_header))
+                {
+                    FunDebug.Log("Encryption handshake failure: {0}", encryptor.name);
+                    return false;
+                }
+
+                FunDebug.Assert(encryptor.state == Encryptor.State.kEstablished);
+            }
+
+            bool handshake_complete = true;
+            foreach (KeyValuePair<EncryptionType, Encryptor> pair in encryptors_)
+            {
+                if (pair.Value.state != Encryptor.State.kEstablished)
+                {
+                    handshake_complete = false;
+                    break;
+                }
+            }
+
+            return handshake_complete;
+        }
+
+        protected bool EncryptMessage (FunapiMessage message, EncryptionType type, ref string header)
+        {
+            if (!encryptors_.ContainsKey(type))
+            {
+                FunDebug.Log("Unknown encryption: {0}", type);
+                return false;
+            }
+
+            Encryptor encryptor = encryptors_[type];
+            if (encryptor == null || encryptor.state != Encryptor.State.kEstablished)
+            {
+                FunDebug.Log("Invalid encryption: {0}", type);
+                return false;
+            }
+
+            if (message.buffer.Count > 0)
+            {
+                Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref header);
+                if (nSize <= 0)
+                {
+                    FunDebug.Log("Failed to encrypt.");
+                    return false;
+                }
+
+                FunDebug.Assert(nSize == message.buffer.Count);
+            }
+
+            return true;
+        }
+
+        protected bool DecryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
+        {
+            EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
+            if (!encryptors_.ContainsKey(type))
+            {
+                FunDebug.Log("Unknown encryption: {0}", type);
+                return false;
+            }
+
+            Encryptor encryptor = encryptors_[type];
+            if (encryptor == null)
+            {
+                FunDebug.Log("Invalid encryption: {0}", type);
+                return false;
+            }
+
+            Int64 nSize = encryptor.Decrypt(buffer, buffer, encryption_header);
+            if (nSize <= 0)
+            {
+                FunDebug.Log("Failed to decrypt.");
+                return false;
+            }
+
+            return true;
+        }
+
+
+        static readonly string kEncryptionHandshakeBegin = "HELLO!";
+        static readonly char kDelim1 = '-';
+        static readonly char kDelim2 = ',';
+
+        EncryptionType default_encryptor_ = EncryptionType.kNoneEncryption;
+        Dictionary<EncryptionType, Encryptor> encryptors_ = new Dictionary<EncryptionType, Encryptor>();
     }
 }

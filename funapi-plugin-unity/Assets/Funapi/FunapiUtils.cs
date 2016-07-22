@@ -4,9 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using MiniJSON;
 using System;
-using System.IO;
 using System.Collections.Generic;
 #if !NO_UNITY
 using UnityEngine;
@@ -16,10 +14,10 @@ using UnityEngine;
 namespace Fun
 {
     // Funapi plugin version
-    internal class FunapiVersion
+    public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 157;
+        public static readonly int kPluginVersion = 158;
     }
 
 
@@ -137,18 +135,18 @@ namespace Fun
             }
 
 #if !NO_UNITY
-            private static readonly float kDeltaTimeMax = 0.3f;
+            static readonly float kDeltaTimeMax = 0.3f;
 
-            private long prev_ticks_ = 0;
-            private float deltaTime_ = 0f;
+            long prev_ticks_ = 0;
+            float deltaTime_ = 0f;
 #endif
         }
 
 #if !NO_UNITY
-        private GameObject game_object_ = null;
+        GameObject game_object_ = null;
 #endif
-        private FunapiObject funapi_object_ = null;
-        private ThreadSafeEventList event_ = new ThreadSafeEventList();
+        FunapiObject funapi_object_ = null;
+        ThreadSafeEventList event_ = new ThreadSafeEventList();
     }
 
 
@@ -276,7 +274,7 @@ namespace Fun
 
 
         // Gets new id
-        private int GetNewId ()
+        int GetNewId ()
         {
             do
             {
@@ -290,7 +288,7 @@ namespace Fun
         }
 
         // Adds a action
-        private int AddItem (Action callback, float start_delay = 0f,
+        int AddItem (Action callback, float start_delay = 0f,
                              bool repeat = false, float repeat_time = 0f)
         {
             if (callback == null)
@@ -307,7 +305,7 @@ namespace Fun
         }
 
         // Removes actions from remove list
-        private void CheckRemoveList ()
+        void CheckRemoveList ()
         {
             lock (lock_)
             {
@@ -349,17 +347,18 @@ namespace Fun
         }
 
 
+        static int next_id_ = 0;
+
         // member variables.
-        private static int next_id_ = 0;
-        private object lock_ = new object();
-        private Dictionary<int, Item> original_ = new Dictionary<int, Item>();
-        private Dictionary<int, Item> pending_ = new Dictionary<int, Item>();
-        private List<int> removing_ = new List<int>();
-        private bool is_all_clear_ = false;
+        object lock_ = new object();
+        Dictionary<int, Item> original_ = new Dictionary<int, Item>();
+        Dictionary<int, Item> pending_ = new Dictionary<int, Item>();
+        List<int> removing_ = new List<int>();
+        bool is_all_clear_ = false;
     }
 
 
-    internal class FunapiUtils
+    public class FunapiUtils
     {
         // Gets assets path
         public static string GetAssetsPath
@@ -410,7 +409,7 @@ namespace Fun
             }
         }
 
-        private static string path_ = null;
+        static string path_ = null;
     }
 
 

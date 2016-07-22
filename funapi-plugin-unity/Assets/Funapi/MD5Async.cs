@@ -4,7 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using System;
+using Fun;
 using System.Collections;
 using System.IO;
 using System.Security.Cryptography;
@@ -13,8 +13,6 @@ using UnityEngine;
 #else
 using System.Threading;
 #endif
-
-using Fun;
 
 
 public class MD5Async
@@ -129,8 +127,8 @@ public class MD5Async
 
 
     // Buffer-related constants.
-    private static readonly int kBlockSize = 1024 * 1024;
-    private static readonly int kMaxSleepCount = 5;
+    static readonly int kBlockSize = 1024 * 1024;
+    static readonly int kMaxSleepCount = 5;
 
     // Event handler delegate
     public delegate void OnResult (string path, DownloadFileInfo file, bool is_match);

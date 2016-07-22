@@ -20,9 +20,10 @@ namespace Tester
 {
     class Client
     {
-        public Client (int id)
+        public Client (int id, string server_addr)
         {
             id_ = id;
+            server_addr_ = server_addr;
         }
 
         public void Connect (bool session_reliability)
@@ -31,7 +32,7 @@ namespace Tester
 
             if (session_ == null)
             {
-                session_ = FunapiSession.Create(kServerIp, session_reliability);
+                session_ = FunapiSession.Create(server_addr_, session_reliability);
                 session_.SessionEventCallback += OnSessionEvent;
                 session_.TransportEventCallback += OnTransportEvent;
                 session_.TransportErrorCallback += OnTransportError;
@@ -53,7 +54,7 @@ namespace Tester
                     {
                         option = new TransportOption();
                     }
-                    option.ConnectTimeout = 3f;
+                    option.ConnectionTimeout = 3f;
 
                     ushort port = GetPort(protocols[i], encodings[i]);
                     session_.Connect(protocols[i], encodings[i], port, option);
@@ -164,8 +165,6 @@ namespace Tester
         }
 
 
-        const string kServerIp = "127.0.0.1";
-
         static List<TransportProtocol> protocols = new List<TransportProtocol>() {
             TransportProtocol.kTcp, TransportProtocol.kUdp, TransportProtocol.kHttp };
 
@@ -173,6 +172,7 @@ namespace Tester
             FunEncoding.kProtobuf, FunEncoding.kJson, FunEncoding.kJson };
 
         int id_ = -1;
+        string server_addr_;
         bool connected_ = false;
         int message_number_ = 0;
 
