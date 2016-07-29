@@ -26,7 +26,7 @@ public class AnnouncementTest : MonoBehaviour
         if (announcement_ == null)
         {
             announcement_ = new FunapiAnnouncement();
-            announcement_.ResultCallback += OnAnnouncementResult;
+            announcement_.ResultCallback += onAnnouncementResult;
 
             string url = string.Format("http://{0}:{1}", kAnnouncementIp, kAnnouncementPort);
             announcement_.Init(url);
@@ -35,7 +35,8 @@ public class AnnouncementTest : MonoBehaviour
         announcement_.UpdateList(5);
     }
 
-    void OnAnnouncementResult (AnnounceResult result)
+
+    void onAnnouncementResult (AnnounceResult result)
     {
         FunDebug.Log("OnAnnouncementResult - result: {0}", result);
         if (result != AnnounceResult.kSuccess)
@@ -63,8 +64,9 @@ public class AnnouncementTest : MonoBehaviour
 
 
     // Please change this address and port to your server.
-    private const string kAnnouncementIp = "127.0.0.1";
-    private const UInt16 kAnnouncementPort = 8080;
+    const string kAnnouncementIp = "127.0.0.1";
+    const UInt16 kAnnouncementPort = 8080;
 
-    private FunapiAnnouncement announcement_ = null;
+    // Member variables.
+    FunapiAnnouncement announcement_ = null;
 }

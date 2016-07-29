@@ -7,7 +7,6 @@
 // consent of iFunFactory Inc.
 
 using Fun;
-using ProtoBuf;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -15,7 +14,6 @@ using UnityEngine.UI;
 
 // protobuf
 using funapi.service.multicast_message;
-using plugin_messages;
 
 
 public class ChattingTest : MonoBehaviour
@@ -30,10 +28,10 @@ public class ChattingTest : MonoBehaviour
         buttons_["leave"] = GameObject.Find("ButtonLeave").GetComponent<Button>();
         buttons_["getlist"] = GameObject.Find("ButtonGetList").GetComponent<Button>();
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void UpdateButtonState ()
+    void updateButtonState ()
     {
         bool enable = chat_ == null;
         buttons_["create"].interactable = enable;
@@ -52,15 +50,27 @@ public class ChattingTest : MonoBehaviour
     public void OnCreateChat ()
     {
         if (network_ == null)
-            Connect();
+        {
+            FunDebug.Log("-------- Connect --------");
 
-        FunapiTransport transport = network_.GetTransport(TransportProtocol.kTcp);
+            network_ = new FunapiNetwork(false);
+            network_.StoppedAllTransportCallback += onStoppedAllTransport;
 
-        chat_ = new FunapiChatClient(network_, transport.Encoding);
+            FunapiTcpTransport transport = new FunapiTcpTransport(kServerIp, 8012, FunEncoding.kJson);
+            transport.StartedCallback += onTransportStarted;
+            transport.AutoReconnect = true;
+            network_.AttachTransport(transport);
+
+            network_.Start();
+        }
+
+        FunapiTransport t = network_.GetTransport(TransportProtocol.kTcp);
+
+        chat_ = new FunapiChatClient(network_, t.Encoding);
         chat_.sender = "player" + UnityEngine.Random.Range(1, 100);
 
         chat_.ChannelListCallback += delegate(object channel_list) {
-            OnMulticastChannelList(chat_.encoding, channel_list);
+            onMulticastChannelList(chat_.encoding, channel_list);
         };
         chat_.JoinedCallback += delegate(string channel_id, string sender) {
             FunDebug.DebugLog("JoinedCallback called. player:{0}", sender);
@@ -68,15 +78,15 @@ public class ChattingTest : MonoBehaviour
         chat_.LeftCallback += delegate(string channel_id, string sender) {
             FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
         };
-        chat_.ErrorCallback += OnChatError;
+        chat_.ErrorCallback += onChatError;
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
     public void OnJoinChatChannel ()
     {
-        chat_.JoinChannel(kChatTestChannel, OnChatChannelReceived);
-        UpdateButtonState();
+        chat_.JoinChannel(kChatTestChannel, onChatChannelReceived);
+        updateButtonState();
     }
 
     public void OnSendChatMessage ()
@@ -87,7 +97,7 @@ public class ChattingTest : MonoBehaviour
     public void OnLeaveChatChannel ()
     {
         chat_.LeaveChannel(kChatTestChannel);
-        UpdateButtonState();
+        updateButtonState();
     }
 
     public void OnGetChatChannelList ()
@@ -95,51 +105,21 @@ public class ChattingTest : MonoBehaviour
         chat_.RequestChannelList();
     }
 
-    FunapiTransport GetNewTransport ()
+
+    void onTransportStarted (TransportProtocol protocol)
     {
-        FunapiTransport transport = null;
-        FunEncoding encoding = FunEncoding.kJson;
-
-        transport = new FunapiTcpTransport(kServerIp, 8012, encoding);
-        transport.AutoReconnect = true;
-
-        return transport;
+        updateButtonState();
     }
 
-    void Connect ()
-    {
-        FunDebug.Log("-------- Connect --------");
-
-        network_ = new FunapiNetwork(false);
-        network_.StoppedAllTransportCallback += OnStoppedAllTransport;
-
-        FunapiTransport transport = GetNewTransport();
-        transport.StartedCallback += OnTransportStarted;
-        network_.AttachTransport(transport);
-
-        network_.Start();
-    }
-
-    void Disconnect ()
-    {
-        if (network_.Started)
-            network_.Stop();
-    }
-
-    void OnTransportStarted (TransportProtocol protocol)
-    {
-        UpdateButtonState();
-    }
-
-    void OnStoppedAllTransport ()
+    void onStoppedAllTransport ()
     {
         FunDebug.Log("OnStoppedAllTransport called.");
-        UpdateButtonState();
+        updateButtonState();
         network_ = null;
         chat_ = null;
     }
 
-    void OnMulticastChannelList (FunEncoding encoding, object channel_list)
+    void onMulticastChannelList (FunEncoding encoding, object channel_list)
     {
         if (encoding == FunEncoding.kJson)
         {
@@ -176,32 +156,33 @@ public class ChattingTest : MonoBehaviour
         }
     }
 
-    void OnChatChannelReceived (string chat_channel, string sender, string text)
+    void onChatChannelReceived (string chat_channel, string sender, string text)
     {
         FunDebug.Log("Received a chat channel message.\nChannel={0}, sender={1}, text={2}",
                        chat_channel, sender, text);
     }
 
-    void OnChatError (string channel_id, FunMulticastMessage.ErrorCode code)
+    void onChatError (string channel_id, FunMulticastMessage.ErrorCode code)
     {
         if (code == FunMulticastMessage.ErrorCode.EC_CLOSED)
         {
             // If the server is closed, try to rejoin the channel.
             if (chat_ != null && chat_.Connected)
-                chat_.JoinChannel(kChatTestChannel, OnChatChannelReceived);
+                chat_.JoinChannel(kChatTestChannel, onChatChannelReceived);
         }
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
 
     // Please change this address to your server.
-    private const string kServerIp = "127.0.0.1";
-    private const string kChatTestChannel = "chat";
+    const string kServerIp = "127.0.0.1";
+    const string kChatTestChannel = "chat";
 
-    // member variables.
-    private FunapiNetwork network_ = null;
-    private FunapiChatClient chat_ = null;
+    // Member variables.
+    FunapiNetwork network_ = null;
+    FunapiChatClient chat_ = null;
 
-    private Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
+    // UI buttons
+    Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
 }

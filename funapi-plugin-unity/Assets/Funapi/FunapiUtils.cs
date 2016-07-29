@@ -17,13 +17,13 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 158;
+        public static readonly int kPluginVersion = 159;
     }
 
 
     public class FunapiUpdater
     {
-        protected void CreateUpdater ()
+        protected void createUpdater ()
         {
 #if !NO_UNITY
             if (game_object_ != null)
@@ -36,20 +36,23 @@ namespace Fun
                 if (obj != null)
                 {
                     funapi_object_ = obj;
-                    obj.Updater = Update;
-                    obj.OnQuit = OnQuit;
+                    obj.Updater = onUpdate;
+                    obj.OnQuit = onQuit;
                 }
 
                 FunDebug.DebugLog("'{0}' GameObject was created.", game_object_.name);
             }
 #else
+            if (funapi_object_ != null)
+                return;
+
             funapi_object_ = new FunapiObject();
-            funapi_object_.Updater = Update;
-            funapi_object_.OnQuit = OnQuit;
+            funapi_object_.Updater = onUpdate;
+            funapi_object_.OnQuit = onQuit;
 #endif
         }
 
-        protected void ReleaseUpdater ()
+        protected void releaseUpdater ()
         {
 #if !NO_UNITY
             if (game_object_ == null)
@@ -58,25 +61,25 @@ namespace Fun
             FunDebug.DebugLog("'{0}' GameObject was destroyed", game_object_.name);
             GameObject.Destroy(game_object_);
             game_object_ = null;
-#endif
             funapi_object_ = null;
+#endif
         }
 
 #if NO_UNITY
-        public void UpdateFrame ()
+        public void updateFrame ()
         {
             if (funapi_object_ != null)
                 funapi_object_.Update();
         }
 #endif
 
-        protected virtual bool Update (float deltaTime)
+        protected virtual bool onUpdate (float deltaTime)
         {
             event_.Update(deltaTime);
             return true;
         }
 
-        protected virtual void OnQuit ()
+        protected virtual void onQuit ()
         {
         }
 
@@ -154,17 +157,17 @@ namespace Fun
     {
         public int Add (Action callback, float start_delay = 0f)
         {
-            return AddItem(callback, start_delay);
+            return addItem(callback, start_delay);
         }
 
         public int Add (Action callback, bool repeat, float repeat_time)
         {
-            return AddItem(callback, 0f, repeat, repeat_time);
+            return addItem(callback, 0f, repeat, repeat_time);
         }
 
         public int Add (Action callback, float start_delay, bool repeat, float repeat_time)
         {
-            return AddItem(callback, start_delay, repeat, repeat_time);
+            return addItem(callback, start_delay, repeat, repeat_time);
         }
 
         public void Remove (int key)
@@ -231,7 +234,7 @@ namespace Fun
                     return;
                 }
 
-                CheckRemoveList();
+                checkRemoveList();
 
                 // Adds timer
                 if (pending_.Count > 0)
@@ -268,13 +271,13 @@ namespace Fun
                     item.callback();
                 }
 
-                CheckRemoveList();
+                checkRemoveList();
             }
         }
 
 
         // Gets new id
-        int GetNewId ()
+        int getNewId ()
         {
             do
             {
@@ -288,7 +291,7 @@ namespace Fun
         }
 
         // Adds a action
-        int AddItem (Action callback, float start_delay = 0f,
+        int addItem (Action callback, float start_delay = 0f,
                              bool repeat = false, float repeat_time = 0f)
         {
             if (callback == null)
@@ -298,14 +301,14 @@ namespace Fun
 
             lock (lock_)
             {
-                int key = GetNewId();
+                int key = getNewId();
                 pending_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
                 return key;
             }
         }
 
         // Removes actions from remove list
-        void CheckRemoveList ()
+        void checkRemoveList ()
         {
             lock (lock_)
             {

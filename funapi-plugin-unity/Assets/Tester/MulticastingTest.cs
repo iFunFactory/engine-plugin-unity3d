@@ -30,10 +30,10 @@ public class MulticastingTest : MonoBehaviour
         buttons_["leave"] = GameObject.Find("ButtonLeave").GetComponent<Button>();
         buttons_["getlist"] = GameObject.Find("ButtonGetList").GetComponent<Button>();
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void UpdateButtonState ()
+    void updateButtonState ()
     {
         bool enable = multicast_ == null;
         buttons_["create"].interactable = enable;
@@ -52,15 +52,27 @@ public class MulticastingTest : MonoBehaviour
     public void OnCreateMulticast ()
     {
         if (network_ == null)
-            Connect();
+        {
+            FunDebug.Log("-------- Connect --------");
 
-        FunapiTransport transport = network_.GetTransport(TransportProtocol.kTcp);
+            network_ = new FunapiNetwork(false);
+            network_.StoppedAllTransportCallback += onStoppedAllTransport;
 
-        multicast_ = new FunapiMulticastClient(network_, transport.Encoding);
+            FunapiTransport transport = new FunapiTcpTransport(kServerIp, 8012, FunEncoding.kJson);
+            transport.StartedCallback += onTransportStarted;
+            transport.AutoReconnect = true;
+            network_.AttachTransport(transport);
+
+            network_.Start();
+        }
+
+        FunapiTransport t = network_.GetTransport(TransportProtocol.kTcp);
+
+        multicast_ = new FunapiMulticastClient(network_, t.Encoding);
         multicast_.sender = "player" + UnityEngine.Random.Range(1, 100);
 
         multicast_.ChannelListCallback += delegate(object channel_list) {
-            OnMulticastChannelList(multicast_.encoding, channel_list);
+            onMulticastChannelList(multicast_.encoding, channel_list);
         };
         multicast_.JoinedCallback += delegate(string channel_id, string sender) {
             FunDebug.DebugLog("JoinedCallback called. player:{0}", sender);
@@ -68,15 +80,15 @@ public class MulticastingTest : MonoBehaviour
         multicast_.LeftCallback += delegate(string channel_id, string sender) {
             FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
         };
-        multicast_.ErrorCallback += OnMulticastError;
+        multicast_.ErrorCallback += onMulticastError;
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
     public void OnJoinMulticastChannel ()
     {
-        multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelReceived);
-        UpdateButtonState();
+        multicast_.JoinChannel(kMulticastTestChannel, onMulticastChannelReceived);
+        updateButtonState();
     }
 
     public void OnSendMulticastMessage ()
@@ -107,7 +119,7 @@ public class MulticastingTest : MonoBehaviour
     public void OnLeaveMulticastChannel ()
     {
         multicast_.LeaveChannel(kMulticastTestChannel);
-        UpdateButtonState();
+        updateButtonState();
     }
 
     public void OnGetMulticastChannelList ()
@@ -115,54 +127,21 @@ public class MulticastingTest : MonoBehaviour
         multicast_.RequestChannelList();
     }
 
-    FunapiTransport GetNewTransport ()
+
+    void onTransportStarted (TransportProtocol protocol)
     {
-        FunapiTransport transport = null;
-        FunEncoding encoding = FunEncoding.kJson;
-
-        transport = new FunapiTcpTransport(kServerIp, 8012, encoding);
-        transport.AutoReconnect = true;
-
-        return transport;
+        updateButtonState();
     }
 
-    void Connect ()
-    {
-        FunDebug.Log("-------- Connect --------");
-
-        network_ = new FunapiNetwork(false);
-        network_.StoppedAllTransportCallback += OnStoppedAllTransport;
-
-        FunapiTransport transport = GetNewTransport();
-        transport.StartedCallback += OnTransportStarted;
-        network_.AttachTransport(transport);
-
-        network_.Start();
-    }
-
-    void Disconnect ()
-    {
-        if (multicast_ != null)
-            multicast_.LeaveAllChannels();
-
-        if (network_.Started)
-            network_.Stop();
-    }
-
-    void OnTransportStarted (TransportProtocol protocol)
-    {
-        UpdateButtonState();
-    }
-
-    void OnStoppedAllTransport ()
+    void onStoppedAllTransport ()
     {
         FunDebug.Log("OnStoppedAllTransport called.");
-        UpdateButtonState();
+        updateButtonState();
         network_ = null;
         multicast_ = null;
     }
 
-    void OnMulticastChannelList (FunEncoding encoding, object channel_list)
+    void onMulticastChannelList (FunEncoding encoding, object channel_list)
     {
         if (encoding == FunEncoding.kJson)
         {
@@ -199,7 +178,7 @@ public class MulticastingTest : MonoBehaviour
         }
     }
 
-    void OnMulticastChannelReceived (string channel_id, string sender, object body)
+    void onMulticastChannelReceived (string channel_id, string sender, object body)
     {
         if (multicast_.encoding == FunEncoding.kJson)
         {
@@ -227,26 +206,25 @@ public class MulticastingTest : MonoBehaviour
         }
     }
 
-    void OnMulticastError (string channel_id, FunMulticastMessage.ErrorCode code)
+    void onMulticastError (string channel_id, FunMulticastMessage.ErrorCode code)
     {
         if (code == FunMulticastMessage.ErrorCode.EC_CLOSED)
         {
             // If the server is closed, try to rejoin the channel.
             if (multicast_ != null && multicast_.Connected)
-                multicast_.JoinChannel(kMulticastTestChannel, OnMulticastChannelReceived);
+                multicast_.JoinChannel(kMulticastTestChannel, onMulticastChannelReceived);
         }
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
 
     // Please change this address to your server.
-    private const string kServerIp = "127.0.0.1";
-    private const string kMulticastTestChannel = "multicast";
+    const string kServerIp = "127.0.0.1";
+    const string kMulticastTestChannel = "multicast";
 
-    // member variables.
-    private FunapiNetwork network_ = null;
-    private FunapiMulticastClient multicast_ = null;
-
-    private Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
+    // Member variables.
+    FunapiNetwork network_ = null;
+    FunapiMulticastClient multicast_ = null;
+    Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
 }

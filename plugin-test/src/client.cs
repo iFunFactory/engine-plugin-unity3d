@@ -6,12 +6,11 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
-
 using Fun;
 using MiniJSON;
+using System.Collections.Generic;
+
+// protobuf
 using plugin_messages;
 using funapi.network.fun_message;
 
@@ -20,10 +19,10 @@ namespace Tester
 {
     class Client
     {
-        public Client (int id, string server_addr)
+        public Client (int id, string server_ip)
         {
             id_ = id;
-            server_addr_ = server_addr;
+            server_ip_ = server_ip;
         }
 
         public void Connect (bool session_reliability)
@@ -32,11 +31,11 @@ namespace Tester
 
             if (session_ == null)
             {
-                session_ = FunapiSession.Create(server_addr_, session_reliability);
-                session_.SessionEventCallback += OnSessionEvent;
-                session_.TransportEventCallback += OnTransportEvent;
-                session_.TransportErrorCallback += OnTransportError;
-                session_.ReceivedMessageCallback += OnReceivedMessage;
+                session_ = FunapiSession.Create(server_ip_, session_reliability);
+                session_.SessionEventCallback += onSessionEvent;
+                session_.TransportEventCallback += onTransportEvent;
+                session_.TransportErrorCallback += onTransportError;
+                session_.ReceivedMessageCallback += onReceivedMessage;
 
                 for (int i = 0; i < 3; ++i)
                 {
@@ -44,7 +43,6 @@ namespace Tester
                     if (protocols[i] == TransportProtocol.kTcp)
                     {
                         TcpTransportOption tcp_option = new TcpTransportOption();
-                        tcp_option.AutoReconnect = true;
                         tcp_option.EnablePing = true;
                         tcp_option.PingIntervalSeconds = 1;
                         tcp_option.PingTimeoutSeconds = 3;
@@ -54,9 +52,15 @@ namespace Tester
                     {
                         option = new TransportOption();
                     }
+
                     option.ConnectionTimeout = 3f;
 
-                    ushort port = GetPort(protocols[i], encodings[i]);
+                    //if (protocols[i] == TransportProtocol.kTcp)
+                    //    option.Encryption = EncryptionType.kIFunEngine1Encryption;
+                    //else
+                    //    option.Encryption = EncryptionType.kIFunEngine2Encryption;
+
+                    ushort port = getPort(protocols[i], encodings[i]);
                     session_.Connect(protocols[i], encodings[i], port, option);
                 }
             }
@@ -80,24 +84,15 @@ namespace Tester
             get { return connected_; }
         }
 
+        public bool HasUnsentMessages
+        {
+            get { return session_.HasUnsentMessages; }
+        }
+
         public void Update ()
         {
             if (session_ != null)
-                session_.UpdateFrame();
-        }
-
-
-        ushort GetPort (TransportProtocol protocol, FunEncoding encoding)
-        {
-            ushort port = 0;
-            if (protocol == TransportProtocol.kTcp)
-                port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8022);
-            else if (protocol == TransportProtocol.kUdp)
-                port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
-            else if (protocol == TransportProtocol.kHttp)
-                port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
-
-            return port;
+                session_.updateFrame();
         }
 
         public void SendMessage (TransportProtocol protocol, string message)
@@ -117,12 +112,26 @@ namespace Tester
             }
         }
 
-        void OnSessionEvent (SessionEventType type, string session_id)
+
+        ushort getPort (TransportProtocol protocol, FunEncoding encoding)
+        {
+            ushort port = 0;
+            if (protocol == TransportProtocol.kTcp)
+                port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8022);
+            else if (protocol == TransportProtocol.kUdp)
+                port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
+            else if (protocol == TransportProtocol.kHttp)
+                port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
+
+            return port;
+        }
+
+        void onSessionEvent (SessionEventType type, string session_id)
         {
             FunDebug.Log("[EVENT] Session - {0}.", type);
         }
 
-        void OnTransportEvent (TransportProtocol protocol, TransportEventType type)
+        void onTransportEvent (TransportProtocol protocol, TransportEventType type)
         {
             FunDebug.Log("[EVENT] {0} transport - {1}.",
                          protocol.ToString().Substring(1).ToUpper(), type);
@@ -138,19 +147,19 @@ namespace Tester
             }
         }
 
-        void OnTransportError (TransportProtocol protocol, TransportError error)
+        void onTransportError (TransportProtocol protocol, TransportError error)
         {
             FunDebug.Log("[ERROR] {0} transport - {1}\n{2}.",
                          protocol.ToString().Substring(1).ToUpper(), error.type, error.message);
         }
 
-        void OnReceivedMessage (string type, object message)
+        void onReceivedMessage (string type, object message)
         {
             if (type == "echo")
             {
                 Dictionary<string, object> json = message as Dictionary<string, object>;
-                string strJson = Json.Serialize(json);
-                FunDebug.Log("[{0}:{2}] {1}", id_, strJson, ++message_number_);
+                string echo_msg = json["message"] as string;
+                FunDebug.Log("[{0}:{2}] {1}", id_, echo_msg, ++message_number_);
             }
             else if (type == "pbuf_echo")
             {
@@ -165,14 +174,18 @@ namespace Tester
         }
 
 
-        static List<TransportProtocol> protocols = new List<TransportProtocol>() {
+        // Protocol constants.
+        static readonly List<TransportProtocol> protocols = new List<TransportProtocol>() {
             TransportProtocol.kTcp, TransportProtocol.kUdp, TransportProtocol.kHttp };
 
-        static List<FunEncoding> encodings = new List<FunEncoding>() {
+        // Encoding constants.
+        static readonly List<FunEncoding> encodings = new List<FunEncoding>() {
             FunEncoding.kProtobuf, FunEncoding.kJson, FunEncoding.kJson };
 
+
+        // Member variables.
         int id_ = -1;
-        string server_addr_;
+        string server_ip_;
         bool connected_ = false;
         int message_number_ = 0;
 

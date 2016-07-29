@@ -8,14 +8,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
-// Protobuf
-using ProtoBuf;
+// protobuf
 using funapi.network.fun_message;
 
 
@@ -169,7 +164,7 @@ namespace Fun
                 state_ = State.kStarted;
             }
 
-            CreateUpdater();
+            createUpdater();
 
             event_list.Add (delegate {
                 FunDebug.Log("Starting a network module.");
@@ -231,7 +226,7 @@ namespace Fun
 
             FunDebug.Log("Stopping a network module.");
 
-            ReleaseUpdater();
+            releaseUpdater();
 
             // Stops all transport
             lock (transports_lock_)
@@ -282,9 +277,9 @@ namespace Fun
         }
 
         // Updates FunapiNetwork
-        protected override bool Update (float deltaTime)
+        protected override bool onUpdate (float deltaTime)
         {
-            if (!base.Update(deltaTime))
+            if (!base.onUpdate(deltaTime))
                 return false;
 
             lock (transports_lock_)
@@ -412,7 +407,7 @@ namespace Fun
             return true;
         }
 
-        protected override void OnQuit ()
+        protected override void onQuit ()
         {
             Stop(true, true);
         }

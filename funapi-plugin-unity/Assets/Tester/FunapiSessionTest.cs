@@ -30,10 +30,10 @@ public class FunapiSessionTest : MonoBehaviour
         // you need to register Json accessors to handle the Json implementation before the FunapiSession.Connect().
         //FunapiMessage.JsonHelper = new YourJsonAccessorClass;
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void UpdateButtonState ()
+    void updateButtonState ()
     {
         bool enable = session_ == null || !session_.Started;
         buttons_["connect_tcp"].interactable = enable;
@@ -47,17 +47,17 @@ public class FunapiSessionTest : MonoBehaviour
 
     public void OnConnectTCP ()
     {
-        Connect(TransportProtocol.kTcp);
+        tryConnect(TransportProtocol.kTcp);
     }
 
     public void OnConnectUDP ()
     {
-        Connect(TransportProtocol.kUdp);
+        tryConnect(TransportProtocol.kUdp);
     }
 
     public void OnConnectHTTP ()
     {
-        Connect(TransportProtocol.kHttp);
+        tryConnect(TransportProtocol.kHttp);
     }
 
     public void OnDisconnect ()
@@ -71,7 +71,7 @@ public class FunapiSessionTest : MonoBehaviour
         session_.Close();
         session_ = null;
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
     public void OnSendMessage ()
@@ -81,31 +81,27 @@ public class FunapiSessionTest : MonoBehaviour
     }
 
 
-    void Connect (TransportProtocol protocol)
+    void tryConnect (TransportProtocol protocol)
     {
         FunDebug.Log("-------- Connect --------");
 
         FunEncoding encoding = with_protobuf_.isOn ? FunEncoding.kProtobuf : FunEncoding.kJson;
 
         session_ = FunapiSession.Create(kServerIp, with_session_reliability_.isOn);
-
-        session_.SessionEventCallback += OnSessionEvent;
-        session_.TransportEventCallback += OnTransportEvent;
-        session_.TransportErrorCallback += OnTransportError;
-
         message_helper_ = new MessageHelper(session_, encoding);
-        session_.ReceivedMessageCallback += message_helper_.OnReceivedMessage;
-        session_.ResponseTimeoutCallback += message_helper_.OnResponseTimedOut;
 
-        ushort port = GetPort(protocol, encoding);
-        TransportOption option = MakeOption(protocol);
+        session_.SessionEventCallback += onSessionEvent;
+        session_.TransportEventCallback += onTransportEvent;
+        session_.TransportErrorCallback += onTransportError;
 
+        ushort port = getPort(protocol, encoding);
+        TransportOption option = makeOption(protocol);
         session_.Connect(protocol, encoding, port, option);
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    TransportOption MakeOption (TransportProtocol protocol)
+    TransportOption makeOption (TransportProtocol protocol)
     {
         TransportOption option = null;
 
@@ -160,7 +156,7 @@ public class FunapiSessionTest : MonoBehaviour
         return option;
     }
 
-    ushort GetPort (TransportProtocol protocol, FunEncoding encoding)
+    ushort getPort (TransportProtocol protocol, FunEncoding encoding)
     {
         ushort port = 0;
         if (protocol == TransportProtocol.kTcp)
@@ -173,14 +169,14 @@ public class FunapiSessionTest : MonoBehaviour
         return port;
     }
 
-    void OnSessionEvent (SessionEventType type, string session_id)
+    void onSessionEvent (SessionEventType type, string session_id)
     {
         FunDebug.Log("[EVENT] Session - {0}.", type);
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void OnTransportEvent (TransportProtocol protocol, TransportEventType type)
+    void onTransportEvent (TransportProtocol protocol, TransportEventType type)
     {
         FunDebug.Log("[EVENT] {0} transport - {1}.",
                      protocol.ToString().Substring(1).ToUpper(), type);
@@ -188,25 +184,26 @@ public class FunapiSessionTest : MonoBehaviour
         if (session_ != null && !session_.Started)
             session_ = null;
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void OnTransportError (TransportProtocol protocol, TransportError error)
+    void onTransportError (TransportProtocol protocol, TransportError error)
     {
         FunDebug.Log("[ERROR] {0} transport - {1}\n{2}.",
                      protocol.ToString().Substring(1).ToUpper(), error.type, error.message);
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
 
     // Please change this address to your server.
     const string kServerIp = "127.0.0.1";
 
-    // member variables.
+    // Member variables.
     FunapiSession session_ = null;
     MessageHelper message_helper_ = null;
 
+    // UI buttons
     Toggle with_protobuf_;
     Toggle with_session_reliability_;
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();

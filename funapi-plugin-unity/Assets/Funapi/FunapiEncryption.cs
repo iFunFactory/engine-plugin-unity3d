@@ -38,25 +38,10 @@ namespace Fun
             return null;
         }
 
-        public static Encryptor Create (string name)
+        protected Encryptor (EncryptionType type, string name, State initial_state)
         {
-            if (name == Encryptor0.kName)
-                return new Encryptor0();
-            else if (name == Encryptor1.kName)
-                return new Encryptor1();
-            else if (name == Encryptor2.kName)
-                return new Encryptor2();
-
-            FunDebug.LogWarning("Unknown encryptor: {0}", name);
-            FunDebug.Assert(false);
-
-            return null;
-        }
-
-        protected Encryptor (EncryptionType encryption, string encryption_name, State initial_state)
-        {
-            encryption_ = encryption;
-            name_ = encryption_name;
+            type_ = type;
+            name_ = name;
             state_ = initial_state;
         }
 
@@ -69,9 +54,9 @@ namespace Fun
         public abstract Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header);
         public abstract Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header);
 
-        public EncryptionType encryption
+        public EncryptionType type
         {
-            get { return encryption_; }
+            get { return type_; }
         }
 
         public string name
@@ -84,17 +69,17 @@ namespace Fun
             get { return state_; }
         }
 
-        protected void SetState (State state)
+        protected void setState (State state)
         {
             state_ = state;
         }
 
-        protected static byte CircularLeftShift (byte value, int shift_len)
+        protected static byte circularLeftShift (byte value, int shift_len)
         {
             return (byte)((value << shift_len) | (value >> (sizeof(byte) * 8 - shift_len)));
         }
 
-        protected static UInt32 CircularLeftShift (UInt32 value, int shift_len)
+        protected static UInt32 circularLeftShift (UInt32 value, int shift_len)
         {
             return (value << shift_len) | (value >> (sizeof(UInt32) * 8 - shift_len));
         }
@@ -106,9 +91,8 @@ namespace Fun
             kEstablished
         }
 
-        protected static readonly int kBlockSize = sizeof(UInt32);
 
-        EncryptionType encryption_;
+        EncryptionType type_;
         string name_;
         State state_;
     }
@@ -117,7 +101,7 @@ namespace Fun
     // encryption - dummy
     class Encryptor0 : Encryptor
     {
-        public Encryptor0 () : base(EncryptionType.kDummyEncryption, kName, State.kEstablished)
+        public Encryptor0 () : base(EncryptionType.kDummyEncryption, "dummy", State.kEstablished)
         {
         }
 
@@ -145,15 +129,13 @@ namespace Fun
             string out_header = "";
             return Encrypt(src, dst, ref out_header);
         }
-
-        public static readonly string kName = "dummy";
     }
 
 
     // encryption - ife1
     class Encryptor1 : Encryptor
     {
-        public Encryptor1 () : base(EncryptionType.kIFunEngine1Encryption, kName, State.kHandshaking)
+        public Encryptor1 () : base(EncryptionType.kIFunEngine1Encryption, "ife1", State.kHandshaking)
         {
             enc_key_ = 0;
             dec_key_ = 0;
@@ -166,7 +148,7 @@ namespace Fun
             enc_key_ = Convert.ToUInt32(in_header);
             dec_key_ = enc_key_;
 
-            SetState(State.kEstablished);
+            setState(State.kEstablished);
 
             return true;
         }
@@ -175,7 +157,7 @@ namespace Fun
         {
             FunDebug.Assert(state == State.kEstablished);
 
-            return Encrypt(src, dst, ref enc_key_);
+            return encrypt(src, dst, ref enc_key_);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
@@ -188,10 +170,10 @@ namespace Fun
                 return -1;
             }
 
-            return Encrypt(src, dst, ref dec_key_);
+            return encrypt(src, dst, ref dec_key_);
         }
 
-        static Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref UInt32 key)
+        static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref UInt32 key)
         {
             if (dst.Count < src.Count)
                 return -1;
@@ -200,7 +182,7 @@ namespace Fun
             key = 8253729 * key + 2396403;
 
             int shift_len = (int)(key & 0x0F);
-            UInt32 key32 = CircularLeftShift(key, shift_len);
+            UInt32 key32 = circularLeftShift(key, shift_len);
 
             // Encrypted in kBlockSize
             for (int i = 0; i < (src.Count / kBlockSize); ++i)
@@ -217,9 +199,9 @@ namespace Fun
             byte key8 = 0;
             byte[] k = BitConverter.GetBytes(key);
             if (BitConverter.IsLittleEndian)
-                key8 = CircularLeftShift(k[0], shift_len);
+                key8 = circularLeftShift(k[0], shift_len);
             else
-                key8 = CircularLeftShift(k[3], shift_len);
+                key8 = circularLeftShift(k[3], shift_len);
 
             // The remaining values are encrypted in units of 1byte
             for (int i = 0; i < (src.Count % kBlockSize); ++i)
@@ -231,7 +213,8 @@ namespace Fun
             return src.Count;
         }
 
-        public static readonly string kName = "ife1";
+
+        const int kBlockSize = sizeof(UInt32);
 
         UInt32 enc_key_;
         UInt32 dec_key_;
@@ -241,7 +224,7 @@ namespace Fun
     // encryption - ife2
     class Encryptor2 : Encryptor
     {
-        public Encryptor2 () : base(EncryptionType.kIFunEngine2Encryption, kName, State.kEstablished)
+        public Encryptor2 () : base(EncryptionType.kIFunEngine2Encryption, "ife2", State.kEstablished)
         {
         }
 
@@ -249,7 +232,7 @@ namespace Fun
         {
             FunDebug.Assert(state == State.kEstablished);
 
-            return Encrypt(src, dst, true);
+            return encrypt(src, dst);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
@@ -262,45 +245,45 @@ namespace Fun
                 return -1;
             }
 
-            return Encrypt(src, dst, false);
+            return decrypt(src, dst);
         }
 
-        static Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, bool encrypt)
+        static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
             byte key = (byte)src.Count;
             int shift_len = 0;
 
-            if (encrypt)
-                shift_len = key % (sizeof(byte) * 8);
-            else
-                shift_len = (sizeof(byte) * 8) - (key % (sizeof(byte) * 8));
+            shift_len = key % (sizeof(byte) * 8);
 
             for (Int64 i = 0; i < src.Count; ++i)
             {
-                if (encrypt)
-                {
-                    dst.Array[dst.Offset + i] = CircularLeftShift((byte)(src.Array[src.Offset + i] ^ key), shift_len);
-                }
-                else
-                {
-                    dst.Array[dst.Offset + i] = (byte)(CircularLeftShift(src.Array[src.Offset + i], shift_len) ^ key);
-                }
+                dst.Array[dst.Offset + i] = circularLeftShift((byte)(src.Array[src.Offset + i] ^ key), shift_len);
             }
 
             return src.Count;
         }
 
-        public static readonly string kName = "ife2";
+        static Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            byte key = (byte)src.Count;
+            int shift_len = 0;
+
+            shift_len = (sizeof(byte) * 8) - (key % (sizeof(byte) * 8));
+
+            for (Int64 i = 0; i < src.Count; ++i)
+            {
+                dst.Array[dst.Offset + i] = (byte)(circularLeftShift(src.Array[src.Offset + i], shift_len) ^ key);
+            }
+
+            return src.Count;
+        }
     }
 
 
     public class FunapiEncryptor
     {
-        bool CreateEncryptor (EncryptionType type)
+        bool createEncryptor (EncryptionType type)
         {
-            if (encryptors_.ContainsKey(type))
-                return true;
-
             Encryptor encryptor = Encryptor.Create(type);
             if (encryptor == null)
             {
@@ -311,12 +294,12 @@ namespace Fun
             encryptors_[type] = encryptor;
 
             if (default_encryptor_ == EncryptionType.kNoneEncryption)
-                SetDefaultEncryption(type);
+                setDefaultEncryption(type);
 
             return true;
         }
 
-        void SetDefaultEncryption (EncryptionType type)
+        void setDefaultEncryption (EncryptionType type)
         {
             if (default_encryptor_ == type)
                 return;
@@ -325,15 +308,15 @@ namespace Fun
             FunDebug.Log("Set default encryption: {0}", (int)type);
         }
 
-        protected void SetEncryption (EncryptionType type)
+        protected void setEncryption (EncryptionType type)
         {
-            if (!CreateEncryptor(type))
+            if (!createEncryptor(type))
                 return;
 
-            SetDefaultEncryption(type);
+            setDefaultEncryption(type);
         }
 
-        protected EncryptionType GetEncryption (FunapiMessage message)
+        protected EncryptionType getEncryption (FunapiMessage message)
         {
             if (message.enc_type != EncryptionType.kDefaultEncryption)
                 return message.enc_type;
@@ -341,7 +324,7 @@ namespace Fun
             return default_encryptor_;
         }
 
-        protected void ParseEncryptionHeader (ref string encryption_type, ref string encryption_header)
+        protected void parseEncryptionHeader (ref string encryption_type, ref string encryption_header)
         {
             int index = encryption_header.IndexOf(kDelim1);
             if (index != -1)
@@ -355,7 +338,7 @@ namespace Fun
             }
         }
 
-        protected bool Handshake (string encryption_type, string encryption_header)
+        protected bool handshake (string encryption_type, string encryption_header)
         {
             if (encryption_type == kEncryptionHandshakeBegin)
             {
@@ -366,32 +349,32 @@ namespace Fun
                 {
                     int begin = 0;
                     int end = encryption_header.IndexOf(kDelim2);
-                    EncryptionType encryption;
+                    EncryptionType type;
 
                     while (end != -1)
                     {
-                        encryption = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin, end - begin));
-                        encryption_list.Add(encryption);
+                        type = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin, end - begin));
+                        encryption_list.Add(type);
                         begin = end + 1;
                         end = encryption_header.IndexOf(kDelim2, begin);
                     }
 
-                    encryption = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin));
-                    encryption_list.Add(encryption);
+                    type = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin));
+                    encryption_list.Add(type);
                 }
 
                 // Create encryptors
                 foreach (EncryptionType type in encryption_list)
                 {
-                    if (!CreateEncryptor(type))
+                    if (!createEncryptor(type))
                         return false;
                 }
             }
             else
             {
                 // Encryption handshake message
-                EncryptionType encryption = (EncryptionType)Convert.ToInt32(encryption_type);
-                Encryptor encryptor = encryptors_[encryption];
+                EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
+                Encryptor encryptor = encryptors_[type];
                 if (encryptor == null)
                 {
                     FunDebug.Log("Unknown encryption: {0}", encryption_type);
@@ -427,7 +410,7 @@ namespace Fun
             return handshake_complete;
         }
 
-        protected bool EncryptMessage (FunapiMessage message, EncryptionType type, ref string header)
+        protected bool encryptMessage (FunapiMessage message, EncryptionType type, ref string header)
         {
             if (!encryptors_.ContainsKey(type))
             {
@@ -457,7 +440,7 @@ namespace Fun
             return true;
         }
 
-        protected bool DecryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
+        protected bool decryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
         {
             EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
             if (!encryptors_.ContainsKey(type))
@@ -484,9 +467,9 @@ namespace Fun
         }
 
 
-        static readonly string kEncryptionHandshakeBegin = "HELLO!";
-        static readonly char kDelim1 = '-';
-        static readonly char kDelim2 = ',';
+        const string kEncryptionHandshakeBegin = "HELLO!";
+        const char kDelim1 = '-';
+        const char kDelim2 = ',';
 
         EncryptionType default_encryptor_ = EncryptionType.kNoneEncryption;
         Dictionary<EncryptionType, Encryptor> encryptors_ = new Dictionary<EncryptionType, Encryptor>();

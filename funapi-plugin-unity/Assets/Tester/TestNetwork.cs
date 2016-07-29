@@ -8,7 +8,6 @@
 
 using Fun;
 using MiniJSON;
-using ProtoBuf;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -24,15 +23,15 @@ public class TestNetwork
     {
         FunapiNetwork network = new FunapiNetwork(session_reliability);
 
-        network.OnSessionInitiated += OnSessionInitiated;
-        network.OnSessionClosed += OnSessionClosed;
-        network.MaintenanceCallback += OnMaintenanceMessage;
-        network.StoppedAllTransportCallback += OnStoppedAllTransport;
-        network.TransportConnectFailedCallback += OnTransportConnectFailed;
-        network.TransportDisconnectedCallback += OnTransportDisconnected;
+        network.OnSessionInitiated += onSessionInitiated;
+        network.OnSessionClosed += onSessionClosed;
+        network.MaintenanceCallback += onMaintenanceMessage;
+        network.StoppedAllTransportCallback += onStoppedAllTransport;
+        network.TransportConnectFailedCallback += onTransportConnectFailed;
+        network.TransportDisconnectedCallback += onTransportDisconnected;
 
-        network.RegisterHandler("echo", this.OnEcho);
-        network.RegisterHandler("pbuf_echo", this.OnEchoWithProtobuf);
+        network.RegisterHandler("echo", this.onEcho);
+        network.RegisterHandler("pbuf_echo", this.onEchoWithProtobuf);
 
         //network.SetMessageProtocol(TransportProtocol.kTcp, "echo");
         //network.SetMessageProtocol(TransportProtocol.kUdp, "pbuf_echo");
@@ -46,7 +45,7 @@ public class TestNetwork
                                          string ip, FunEncoding encoding)
     {
         FunapiTransport transport = null;
-        ushort port = GetPort(protocol, encoding);
+        ushort port = getPort(protocol, encoding);
 
         if (protocol == TransportProtocol.kTcp)
         {
@@ -65,12 +64,12 @@ public class TestNetwork
         if (transport == null)
             return null;
 
-        transport.StartedCallback += OnTransportStarted;
-        transport.StoppedCallback += OnTransportClosed;
-        transport.FailureCallback += OnTransportFailure;
+        transport.StartedCallback += onTransportStarted;
+        transport.StoppedCallback += onTransportClosed;
+        transport.FailureCallback += onTransportFailure;
 
         // Connect timeout.
-        transport.ConnectTimeoutCallback += OnConnectTimeout;
+        transport.ConnectTimeoutCallback += onConnectTimeout;
         transport.ConnectTimeout = 10f;
 
         network_.AttachTransport(transport);
@@ -128,7 +127,7 @@ public class TestNetwork
         }
     }
 
-    private ushort GetPort (TransportProtocol protocol, FunEncoding encoding)
+    ushort getPort (TransportProtocol protocol, FunEncoding encoding)
     {
         ushort port = 0;
         if (protocol == TransportProtocol.kTcp)
@@ -141,40 +140,40 @@ public class TestNetwork
         return port;
     }
 
-    private void OnSessionInitiated (string session_id)
+    void onSessionInitiated (string session_id)
     {
         FunDebug.Log("Session initiated. Session id:{0}", session_id);
     }
 
-    private void OnSessionClosed ()
+    void onSessionClosed ()
     {
         FunDebug.Log("Session closed.");
         //network = null;
     }
 
-    private void OnConnectTimeout (TransportProtocol protocol)
+    void onConnectTimeout (TransportProtocol protocol)
     {
         FunDebug.Log("{0} Transport Connection timed out.", protocol);
     }
 
-    private void OnTransportStarted (TransportProtocol protocol)
+    void onTransportStarted (TransportProtocol protocol)
     {
         FunDebug.Log("{0} Transport started.", protocol);
     }
 
-    private void OnTransportClosed (TransportProtocol protocol)
+    void onTransportClosed (TransportProtocol protocol)
     {
         FunDebug.Log("{0} Transport closed.", protocol);
     }
 
-    private void OnEcho (string msg_type, object body)
+    void onEcho (string msg_type, object body)
     {
         FunDebug.Assert(body is Dictionary<string, object>);
         string strJson = Json.Serialize(body as Dictionary<string, object>);
         FunDebug.Log("Received an echo message: {0}", strJson);
     }
 
-    private void OnEchoWithProtobuf (string msg_type, object body)
+    void onEchoWithProtobuf (string msg_type, object body)
     {
         FunDebug.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
@@ -186,7 +185,7 @@ public class TestNetwork
         FunDebug.Log("Received an echo message: {0}", echo.msg);
     }
 
-    private void OnMaintenanceMessage (string msg_type, object body)
+    void onMaintenanceMessage (string msg_type, object body)
     {
         FunEncoding encoding = network_.GetEncoding(network_.GetDefaultProtocol());
         if (encoding == FunEncoding.kNone)
@@ -215,12 +214,12 @@ public class TestNetwork
         }
     }
 
-    private void OnStoppedAllTransport()
+    void onStoppedAllTransport()
     {
         FunDebug.Log("OnStoppedAllTransport called.");
     }
 
-    private void OnTransportConnectFailed (TransportProtocol protocol)
+    void onTransportConnectFailed (TransportProtocol protocol)
     {
         FunDebug.Log("OnTransportConnectFailed called.");
 
@@ -231,16 +230,17 @@ public class TestNetwork
         //network.Reconnect(protocol);
     }
 
-    private void OnTransportDisconnected (TransportProtocol protocol)
+    void onTransportDisconnected (TransportProtocol protocol)
     {
         FunDebug.Log("OnTransportDisconnected called.");
     }
 
-    private void OnTransportFailure (TransportProtocol protocol)
+    void onTransportFailure (TransportProtocol protocol)
     {
         FunDebug.Log("OnTransportFailure({0}) - {1}", protocol, network_.LastErrorCode(protocol));
     }
 
 
-    private FunapiNetwork network_ = null;
+    // Member variables.
+    FunapiNetwork network_ = null;
 }
