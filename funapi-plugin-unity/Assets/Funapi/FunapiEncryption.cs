@@ -21,32 +21,32 @@ namespace Fun
 
     public class FunapiEncryptor
     {
-        protected void SetEncryption (EncryptionType type)
+        protected void setEncryption (EncryptionType type)
         {
         }
 
-        protected EncryptionType GetEncryption (FunapiMessage message)
+        protected EncryptionType getEncryption (FunapiMessage message)
         {
             return EncryptionType.kNoneEncryption;
         }
 
-        protected void ParseEncryptionHeader (ref string encryption_type, ref string encryption_header)
+        protected void parseEncryptionHeader (ref string encryption_type, ref string encryption_header)
         {
         }
 
-        protected bool Handshake (string encryption_type, string encryption_header)
+        protected bool handshake (string encryption_type, string encryption_header)
         {
             // Do nothing
             return true;
         }
 
-        protected bool EncryptMessage (FunapiMessage message, EncryptionType type, ref string header)
+        protected bool encryptMessage (FunapiMessage message, EncryptionType type, ref string header)
         {
             FunDebug.LogWarning("This plugin is not support encryption.");
             return false;
         }
 
-        protected bool DecryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
+        protected bool decryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
         {
             FunDebug.LogWarning("This plugin is not support encryption.");
             return false;

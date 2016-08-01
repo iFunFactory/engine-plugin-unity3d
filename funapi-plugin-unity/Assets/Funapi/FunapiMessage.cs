@@ -6,11 +6,8 @@
 
 using System;
 using System.IO;
-using System.Collections;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
+// protobuf
 using ProtoBuf;
 using funapi.network.fun_message;
 
@@ -124,10 +121,10 @@ namespace Fun
         public TimeoutEventHandler timeout_callback = null;
 
         // json-related members.
-        private static JsonAccessor json_helper_ = new DictionaryJsonAccessor();
+        static JsonAccessor json_helper_ = new DictionaryJsonAccessor();
 
         // protobuf-related members.
-        private static Type funmsg_type_ = typeof(FunMessage);
-        private static FunMessageSerializer serializer_ = new FunMessageSerializer();
+        static Type funmsg_type_ = typeof(FunMessage);
+        static FunMessageSerializer serializer_ = new FunMessageSerializer();
     }
 }

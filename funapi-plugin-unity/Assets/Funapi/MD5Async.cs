@@ -4,7 +4,6 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using Fun;
 using System.Collections;
 using System.IO;
 using System.Security.Cryptography;
@@ -15,121 +14,130 @@ using System.Threading;
 #endif
 
 
-public class MD5Async
+namespace Fun
 {
-    public static void Compute (MonoBehaviour mono, ref string path, ref DownloadFileInfo file, OnResult on_result)
+    public class MD5Async
     {
-        if (File.Exists(path))
+        public static void Compute (MonoBehaviour mono, ref string path, ref DownloadFileInfo file, OnResult on_result)
         {
-#if !NO_UNITY
-            mono.StartCoroutine(AsyncCompute(path, file, on_result));
-#else
-            string path_ = path;
-            DownloadFileInfo file_ = file;
-            mono.StartCoroutine(delegate { AsyncCompute(path_, file_, on_result); });
-#endif
-            return;
-        }
-
-        FunDebug.Log("MD5Async.Compute - Can't find a file.\npath: {0}", path);
-        if (on_result != null)
-            on_result(path, file, false);
-    }
-
-#if !NO_UNITY
-    static IEnumerator AsyncCompute (string path, DownloadFileInfo file, OnResult on_result)
-#else
-    static void AsyncCompute (string path, DownloadFileInfo file, OnResult on_result)
-#endif
-    {
-        MD5 md5 = MD5.Create();
-        int length, read_bytes;
-        byte[] buffer = new byte[kBlockSize];
-        string md5hash = "";
-
-        FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (stream.Length > 0)
-        {
-            if (file.hash_front.Length > 0)
+            if (File.Exists(path))
             {
-                length = (stream.Length < kBlockSize) ? (int)stream.Length : kBlockSize;
-                read_bytes = stream.Read(buffer, 0, length);
-                md5.TransformFinalBlock(buffer, 0, read_bytes);
-
-                md5hash = MakeHashString(md5.Hash);
-                if (md5hash != file.hash_front || length == stream.Length)
-                {
-                    stream.Close();
-                    if (on_result != null)
-                        on_result(path, file, md5hash == file.hash_front && md5hash == file.hash);
-
 #if !NO_UNITY
-                    yield break;
+                mono.StartCoroutine(asyncCompute(path, file, on_result));
 #else
-                    return;
+                string path_ = path;
+                DownloadFileInfo file_ = file;
+                mono.StartCoroutine(delegate { asyncCompute(path_, file_, on_result); });
 #endif
-                }
-
-                md5.Clear();
-                md5 = MD5.Create();
-                stream.Position = 0;
-
-#if !NO_UNITY
-                yield return new WaitForEndOfFrame();
-#endif
+                return;
             }
 
-            int sleep_count = 0;
-            while (stream.Position < stream.Length)
+            FunDebug.Log("MD5Async.Compute - Can't find a file.\npath: {0}", path);
+            if (on_result != null)
+                on_result(path, file, false);
+        }
+
+#if !NO_UNITY
+        static IEnumerator asyncCompute (string path, DownloadFileInfo file, OnResult on_result)
+#else
+        static void asyncCompute (string path, DownloadFileInfo file, OnResult on_result)
+#endif
+        {
+            MD5 md5 = MD5.Create();
+            int length, read_bytes;
+            byte[] buffer = new byte[kBlockSize];
+            string md5hash = "";
+
+            FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length > 0)
             {
-                length = (stream.Position + kBlockSize > stream.Length) ? (int)(stream.Length - stream.Position) : kBlockSize;
-                read_bytes = stream.Read(buffer, 0, length);
-
-                if (stream.Position < stream.Length)
+                if (file.hash_front.Length > 0)
                 {
-                    md5.TransformBlock(buffer, 0, read_bytes, buffer, 0);
-                }
-                else
-                {
+                    length = (stream.Length < kBlockSize) ? (int)stream.Length : kBlockSize;
+                    read_bytes = stream.Read(buffer, 0, length);
                     md5.TransformFinalBlock(buffer, 0, read_bytes);
-                    break;
-                }
 
-                ++sleep_count;
-                if (sleep_count % kMaxSleepCount == 0)
+                    md5hash = makeHashString(md5.Hash);
+                    if (md5hash != file.hash_front || length == stream.Length)
+                    {
+                        stream.Close();
+                        if (on_result != null)
+                            on_result(path, file, md5hash == file.hash_front && md5hash == file.hash);
+
+#if !NO_UNITY
+                        yield break;
+#else
+                        return;
+#endif
+                    }
+
+                    md5.Clear();
+                    md5 = MD5.Create();
+                    stream.Position = 0;
+
 #if !NO_UNITY
                     yield return new WaitForEndOfFrame();
-#else
-                    Thread.Sleep(30);
 #endif
+                }
+
+                int sleep_count = 0;
+                while (stream.Position < stream.Length)
+                {
+                    length = kBlockSize;
+                    if (stream.Position + length > stream.Length)
+                        length = (int)(stream.Length - stream.Position);
+
+                    read_bytes = stream.Read(buffer, 0, length);
+
+                    if (stream.Position < stream.Length)
+                    {
+                        md5.TransformBlock(buffer, 0, read_bytes, buffer, 0);
+                    }
+                    else
+                    {
+                        md5.TransformFinalBlock(buffer, 0, read_bytes);
+                        break;
+                    }
+
+                    ++sleep_count;
+                    if (sleep_count >= kSleepCountMax)
+                    {
+                        sleep_count = 0;
+#if !NO_UNITY
+                        yield return new WaitForEndOfFrame();
+#else
+                        Thread.Sleep(30);
+#endif
+                    }
+                }
             }
+            else
+            {
+                md5.TransformFinalBlock(buffer, 0, 0);
+            }
+
+            stream.Close();
+
+            md5hash = makeHashString(md5.Hash);
+            if (on_result != null)
+                on_result(path, file, md5hash == file.hash);
         }
-        else
+
+        static string makeHashString (byte[] hash)
         {
-            md5.TransformFinalBlock(buffer, 0, 0);
+            string md5hash = "";
+            foreach (byte n in hash)
+                md5hash += n.ToString("x2");
+
+            return md5hash;
         }
 
-        stream.Close();
 
-        md5hash = MakeHashString(md5.Hash);
-        if (on_result != null)
-            on_result(path, file, md5hash == file.hash);
+        // Buffer-related constants.
+        const int kBlockSize = 1024 * 1024;
+        const int kSleepCountMax = 5;
+
+        // Event handler delegate
+        public delegate void OnResult (string path, DownloadFileInfo file, bool is_match);
     }
-
-    static string MakeHashString (byte[] hash)
-    {
-        string md5hash = "";
-        foreach (byte n in hash)
-            md5hash += n.ToString("x2");
-
-        return md5hash;
-    }
-
-
-    // Buffer-related constants.
-    static readonly int kBlockSize = 1024 * 1024;
-    static readonly int kMaxSleepCount = 5;
-
-    // Event handler delegate
-    public delegate void OnResult (string path, DownloadFileInfo file, bool is_match);
 }

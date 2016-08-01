@@ -19,7 +19,7 @@ using System.Text;
 using UnityEngine;
 #endif
 
-// Protobuf
+// protobuf
 using ProtoBuf;
 using funapi.network.fun_message;
 using funapi.network.ping_message;
@@ -1876,7 +1876,7 @@ namespace Fun
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
             request.ConnectionGroupName = session_id_;
             request.Method = "POST";
-            request.ContentType = "application/x-www-form-urlencoded";
+            request.ContentType = "application/octet-stream";
             request.ContentLength = body.buffer.Count;
 
             foreach (KeyValuePair<string, string> item in headers) {

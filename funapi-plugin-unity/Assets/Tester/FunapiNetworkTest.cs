@@ -26,10 +26,10 @@ public class FunapiNetworkTest : MonoBehaviour
         buttons_["disconnect"] = GameObject.Find("ButtonSendMessage").GetComponent<Button>();
         buttons_["send"] = GameObject.Find("ButtonDisconnect").GetComponent<Button>();
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void UpdateButtonState ()
+    void updateButtonState ()
     {
         bool enable = network_ == null || !network_.Started;
         buttons_["connect_tcp"].interactable = enable;
@@ -43,24 +43,24 @@ public class FunapiNetworkTest : MonoBehaviour
 
     public void OnConnectTCP ()
     {
-        Connect(TransportProtocol.kTcp);
+        tryConnect(TransportProtocol.kTcp);
     }
 
     public void OnConnectUDP ()
     {
-        Connect(TransportProtocol.kUdp);
+        tryConnect(TransportProtocol.kUdp);
     }
 
     public void OnConnectHTTP ()
     {
-        Connect(TransportProtocol.kHttp);
+        tryConnect(TransportProtocol.kHttp);
     }
 
     public void OnDisconnect ()
     {
         handler_.Disconnect();
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
     public void OnSendMessage ()
@@ -69,7 +69,7 @@ public class FunapiNetworkTest : MonoBehaviour
     }
 
 
-    void Connect (TransportProtocol protocol)
+    void tryConnect (TransportProtocol protocol)
     {
         FunDebug.Log("-------- Connect --------");
 
@@ -87,7 +87,7 @@ public class FunapiNetworkTest : MonoBehaviour
             // So this option is recommended for use with the ping.
             //network.ResponseTimeout = 10f;
 
-            network_.StoppedAllTransportCallback += OnStoppedAllTransport;
+            network_.StoppedAllTransportCallback += onStoppedAllTransport;
 
             FunEncoding encoding = with_protobuf_.isOn ? FunEncoding.kProtobuf : FunEncoding.kJson;
             transport = handler_.AddTransport(protocol, kServerIp, encoding);
@@ -111,7 +111,7 @@ public class FunapiNetworkTest : MonoBehaviour
 
         if (transport != null)
         {
-            transport.StartedCallback += OnTransportStarted;
+            transport.StartedCallback += onTransportStarted;
 
             if (protocol == TransportProtocol.kTcp)
             {
@@ -148,32 +148,33 @@ public class FunapiNetworkTest : MonoBehaviour
 
         network_.Start();
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void OnTransportStarted (TransportProtocol protocol)
+    void onTransportStarted (TransportProtocol protocol)
     {
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void OnStoppedAllTransport()
+    void onStoppedAllTransport()
     {
         if (!network_.SessionReliability)
             network_ = null;
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
 
     // Please change this address to your server.
-    private const string kServerIp = "127.0.0.1";
+    const string kServerIp = "127.0.0.1";
 
-    // member variables.
-    private Toggle with_protobuf_;
-    private Toggle with_session_reliability_;
+    // Member variables.
+    TestNetwork handler_ = null;
+    FunapiNetwork network_ = null;
 
-    private TestNetwork handler_ = null;
-    private FunapiNetwork network_ = null;
-
-    private Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
+    // UI buttons
+    Button button_start_;
+    Toggle with_protobuf_;
+    Toggle with_session_reliability_;
+    Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
 }

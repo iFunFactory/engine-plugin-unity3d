@@ -21,31 +21,6 @@ namespace Fun
 {
     public class MozRoots
     {
-        const string kMozillaCertificatesUrl = "http://mxr.mozilla.org/seamonkey/source/security/nss/lib/ckfw/builtins/certdata.txt?raw=1";
-        const string kDownloadCertificatesPath = "/Resources/Funapi/MozRoots.bytes";
-        const string kResourceCertificatesPath = "Funapi/MozRoots";
-
-        static X509Certificate2Collection trustedCerificates = null;
-
-
-        static byte[] DecodeOctalString (string s)
-        {
-            string[] pieces = s.Split('\\');
-            byte[] data = new byte[pieces.Length - 1];
-            for (int i = 1; i < pieces.Length; i++)
-            {
-                data[i - 1] = (byte)((pieces[i][0] - '0' << 6) + (pieces[i][1] - '0' << 3) + (pieces[i][2] - '0'));
-            }
-            return data;
-        }
-
-        static X509Certificate2 DecodeCertificate (string s)
-        {
-            byte[] rawdata = DecodeOctalString(s);
-            return new X509Certificate2(rawdata);
-        }
-
-
         public static bool DownloadMozRoots ()
         {
             string tempPath = FunapiUtils.GetLocalDataPath + "/" + Path.GetRandomFileName();
@@ -139,7 +114,7 @@ namespace Fun
                                         if (line.StartsWith("END"))
                                         {
                                             processing = false;
-                                            X509Certificate root = DecodeCertificate(sb.ToString());
+                                            X509Certificate root = decodeCertificate(sb.ToString());
                                             trustedCerificates.Add(root);
 
                                             sb = new StringBuilder();
@@ -184,5 +159,29 @@ namespace Fun
 
             return false;
         }
+
+        static byte[] decodeOctalString (string s)
+        {
+            string[] pieces = s.Split('\\');
+            byte[] data = new byte[pieces.Length - 1];
+            for (int i = 1; i < pieces.Length; i++)
+            {
+                data[i - 1] = (byte)((pieces[i][0] - '0' << 6) + (pieces[i][1] - '0' << 3) + (pieces[i][2] - '0'));
+            }
+            return data;
+        }
+
+        static X509Certificate2 decodeCertificate (string s)
+        {
+            byte[] rawdata = decodeOctalString(s);
+            return new X509Certificate2(rawdata);
+        }
+
+
+        const string kMozillaCertificatesUrl = "http://mxr.mozilla.org/seamonkey/source/security/nss/lib/ckfw/builtins/certdata.txt?raw=1";
+        const string kDownloadCertificatesPath = "/Resources/Funapi/MozRoots.bytes";
+        const string kResourceCertificatesPath = "Funapi/MozRoots";
+
+        static X509Certificate2Collection trustedCerificates = null;
     }
 }

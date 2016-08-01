@@ -4,15 +4,10 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using Fun;
 using System;
 using System.Collections.Generic;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
 // protobuf
-using ProtoBuf;
 using funapi.network.fun_message;
 using funapi.service.multicast_message;
 
@@ -27,7 +22,7 @@ namespace Fun
             network_ = network;
             encoding_ = encoding;
 
-            network_.RegisterHandlerWithProtocol(kMulticastMsgType, TransportProtocol.kTcp, OnReceived);
+            network_.RegisterHandlerWithProtocol(kMulticastMsgType, TransportProtocol.kTcp, onReceived);
         }
 
         public string sender
@@ -136,8 +131,8 @@ namespace Fun
                 channels_.Remove(channel_id);
             }
 
-            SendLeaveMessage(channel_id);
-            OnLeftCallback(channel_id, sender_);
+            sendLeaveMessage(channel_id);
+            onUserLeft(channel_id, sender_);
 
             return true;
         }
@@ -154,8 +149,8 @@ namespace Fun
 
                 foreach (string channel_id in channels_.Keys)
                 {
-                    SendLeaveMessage(channel_id);
-                    OnLeftCallback(channel_id, sender_);
+                    sendLeaveMessage(channel_id);
+                    onUserLeft(channel_id, sender_);
                 }
 
                 channels_.Clear();
@@ -247,7 +242,8 @@ namespace Fun
             return true;
         }
 
-        private void SendLeaveMessage (string channel_id)
+
+        void sendLeaveMessage (string channel_id)
         {
             if (encoding_ == FunEncoding.kJson)
             {
@@ -270,7 +266,21 @@ namespace Fun
             }
         }
 
-        protected void OnReceived (string msg_type, object body)
+        void onUserJoined (string channel_id, string user_id)
+        {
+            FunDebug.Log("{0} joined the '{1}' channel", user_id, channel_id);
+            if (JoinedCallback != null)
+                JoinedCallback(channel_id, user_id);
+        }
+
+        void onUserLeft (string channel_id, string user_id)
+        {
+            FunDebug.Log("{0} left the '{1}' channel", user_id, channel_id);
+            if (LeftCallback != null)
+                LeftCallback(channel_id, user_id);
+        }
+
+        void onReceived (string msg_type, object body)
         {
             FunDebug.Assert(msg_type == kMulticastMsgType);
 
@@ -379,11 +389,11 @@ namespace Fun
 
             if (join)
             {
-                OnJoinedCallback(channel_id, sender);
+                onUserJoined(channel_id, sender);
             }
             else if (leave)
             {
-                OnLeftCallback(channel_id, sender);
+                onUserLeft(channel_id, sender);
             }
             else
             {
@@ -395,44 +405,30 @@ namespace Fun
             }
         }
 
-        private void OnJoinedCallback (string channel_id, string sender)
-        {
-            FunDebug.Log("{0} joined the '{1}' channel", sender, channel_id);
-            if (JoinedCallback != null)
-                JoinedCallback(channel_id, sender);
-        }
 
-        private void OnLeftCallback (string channel_id, string sender)
-        {
-            FunDebug.Log("{0} left the '{1}' channel", sender, channel_id);
-            if (LeftCallback != null)
-                LeftCallback(channel_id, sender);
-        }
-
-
-        protected static readonly string kMulticastMsgType = "_multicast";
-        protected static readonly string kChannels = "_channels";
-        protected static readonly string kChannelId = "_channel";
-        protected static readonly string kSender = "_sender";
-        protected static readonly string kJoin = "_join";
-        protected static readonly string kLeave = "_leave";
-        protected static readonly string kErrorCode = "_error_code";
+        protected const string kMulticastMsgType = "_multicast";
+        protected const string kChannels = "_channels";
+        protected const string kChannelId = "_channel";
+        protected const string kSender = "_sender";
+        protected const string kJoin = "_join";
+        protected const string kLeave = "_leave";
+        protected const string kErrorCode = "_error_code";
 
         public delegate void ChannelList(object channel_list);
         public delegate void ChannelNotify(string channel_id, string sender);
         public delegate void ChannelMessage(string channel_id, string sender, object body);
         public delegate void ErrorNotify(string channel_id, FunMulticastMessage.ErrorCode code);
 
-        private FunapiNetwork network_ = null;
-        private object channel_lock_ = new object();
-        private Dictionary<string, ChannelMessage> channels_ = new Dictionary<string, ChannelMessage>();
-
-        protected FunEncoding encoding_;
-        protected string sender_ = "";
-
         public event ChannelList ChannelListCallback;
         public event ChannelNotify JoinedCallback;
         public event ChannelNotify LeftCallback;
         public event ErrorNotify ErrorCallback;
+
+        protected FunEncoding encoding_;
+        protected string sender_ = "";
+
+        FunapiNetwork network_ = null;
+        object channel_lock_ = new object();
+        Dictionary<string, ChannelMessage> channels_ = new Dictionary<string, ChannelMessage>();
     }
 }

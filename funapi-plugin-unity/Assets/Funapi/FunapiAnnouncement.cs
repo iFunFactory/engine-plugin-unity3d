@@ -7,14 +7,11 @@
 using MiniJSON;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
-#if !NO_UNITY
-using UnityEngine;
-#endif
+
 
 namespace Fun
 {
@@ -32,17 +29,17 @@ namespace Fun
     {
         public void Init (string url)
         {
-            // Url
+            // Sets host url
             host_url_ = url;
 
-            // Check resource directory
+            // Checks resource directory
             local_path_ = FunapiUtils.GetLocalDataPath + kLocalPath;
             if (!Directory.Exists(local_path_))
                 Directory.CreateDirectory(local_path_);
 
             // Download handler
-            web_client_.DownloadDataCompleted += DownloadDataCompleteCb;
-            web_client_.DownloadFileCompleted += DownloadFileCompleteCb;
+            web_client_.DownloadDataCompleted += downloadDataCompleteCb;
+            web_client_.DownloadFileCompleted += downloadFileCompleteCb;
         }
 
         public void UpdateList (int max_count)
@@ -50,7 +47,7 @@ namespace Fun
             if (string.IsNullOrEmpty(host_url_))
             {
                 FunDebug.Log("url is null or empty.");
-                OnResultCallback(AnnounceResult.kInvalidUrl);
+                onResult(AnnounceResult.kInvalidUrl);
                 return;
             }
 
@@ -82,25 +79,25 @@ namespace Fun
             return local_path_ + Path.GetFileName(path);
         }
 
-        private void DownloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
+        void downloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
         {
             try
             {
                 if (ar.Error != null)
                 {
                     FunDebug.Log("Exception Error: {0}", ar.Error);
-                    OnResultCallback(AnnounceResult.kExceptionError);
+                    onResult(AnnounceResult.kExceptionError);
                     FunDebug.Assert(false);
                 }
                 else
                 {
                     // Parse json
-                    string data = Encoding.ASCII.GetString(ar.Result);
+                    string data = Encoding.UTF8.GetString(ar.Result);
                     Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
                     if (json == null)
                     {
                         FunDebug.Log("Deserialize json failed. json: {0}", data);
-                        OnResultCallback(AnnounceResult.kInvalidJson);
+                        onResult(AnnounceResult.kInvalidJson);
                         return;
                     }
 
@@ -109,7 +106,7 @@ namespace Fun
                     if (list == null || list.Count <= 0)
                     {
                         FunDebug.Log("Invalid announcement list. list: {0}", list);
-                        OnResultCallback(AnnounceResult.kListIsNullOrEmpty);
+                        onResult(AnnounceResult.kListIsNullOrEmpty);
                         return;
                     }
 
@@ -122,7 +119,7 @@ namespace Fun
                         // download image
                         if (node.ContainsKey(kImageUrlKey) && node.ContainsKey(kImageMd5Key))
                         {
-                            CheckDownloadImage(node[kImageUrlKey] as string, node[kImageMd5Key] as string);
+                            checkDownloadImage(node[kImageUrlKey] as string, node[kImageMd5Key] as string);
                         }
                     }
 
@@ -137,25 +134,25 @@ namespace Fun
                     }
                     else
                     {
-                        OnResultCallback(AnnounceResult.kSuccess);
+                        onResult(AnnounceResult.kSuccess);
                     }
                 }
             }
             catch (Exception e)
             {
-                FunDebug.Log("Failure in DownloadDataCompleteCb: {0}", e.ToString());
-                OnResultCallback(AnnounceResult.kExceptionError);
+                FunDebug.Log("Failure in downloadDataCompleteCb: {0}", e.ToString());
+                onResult(AnnounceResult.kExceptionError);
             }
         }
 
-        private void DownloadFileCompleteCb (object sender, System.ComponentModel.AsyncCompletedEventArgs ar)
+        void downloadFileCompleteCb (object sender, System.ComponentModel.AsyncCompletedEventArgs ar)
         {
             try
             {
                 if (ar.Error != null)
                 {
                     FunDebug.Log("Exception Error: {0}", ar.Error);
-                    OnResultCallback(AnnounceResult.kExceptionError);
+                    onResult(AnnounceResult.kExceptionError);
                     FunDebug.Assert(false);
                 }
                 else
@@ -170,18 +167,18 @@ namespace Fun
                     else
                     {
                         FunDebug.Log("Download file completed.");
-                        OnResultCallback(AnnounceResult.kSuccess);
+                        onResult(AnnounceResult.kSuccess);
                     }
                 }
             }
             catch (Exception e)
             {
-                FunDebug.Log("Failure in DownloadFileCompleteCb: {0}", e.ToString());
-                OnResultCallback(AnnounceResult.kExceptionError);
+                FunDebug.Log("Failure in downloadFileCompleteCb: {0}", e.ToString());
+                onResult(AnnounceResult.kExceptionError);
             }
         }
 
-        private void CheckDownloadImage (string url, string imgmd5)
+        void checkDownloadImage (string url, string imgmd5)
         {
             if (url.Length <= 0 || imgmd5.Length <= 0)
                 return;
@@ -210,31 +207,29 @@ namespace Fun
             }
         }
 
-        private void OnResultCallback (AnnounceResult result)
+        void onResult (AnnounceResult result)
         {
             if (ResultCallback != null)
-            {
                 ResultCallback(result);
-            }
         }
 
-
-        // Url-related constants.
-        private static readonly string kLocalPath = "/announce/";
-        private static readonly string kImagesUrl = "/images";
-        private static readonly string kImageUrlKey = "image_url";
-        private static readonly string kImageMd5Key = "image_md5";
-        private static readonly string kAnnouncementsUrl = "/announcements/";
-
-        // member variables.
-        private string host_url_ = "";
-        private string local_path_ = "";
-        private WebClient web_client_ = new WebClient();
-        private List<Dictionary<string, object>> announce_list_ = new List<Dictionary<string, object>>();
-        private List<KeyValuePair<string, string>> image_list_ = new List<KeyValuePair<string, string>>();
 
         // Result callback delegate
         public delegate void EventHandler(AnnounceResult result);
         public event EventHandler ResultCallback;
+
+        // Url-related constants.
+        const string kLocalPath = "/announce/";
+        const string kImagesUrl = "/images";
+        const string kImageUrlKey = "image_url";
+        const string kImageMd5Key = "image_md5";
+        const string kAnnouncementsUrl = "/announcements/";
+
+        // member variables.
+        string host_url_ = "";
+        string local_path_ = "";
+        WebClient web_client_ = new WebClient();
+        List<Dictionary<string, object>> announce_list_ = new List<Dictionary<string, object>>();
+        List<KeyValuePair<string, string>> image_list_ = new List<KeyValuePair<string, string>>();
     }
 }

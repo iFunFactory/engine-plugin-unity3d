@@ -6,18 +6,18 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using Fun;
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using Fun;
 
 
 namespace Tester
 {
     class TesterMain
     {
-        const int max_client = 3;
-        const bool reliability = true;
+        const int kClientMax = 10;
+        const bool reliableSession = true;
         const string kServerIp = "127.0.0.1";
 
         List<Client> list_ = new List<Client>();
@@ -25,31 +25,32 @@ namespace Tester
 
         public static void Main ()
         {
-            new TesterMain().Start();
+            new TesterMain().start();
         }
 
-        void Start ()
-        {
-            WriteTitle("START");
-            FunDebug.Log("Client count is {0}.", max_client);
 
-            for (int i = 0; i < max_client; ++i)
+        void start ()
+        {
+            writeTitle("START");
+            FunDebug.Log("Client count is {0}.", kClientMax);
+
+            for (int i = 0; i < kClientMax; ++i)
             {
                 Client client = new Client(i, kServerIp);
                 list_.Add(client);
             }
 
-            Thread t = new Thread(new ThreadStart(Update));
+            Thread t = new Thread(new ThreadStart(onUpdate));
             t.Start();
 
-            ConnectTest();
-            StartStopTest();
-            SendReceiveTest();
+            testConnect();
+            testStartStop();
+            testSendReceive();
 
             t.Abort();
         }
 
-        void Update ()
+        void onUpdate ()
         {
             while (true)
             {
@@ -62,42 +63,72 @@ namespace Tester
             }
         }
 
-        void Connect ()
+        void connect ()
         {
             foreach (Client c in list_)
             {
-                c.Connect(reliability);
+                c.Connect(reliableSession);
             }
 
-            while (true)
+            while (waitForConnect())
             {
-                bool keep_check = false;
-                foreach (Client c in list_)
-                {
-                    if (!c.Connected)
-                    {
-                        keep_check = true;
-                        break;
-                    }
-                }
-
                 Thread.Sleep(100);
-                if (!keep_check)
-                    break;
             }
         }
 
-        void Stop ()
+        void stop ()
         {
+            while (waitForSend())
+            {
+                Thread.Sleep(100);
+            }
+            Thread.Sleep(100);
+
             foreach (Client c in list_)
             {
                 c.Stop();
             }
 
-            Thread.Sleep(100);
+            while (waitForStop())
+            {
+                Thread.Sleep(100);
+            }
         }
 
-        void SendMessage ()
+        bool waitForConnect ()
+        {
+            foreach (Client c in list_)
+            {
+                if (!c.Connected)
+                    return true;
+            }
+
+            return false;
+        }
+
+        bool waitForStop ()
+        {
+            foreach (Client c in list_)
+            {
+                if (c.Connected)
+                    return true;
+            }
+
+            return false;
+        }
+
+        bool waitForSend ()
+        {
+            foreach (Client c in list_)
+            {
+                if (c.HasUnsentMessages)
+                    return true;
+            }
+
+            return false;
+        }
+
+        void sendMessage ()
         {
             foreach (Client c in list_)
             {
@@ -109,44 +140,42 @@ namespace Tester
             Thread.Sleep(33);
         }
 
-        void ConnectTest ()
+        void testConnect ()
         {
-            WriteTitle("CONNECT TEST");
+            writeTitle("CONNECT TEST");
 
             for (int i = 0; i < 10; ++i)
             {
-                Connect();
-                Stop();
+                connect();
+                stop();
             }
         }
 
-        void StartStopTest ()
+        void testStartStop ()
         {
-            WriteTitle("START / STOP TEST");
+            writeTitle("START / STOP TEST");
 
             for (int i = 0; i < 10; ++i)
             {
-                Connect();
-                SendMessage();
-                Thread.Sleep(200);
-                Stop();
+                connect();
+                sendMessage();
+                stop();
             }
         }
 
-        void SendReceiveTest ()
+        void testSendReceive ()
         {
-            WriteTitle("SEND / RECEIVE TEST");
+            writeTitle("SEND / RECEIVE TEST");
 
-            Connect();
+            connect();
 
             for (int i = 0; i < 100; ++i)
-                SendMessage();
+                sendMessage();
 
-            Thread.Sleep(200);
-            Stop();
+            stop();
         }
 
-        void WriteTitle (string message)
+        void writeTitle (string message)
         {
             Console.WriteLine("\n---------------------- "
                               + message

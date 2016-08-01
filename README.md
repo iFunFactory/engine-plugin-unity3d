@@ -12,9 +12,20 @@ Funapi plugin
 Funapi plugin의 업데이트 내용입니다.
 
 ```
-플러그인 버전 141 부터는 플러그인에서 필요한 MonoBehaviour를 자체적으로 생성해서 사용하므로
+플러그인 버전 141부터는 플러그인에서 필요한 MonoBehaviour를 자체적으로 생성해서 사용하므로
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
+
+플러그인 버전 150 이상부터 Json과 Protobuf의 인/디코딩 함수의 위치가 변경되었습니다.
+기존에 JsonHelper는 FunapiTransport에 Protobuf 관련 함수는 FunapiNetwork에 있었으나
+이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
+
+### 08/04/2016 (ver.159)
+- 코드 정리 및 불필요한 private 키워드 삭제
+- private, protected 멤버 이름 소문자로 시작하도록 수정
+- Encryptor.encryption 이름을 Encryptor.type으로 변경
+- http content type 변경 (x-www-form-urlencoded -> octet-stream)
+- C# Runtime 테스트 코드 버그 수정
 
 ### 07/29/2016 (ver.158)
 - FunapiSession 클래스 및 예제 추가

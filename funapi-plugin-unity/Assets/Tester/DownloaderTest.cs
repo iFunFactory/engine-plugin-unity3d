@@ -31,32 +31,33 @@ public class DownloaderTest : MonoBehaviour
         string download_url = string.Format("http://{0}:{1}", kServerIp, kServerPort);
 
         downloader_ = new FunapiHttpDownloader();
-        downloader_.VerifyCallback += OnDownloadVerify;
-        downloader_.ReadyCallback += OnDownloadReady;
-        downloader_.UpdateCallback += OnDownloadUpdate;
-        downloader_.FinishedCallback += OnDownloadFinished;
+        downloader_.VerifyCallback += onDownloadVerify;
+        downloader_.ReadyCallback += onDownloadReady;
+        downloader_.UpdateCallback += onDownloadUpdate;
+        downloader_.FinishedCallback += onDownloadFinished;
         downloader_.GetDownloadList(download_url, FunapiUtils.GetLocalDataPath);
 
         button_start_.interactable = false;
     }
 
-    void OnDownloadVerify (string path)
+
+    void onDownloadVerify (string path)
     {
         FunDebug.DebugLog("Check file - {0}", path);
     }
 
-    void OnDownloadReady (int total_count, UInt64 total_size)
+    void onDownloadReady (int total_count, UInt64 total_size)
     {
         downloader_.StartDownload();
     }
 
-    void OnDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
+    void onDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
     {
         FunDebug.DebugLog("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
                             path, bytes_received, total_bytes, percentage);
     }
 
-    void OnDownloadFinished (DownloadResult code)
+    void onDownloadFinished (DownloadResult code)
     {
         button_start_.interactable = true;
 
@@ -68,9 +69,12 @@ public class DownloaderTest : MonoBehaviour
 
 
     // Please change this address to your server.
-    private const string kServerIp = "127.0.0.1";
-    private const UInt16 kServerPort = 8020;
+    const string kServerIp = "127.0.0.1";
+    const UInt16 kServerPort = 8020;
 
-    private FunapiHttpDownloader downloader_ = null;
-    private Button button_start_;
+    // Member variables.
+    FunapiHttpDownloader downloader_ = null;
+
+    // UI buttons
+    Button button_start_;
 }

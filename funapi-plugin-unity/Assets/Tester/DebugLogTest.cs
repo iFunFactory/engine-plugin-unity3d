@@ -29,7 +29,7 @@ public class DebugLogTest : MonoBehaviour
         buttons_["getlogs"] = GameObject.Find("ButtonGetLogs").GetComponent<Button>();
         buttons_["savelogs"] = GameObject.Find("ButtonSaveLogs").GetComponent<Button>();
 
-        UpdateButtonState();
+        updateButtonState();
     }
 
     void FixedUpdate ()
@@ -39,7 +39,7 @@ public class DebugLogTest : MonoBehaviour
         buttons_["savelogs"].interactable = enable;
     }
 
-    void UpdateButtonState ()
+    void updateButtonState ()
     {
         bool enable = network_ == null || !network_.Started;
         buttons_["connect"].interactable = enable;
@@ -51,7 +51,19 @@ public class DebugLogTest : MonoBehaviour
 
     public void OnConnect ()
     {
-        Connect(TransportProtocol.kHttp);
+        if (network_ == null)
+        {
+            handler_ = new TestNetwork();
+            network_ = handler_.CreateNetwork(false);
+            network_.StoppedAllTransportCallback += onStoppedAllTransport;
+
+            FunapiTransport transport = handler_.AddTransport(TransportProtocol.kHttp, kServerIp, FunEncoding.kJson);
+            transport.StartedCallback += onTransportStarted;
+        }
+
+        network_.Start();
+
+        updateButtonState();
     }
 
     public void OnDisconnect ()
@@ -74,40 +86,25 @@ public class DebugLogTest : MonoBehaviour
         FunDebug.SaveLogs();
     }
 
-    void Connect (TransportProtocol protocol)
+
+    void onTransportStarted (TransportProtocol protocol)
     {
-        if (network_ == null)
-        {
-            handler_ = new TestNetwork();
-            network_ = handler_.CreateNetwork(false);
-            network_.StoppedAllTransportCallback += OnStoppedAllTransport;
-
-            FunapiTransport transport = handler_.AddTransport(protocol, kServerIp, FunEncoding.kJson);
-            transport.StartedCallback += OnTransportStarted;
-        }
-
-        network_.Start();
-
-        UpdateButtonState();
+        updateButtonState();
     }
 
-    void OnTransportStarted (TransportProtocol protocol)
+    void onStoppedAllTransport()
     {
-        UpdateButtonState();
-    }
-
-    void OnStoppedAllTransport()
-    {
-        UpdateButtonState();
+        updateButtonState();
     }
 
 
     // Please change this address to your server.
-    private const string kServerIp = "127.0.0.1";
+    const string kServerIp = "127.0.0.1";
 
-    // member variables.
-    private TestNetwork handler_ = null;
-    private FunapiNetwork network_ = null;
+    // Member variables.
+    TestNetwork handler_ = null;
+    FunapiNetwork network_ = null;
 
-    private Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
+    // UI buttons
+    Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
 }

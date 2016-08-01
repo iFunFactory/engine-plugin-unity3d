@@ -4,15 +4,10 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using Fun;
-using ProtoBuf;
 using System.Collections.Generic;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
 // protobuf
-using funapi.network.fun_message;
+using ProtoBuf;
 using funapi.service.multicast_message;
 
 
@@ -23,9 +18,9 @@ namespace Fun
         public FunapiChatClient (FunapiNetwork network, FunEncoding encoding)
             : base(network, encoding)
         {
-            JoinedCallback += OnJoinedCallback;
-            LeftCallback += OnLeftCallback;
-            ErrorCallback += OnErrorCallback;
+            JoinedCallback += onUserJoined;
+            LeftCallback += onUserLeft;
+            ErrorCallback += onError;
         }
 
         public bool JoinChannel (string channel_id, string my_name, OnChatMessage handler)
@@ -37,7 +32,7 @@ namespace Fun
 
         public bool JoinChannel (string channel_id, OnChatMessage handler)
         {
-            if (!base.JoinChannel(channel_id, OnMulticastingReceived))
+            if (!base.JoinChannel(channel_id, onReceived))
                 return false;
 
             lock (chat_channel_lock_)
@@ -64,27 +59,6 @@ namespace Fun
             lock (chat_channel_lock_)
             {
                 chat_channels_.Clear();
-            }
-        }
-
-        private void OnJoinedCallback (string channel_id, string sender)
-        {
-        }
-
-        private void OnLeftCallback (string channel_id, string sender)
-        {
-            if (sender == sender_)
-            {
-                lock (chat_channel_lock_)
-                {
-                    if (!chat_channels_.ContainsKey(channel_id))
-                    {
-                        FunDebug.Log("You are not in the '{0}' channel.", channel_id);
-                        return;
-                    }
-
-                    chat_channels_.Remove(channel_id);
-                }
             }
         }
 
@@ -118,7 +92,29 @@ namespace Fun
             return true;
         }
 
-        private void OnMulticastingReceived (string channel_id, string sender, object data)
+
+        void onUserJoined (string channel_id, string sender)
+        {
+        }
+
+        void onUserLeft (string channel_id, string sender)
+        {
+            if (sender == sender_)
+            {
+                lock (chat_channel_lock_)
+                {
+                    if (!chat_channels_.ContainsKey(channel_id))
+                    {
+                        FunDebug.Log("You are not in the '{0}' channel.", channel_id);
+                        return;
+                    }
+
+                    chat_channels_.Remove(channel_id);
+                }
+            }
+        }
+
+        void onReceived (string channel_id, string sender, object data)
         {
             if (encoding_ == FunEncoding.kJson)
             {
@@ -149,7 +145,7 @@ namespace Fun
             }
         }
 
-        private void OnErrorCallback (string channel_id, FunMulticastMessage.ErrorCode code)
+        void onError (string channel_id, FunMulticastMessage.ErrorCode code)
         {
             if (code == FunMulticastMessage.ErrorCode.EC_FULL_MEMBER ||
                 code == FunMulticastMessage.ErrorCode.EC_ALREADY_LEFT ||
@@ -164,12 +160,12 @@ namespace Fun
         }
 
 
-        private static readonly string kBounce = "_bounce";
-        private static readonly string kMessage = "_message";
+        const string kBounce = "_bounce";
+        const string kMessage = "_message";
 
         public delegate void OnChatMessage(string channel_id, string sender, string text);
 
-        private object chat_channel_lock_ = new object();
-        private Dictionary<string, OnChatMessage> chat_channels_ = new Dictionary<string, OnChatMessage>();
+        object chat_channel_lock_ = new object();
+        Dictionary<string, OnChatMessage> chat_channels_ = new Dictionary<string, OnChatMessage>();
     }
 }
