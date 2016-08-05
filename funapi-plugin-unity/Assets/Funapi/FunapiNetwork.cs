@@ -350,19 +350,19 @@ namespace Fun
                 if (expected_replies_.Count > 0)
                 {
                     List<string> remove_list = new List<string>();
-                    Dictionary<string, List<FunapiMessage>> exp_list = expected_replies_;
-                    expected_replies_ = new Dictionary<string, List<FunapiMessage>>();
+                    Dictionary<string, List<ExpectedReply>> exp_list = expected_replies_;
+                    expected_replies_ = new Dictionary<string, List<ExpectedReply>>();
 
                     foreach (var item in exp_list)
                     {
                         int remove_count = 0;
-                        foreach (FunapiMessage exp in item.Value)
+                        foreach (ExpectedReply er in item.Value)
                         {
-                            exp.reply_timeout -= deltaTime;
-                            if (exp.reply_timeout <= 0f)
+                            er.reply_timeout -= deltaTime;
+                            if (er.reply_timeout <= 0f)
                             {
-                                FunDebug.Log("'{0}' message waiting time has been exceeded.", exp.msg_type);
-                                exp.timeout_callback(exp.msg_type);
+                                FunDebug.Log("'{0}' message waiting time has been exceeded.", er.reply_type);
+                                er.timeout_callback(er.msg_type);
                                 ++remove_count;
                             }
                         }
@@ -386,7 +386,7 @@ namespace Fun
 
                     if (exp_list.Count > 0)
                     {
-                        Dictionary<string, List<FunapiMessage>> added_list = expected_replies_;
+                        Dictionary<string, List<ExpectedReply>> added_list = expected_replies_;
                         expected_replies_ = exp_list;
 
                         if (added_list.Count > 0)
@@ -718,10 +718,11 @@ namespace Fun
 
         private void OnTransportFailure (TransportProtocol protocol, FunapiMessage fun_msg)
         {
-            if (fun_msg == null || fun_msg.reply_type.Length <= 0)
+            if (fun_msg == null || fun_msg.reply == null)
                 return;
 
-            DeleteExpectedReply(fun_msg.reply_type);
+            ExpectedReply reply = fun_msg.reply as ExpectedReply;
+            DeleteExpectedReply(reply.reply_type);
         }
 
 
@@ -856,9 +857,10 @@ namespace Fun
                     }
                 }
 
-                if (expected_reply_type != null && expected_reply_type.Length > 0)
+                if (fun_msg != null && expected_reply_type != null && expected_reply_type.Length > 0)
                 {
-                    AddExpectedReply(fun_msg, expected_reply_type, expected_reply_time, onReplyMissed);
+                    fun_msg.reply = new ExpectedReply(msg_type, expected_reply_type, expected_reply_time, onReplyMissed);
+                    AddExpectedReply(fun_msg);
                 }
 
                 transport.SendMessage(fun_msg);
@@ -866,20 +868,29 @@ namespace Fun
             else if (transport != null &&
                      (transport_reliability || transport.state == FunapiTransport.State.kEstablished))
             {
+                FunapiMessage fun_msg = null;
+
                 if (transport.Encoding == FunEncoding.kJson)
                 {
                     if (transport == null)
-                        unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, encryption));
+                        fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
                     else
-                        unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type,
-                                                                FunapiMessage.JsonHelper.Clone(message), encryption));
+                        fun_msg = new FunapiMessage(protocol, msg_type,
+                                                    FunapiMessage.JsonHelper.Clone(message), encryption);
                 }
                 else if (transport.Encoding == FunEncoding.kProtobuf)
                 {
-                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, encryption));
+                    fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
                 }
 
-                FunDebug.Log("SendMessage - '{0}' message queued.", msg_type);
+                if (fun_msg != null)
+                {
+                    if (expected_reply_type != null && expected_reply_type.Length > 0)
+                        fun_msg.reply = new ExpectedReply(msg_type, expected_reply_type, expected_reply_time, onReplyMissed);
+
+                    unsent_queue_.Enqueue(fun_msg);
+                    FunDebug.Log("SendMessage - '{0}' message queued.", msg_type);
+                }
             }
             else
             {
@@ -894,21 +905,22 @@ namespace Fun
             }
         }
 
-        private void AddExpectedReply (FunapiMessage fun_msg, string reply_type,
-                                       float reply_time, TimeoutEventHandler onReplyMissed)
+        private void AddExpectedReply (FunapiMessage fun_msg)
         {
+            ExpectedReply er = fun_msg.reply as ExpectedReply;
+            if (er == null)
+                return;
+
             lock (expected_reply_lock)
             {
-                if (!expected_replies_.ContainsKey(reply_type))
-                {
-                    expected_replies_[reply_type] = new List<FunapiMessage>();
-                }
+                if (!expected_replies_.ContainsKey(er.reply_type))
+                    expected_replies_[er.reply_type] = new List<ExpectedReply>();
 
-                fun_msg.SetReply(reply_type, reply_time, onReplyMissed);
-                expected_replies_[reply_type].Add(fun_msg);
-                FunDebug.Log("Adds expected reply message - {0} > {1} ({2})",
-                               fun_msg.msg_type, reply_type, reply_time);
+                expected_replies_[er.reply_type].Add(er);
             }
+
+            FunDebug.Log("Adds expected reply message - {0} > {1} ({2})",
+                         fun_msg.msg_type, er.reply_type, er.reply_timeout);
         }
 
         private void DeleteExpectedReply (string reply_type)
@@ -917,7 +929,7 @@ namespace Fun
             {
                 if (expected_replies_.ContainsKey(reply_type))
                 {
-                    List<FunapiMessage> list = expected_replies_[reply_type];
+                    List<ExpectedReply> list = expected_replies_[reply_type];
                     if (list.Count > 0)
                     {
                         list.RemoveAt(0);
@@ -1024,7 +1036,7 @@ namespace Fun
                     return;
                 }
 
-                if (msg_type != null && msg_type.Length > 0)
+                if (msg_type.Length > 0)
                 {
                     DeleteExpectedReply(msg_type);
 
@@ -1125,10 +1137,8 @@ namespace Fun
                     }
                 }
 
-                if (msg.reply_type != null && msg.reply_type.Length > 0)
-                {
-                    AddExpectedReply(msg, msg.reply_type, msg.reply_timeout, msg.timeout_callback);
-                }
+                if (msg.reply != null)
+                    AddExpectedReply(msg);
 
                 transport.SendMessage(msg);
             }
@@ -1485,6 +1495,26 @@ namespace Fun
         }
 
 
+        // Expected-reply-related class
+        class ExpectedReply
+        {
+            public ExpectedReply (string msg_type, string reply_type,
+                                  float reply_timeout, TimeoutEventHandler callback)
+            {
+                this.msg_type = msg_type;
+                this.reply_type = reply_type;
+                this.reply_timeout = reply_timeout;
+                this.timeout_callback = callback;
+            }
+
+            public string msg_type;
+            public string reply_type;
+            public float reply_timeout;
+            public TimeoutEventHandler timeout_callback;
+        }
+
+
+
         // Status
         public enum State
         {
@@ -1549,7 +1579,7 @@ namespace Fun
         private DateTime last_received_ = DateTime.Now;
         private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
         private Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
-        private Dictionary<string, List<FunapiMessage>> expected_replies_ = new Dictionary<string, List<FunapiMessage>>();
+        private Dictionary<string, List<ExpectedReply>> expected_replies_ = new Dictionary<string, List<ExpectedReply>>();
         private List<FunapiMessage> message_buffer_ = new List<FunapiMessage>();
     }
 }  // namespace Fun

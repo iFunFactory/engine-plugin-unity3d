@@ -25,14 +25,6 @@ namespace Fun
             this.message = message;
         }
 
-        // Sets expected reply
-        public void SetReply (string reply_type, float reply_timeout, TimeoutEventHandler callback)
-        {
-            this.reply_type = reply_type;
-            this.reply_timeout = reply_timeout;
-            this.timeout_callback = callback;
-        }
-
         public byte[] GetBytes (FunEncoding encoding)
         {
             byte[] buffer = null;
@@ -114,11 +106,7 @@ namespace Fun
         public string msg_type;
         public object message;
         public ArraySegment<byte> buffer;
-
-        // expected reply-related members.
-        public string reply_type = "";
-        public float reply_timeout = 0f;
-        public TimeoutEventHandler timeout_callback = null;
+        public object reply = null;
 
         // json-related members.
         static JsonAccessor json_helper_ = new DictionaryJsonAccessor();
