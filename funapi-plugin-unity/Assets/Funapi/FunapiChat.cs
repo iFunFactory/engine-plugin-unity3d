@@ -160,6 +160,7 @@ namespace Fun
         }
 
 
+        const string kChannelId = "_channel";
         const string kBounce = "_bounce";
         const string kMessage = "_message";
 

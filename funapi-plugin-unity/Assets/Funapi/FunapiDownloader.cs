@@ -199,6 +199,10 @@ namespace Fun
             }
         }
 
+        public bool IsPaused { get { return state_ == State.Paused; } }
+
+        public bool IsDownloading { get { return state_ >= State.Start && state_ <= State.Downloading; } }
+
         public string DownloadPath { get { return target_path_; } }
 
         public int CurrentDownloadFileCount { get { return cur_download_count_; } }
@@ -209,17 +213,12 @@ namespace Fun
 
         public UInt64 TotalDownloadFileSize { get { return total_download_size_; } }
 
-        public bool IsPaused { get { return state_ == State.Paused; } }
-
-        public bool IsDownloading
-        {
-            get { return state_ == State.Start || state_ == State.Ready || state_ == State.Downloading; }
-        }
 
         protected override void onQuit ()
         {
             Stop();
         }
+
 
         void loadCachedList ()
         {

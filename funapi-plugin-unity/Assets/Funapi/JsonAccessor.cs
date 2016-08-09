@@ -14,6 +14,7 @@ namespace Fun
     // Container to hold json-related functions.
     public abstract class JsonAccessor
     {
+        public abstract object Clone(object json_obj);
         public abstract string Serialize(object json_obj);
         public abstract object Deserialize(string json_str);
         public abstract string GetStringField(object json_obj, string field_name);
@@ -22,13 +23,20 @@ namespace Fun
         public abstract void SetIntegerField(object json_obj, string field_name, Int64 value);
         public abstract bool HasField(object json_obj, string field_name);
         public abstract void RemoveStringField(object json_obj, string field_name);
-        public abstract object Clone(object json_obj);
     }
 
 
     // Default json accessor
     public class DictionaryJsonAccessor : JsonAccessor
     {
+        public override object Clone(object json_obj)
+        {
+            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
+            FunDebug.Assert(d != null);
+            return new Dictionary<string, object>(d);
+
+        }
+
         public override string Serialize(object json_obj)
         {
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
@@ -81,14 +89,6 @@ namespace Fun
             Dictionary<string, object> d = json_obj as Dictionary<string, object>;
             FunDebug.Assert(d != null);
             d.Remove(field_name);
-        }
-
-        public override object Clone(object json_obj)
-        {
-            Dictionary<string, object> d = json_obj as Dictionary<string, object>;
-            FunDebug.Assert(d != null);
-            return new Dictionary<string, object>(d);
-
         }
     }
 }  // namespace Fun

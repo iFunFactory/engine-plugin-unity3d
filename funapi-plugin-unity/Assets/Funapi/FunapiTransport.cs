@@ -910,7 +910,7 @@ namespace Fun
 
         internal bool EncryptThenSendMessage()
         {
-            FunDebug.Assert((int)state_ >= (int)State.kConnected);
+            FunDebug.Assert(state_ >= State.kConnected);
             FunDebug.Assert(sending_.Count > 0);
 
             for (int i = 0; i < sending_.Count; i+=2)
@@ -1267,7 +1267,7 @@ namespace Fun
 
             if (body_length > 0)
             {
-                if ((int)state_ < (int)State.kConnected)
+                if (state_ < State.kConnected)
                 {
                     FunDebug.Log("Unexpected message. state:{0}", state_);
                     return false;
@@ -1456,7 +1456,7 @@ namespace Fun
         {
             get
             {
-                return sock_ != null && sock_.Connected && (int)state_ >= (int)State.kConnected;
+                return sock_ != null && sock_.Connected && state_ >= State.kConnected;
             }
         }
 
@@ -1754,7 +1754,7 @@ namespace Fun
 
         internal override bool Started
         {
-            get { return sock_ != null && (int)state_ >= (int)State.kConnected; }
+            get { return sock_ != null && state_ >= State.kConnected; }
         }
 
         public override bool IsDatagram
@@ -2003,7 +2003,7 @@ namespace Fun
 
         internal override bool Started
         {
-            get { return (int)state_ >= (int)State.kConnected; }
+            get { return state_ >= State.kConnected; }
         }
 
         public override bool IsRequestResponse

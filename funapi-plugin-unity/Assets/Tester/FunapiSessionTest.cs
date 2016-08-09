@@ -110,11 +110,9 @@ public class FunapiSessionTest : MonoBehaviour
             TcpTransportOption tcp_option = new TcpTransportOption();
             //tcp_option.AutoReconnect = true;
 
-            // If you want to use the ping of client side. Set 'enable_ping' to true.
+            // If you want to use the ping of client side. Call 'SetPing' function.
             // If you want to use the ping of server side. You don't have to anything.
-            //tcp_option.EnablePing = true;
-            //tcp_option.PingIntervalSeconds = 3;
-            //tcp_option.PingTimeoutSeconds = 20;
+            //tcp_option.SetPing(3, 20, true);
 
             // You can turn the nagle option on/off. The default value is false.
             //tcp_option.DisableNagle = true;
