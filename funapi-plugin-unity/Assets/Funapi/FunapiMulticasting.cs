@@ -19,6 +19,7 @@ namespace Fun
         public FunapiMulticastClient (FunapiNetwork network, FunEncoding encoding)
         {
             FunDebug.Assert(network != null);
+
             network_ = network;
             encoding_ = encoding;
 
@@ -167,20 +168,24 @@ namespace Fun
             }
         }
 
-        /// <summary>
-        /// The sender must fill in the mcast_msg.
-        /// The "channel_id" field is mandatory.
-        /// And mcas_msg must have join and leave flags set.
-        /// </summary>
+
+        /// The 'channel_id' field is mandatory.
+        /// The 'sender' must fill in the message.
+        /// The message shouldn't include join and leave flags.
         public bool SendToChannel (FunMulticastMessage mcast_msg)
         {
-            FunDebug.Assert(encoding_ == FunEncoding.kProtobuf);
-            FunDebug.Assert(mcast_msg != null);
+            if (mcast_msg == null)
+                return false;
+
             FunDebug.Assert(!mcast_msg.join);
             FunDebug.Assert(!mcast_msg.leave);
 
             string channel_id = mcast_msg.channel;
-            FunDebug.Assert(channel_id != "");
+            if (channel_id == "")
+            {
+                FunDebug.LogWarning("You should set a vaild channel id.");
+                return false;
+            }
 
             lock (channel_lock_)
             {
@@ -204,22 +209,24 @@ namespace Fun
             return true;
         }
 
-        /// <summary>
-        /// The sender must fill in the mcast_msg.
-        /// The "channel_id" field is mandatory.
-        /// And mcas_msg must have join and leave flags set.
-        /// </summary>
+        /// The 'channel_id' field is mandatory.
+        /// The 'sender' must fill in the message.
+        /// The message shouldn't include join and leave flags.
         public bool SendToChannel (object json_msg)
         {
-            FunDebug.Assert(encoding_ == FunEncoding.kJson);
-            FunDebug.Assert(json_msg != null);
+            if (json_msg == null)
+                return false;
 
             Dictionary<string, object> mcast_msg = json_msg as Dictionary<string, object>;
             FunDebug.Assert(!mcast_msg.ContainsKey(kJoin));
             FunDebug.Assert(!mcast_msg.ContainsKey(kLeave));
 
             string channel_id = mcast_msg[kChannelId] as string;
-            FunDebug.Assert(channel_id != "");
+            if (channel_id == "")
+            {
+                FunDebug.LogWarning("You should set a vaild channel id.");
+                return false;
+            }
 
             lock (channel_lock_)
             {
@@ -304,10 +311,10 @@ namespace Fun
                 if (msg.ContainsKey(kErrorCode))
                     error_code = Convert.ToInt32(msg[kErrorCode]);
 
-                if (msg.ContainsKey(kChannels))
+                if (msg.ContainsKey(kChannelList))
                 {
                     if (ChannelListCallback != null)
-                        ChannelListCallback(msg[kChannels]);
+                        ChannelListCallback(msg[kChannelList]);
                     return;
                 }
                 else if (msg.ContainsKey(kJoin))
@@ -406,13 +413,13 @@ namespace Fun
         }
 
 
-        protected const string kMulticastMsgType = "_multicast";
-        protected const string kChannels = "_channels";
-        protected const string kChannelId = "_channel";
-        protected const string kSender = "_sender";
-        protected const string kJoin = "_join";
-        protected const string kLeave = "_leave";
-        protected const string kErrorCode = "_error_code";
+        const string kMulticastMsgType = "_multicast";
+        const string kChannelList = "_channels";
+        const string kChannelId = "_channel";
+        const string kSender = "_sender";
+        const string kJoin = "_join";
+        const string kLeave = "_leave";
+        const string kErrorCode = "_error_code";
 
         public delegate void ChannelList(object channel_list);
         public delegate void ChannelNotify(string channel_id, string sender);

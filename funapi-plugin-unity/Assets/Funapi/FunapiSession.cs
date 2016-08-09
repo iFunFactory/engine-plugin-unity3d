@@ -1278,6 +1278,14 @@ namespace Fun
         }
 
 
+        // Message-type-related constants.
+        const string kMessageTypeField = "_msgtype";
+        const string kSessionIdField = "_sid";
+        const string kSeqNumberField = "_seq";
+        const string kAckNumberField = "_ack";
+        const string kSessionOpenedType = "_session_opened";
+        const string kSessionClosedType = "_session_closed";
+
         // Delegates
         public delegate void SessionEventHandler (SessionEventType type, string session_id);
         public delegate void TransportEventHandler (TransportProtocol protocol, TransportEventType type);
@@ -1291,14 +1299,6 @@ namespace Fun
         public event TransportErrorHandler TransportErrorCallback;
         public event ReceivedMessageHandler ReceivedMessageCallback;
         public event ResponseTimeoutHandler ResponseTimeoutCallback;
-
-        // Message-type-related constants.
-        const string kMessageTypeField = "_msgtype";
-        const string kSessionIdField = "_sid";
-        const string kSeqNumberField = "_seq";
-        const string kAckNumberField = "_ack";
-        const string kSessionOpenedType = "_session_opened";
-        const string kSessionClosedType = "_session_closed";
 
         class ExpectedResponse
         {

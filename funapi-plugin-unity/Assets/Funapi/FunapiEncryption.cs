@@ -34,7 +34,7 @@ namespace Fun
         {
         }
 
-        protected bool handshake (string encryption_type, string encryption_header)
+        protected bool doHandshaking (string encryption_type, string encryption_header)
         {
             // Do nothing
             return true;

@@ -66,8 +66,17 @@ namespace Fun
         public bool AutoReconnect = false;
         public bool DisableNagle = false;
         public bool EnablePing = false;
+        public bool EnablePingLog = false;
         public int PingIntervalSeconds = 0;
         public float PingTimeoutSeconds = 0f;
+
+        public void SetPing (int interval, float timeout, bool enable_log = false)
+        {
+            EnablePing = true;
+            EnablePingLog = enable_log;
+            PingIntervalSeconds = interval;
+            PingTimeoutSeconds = timeout;
+        }
     }
 
     public class HttpTransportOption : TransportOption
@@ -183,6 +192,7 @@ namespace Fun
                     TcpTransportOption tcp_option = option as TcpTransportOption;
                     auto_reconnect_ = tcp_option.AutoReconnect;
                     enable_ping_ = tcp_option.EnablePing;
+                    enable_ping_log_ = tcp_option.EnablePingLog;
                     ping_interval_ = tcp_option.PingIntervalSeconds;
                     ping_timeout_ = tcp_option.PingTimeoutSeconds;
                 }
@@ -467,7 +477,7 @@ namespace Fun
 
             bool buildingMessages()
             {
-                FunDebug.Assert((int)state_ >= (int)State.kConnected);
+                FunDebug.Assert(state_ >= State.kConnected);
                 FunDebug.Assert(sending_.Count > 0);
 
                 for (int i = 0; i < sending_.Count; i+=2)
@@ -678,7 +688,7 @@ namespace Fun
                 {
                     FunDebug.Assert(body_length == 0);
 
-                    if (handshake(encryption_type, encryption_header))
+                    if (doHandshaking(encryption_type, encryption_header))
                     {
                         // Makes a state transition.
                         state_ = State.kConnected;
@@ -690,7 +700,7 @@ namespace Fun
 
                 if (body_length > 0)
                 {
-                    if ((int)state_ < (int)State.kConnected)
+                    if (state_ < State.kConnected)
                     {
                         FunDebug.Log("Unexpected message. state:{0}", state_);
                         return false;
@@ -861,13 +871,7 @@ namespace Fun
                 }
 
                 ping_wait_time_ += ping_interval_;
-#if NO_UNITY
-                FunDebug.DebugLog("Send {0} ping - timestamp: {1}",
-                                  convertString(protocol_), timestamp);
-#else
-                FunDebug.DebugLog("Send {0} ping - timestamp: {1}",
-                                  convertString(protocol_), timestamp);
-#endif
+                FunDebug.DebugLog("Send ping - timestamp: {0}", timestamp);
             }
 
             void onServerPingMessage (object body)
@@ -931,13 +935,8 @@ namespace Fun
 
                 ping_time_ = (int)((DateTime.Now.Ticks - timestamp) / 10000);
 
-#if NO_UNITY
-                FunDebug.DebugLog("Receive {0} ping - timestamp:{1} time={2} ms",
-                                  convertString(protocol_), timestamp, ping_time_);
-#else
-                FunDebug.DebugLog("Receive {0} ping - timestamp:{1} time={2} ms",
-                                  convertString(protocol_), timestamp, ping_time_);
-#endif
+                if (enable_ping_log_)
+                    FunDebug.Log("Received ping - timestamp:{0} time={1} ms", timestamp, ping_time_);
             }
 
 
@@ -1037,6 +1036,7 @@ namespace Fun
 
             // Ping-related variables.
             bool enable_ping_ = false;
+            bool enable_ping_log_ = false;
             int ping_time_ = 0;
             int ping_timer_id_ = 0;
             int ping_interval_ = 0;
@@ -1077,7 +1077,7 @@ namespace Fun
 
             public override bool Started
             {
-                get { return sock_ != null && sock_.Connected && (int)state_ >= (int)State.kConnected; }
+                get { return sock_ != null && sock_.Connected && state_ >= State.kConnected; }
             }
 
             protected override void setAddress (HostAddr addr)
@@ -1330,7 +1330,7 @@ namespace Fun
 
             public override bool Started
             {
-                get { return sock_ != null && (int)state_ >= (int)State.kConnected; }
+                get { return sock_ != null && state_ >= State.kConnected; }
             }
 
             protected override void setAddress (HostAddr addr)
@@ -1554,7 +1554,7 @@ namespace Fun
 
             public override bool Started
             {
-                get { return (int)state_ >= (int)State.kConnected; }
+                get { return state_ >= State.kConnected; }
             }
 
             protected override void setAddress (HostAddr addr)
