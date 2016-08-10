@@ -454,9 +454,10 @@ namespace Fun
             }
         }
 
-        internal void OnStarted ()
+        internal void OnStarted (string session_id)
         {
             state_ = State.kEstablished;
+            session_id_ = session_id;
 
             if (EnablePing && PingIntervalSeconds > 0)
             {
@@ -600,6 +601,9 @@ namespace Fun
 
         private void SendPingMessage ()
         {
+            if (session_id_.Length <= 0)
+                return;
+
             long timestamp = DateTime.Now.Ticks;
 
             if (encoding_ == FunEncoding.kJson)
@@ -635,8 +639,10 @@ namespace Fun
             {
                 FunapiMessage.JsonHelper.SetStringField(body, kMsgTypeBodyField, kServerPingMessageType);
 
-                if (session_id_.Length > 0)
-                    FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+                if (session_id_.Length <= 0)
+                    session_id_ = FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField) as string;
+
+                FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
 
                 SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, FunapiMessage.JsonHelper.Clone(body)));
             }
@@ -646,6 +652,9 @@ namespace Fun
                 FunPingMessage obj = (FunPingMessage)FunapiMessage.GetMessage(msg, MessageType.cs_ping);
                 if (obj == null)
                     return;
+
+                if (session_id_.Length <= 0)
+                    session_id_ = msg.sid;
 
                 FunPingMessage ping = new FunPingMessage();
                 ping.timestamp = obj.timestamp;
