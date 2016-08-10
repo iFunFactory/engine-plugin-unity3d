@@ -539,7 +539,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            transport.OnStarted();
+            transport.OnStarted(session_id_);
 
             if (send_unsent && unsent_queue_.Count > 0)
             {
@@ -1383,8 +1383,6 @@ namespace Fun
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
-                    transport.session_id_ = session_id;
-
                     if (transport.state == FunapiTransport.State.kWaitForSession)
                     {
                         SetTransportStarted(transport, false);

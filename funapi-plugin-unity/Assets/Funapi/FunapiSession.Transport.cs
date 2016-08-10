@@ -850,6 +850,9 @@ namespace Fun
 
             void sendPingMessage ()
             {
+                if (session_id_.Length <= 0)
+                    return;
+
                 long timestamp = DateTime.Now.Ticks;
 
                 if (encoding_ == FunEncoding.kJson)
@@ -881,8 +884,10 @@ namespace Fun
                 {
                     FunapiMessage.JsonHelper.SetStringField(body, kMessageTypeField, kServerPingMessageType);
 
-                    if (session_id_.Length > 0)
-                        FunapiMessage.JsonHelper.SetStringField(body, kSessionIdField, session_id_);
+                    if (session_id_.Length <= 0)
+                        session_id_ = FunapiMessage.JsonHelper.GetStringField(body, kSessionIdField) as string;
+
+                    FunapiMessage.JsonHelper.SetStringField(body, kSessionIdField, session_id_);
 
                     SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, FunapiMessage.JsonHelper.Clone(body)));
                 }
@@ -892,6 +897,9 @@ namespace Fun
                     FunPingMessage obj = (FunPingMessage)FunapiMessage.GetMessage(msg, MessageType.cs_ping);
                     if (obj == null)
                         return;
+
+                    if (session_id_.Length <= 0)
+                        session_id_ = msg.sid;
 
                     FunPingMessage ping = new FunPingMessage();
                     ping.timestamp = obj.timestamp;

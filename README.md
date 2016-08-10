@@ -20,6 +20,9 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 08/12/2016 (ver.162)
+- 핑 메시지에 Session Id가 빈 값으로 전송되는 버그 수정
+
 ### 08/10/2016 (ver.161)
 - TcpTransportOption에 핑 로그 표시 옵션 추가, SetPing 함수 추가
 - FunapiMessage의 Reply 관련 멤버를 FunapiNetwork로 이동
