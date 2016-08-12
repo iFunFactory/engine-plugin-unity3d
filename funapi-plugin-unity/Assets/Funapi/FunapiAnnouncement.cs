@@ -17,7 +17,7 @@ namespace Fun
 {
     public enum AnnounceResult
     {
-        kSuccess,
+        kSucceeded,
         kInvalidUrl,
         kInvalidJson,
         kListIsNullOrEmpty,
@@ -134,7 +134,7 @@ namespace Fun
                     }
                     else
                     {
-                        onResult(AnnounceResult.kSuccess);
+                        onResult(AnnounceResult.kSucceeded);
                     }
                 }
             }
@@ -167,7 +167,7 @@ namespace Fun
                     else
                     {
                         FunDebug.Log("Download file completed.");
-                        onResult(AnnounceResult.kSuccess);
+                        onResult(AnnounceResult.kSucceeded);
                     }
                 }
             }

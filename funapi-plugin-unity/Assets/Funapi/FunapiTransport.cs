@@ -709,7 +709,7 @@ namespace Fun
             kUnknown = 0,
             kConnecting,
             kConnected,
-            kWaitForSession,
+            kWaitForSessionId,
             kWaitForAck,
             kEstablished
         };
