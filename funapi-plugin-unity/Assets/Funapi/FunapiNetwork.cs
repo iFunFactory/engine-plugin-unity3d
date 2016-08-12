@@ -554,12 +554,12 @@ namespace Fun
                 if (state_ == State.kStopped)
                     return;
 
-                if (state_ == State.kWaitForSession && protocol == session_protocol_)
+                if (state_ == State.kWaitForSessionId && protocol == session_protocol_)
                 {
                     FunapiTransport other = FindOtherTransport(protocol);
                     if (other != null)
                     {
-                        other.state = FunapiTransport.State.kWaitForSession;
+                        other.state = FunapiTransport.State.kWaitForSessionId;
                         SendEmptyMessage(other.Protocol);
                     }
                     else
@@ -655,15 +655,15 @@ namespace Fun
                 }
                 else if (state_ == State.kStarted || state_ == State.kStopped)
                 {
-                    state_ = State.kWaitForSession;
-                    transport.state = FunapiTransport.State.kWaitForSession;
+                    state_ = State.kWaitForSessionId;
+                    transport.state = FunapiTransport.State.kWaitForSessionId;
 
                     // To get a session id
                     SendEmptyMessage(protocol);
                 }
-                else if (state_ == State.kWaitForSession)
+                else if (state_ == State.kWaitForSessionId)
                 {
-                    transport.state = FunapiTransport.State.kWaitForSession;
+                    transport.state = FunapiTransport.State.kWaitForSessionId;
                 }
             }
         }
@@ -1385,7 +1385,7 @@ namespace Fun
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
-                    if (transport.state == FunapiTransport.State.kWaitForSession)
+                    if (transport.state == FunapiTransport.State.kWaitForSessionId)
                     {
                         SetTransportStarted(transport, false);
                     }
@@ -1519,7 +1519,7 @@ namespace Fun
             kUnknown = 0,
             kStarted,
             kConnected,
-            kWaitForSession,
+            kWaitForSessionId,
             kWaitForStop,
             kStopped
         };

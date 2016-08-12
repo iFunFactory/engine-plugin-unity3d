@@ -39,7 +39,7 @@ public class AnnouncementTest : MonoBehaviour
     void onAnnouncementResult (AnnounceResult result)
     {
         FunDebug.Log("OnAnnouncementResult - result: {0}", result);
-        if (result != AnnounceResult.kSuccess)
+        if (result != AnnounceResult.kSucceeded)
             return;
 
         if (announcement_.ListCount > 0)

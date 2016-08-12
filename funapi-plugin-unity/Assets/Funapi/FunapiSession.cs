@@ -452,7 +452,7 @@ namespace Fun
             {
                 foreach (Transport transport in transports_.Values)
                 {
-                    if (transport.state == Transport.State.kWaitForSession)
+                    if (transport.state == Transport.State.kWaitForSessionId)
                     {
                         setTransportStarted(transport, false);
                     }
@@ -602,12 +602,12 @@ namespace Fun
 
             lock (state_lock_)
             {
-                if (state_ == State.kWaitForSession && protocol == first_sending_protocol_)
+                if (state_ == State.kWaitForSessionId && protocol == first_sending_protocol_)
                 {
                     Transport transport = findConnectedTransport(protocol);
                     if (transport != null)
                     {
-                        transport.state = Transport.State.kWaitForSession;
+                        transport.state = Transport.State.kWaitForSessionId;
                         sendFirstMessage(transport);
                     }
                     else
@@ -807,15 +807,15 @@ namespace Fun
                 }
                 else if (state_ == State.kStarted || state_ == State.kStopped)
                 {
-                    state_ = State.kWaitForSession;
-                    transport.state = Transport.State.kWaitForSession;
+                    state_ = State.kWaitForSessionId;
+                    transport.state = Transport.State.kWaitForSessionId;
 
                     // To get a session id
                     sendFirstMessage(transport);
                 }
-                else if (state_ == State.kWaitForSession)
+                else if (state_ == State.kWaitForSessionId)
                 {
-                    transport.state = Transport.State.kWaitForSession;
+                    transport.state = Transport.State.kWaitForSessionId;
                 }
             }
         }
@@ -1317,7 +1317,7 @@ namespace Fun
             kUnknown = 0,
             kStarted,
             kConnected,
-            kWaitForSession,
+            kWaitForSessionId,
             kStopped
         };
 

@@ -980,7 +980,7 @@ namespace Fun
                 kConnecting,
                 kHandshaking,
                 kConnected,
-                kWaitForSession,
+                kWaitForSessionId,
                 kWaitForAck,
                 kEstablished
             };

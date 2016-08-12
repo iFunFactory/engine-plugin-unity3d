@@ -714,7 +714,7 @@ namespace Fun
             kConnecting,
             kEncryptionHandshaking,
             kConnected,
-            kWaitForSession,
+            kWaitForSessionId,
             kWaitForAck,
             kEstablished
         };
