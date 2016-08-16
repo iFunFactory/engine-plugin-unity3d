@@ -79,9 +79,23 @@ namespace Fun
             addr_list_.AddRange(list);
         }
 
-        public void Add (HostAddr addr)
+        public void Replace (string hostname, ushort port)
         {
-            addr_list_.Add(addr);
+            if (addr_list_.Count <= 0)
+                return;
+
+            HostAddr addr = addr_list_[0];
+            Clear();
+
+            if (addr is HostHttp)
+            {
+                HostHttp http = (HostHttp)addr;
+                Add(hostname, port, http.https);
+            }
+            else
+            {
+                Add(hostname, port);
+            }
         }
 
         public void Clear ()
