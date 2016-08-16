@@ -96,22 +96,6 @@ namespace Fun
                 state_ = State.kUnknown;
             }
 
-            public TransportProtocol protocol
-            {
-                get { return protocol_; }
-            }
-
-            public FunEncoding encoding
-            {
-                get { return encoding_; }
-            }
-
-            public State state
-            {
-                get { return state_; }
-                set { state_ = value; }
-            }
-
             // Starts transport
             public void Start ()
             {
@@ -162,6 +146,18 @@ namespace Fun
                 }
             }
 
+            public void Redirect (string host, ushort port)
+            {
+                ip_list_.Replace(host, port);
+                setNextAddress();
+
+                FunDebug.Log("'{0}' Try to redirect to server.", convertString(protocol_));
+                exponential_time_ = 1f;
+                reconnect_count_ = 0;
+
+                Start();
+            }
+
             // Stops transport
             public void Stop ()
             {
@@ -181,24 +177,6 @@ namespace Fun
 
                 if (StoppedCallback != null)
                     StoppedCallback(protocol_);
-            }
-
-            public void SetOption (TransportOption option)
-            {
-                option_ = option;
-
-                if (protocol_ == TransportProtocol.kTcp)
-                {
-                    TcpTransportOption tcp_option = option as TcpTransportOption;
-                    auto_reconnect_ = tcp_option.AutoReconnect;
-                    enable_ping_ = tcp_option.EnablePing;
-                    enable_ping_log_ = tcp_option.EnablePingLog;
-                    ping_interval_ = tcp_option.PingIntervalSeconds;
-                    ping_timeout_ = tcp_option.PingTimeoutSeconds;
-                }
-
-                if (option.Encryption != EncryptionType.kDefaultEncryption)
-                    setEncryption(option.Encryption);
             }
 
             public void SetEstablish (string session_id)
@@ -248,7 +226,34 @@ namespace Fun
             //
             // Properties
             //
+            public TransportProtocol protocol
+            {
+                get { return protocol_; }
+            }
+
+            public FunEncoding encoding
+            {
+                get { return encoding_; }
+            }
+
+            public TransportOption option
+            {
+                get { return option_; }
+                set { option_ = value; applyOption(option_); }
+            }
+
+            public State state
+            {
+                get { return state_; }
+                set { state_ = value; }
+            }
+
             public abstract bool Started { get; }
+
+            public bool Connecting
+            {
+                get { return state_ != State.kUnknown && state_ != State.kEstablished; }
+            }
 
             public bool Reconnecting
             {
@@ -317,6 +322,22 @@ namespace Fun
             protected virtual bool isSendable
             {
                 get { lock (sending_lock_) { return sending_.Count == 0; } }
+            }
+
+            void applyOption (TransportOption option)
+            {
+                if (protocol_ == TransportProtocol.kTcp)
+                {
+                    TcpTransportOption tcp_option = option as TcpTransportOption;
+                    auto_reconnect_ = tcp_option.AutoReconnect;
+                    enable_ping_ = tcp_option.EnablePing;
+                    enable_ping_log_ = tcp_option.EnablePingLog;
+                    ping_interval_ = tcp_option.PingIntervalSeconds;
+                    ping_timeout_ = tcp_option.PingTimeoutSeconds;
+                }
+
+                if (option.Encryption != EncryptionType.kDefaultEncryption)
+                    setEncryption(option.Encryption);
             }
 
             protected void initAddress (string hostname, UInt16 port)
@@ -441,6 +462,9 @@ namespace Fun
             }
 
 
+            //---------------------------------------------------------------------
+            // Message-related functions
+            //---------------------------------------------------------------------
             protected void sendPendingMessages ()
             {
                 try
@@ -1039,6 +1063,7 @@ namespace Fun
             ConnectState cstate_ = ConnectState.kUnknown;
             ConnectList ip_list_ = new ConnectList();
             bool auto_reconnect_ = false;
+            int connect_timer_id_ = 0;
             float exponential_time_ = 0f;
             int reconnect_count_ = 0;
 
@@ -1051,8 +1076,7 @@ namespace Fun
             float ping_timeout_ = 0f;
             float ping_wait_time_ = 0f;
 
-            // Message-related.
-            int connect_timer_id_ = 0;
+            // Message-related variables.
             bool first_sending_ = true;
             bool first_receiving_ = true;
             bool header_decoded_ = false;
@@ -1511,7 +1535,7 @@ namespace Fun
 
                             last_error_code_ = TransportError.Type.kDisconnected;
                             last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
-                            event_.Add(onFailure);
+                            event_.Add(onDisconnected);
                         }
                     }
                 }

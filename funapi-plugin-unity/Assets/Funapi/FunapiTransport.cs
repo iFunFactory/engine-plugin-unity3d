@@ -1683,7 +1683,7 @@ namespace Fun
                         last_error_code_ = ErrorCode.kDisconnected;
                         last_error_message_ = "Can not receive messages. Maybe the socket is closed.";
                         FunDebug.Log(last_error_message_);
-                        event_.Add(OnFailure);
+                        event_.Add(OnDisconnected);
                     }
                 }
             }
