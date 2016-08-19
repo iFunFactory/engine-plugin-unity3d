@@ -217,11 +217,10 @@ namespace Fun
             if (json_msg == null)
                 return false;
 
-            Dictionary<string, object> mcast_msg = json_msg as Dictionary<string, object>;
-            FunDebug.Assert(!mcast_msg.ContainsKey(kJoin));
-            FunDebug.Assert(!mcast_msg.ContainsKey(kLeave));
+            FunDebug.Assert(!json_helper_.HasField(json_msg, kJoin));
+            FunDebug.Assert(!json_helper_.HasField(json_msg, kLeave));
 
-            string channel_id = mcast_msg[kChannelId] as string;
+            string channel_id = json_helper_.GetStringField(json_msg, kChannelId);
             if (channel_id == "")
             {
                 FunDebug.LogWarning("You should set a vaild channel id.");
@@ -243,9 +242,9 @@ namespace Fun
                 }
             }
 
-            mcast_msg[kSender] = sender_;
+            json_helper_.SetStringField(json_msg, kSender, sender_);
 
-            network_.SendMessage(kMulticastMsgType, mcast_msg);
+            network_.SendMessage(kMulticastMsgType, json_msg);
             return true;
         }
 
@@ -299,38 +298,36 @@ namespace Fun
 
             if (encoding_ == FunEncoding.kJson)
             {
-                FunDebug.Assert(body is Dictionary<string, object>);
-                Dictionary<string, object> msg = body as Dictionary<string, object>;
+                if (json_helper_.HasField(body, kChannelId))
+                    channel_id = json_helper_.GetStringField(body, kChannelId);
 
-                if (msg.ContainsKey(kChannelId))
-                    channel_id = msg[kChannelId] as string;
+                if (json_helper_.HasField(body, kSender))
+                    sender = json_helper_.GetStringField(body, kSender);
 
-                if (msg.ContainsKey(kSender))
-                    sender = msg[kSender] as String;
+                if (json_helper_.HasField(body, kErrorCode))
+                    error_code = (int)json_helper_.GetIntegerField(body, kErrorCode);
 
-                if (msg.ContainsKey(kErrorCode))
-                    error_code = Convert.ToInt32(msg[kErrorCode]);
-
-                if (msg.ContainsKey(kChannelList))
+                if (json_helper_.HasField(body, kChannelList))
                 {
                     if (ChannelListCallback != null)
-                        ChannelListCallback(msg[kChannelList]);
+                    {
+                        object list = json_helper_.GetObject(body, kChannelList);
+                        ChannelListCallback(list);
+                    }
                     return;
                 }
-                else if (msg.ContainsKey(kJoin))
+                else if (json_helper_.HasField(body, kJoin))
                 {
-                    join = (bool)msg[kJoin];
+                    join = json_helper_.GetBooleanField(body, kJoin);
                 }
-                else if (msg.ContainsKey(kLeave))
+                else if (json_helper_.HasField(body, kLeave))
                 {
-                    leave = (bool)msg[kLeave];
+                    leave = json_helper_.GetBooleanField(body, kLeave);
                 }
             }
             else
             {
-                FunDebug.Assert(body is FunMessage);
                 FunMessage msg = body as FunMessage;
-
                 object obj = FunapiMessage.GetMessage(msg, MessageType.multicast);
                 FunDebug.Assert(obj != null);
 
@@ -431,6 +428,7 @@ namespace Fun
         public event ChannelNotify LeftCallback;
         public event ErrorNotify ErrorCallback;
 
+        protected JsonAccessor json_helper_ = FunapiMessage.JsonHelper;
         protected FunEncoding encoding_;
         protected string sender_ = "";
 

@@ -122,21 +122,21 @@ namespace Fun
 
                 if (transport.encoding == FunEncoding.kJson)
                 {
-                    fun_msg = new FunapiMessage(protocol, msg_type, FunapiMessage.JsonHelper.Clone(message));
+                    fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message));
 
                     // Encodes a messsage type
-                    FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kMessageTypeField, msg_type);
+                    json_helper_.SetStringField(fun_msg.message, kMessageTypeField, msg_type);
 
                     // Encodes a session id, if any.
                     if (session_id_.Length > 0)
                     {
-                        FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kSessionIdField, session_id_);
+                        json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
                     }
 
                     if (reliable_transport || sending_sequence)
                     {
                         UInt32 seq = getNextSeq(protocol);
-                        FunapiMessage.JsonHelper.SetIntegerField(fun_msg.message, kSeqNumberField, seq);
+                        json_helper_.SetIntegerField(fun_msg.message, kSeqNumberField, seq);
 
                         if (reliable_transport)
                             send_queue_.Enqueue(fun_msg);
@@ -192,7 +192,7 @@ namespace Fun
             {
                 if (transport.encoding == FunEncoding.kJson)
                 {
-                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, FunapiMessage.JsonHelper.Clone(message)));
+                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, json_helper_.Clone(message)));
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
@@ -902,8 +902,8 @@ namespace Fun
             if (transport.encoding == FunEncoding.kJson)
             {
                 object ack_msg = FunapiMessage.Deserialize("{}");
-                FunapiMessage.JsonHelper.SetStringField(ack_msg, kSessionIdField, session_id_);
-                FunapiMessage.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
+                json_helper_.SetStringField(ack_msg, kSessionIdField, session_id_);
+                json_helper_.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
@@ -940,15 +940,15 @@ namespace Fun
                     object json = msg.message;
 
                     // Encodes a messsage type
-                    FunapiMessage.JsonHelper.SetStringField(json, kMessageTypeField, msg.msg_type);
+                    json_helper_.SetStringField(json, kMessageTypeField, msg.msg_type);
 
                     if (session_id_.Length > 0)
-                        FunapiMessage.JsonHelper.SetStringField(json, kSessionIdField, session_id_);
+                        json_helper_.SetStringField(json, kSessionIdField, session_id_);
 
                     if (reliable_transport || sending_sequence)
                     {
                         UInt32 seq = getNextSeq(transport.protocol);
-                        FunapiMessage.JsonHelper.SetIntegerField(json, kSeqNumberField, seq);
+                        json_helper_.SetIntegerField(json, kSeqNumberField, seq);
 
                         if (reliable_transport)
                             send_queue_.Enqueue(msg);
@@ -1049,26 +1049,26 @@ namespace Fun
             {
                 try
                 {
-                    session_id = FunapiMessage.JsonHelper.GetStringField(message, kSessionIdField) as string;
-                    FunapiMessage.JsonHelper.RemoveStringField(message, kSessionIdField);
+                    session_id = json_helper_.GetStringField(message, kSessionIdField);
+                    json_helper_.RemoveField(message, kSessionIdField);
                     setSessionId(session_id);
 
                     if (isReliableTransport(msg.protocol))
                     {
-                        if (FunapiMessage.JsonHelper.HasField(message, kAckNumberField))
+                        if (json_helper_.HasField(message, kAckNumberField))
                         {
-                            UInt32 ack = (UInt32)FunapiMessage.JsonHelper.GetIntegerField(message, kAckNumberField);
+                            UInt32 ack = (UInt32)json_helper_.GetIntegerField(message, kAckNumberField);
                             onAckReceived(transport, ack);
                             return;
                         }
 
-                        if (FunapiMessage.JsonHelper.HasField(message, kSeqNumberField))
+                        if (json_helper_.HasField(message, kSeqNumberField))
                         {
-                            UInt32 seq = (UInt32)FunapiMessage.JsonHelper.GetIntegerField(message, kSeqNumberField);
+                            UInt32 seq = (UInt32)json_helper_.GetIntegerField(message, kSeqNumberField);
                             if (!onSeqReceived(transport, seq))
                                 return;
 
-                            FunapiMessage.JsonHelper.RemoveStringField(message, kSeqNumberField);
+                            json_helper_.RemoveField(message, kSeqNumberField);
                         }
                     }
                 }
@@ -1182,7 +1182,7 @@ namespace Fun
                 FunapiMessage last_msg = send_queue_.Peek();
                 if (transport.encoding == FunEncoding.kJson)
                 {
-                    seq = (UInt32)FunapiMessage.JsonHelper.GetIntegerField(last_msg.message, kSeqNumberField);
+                    seq = (UInt32)json_helper_.GetIntegerField(last_msg.message, kSeqNumberField);
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
@@ -1212,7 +1212,7 @@ namespace Fun
                     {
                         if (transport.encoding == FunEncoding.kJson)
                         {
-                            seq = (UInt32)FunapiMessage.JsonHelper.GetIntegerField(msg.message, kSeqNumberField);
+                            seq = (UInt32)json_helper_.GetIntegerField(msg.message, kSeqNumberField);
                         }
                         else if (transport.encoding == FunEncoding.kProtobuf)
                         {
@@ -1346,6 +1346,7 @@ namespace Fun
         // Message-related variables.
         object message_lock_ = new object();
         object expected_response_lock = new object();
+        static JsonAccessor json_helper_ = FunapiMessage.JsonHelper;
         Queue<FunapiMessage> send_queue_ = new Queue<FunapiMessage>();
         Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
         List<FunapiMessage> message_buffer_ = new List<FunapiMessage>();

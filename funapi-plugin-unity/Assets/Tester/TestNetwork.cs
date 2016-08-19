@@ -169,7 +169,7 @@ public class TestNetwork
     void onEcho (string msg_type, object body)
     {
         FunDebug.Assert(body is Dictionary<string, object>);
-        string strJson = Json.Serialize(body as Dictionary<string, object>);
+        string strJson = Json.Serialize(body);
         FunDebug.Log("Received an echo message: {0}", strJson);
     }
 
@@ -207,10 +207,11 @@ public class TestNetwork
         }
         else if (encoding == FunEncoding.kJson)
         {
-            FunDebug.Assert(body is Dictionary<string, object>);
-            Dictionary<string, object> msg = body as Dictionary<string, object>;
+            JsonAccessor json_helper = FunapiMessage.JsonHelper;
             FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
-                         msg["date_start"], msg["date_end"], msg["messages"]);
+                         json_helper.GetStringField(body, "date_start"),
+                         json_helper.GetStringField(body, "date_end"),
+                         json_helper.GetStringField(body, "messages"));
         }
     }
 
