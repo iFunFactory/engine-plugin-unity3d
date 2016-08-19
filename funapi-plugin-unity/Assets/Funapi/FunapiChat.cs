@@ -118,22 +118,21 @@ namespace Fun
         {
             if (encoding_ == FunEncoding.kJson)
             {
-                FunDebug.Assert(data is Dictionary<string, object>);
-                Dictionary<string, object> mcast_msg = data as Dictionary<string, object>;
+                string text = json_helper_.GetStringField(data, kMessage);
 
                 lock (chat_channel_lock_)
                 {
                     if (chat_channels_.ContainsKey(channel_id))
                     {
-                        chat_channels_[channel_id](channel_id, sender, mcast_msg[kMessage] as string);
+                        chat_channels_[channel_id](channel_id, sender, text);
                     }
                 }
             }
             else
             {
-                FunDebug.Assert (data is FunMulticastMessage);
+                FunDebug.Assert(data is FunMulticastMessage);
                 FunMulticastMessage mcast_msg = data as FunMulticastMessage;
-                FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage> (mcast_msg, (int)MulticastMessageType.chat);
+                FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage>(mcast_msg, (int)MulticastMessageType.chat);
 
                 lock (chat_channel_lock_)
                 {

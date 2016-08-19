@@ -961,9 +961,9 @@ namespace Fun
                 try
                 {
                     FunDebug.Assert(FunapiMessage.JsonHelper.GetStringField(message, kSessionIdBodyField) is string);
-                    string session_id_node = FunapiMessage.JsonHelper.GetStringField(message, kSessionIdBodyField) as string;
+                    string session_id_node = FunapiMessage.JsonHelper.GetStringField(message, kSessionIdBodyField);
                     session_id = session_id_node;
-                    FunapiMessage.JsonHelper.RemoveStringField(message, kSessionIdBodyField);
+                    FunapiMessage.JsonHelper.RemoveField(message, kSessionIdBodyField);
 
                     PrepareSession(session_id);
 
@@ -983,7 +983,7 @@ namespace Fun
                             UInt32 seq = (UInt32)FunapiMessage.JsonHelper.GetIntegerField(message, kSeqNumberField);
                             if (!OnSeqReceived(transport, seq))
                                 return;
-                            FunapiMessage.JsonHelper.RemoveStringField(message, kSeqNumberField);
+                            FunapiMessage.JsonHelper.RemoveField(message, kSeqNumberField);
                         }
                     }
                 }

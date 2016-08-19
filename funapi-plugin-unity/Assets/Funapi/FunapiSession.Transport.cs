@@ -760,10 +760,10 @@ namespace Fun
 
                 if (encoding_ == FunEncoding.kJson)
                 {
-                    if (FunapiMessage.JsonHelper.HasField(message, kMessageTypeField))
+                    if (json_helper_.HasField(message, kMessageTypeField))
                     {
-                        msg_type = FunapiMessage.JsonHelper.GetStringField(message, kMessageTypeField) as string;
-                        FunapiMessage.JsonHelper.RemoveStringField(message, kMessageTypeField);
+                        msg_type = json_helper_.GetStringField(message, kMessageTypeField);
+                        json_helper_.RemoveField(message, kMessageTypeField);
                     }
 
                     if (msg_type.Length > 0)
@@ -858,9 +858,9 @@ namespace Fun
                 if (encoding_ == FunEncoding.kJson)
                 {
                     object msg = FunapiMessage.Deserialize("{}");
-                    FunapiMessage.JsonHelper.SetStringField(msg, kMessageTypeField, kClientPingMessageType);
-                    FunapiMessage.JsonHelper.SetStringField(msg, kSessionIdField, session_id_);
-                    FunapiMessage.JsonHelper.SetIntegerField(msg, kPingTimestampField, timestamp);
+                    json_helper_.SetStringField(msg, kMessageTypeField, kClientPingMessageType);
+                    json_helper_.SetStringField(msg, kSessionIdField, session_id_);
+                    json_helper_.SetIntegerField(msg, kPingTimestampField, timestamp);
                     SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)
@@ -882,14 +882,14 @@ namespace Fun
                 // Send response
                 if (encoding_ == FunEncoding.kJson)
                 {
-                    FunapiMessage.JsonHelper.SetStringField(body, kMessageTypeField, kServerPingMessageType);
+                    json_helper_.SetStringField(body, kMessageTypeField, kServerPingMessageType);
 
                     if (session_id_.Length <= 0)
-                        session_id_ = FunapiMessage.JsonHelper.GetStringField(body, kSessionIdField) as string;
+                        session_id_ = json_helper_.GetStringField(body, kSessionIdField);
 
-                    FunapiMessage.JsonHelper.SetStringField(body, kSessionIdField, session_id_);
+                    json_helper_.SetStringField(body, kSessionIdField, session_id_);
 
-                    SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, FunapiMessage.JsonHelper.Clone(body)));
+                    SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, json_helper_.Clone(body)));
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)
                 {
@@ -922,9 +922,9 @@ namespace Fun
 
                 if (encoding_ == FunEncoding.kJson)
                 {
-                    if (FunapiMessage.JsonHelper.HasField(body, kPingTimestampField))
+                    if (json_helper_.HasField(body, kPingTimestampField))
                     {
-                        timestamp = (long)FunapiMessage.JsonHelper.GetIntegerField(body, kPingTimestampField);
+                        timestamp = (long)json_helper_.GetIntegerField(body, kPingTimestampField);
                     }
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)

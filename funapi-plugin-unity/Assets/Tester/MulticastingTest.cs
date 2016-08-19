@@ -182,19 +182,18 @@ public class MulticastingTest : MonoBehaviour
     {
         if (multicast_.encoding == FunEncoding.kJson)
         {
-            FunDebug.Assert(body is Dictionary<string, object>);
-            Dictionary<string, object> mcast_msg = body as Dictionary<string, object>;
-            FunDebug.Assert (channel_id == (mcast_msg["_channel"] as string));
+            string channel = FunapiMessage.JsonHelper.GetStringField(body, "_channel");
+            FunDebug.Assert(channel != null && channel == channel_id);
 
-            string message = mcast_msg["_message"] as string;
+            string message = FunapiMessage.JsonHelper.GetStringField(body, "_message");
             FunDebug.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
-                           channel_id, message);
+                         channel_id, message);
         }
         else
         {
-            FunDebug.Assert (body is FunMulticastMessage);
+            FunDebug.Assert(body is FunMulticastMessage);
             FunMulticastMessage mcast_msg = body as FunMulticastMessage;
-            FunDebug.Assert (channel_id == mcast_msg.channel);
+            FunDebug.Assert(channel_id == mcast_msg.channel);
 
             PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(
                 mcast_msg, (int)MulticastMessageType.pbuf_hello);
@@ -202,7 +201,7 @@ public class MulticastingTest : MonoBehaviour
                 return;
 
             FunDebug.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
-                           channel_id, hello_msg.message);
+                         channel_id, hello_msg.message);
         }
     }
 

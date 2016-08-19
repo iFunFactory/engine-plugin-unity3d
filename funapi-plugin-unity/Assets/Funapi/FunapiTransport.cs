@@ -402,8 +402,8 @@ namespace Fun
             {
                 if (FunapiMessage.JsonHelper.HasField(message, kMsgTypeBodyField))
                 {
-                    msg_type = FunapiMessage.JsonHelper.GetStringField(message, kMsgTypeBodyField) as string;
-                    FunapiMessage.JsonHelper.RemoveStringField(message, kMsgTypeBodyField);
+                    msg_type = FunapiMessage.JsonHelper.GetStringField(message, kMsgTypeBodyField);
+                    FunapiMessage.JsonHelper.RemoveField(message, kMsgTypeBodyField);
                 }
 
                 if (msg_type.Length > 0)
@@ -636,7 +636,7 @@ namespace Fun
                 FunapiMessage.JsonHelper.SetStringField(body, kMsgTypeBodyField, kServerPingMessageType);
 
                 if (session_id_.Length <= 0)
-                    session_id_ = FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField) as string;
+                    session_id_ = FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField);
 
                 FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
 

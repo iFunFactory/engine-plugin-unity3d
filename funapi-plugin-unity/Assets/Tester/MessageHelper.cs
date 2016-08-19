@@ -31,28 +31,27 @@ public class MessageHelper
 
     public void SendEchoMessage ()
     {
-        if (session_.Connected == false && !session_.ReliableSession)
+        if (!session_.Connected && !session_.ReliableSession)
         {
             FunDebug.Log("You should connect first.");
+            return;
         }
-        else
+
+        if (encoding_ == FunEncoding.kJson)
         {
-            if (encoding_ == FunEncoding.kProtobuf)
-            {
-                PbufEchoMessage echo = new PbufEchoMessage();
-                echo.msg = "hello proto";
-                FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-                session_.SendMessage(MessageType.pbuf_echo, message);
-            }
-            if (encoding_ == FunEncoding.kJson)
-            {
-                // In this example, we are using Dictionary<string, object>.
-                // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
-                // by changing JsonHelper member in FunapiTransport.
-                Dictionary<string, object> message = new Dictionary<string, object>();
-                message["message"] = "hello world";
-                session_.SendMessage("echo", message);
-            }
+            // In this example, we are using Dictionary<string, object>.
+            // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
+            // by changing FunapiMessage.JsonHelper property.
+            Dictionary<string, object> message = new Dictionary<string, object>();
+            message["message"] = "hello world";
+            session_.SendMessage("echo", message);
+        }
+        else if (encoding_ == FunEncoding.kProtobuf)
+        {
+            PbufEchoMessage echo = new PbufEchoMessage();
+            echo.msg = "hello proto";
+            FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+            session_.SendMessage(MessageType.pbuf_echo, message);
         }
     }
 
@@ -76,7 +75,7 @@ public class MessageHelper
     void onEcho (object message)
     {
         FunDebug.Assert(message is Dictionary<string, object>);
-        string strJson = Json.Serialize(message as Dictionary<string, object>);
+        string strJson = Json.Serialize(message);
         FunDebug.Log("Received an echo message: {0}", strJson);
     }
 
@@ -94,7 +93,15 @@ public class MessageHelper
 
     void onMaintenanceMessage (object message)
     {
-        if (encoding_ == FunEncoding.kProtobuf)
+        if (encoding_ == FunEncoding.kJson)
+        {
+            JsonAccessor json_helper = FunapiMessage.JsonHelper;
+            FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
+                         json_helper.GetStringField(message, "date_start"),
+                         json_helper.GetStringField(message, "date_end"),
+                         json_helper.GetStringField(message, "messages"));
+        }
+        else if (encoding_ == FunEncoding.kProtobuf)
         {
             FunMessage msg = message as FunMessage;
             object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_maintenance);
@@ -104,13 +111,6 @@ public class MessageHelper
             MaintenanceMessage maintenance = obj as MaintenanceMessage;
             FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
                          maintenance.date_start, maintenance.date_end, maintenance.messages);
-        }
-        else if (encoding_ == FunEncoding.kJson)
-        {
-            FunDebug.Assert(message is Dictionary<string, object>);
-            Dictionary<string, object> msg = message as Dictionary<string, object>;
-            FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
-                         msg["date_start"], msg["date_end"], msg["messages"]);
         }
     }
 
