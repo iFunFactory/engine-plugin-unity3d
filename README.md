@@ -14,11 +14,17 @@ Funapi plugin의 업데이트 내용입니다.
 ```
 플러그인 버전 141부터는 플러그인에서 필요한 MonoBehaviour를 자체적으로 생성해서 사용하므로
 FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요가 없습니다.
-
+```
+```
 플러그인 버전 150 이상부터 Json과 Protobuf의 인/디코딩 함수의 위치가 변경되었습니다.
 기존에 JsonHelper는 FunapiTransport에 Protobuf 관련 함수는 FunapiNetwork에 있었으나
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
+
+### 08/26/2016 (ver.164)
+- FunapiSession에 Redirect 기능 추가
+- FunapiNetwork에 Message Handler 삭제 함수 추가
+- Json 메시지는 모두 JsonHelper를 사용하도록 수정
 
 ### 08/12/2016 (ver.162)
 - 핑 메시지에 Session Id가 빈 값으로 전송되는 버그 수정
