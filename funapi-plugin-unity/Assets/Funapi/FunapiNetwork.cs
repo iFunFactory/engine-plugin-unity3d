@@ -729,13 +729,13 @@ namespace Fun
         //---------------------------------------------------------------------
         // Message-related functions
         //---------------------------------------------------------------------
-        public void RegisterHandler(string type, MessageEventHandler handler)
+        public void RegisterHandler (string type, MessageEventHandler handler)
         {
             FunDebug.DebugLog("New handler for message type '{0}'", type);
             message_handlers_[type] = handler;
         }
 
-        public void RegisterHandlerWithProtocol(string type, TransportProtocol protocol, MessageEventHandler handler)
+        public void RegisterHandlerWithProtocol (string type, TransportProtocol protocol, MessageEventHandler handler)
         {
             if (protocol == TransportProtocol.kDefault)
             {
@@ -746,6 +746,18 @@ namespace Fun
             FunDebug.DebugLog("New handler for and message type '{0}' of '{1}' protocol.", type, protocol);
             message_protocols_[type] = protocol;
             message_handlers_[type] = handler;
+        }
+
+        public void DeregisterHandler (string type)
+        {
+            if (!message_handlers_.ContainsKey(type))
+                return;
+
+            if (message_protocols_.ContainsKey(type))
+                message_protocols_.Remove(type);
+
+            message_handlers_.Remove(type);
+            FunDebug.DebugLog("'{0}' message handler is deregistered.", type);
         }
 
         public void SendMessage (MessageType msg_type, object message,
@@ -995,14 +1007,6 @@ namespace Fun
                     StopTransport(transport);
                     return;
                 }
-
-                if (msg_type.Length > 0)
-                {
-                    DeleteExpectedReply(msg_type);
-
-                    if (message_handlers_.ContainsKey(msg_type))
-                        message_handlers_[msg_type](msg_type, message);
-                }
             }
             else if (transport.Encoding == FunEncoding.kProtobuf)
             {
@@ -1035,20 +1039,22 @@ namespace Fun
                     StopTransport(transport);
                     return;
                 }
-
-                if (msg_type.Length > 0)
-                {
-                    DeleteExpectedReply(msg_type);
-
-                    if (message_handlers_.ContainsKey(msg_type))
-                        message_handlers_[msg_type](msg_type, funmsg);
-                }
             }
             else
             {
-                FunDebug.Log("Invalid message type. type: {0}", transport.Encoding);
+                FunDebug.Log("Invalid encoding type. type: {0}", transport.Encoding);
                 FunDebug.Assert(false);
                 return;
+            }
+
+            if (msg_type.Length > 0)
+            {
+                DeleteExpectedReply(msg_type);
+
+                if (message_handlers_.ContainsKey(msg_type))
+                    message_handlers_[msg_type](msg_type, message);
+                else
+                    FunDebug.Log("No handler for message '{0}'. Ignoring.", msg_type);
             }
 
             if (!message_handlers_.ContainsKey(msg_type))
@@ -1056,11 +1062,6 @@ namespace Fun
                 if (session_id_.Length > 0 && transport.state == FunapiTransport.State.kWaitForAck)
                 {
                     SetTransportStarted(transport);
-                }
-
-                if (msg_type.Length > 0)
-                {
-                    FunDebug.Log("No handler for message '{0}'. Ignoring.", msg_type);
                 }
             }
         }
