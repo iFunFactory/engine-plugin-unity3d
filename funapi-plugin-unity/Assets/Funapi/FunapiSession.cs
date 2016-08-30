@@ -492,6 +492,8 @@ namespace Fun
                 return;
             }
 
+            FunDebug.Log("EVENT: Session ({0}).", type);
+
             if (SessionEventCallback != null)
                 SessionEventCallback(type, session_id_);
         }
@@ -894,6 +896,8 @@ namespace Fun
                 return;
             }
 
+            FunDebug.Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
+
             if (TransportEventCallback != null)
                 TransportEventCallback(protocol, type);
         }
@@ -906,6 +910,8 @@ namespace Fun
                                   convertString(protocol), type, message);
                 return;
             }
+
+            FunDebug.Log("ERROR: {0} transport ({1})\n{2}.", convertString(protocol), type, message);
 
             if (TransportErrorCallback != null)
             {
@@ -938,10 +944,6 @@ namespace Fun
                     return transports_[protocol];
             }
 
-#if !NO_UNITY
-            FunDebug.DebugLog("getTransport - Can't find {0} transport.",
-                              convertString(protocol));
-#endif
             return null;
         }
 

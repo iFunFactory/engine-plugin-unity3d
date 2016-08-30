@@ -169,16 +169,11 @@ public class FunapiSessionTest : MonoBehaviour
 
     void onSessionEvent (SessionEventType type, string session_id)
     {
-        FunDebug.Log("[EVENT] Session - {0}.", type);
-
         updateButtonState();
     }
 
     void onTransportEvent (TransportProtocol protocol, TransportEventType type)
     {
-        FunDebug.Log("[EVENT] {0} transport - {1}.",
-                     protocol.ToString().Substring(1).ToUpper(), type);
-
         if (session_ != null && !session_.Started)
             session_ = null;
 
@@ -187,9 +182,6 @@ public class FunapiSessionTest : MonoBehaviour
 
     void onTransportError (TransportProtocol protocol, TransportError error)
     {
-        FunDebug.Log("[ERROR] {0} transport - {1}\n{2}.",
-                     protocol.ToString().Substring(1).ToUpper(), error.type, error.message);
-
         updateButtonState();
     }
 
