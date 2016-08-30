@@ -190,6 +190,11 @@ namespace Fun
                 }
             }
 
+            public void SetAbolish ()
+            {
+                session_id_ = "";
+            }
+
             // Sends a message
             public void SendMessage (FunapiMessage fun_msg)
             {
