@@ -1409,6 +1409,14 @@ namespace Fun
                 state_ = State.kUnknown;
             }
 
+            lock (transports_lock_)
+            {
+                foreach (FunapiTransport transport in transports_.Values)
+                {
+                    transport.session_id_ = "";
+                }
+            }
+
             if (session_id_.Length == 0)
                 return;
 

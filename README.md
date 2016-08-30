@@ -21,10 +21,19 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 08/30/2016 (ver.165)
+- FunapiSession에 Event Log 추가
+- 핑 메시지에 이전 Session id가 전송되는 버그 수정
+
 ### 08/26/2016 (ver.164)
 - FunapiSession에 Redirect 기능 추가
 - FunapiNetwork에 Message Handler 삭제 함수 추가
 - Json 메시지는 모두 JsonHelper를 사용하도록 수정
+```
+이 업데이트로 인해 JsonAccessor 클래스에 몇 개의 인터페이스가 추가되었습니다.
+JsonAccessor 클래스를 상속 받아 별도의 JsonHelper를 구현해 사용하고 있다면
+추가된 인터페이스에 대한 함수 구현을 추가해 주셔야 합니다.
+```
 
 ### 08/12/2016 (ver.162)
 - 핑 메시지에 Session Id가 빈 값으로 전송되는 버그 수정

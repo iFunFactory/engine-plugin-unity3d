@@ -476,6 +476,14 @@ namespace Fun
 
         void closeSession ()
         {
+            lock (transports_lock_)
+            {
+                foreach (Transport transport in transports_.Values)
+                {
+                    transport.SetAbolish();
+                }
+            }
+
             if (session_id_.Length == 0)
                 return;
 
