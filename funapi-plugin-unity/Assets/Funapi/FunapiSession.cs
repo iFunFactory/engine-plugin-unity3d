@@ -404,8 +404,7 @@ namespace Fun
 
             lock (expected_response_lock)
             {
-                if (expected_responses_.Count > 0)
-                    expected_responses_.Clear();
+                expected_responses_.Clear();
             }
         }
 
@@ -441,8 +440,7 @@ namespace Fun
             {
                 FunDebug.Log("Session id changed: {0} => {1}", session_id_, session_id);
 
-                closeSession();
-                openSession(session_id);
+                session_id_ = session_id;
                 onSessionEvent(SessionEventType.kChanged);
             }
         }
@@ -476,6 +474,8 @@ namespace Fun
 
         void closeSession ()
         {
+            unsent_queue_.Clear();
+
             lock (transports_lock_)
             {
                 foreach (Transport transport in transports_.Values)
