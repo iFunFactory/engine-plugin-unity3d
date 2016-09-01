@@ -21,6 +21,10 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 09/01/2016 (ver.168)
+- Session Close 할 때 Message Queue 비움
+- Session Id 변경시 Id 교체하고 콜백 호출만 하도록 변경
+
 ### 08/30/2016 (ver.165)
 - FunapiSession에 Event Log 추가
 - 핑 메시지에 이전 Session id가 전송되는 버그 수정

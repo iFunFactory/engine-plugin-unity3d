@@ -450,7 +450,7 @@ namespace Fun
             }
         }
 
-        internal void OnStarted (string session_id)
+        internal void SetEstablish (string session_id)
         {
             state_ = State.kEstablished;
             session_id_ = session_id;
@@ -465,6 +465,8 @@ namespace Fun
                 StartedCallback(protocol_);
             }
         }
+
+        internal abstract void SetAbolish ();
 
         internal void OnStartedInternal ()
         {
@@ -847,6 +849,12 @@ namespace Fun
             connect_timeout_id_ = 0;
 
             OnStopped();
+        }
+
+        internal override void SetAbolish ()
+        {
+            session_id_ = "";
+            pending_.Clear();
         }
 
         internal override bool HasUnsentMessages

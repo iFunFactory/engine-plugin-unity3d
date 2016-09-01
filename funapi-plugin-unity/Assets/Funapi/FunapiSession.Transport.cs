@@ -193,6 +193,7 @@ namespace Fun
             public void SetAbolish ()
             {
                 session_id_ = "";
+                pending_.Clear();
             }
 
             // Sends a message

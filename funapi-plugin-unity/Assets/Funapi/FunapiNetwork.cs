@@ -335,6 +335,7 @@ namespace Fun
                         if (expected_replies_.Count > 0)
                             expected_replies_.Clear();
                     }
+
                     return true;
                 }
 
@@ -539,7 +540,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            transport.OnStarted(session_id_);
+            transport.SetEstablish(session_id_);
 
             if (send_unsent && unsent_queue_.Count > 0)
             {
@@ -1350,24 +1351,27 @@ namespace Fun
             return 0;
         }
 
-        private void PrepareSession(string session_id)
+        private void PrepareSession (string session_id)
         {
             if (session_id_.Length == 0)
             {
                 FunDebug.Log("New session id: {0}", session_id);
                 OpenSession(session_id);
+                return;
             }
 
             if (session_id_ != session_id)
             {
                 FunDebug.Log("Session id changed: {0} => {1}", session_id_, session_id);
 
-                CloseSession();
-                OpenSession(session_id);
+                session_id_ = session_id;
+
+                if (OnSessionInitiated != null)
+                    OnSessionInitiated(session_id_);
             }
         }
 
-        private void OpenSession(string session_id)
+        private void OpenSession (string session_id)
         {
             FunDebug.Assert(session_id_.Length == 0);
 
@@ -1392,9 +1396,7 @@ namespace Fun
             }
 
             if (OnSessionInitiated != null)
-            {
                 OnSessionInitiated(session_id_);
-            }
 
             if (unsent_queue_.Count > 0)
             {
@@ -1402,18 +1404,20 @@ namespace Fun
             }
         }
 
-        private void CloseSession()
+        private void CloseSession ()
         {
             lock (state_lock_)
             {
                 state_ = State.kUnknown;
             }
 
+            unsent_queue_.Clear();
+
             lock (transports_lock_)
             {
                 foreach (FunapiTransport transport in transports_.Values)
                 {
-                    transport.session_id_ = "";
+                    transport.SetAbolish();
                 }
             }
 
@@ -1423,9 +1427,7 @@ namespace Fun
             InitSession();
 
             if (OnSessionClosed != null)
-            {
                 OnSessionClosed();
-            }
         }
 
         private void OnNewSession (string msg_type, object body)
