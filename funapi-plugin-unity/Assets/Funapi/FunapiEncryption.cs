@@ -280,14 +280,19 @@ namespace Fun
     }
 
 
-    public class FunapiEncryptor
+    public class FunapiEncryptor : FunDebugLog
     {
+        public FunapiEncryptor ()
+        {
+            setDebugObject(this);
+        }
+
         bool createEncryptor (EncryptionType type)
         {
             Encryptor encryptor = Encryptor.Create(type);
             if (encryptor == null)
             {
-                FunDebug.LogWarning("Failed to create encryptor: {0}", type);
+                LogWarning("Failed to create encryptor: {0}", type);
                 return false;
             }
 
@@ -305,7 +310,7 @@ namespace Fun
                 return;
 
             default_encryptor_ = type;
-            FunDebug.Log("Set default encryption: {0}", (int)type);
+            Log("Set default encryption: {0}", (int)type);
         }
 
         protected void setEncryption (EncryptionType type)
@@ -377,20 +382,20 @@ namespace Fun
                 Encryptor encryptor = encryptors_[type];
                 if (encryptor == null)
                 {
-                    FunDebug.Log("Unknown encryption: {0}", encryption_type);
+                    Log("Unknown encryption: {0}", encryption_type);
                     return false;
                 }
 
                 if (encryptor.state != Encryptor.State.kHandshaking)
                 {
-                    FunDebug.Log("Unexpected handshake message: {0}", encryptor.name);
+                    Log("Unexpected handshake message: {0}", encryptor.name);
                     return false;
                 }
 
                 string out_header = "";
                 if (!encryptor.Handshake(encryption_header, ref out_header))
                 {
-                    FunDebug.Log("Encryption handshake failure: {0}", encryptor.name);
+                    Log("Encryption handshake failure: {0}", encryptor.name);
                     return false;
                 }
 
@@ -414,14 +419,14 @@ namespace Fun
         {
             if (!encryptors_.ContainsKey(type))
             {
-                FunDebug.Log("Unknown encryption: {0}", type);
+                Log("Unknown encryption: {0}", type);
                 return false;
             }
 
             Encryptor encryptor = encryptors_[type];
             if (encryptor == null || encryptor.state != Encryptor.State.kEstablished)
             {
-                FunDebug.Log("Invalid encryption: {0}", type);
+                Log("Invalid encryption: {0}", type);
                 return false;
             }
 
@@ -430,7 +435,7 @@ namespace Fun
                 Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref header);
                 if (nSize <= 0)
                 {
-                    FunDebug.Log("Failed to encrypt.");
+                    Log("Failed to encrypt.");
                     return false;
                 }
 
@@ -445,21 +450,21 @@ namespace Fun
             EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
             if (!encryptors_.ContainsKey(type))
             {
-                FunDebug.Log("Unknown encryption: {0}", type);
+                Log("Unknown encryption: {0}", type);
                 return false;
             }
 
             Encryptor encryptor = encryptors_[type];
             if (encryptor == null)
             {
-                FunDebug.Log("Invalid encryption: {0}", type);
+                Log("Invalid encryption: {0}", type);
                 return false;
             }
 
             Int64 nSize = encryptor.Decrypt(buffer, buffer, encryption_header);
             if (nSize <= 0)
             {
-                FunDebug.Log("Failed to decrypt.");
+                Log("Failed to decrypt.");
                 return false;
             }
 
