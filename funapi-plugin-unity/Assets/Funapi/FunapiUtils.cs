@@ -17,12 +17,17 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 168;
+        public static readonly int kPluginVersion = 169;
     }
 
 
-    public class FunapiUpdater
+    public class FunapiUpdater : FunDebugLog
     {
+        public FunapiUpdater ()
+        {
+            setDebugObject(this);
+        }
+
         protected void createUpdater ()
         {
 #if !NO_UNITY
@@ -40,7 +45,7 @@ namespace Fun
                     obj.OnQuit = onQuit;
                 }
 
-                FunDebug.DebugLog("'{0}' GameObject was created.", game_object_.name);
+                DebugLog("'{0}' GameObject was created.", game_object_.name);
             }
 #else
             if (funapi_object_ != null)
@@ -58,7 +63,7 @@ namespace Fun
             if (game_object_ == null)
                 return;
 
-            FunDebug.DebugLog("'{0}' GameObject was destroyed", game_object_.name);
+            DebugLog("'{0}' GameObject was destroyed", game_object_.name);
             GameObject.Destroy(game_object_);
             game_object_ = null;
             funapi_object_ = null;

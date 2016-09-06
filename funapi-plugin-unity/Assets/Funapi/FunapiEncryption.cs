@@ -19,8 +19,13 @@ namespace Fun
     }
 
 
-    public class FunapiEncryptor
+    public class FunapiEncryptor : FunDebugLog
     {
+        public FunapiEncryptor ()
+        {
+            setDebugObject(this);
+        }
+
         protected void setEncryption (EncryptionType type)
         {
         }
@@ -42,13 +47,13 @@ namespace Fun
 
         protected bool encryptMessage (FunapiMessage message, EncryptionType type, ref string header)
         {
-            FunDebug.LogWarning("This plugin is not support encryption.");
+            LogWarning("This plugin is not support encryption.");
             return false;
         }
 
         protected bool decryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
         {
-            FunDebug.LogWarning("This plugin is not support encryption.");
+            LogWarning("This plugin is not support encryption.");
             return false;
         }
     }

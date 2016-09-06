@@ -68,7 +68,7 @@ namespace Fun
         {
             if (!Started)
             {
-                FunDebug.Log("Starting a network module.");
+                Log("Starting a network module.");
 
                 lock (state_lock_)
                 {
@@ -145,13 +145,13 @@ namespace Fun
                         if (reliable_transport)
                             send_queue_.Enqueue(fun_msg);
 
-                        FunDebug.DebugLog("{0} send message - msgtype:{1} seq:{2}",
-                                          convertString(protocol), msg_type, seq);
+                        DebugLog("{0} send message - msgtype:{1} seq:{2}",
+                                 convertString(protocol), msg_type, seq);
                     }
                     else
                     {
-                        FunDebug.DebugLog("{0} send message - msgtype:{1}",
-                                          convertString(protocol), msg_type);
+                        DebugLog("{0} send message - msgtype:{1}",
+                                 convertString(protocol), msg_type);
                     }
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
@@ -174,18 +174,18 @@ namespace Fun
                         if (reliable_transport)
                             send_queue_.Enqueue(fun_msg);
 
-                        FunDebug.DebugLog("{0} send message - msgtype:{1} seq:{2}",
-                                          convertString(protocol), msg_type, pbuf.seq);
+                        DebugLog("{0} send message - msgtype:{1} seq:{2}",
+                                 convertString(protocol), msg_type, pbuf.seq);
                     }
                     else
                     {
-                        FunDebug.DebugLog("{0} send message - msgtype:{1}",
-                                          convertString(protocol), msg_type);
+                        DebugLog("{0} send message - msgtype:{1}",
+                                 convertString(protocol), msg_type);
                     }
                 }
                 else
                 {
-                    FunDebug.LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
+                    LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
                     return;
                 }
 
@@ -203,7 +203,7 @@ namespace Fun
                     unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message));
                 }
 
-                FunDebug.Log("SendMessage - '{0}' message queued.", msg_type);
+                Log("SendMessage - '{0}' message queued.", msg_type);
             }
             else
             {
@@ -214,7 +214,7 @@ namespace Fun
                 else if (transport.state != Transport.State.kEstablished)
                     strlog.AppendFormat("Transport's state is '{0}'.", transport.state);
 
-                FunDebug.Log(strlog.ToString());
+                Log(strlog.ToString());
             }
         }
 
@@ -227,12 +227,12 @@ namespace Fun
             {
                 if (expected_responses_.ContainsKey(msg_type))
                 {
-                    FunDebug.LogWarning("'{0}' expected response type is already added. Ignored.");
+                    LogWarning("'{0}' expected response type is already added. Ignored.");
                     return;
                 }
 
                 expected_responses_[msg_type] = new ExpectedResponse(msg_type, waiting_time);
-                FunDebug.DebugLog("Expected response message added - '{0}' ({1}s)", msg_type, waiting_time);
+                DebugLog("Expected response message added - '{0}' ({1}s)", msg_type, waiting_time);
             }
         }
 
@@ -243,7 +243,7 @@ namespace Fun
                 if (expected_responses_.ContainsKey(msg_type))
                 {
                     expected_responses_.Remove(msg_type);
-                    FunDebug.DebugLog("Expected response message removed - {0}", msg_type);
+                    DebugLog("Expected response message removed - {0}", msg_type);
                 }
             }
         }
@@ -261,7 +261,7 @@ namespace Fun
         {
             get { return default_protocol_; }
             set { default_protocol_ = value;
-                  FunDebug.Log("The default protocol is '{0}'", convertString(value)); }
+                  Log("The default protocol is '{0}'", convertString(value)); }
         }
 
         public bool Started
@@ -333,7 +333,7 @@ namespace Fun
             {
                 if (message_buffer_.Count > 0)
                 {
-                    FunDebug.DebugLog("Update messages. count: {0}", message_buffer_.Count);
+                    DebugLog("Update messages. count: {0}", message_buffer_.Count);
 
                     foreach (FunapiMessage message in message_buffer_)
                     {
@@ -360,7 +360,7 @@ namespace Fun
                         er.wait_time -= deltaTime;
                         if (er.wait_time <= 0f)
                         {
-                            FunDebug.Log("'{0}' message waiting time has been exceeded.", er.type);
+                            Log("'{0}' message waiting time has been exceeded.", er.type);
                             remove_list.Add(er.type);
 
                             if (ResponseTimeoutCallback != null)
@@ -431,14 +431,14 @@ namespace Fun
         {
             if (session_id_.Length == 0)
             {
-                FunDebug.Log("New session id: {0}", session_id);
+                Log("New session id: {0}", session_id);
                 openSession(session_id);
                 onSessionEvent(SessionEventType.kOpened);
             }
 
             if (session_id_ != session_id)
             {
-                FunDebug.Log("Session id changed: {0} => {1}", session_id_, session_id);
+                Log("Session id changed: {0} => {1}", session_id_, session_id);
 
                 session_id_ = session_id;
                 onSessionEvent(SessionEventType.kChanged);
@@ -496,11 +496,11 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                FunDebug.DebugLog("Session - '{0}' event callback skipped.", type);
+                DebugLog("Session - '{0}' event callback skipped.", type);
                 return;
             }
 
-            FunDebug.Log("EVENT: Session ({0}).", type);
+            Log("EVENT: Session ({0}).", type);
 
             if (SessionEventCallback != null)
                 SessionEventCallback(type, session_id_);
@@ -652,8 +652,8 @@ namespace Fun
             if (transport != null)
             {
 #if !NO_UNITY
-                FunDebug.LogWarning("createTransport - {0} transport already exists.",
-                                    convertString(protocol));
+                LogWarning("createTransport - {0} transport already exists.",
+                           convertString(protocol));
 #endif
                 return transport;
             }
@@ -667,7 +667,7 @@ namespace Fun
                 else if (protocol == TransportProtocol.kHttp)
                     option = new HttpTransportOption();
 
-                FunDebug.Log("{0} transport use the 'default option'.", convertString(protocol));
+                Log("{0} transport use the 'default option'.", convertString(protocol));
             }
 
             if (protocol == TransportProtocol.kTcp)
@@ -686,7 +686,7 @@ namespace Fun
             }
             else
             {
-                FunDebug.LogError("Create a {0} transport failed.", convertString(protocol));
+                LogError("Create a {0} transport failed.", convertString(protocol));
                 return null;
             }
 
@@ -710,7 +710,7 @@ namespace Fun
             if (default_protocol_ == TransportProtocol.kDefault)
                 DefaultProtocol = protocol;
 
-            FunDebug.DebugLog("{0} transport added.", convertString(protocol));
+            DebugLog("{0} transport added.", convertString(protocol));
             return transport;
         }
 
@@ -741,7 +741,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            FunDebug.Log("Starting {0} transport.", convertString(protocol));
+            Log("Starting {0} transport.", convertString(protocol));
 
             if (transport.protocol == TransportProtocol.kHttp)
             {
@@ -756,7 +756,7 @@ namespace Fun
             if (transport == null || transport.state == Transport.State.kUnknown)
                 return;
 
-            FunDebug.Log("Stopping {0} transport.", convertString(transport.protocol));
+            Log("Stopping {0} transport.", convertString(transport.protocol));
 
             transport.Stop();
         }
@@ -830,7 +830,7 @@ namespace Fun
             if (!Started)
                 return;
 
-            FunDebug.Log("Stopping a network module.");
+            Log("Stopping a network module.");
 
             if (force_stop)
             {
@@ -880,9 +880,8 @@ namespace Fun
             {
                 lock (state_lock_)
                 {
-                    FunDebug.Log("{0} Stop waiting... ({1})",
-                                 convertString(transport.protocol),
-                                 transport.HasUnsentMessages ? "sending" : "0");
+                    Log("{0} Stop waiting... ({1})", convertString(transport.protocol),
+                        transport.HasUnsentMessages ? "sending" : "0");
 
 #if !NO_UNITY
                     yield return new WaitForSeconds(0.1f);
@@ -899,12 +898,12 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                FunDebug.DebugLog("{0} transport - '{1}' event callback skipped.",
-                                  convertString(protocol), type);
+                DebugLog("{0} transport - '{1}' event callback skipped.",
+                         convertString(protocol), type);
                 return;
             }
 
-            FunDebug.Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
+            Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
 
             if (TransportEventCallback != null)
                 TransportEventCallback(protocol, type);
@@ -914,12 +913,12 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                FunDebug.DebugLog("{0} transport - '{1}' error callback skipped.\n{2}",
-                                  convertString(protocol), type, message);
+                DebugLog("{0} transport - '{1}' error callback skipped.\n{2}",
+                         convertString(protocol), type, message);
                 return;
             }
 
-            FunDebug.Log("ERROR: {0} transport ({1})\n{2}.", convertString(protocol), type, message);
+            Log("ERROR: {0} transport ({1})\n{2}.", convertString(protocol), type, message);
 
             if (TransportErrorCallback != null)
             {
@@ -1021,7 +1020,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            FunDebug.Log("{0} transport stopped.", convertString(protocol));
+            Log("{0} transport stopped.", convertString(protocol));
 
             checkTransportStatus(protocol);
             onTransportEvent(protocol, TransportEventType.kStopped);
@@ -1038,7 +1037,7 @@ namespace Fun
 
         void onConnectionFailed (TransportProtocol protocol)
         {
-            FunDebug.Log("{0} transport connection failed.", convertString(protocol));
+            Log("{0} transport connection failed.", convertString(protocol));
 
             checkTransportStatus(protocol);
             onTransportEvent(protocol, TransportEventType.kConnectionFailed);
@@ -1046,7 +1045,7 @@ namespace Fun
 
         void onConnectionTimedOut (TransportProtocol protocol)
         {
-            FunDebug.Log("{0} transport connection timed out.", convertString(protocol));
+            Log("{0} transport connection timed out.", convertString(protocol));
 
             stopTransport(getTransport(protocol));
 
@@ -1055,7 +1054,7 @@ namespace Fun
 
         void onDisconnected (TransportProtocol protocol)
         {
-            FunDebug.Log("{0} transport disconnected.", convertString(protocol));
+            Log("{0} transport disconnected.", convertString(protocol));
 
             checkTransportStatus(protocol);
             onTransportEvent(protocol, TransportEventType.kDisconnected);
@@ -1072,8 +1071,8 @@ namespace Fun
 
             first_sending_protocol_ = transport.protocol;
 
-            FunDebug.DebugLog("{0} sending a empty message for getting to session id.",
-                              convertString(transport.protocol));
+            DebugLog("{0} sending a empty message for getting to session id.",
+                     convertString(transport.protocol));
 
             if (transport.encoding == FunEncoding.kJson)
             {
@@ -1092,7 +1091,8 @@ namespace Fun
             if (!Connected || transport == null)
                 return;
 
-            FunDebug.DebugLog("{0} send ack message - ack:{1}", convertString(transport.protocol), ack);
+            DebugLog("{0} send ack message - ack:{1}",
+                     convertString(transport.protocol), ack);
 
             if (transport.encoding == FunEncoding.kJson)
             {
@@ -1115,15 +1115,15 @@ namespace Fun
             if (unsent_queue_.Count <= 0)
                 return;
 
-            FunDebug.Log("sendUnsentMessages - {0} unsent messages.", unsent_queue_.Count);
+            Log("sendUnsentMessages - {0} unsent messages.", unsent_queue_.Count);
 
             foreach (FunapiMessage msg in unsent_queue_)
             {
                 Transport transport = getTransport(msg.protocol);
                 if (transport == null || transport.state != Transport.State.kEstablished)
                 {
-                    FunDebug.Log("sendUnsentMessages - {0} transport is invalid. '{1}' message skipped.",
-                                 convertString(msg.protocol), msg.msg_type);
+                    Log("sendUnsentMessages - {0} transport is invalid. '{1}' message skipped.",
+                        convertString(msg.protocol), msg.msg_type);
                     continue;
                 }
 
@@ -1148,13 +1148,13 @@ namespace Fun
                         if (reliable_transport)
                             send_queue_.Enqueue(msg);
 
-                        FunDebug.Log("{0} send unsent message - msgtype:{1} seq:{2}",
-                                     convertString(transport.protocol), msg.msg_type, seq);
+                        Log("{0} send unsent message - msgtype:{1} seq:{2}",
+                            convertString(transport.protocol), msg.msg_type, seq);
                     }
                     else
                     {
-                        FunDebug.Log("{0} send unsent message - msgtype:{1}",
-                                     convertString(transport.protocol), msg.msg_type);
+                        Log("{0} send unsent message - msgtype:{1}",
+                            convertString(transport.protocol), msg.msg_type);
                     }
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
@@ -1172,13 +1172,13 @@ namespace Fun
                         if (reliable_transport)
                             send_queue_.Enqueue(msg);
 
-                        FunDebug.Log("{0} send unsent message - msgtype:{1} seq:{2}",
-                                     convertString(transport.protocol), msg.msg_type, pbuf.seq);
+                        Log("{0} send unsent message - msgtype:{1} seq:{2}",
+                            convertString(transport.protocol), msg.msg_type, pbuf.seq);
                     }
                     else
                     {
-                        FunDebug.Log("{0} send unsent message - msgtype:{1}",
-                                     convertString(transport.protocol), msg.msg_type);
+                        Log("{0} send unsent message - msgtype:{1}",
+                            convertString(transport.protocol), msg.msg_type);
                     }
                 }
 
@@ -1194,7 +1194,7 @@ namespace Fun
         //
         void onTransportReceived (FunapiMessage message)
         {
-            FunDebug.DebugLog("onTransportReceived - type: {0}", message.msg_type);
+            DebugLog("onTransportReceived - type: {0}", message.msg_type);
 
             lock (message_lock_)
             {
@@ -1207,7 +1207,7 @@ namespace Fun
             object message = msg.message;
             if (message == null)
             {
-                FunDebug.Log("processMessage - '{0}' message is null.", msg.msg_type);
+                Log("processMessage - '{0}' message is null.", msg.msg_type);
                 return;
             }
 
@@ -1247,7 +1247,7 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    FunDebug.LogError("Failure in processMessage: {0}", e.ToString());
+                    LogError("Failure in processMessage: {0}", e.ToString());
                     return;
                 }
             }
@@ -1277,13 +1277,13 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    FunDebug.LogError("Failure in processMessage: {0}", e.ToString());
+                    LogError("Failure in processMessage: {0}", e.ToString());
                     return;
                 }
             }
             else
             {
-                FunDebug.LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
+                LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
                 return;
             }
 
@@ -1360,14 +1360,14 @@ namespace Fun
 
             if (host.Length <= 0 || token.Length <= 0)
             {
-                FunDebug.LogWarning("onRedirectMessage - Invalid host or token.\nhost:{0}, token:{1}",
-                                    host, token);
+                LogWarning("onRedirectMessage - Invalid host or token.\nhost:{0}, token:{1}",
+                           host, token);
                 return;
             }
 
             if (info_list.Count <= 0)
             {
-                FunDebug.LogWarning("onRedirectMessage - Server port list is empty.");
+                LogWarning("onRedirectMessage - Server port list is empty.");
                 return;
             }
 
@@ -1389,7 +1389,7 @@ namespace Fun
                 }
                 else
                 {
-                    FunDebug.LogWarning("Redirect failed. error code: {0}", result);
+                    LogWarning("Redirect failed. error code: {0}", result);
                     onRedirectFailed();
                 }
             }
@@ -1407,7 +1407,7 @@ namespace Fun
                 }
                 else
                 {
-                    FunDebug.LogWarning("Redirect failed. error code: {0}", redirect.result);
+                    LogWarning("Redirect failed. error code: {0}", redirect.result);
                     onRedirectFailed();
                 }
             }
@@ -1421,7 +1421,7 @@ namespace Fun
             }
             else if (msg_type == kSessionClosedType)
             {
-                FunDebug.Log("Session timed out. Resetting session id.");
+                Log("Session timed out. Resetting session id.");
 
                 stopAllTransports();
                 closeSession();
@@ -1452,13 +1452,13 @@ namespace Fun
             {
                 if (!seqLess(seq_recvd_, seq))
                 {
-                    FunDebug.Log("Last sequence number is {0} but {1} received. Skipping message.", seq_recvd_, seq);
+                    Log("Last sequence number is {0} but {1} received. Skipping message.", seq_recvd_, seq);
                     return false;
                 }
                 else if (seq != seq_recvd_ + 1)
                 {
                     string message = string.Format("Received wrong sequence number {0}. {1} expected.", seq, seq_recvd_ + 1);
-                    FunDebug.LogError(message);
+                    LogError(message);
 
                     stopTransport(transport);
                     onTransportError(transport.protocol, TransportError.Type.kInvalidSequence, message);
@@ -1478,7 +1478,7 @@ namespace Fun
             if (!Connected || transport == null)
                 return;
 
-            FunDebug.DebugLog("received ack message - ack:{0}", ack);
+            DebugLog("received ack message - ack:{0}", ack);
 
             UInt32 seq = 0;
 
@@ -1495,7 +1495,7 @@ namespace Fun
                 }
                 else
                 {
-                    FunDebug.LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
+                    LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
                     seq = 0;
                 }
 
@@ -1525,7 +1525,7 @@ namespace Fun
                         }
                         else
                         {
-                            FunDebug.LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
+                            LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
                             seq = 0;
                         }
 
@@ -1535,11 +1535,11 @@ namespace Fun
                         }
                         else
                         {
-                            FunDebug.LogWarning("onAckReceived({0}) - wrong sequence number {1}. ", ack, seq);
+                            LogWarning("onAckReceived({0}) - wrong sequence number {1}. ", ack, seq);
                         }
                     }
 
-                    FunDebug.Log("Resend {0} messages.", send_queue_.Count);
+                    Log("Resend {0} messages.", send_queue_.Count);
                 }
 
                 setTransportStarted(transport);

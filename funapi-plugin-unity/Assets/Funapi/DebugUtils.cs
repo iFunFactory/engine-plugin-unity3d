@@ -193,4 +193,73 @@ namespace Fun
         public static void RemoveAllLogFiles () {}
 #endif
     }
+
+
+    public class FunDebugLog
+    {
+        protected void setDebugObject (object obj)
+        {
+#if ENABLE_DEBUG
+            hash_ = string.Format("{0:X}", obj.GetHashCode()).Substring(0, 6);
+#endif
+        }
+
+        [Conditional("ENABLE_LOG")]
+        protected void Log (string message, params object[] args)
+        {
+#if ENABLE_DEBUG
+            message = string.Format("[{0}] {1}", hash_, message);
+#endif
+            FunDebug.Log(message, args);
+        }
+
+        [Conditional("ENABLE_LOG")]
+        protected void LogWarning (string message, params object[] args)
+        {
+#if ENABLE_DEBUG
+            message = string.Format("[{0}] {1}", hash_, message);
+#endif
+            FunDebug.LogWarning(message, args);
+        }
+
+        [Conditional("ENABLE_LOG")]
+        protected void LogError (string message, params object[] args)
+        {
+#if ENABLE_DEBUG
+            message = string.Format("[{0}] {1}", hash_, message);
+#endif
+            FunDebug.LogError(message, args);
+        }
+
+        [Conditional("ENABLE_DEBUG")]
+        protected void DebugLog (string message, params object[] args)
+        {
+#if ENABLE_DEBUG
+            message = string.Format("[{0}] {1}", hash_, message);
+#endif
+            FunDebug.DebugLog(message, args);
+        }
+
+        [Conditional("ENABLE_DEBUG")]
+        protected void DebugLogWarning (string message, params object[] args)
+        {
+#if ENABLE_DEBUG
+            message = string.Format("[{0}] {1}", hash_, message);
+#endif
+            FunDebug.DebugLogWarning(message, args);
+        }
+
+        [Conditional("ENABLE_DEBUG")]
+        protected void DebugLogError (string message, params object[] args)
+        {
+#if ENABLE_DEBUG
+            message = string.Format("[{0}] {1}", hash_, message);
+#endif
+            FunDebug.DebugLogError(message, args);
+        }
+
+#if ENABLE_DEBUG
+        string hash_ = "";
+#endif
+    }
 }
