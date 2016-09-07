@@ -104,13 +104,15 @@ namespace Fun
         }
 
         public void SendMessage (MessageType msg_type, object message,
-                                 TransportProtocol protocol = TransportProtocol.kDefault)
+                                 TransportProtocol protocol = TransportProtocol.kDefault,
+                                 EncryptionType enc_type = EncryptionType.kDefaultEncryption)
         {
-            SendMessage(MessageTable.Lookup(msg_type), message, protocol);
+            SendMessage(MessageTable.Lookup(msg_type), message, protocol, enc_type);
         }
 
         public void SendMessage (string msg_type, object message,
-                                 TransportProtocol protocol = TransportProtocol.kDefault)
+                                 TransportProtocol protocol = TransportProtocol.kDefault,
+                                 EncryptionType enc_type = EncryptionType.kDefaultEncryption)
         {
             if (protocol == TransportProtocol.kDefault)
                 protocol = default_protocol_;
@@ -126,7 +128,7 @@ namespace Fun
 
                 if (transport.encoding == FunEncoding.kJson)
                 {
-                    fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message));
+                    fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type);
 
                     // Encodes a messsage type
                     json_helper_.SetStringField(fun_msg.message, kMessageTypeField, msg_type);
@@ -156,7 +158,7 @@ namespace Fun
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
-                    fun_msg = new FunapiMessage(protocol, msg_type, message);
+                    fun_msg = new FunapiMessage(protocol, msg_type, message, enc_type);
 
                     FunMessage pbuf = fun_msg.message as FunMessage;
                     pbuf.msgtype = msg_type;
@@ -196,11 +198,11 @@ namespace Fun
             {
                 if (transport.encoding == FunEncoding.kJson)
                 {
-                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, json_helper_.Clone(message)));
+                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type));
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
-                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message));
+                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, enc_type));
                 }
 
                 Log("SendMessage - '{0}' message queued.", msg_type);
