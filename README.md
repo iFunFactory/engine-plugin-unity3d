@@ -21,6 +21,9 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 09/08/2016 (ver.170)
+- FunapiSession의 SendMessage에 EncryptionType 파라미터 추가
+
 ### 09/07/2016 (ver.169)
 - ENABLE_DEBUG 가 활성화 되면 로그에 object id 표시
 
