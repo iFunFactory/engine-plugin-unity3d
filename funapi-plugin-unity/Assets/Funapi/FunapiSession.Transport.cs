@@ -517,7 +517,11 @@ namespace Fun
 
                     string enc_header = "";
                     EncryptionType type = getEncryption(message);
-                    if (type != EncryptionType.kNoneEncryption)
+                    if (message.msg_type == kEncryptionPublicKey)
+                    {
+                        enc_header = generatePublicKey(type);
+                    }
+                    else if (type != EncryptionType.kNoneEncryption)
                     {
                         if (!encryptMessage(message, type, ref enc_header))
                         {
@@ -721,6 +725,12 @@ namespace Fun
 
                     if (doHandshaking(encryption_type, encryption_header))
                     {
+                        if (hasEncryption(EncryptionType.kChaCha20Encryption))
+                            sendPublicKey(EncryptionType.kChaCha20Encryption);
+
+                        if (hasEncryption(EncryptionType.kAes128Encryption))
+                            sendPublicKey(EncryptionType.kAes128Encryption);
+
                         // Makes a state transition.
                         state_ = State.kConnected;
                         DebugLog("Ready to receive.");
@@ -763,6 +773,22 @@ namespace Fun
                 header_decoded_ = false;
                 header_fields_.Clear();
                 return true;
+            }
+
+            void sendPublicKey (EncryptionType type)
+            {
+                if (encoding == FunEncoding.kJson)
+                {
+                    object msg = FunapiMessage.Deserialize("{}");
+                    SendMessage(new FunapiMessage(protocol, kEncryptionPublicKey, msg, type));
+                }
+                else if (encoding == FunEncoding.kProtobuf)
+                {
+                    FunMessage msg = new FunMessage();
+                    SendMessage(new FunapiMessage(protocol, kEncryptionPublicKey, msg, type));
+                }
+
+                DebugLog("{0} sending a {1}-pubkey message.", convertString(protocol), (int)type);
             }
 
             // Sends messages & Calls start callback
@@ -1038,7 +1064,8 @@ namespace Fun
             protected const string kLengthHeaderField = "LEN";
             protected const string kEncryptionHeaderField = "ENC";
 
-            // Ping message-related constants.
+            // message-related constants.
+            const string kEncryptionPublicKey = "_pub_key";
             const string kServerPingMessageType = "_ping_s";
             const string kClientPingMessageType = "_ping_c";
             const string kPingTimestampField = "timestamp";
