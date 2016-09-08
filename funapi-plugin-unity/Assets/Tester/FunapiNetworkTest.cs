@@ -1,4 +1,4 @@
-// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
+﻿// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
 //
 // Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
@@ -43,6 +43,7 @@ public class FunapiNetworkTest : MonoBehaviour
 
     public void OnConnectTCP ()
     {
+        //Sodium.PerformanceTest();
         tryConnect(TransportProtocol.kTcp);
     }
 
