@@ -16,7 +16,9 @@ namespace Fun
         kDefaultEncryption = 100,
         kDummyEncryption,
         kIFunEngine1Encryption,
-        kIFunEngine2Encryption
+        kIFunEngine2Encryption,
+        kChaCha20Encryption,
+        kAes128Encryption
     }
 
 
@@ -31,6 +33,10 @@ namespace Fun
                 return new Encryptor1();
             else if (type == EncryptionType.kIFunEngine2Encryption)
                 return new Encryptor2();
+            else if (type == EncryptionType.kChaCha20Encryption)
+                return new Encryptor3();
+            else if (type == EncryptionType.kAes128Encryption)
+                return new Encryptor4();
 
             FunDebug.LogWarning("Unknown encryptor: {0}", type);
             FunDebug.Assert(false);
@@ -280,10 +286,90 @@ namespace Fun
     }
 
 
+    // encryption - chacha20
+    class Encryptor3 : Encryptor
+    {
+        public Encryptor3 () : base(EncryptionType.kChaCha20Encryption, "chacha20", State.kEstablished)
+        {
+        }
+
+        public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
+        {
+            FunDebug.Assert(state == State.kEstablished);
+
+            return encrypt(src, dst);
+        }
+
+        public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
+        {
+            FunDebug.Assert(state == State.kEstablished);
+
+            if (in_header.Length > 0)
+            {
+                FunDebug.LogWarning("Wrong encryptor header.");
+                return -1;
+            }
+
+            return decrypt(src, dst);
+        }
+
+        static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            return src.Count;
+        }
+
+        static Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            return src.Count;
+        }
+    }
+
+
+    // encryption - aes128
+    class Encryptor4 : Encryptor
+    {
+        public Encryptor4 () : base(EncryptionType.kAes128Encryption, "aes128", State.kEstablished)
+        {
+        }
+
+        public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
+        {
+            FunDebug.Assert(state == State.kEstablished);
+
+            return encrypt(src, dst);
+        }
+
+        public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
+        {
+            FunDebug.Assert(state == State.kEstablished);
+
+            if (in_header.Length > 0)
+            {
+                FunDebug.LogWarning("Wrong encryptor header.");
+                return -1;
+            }
+
+            return decrypt(src, dst);
+        }
+
+        static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            return src.Count;
+        }
+
+        static Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        {
+            return src.Count;
+        }
+    }
+
+
     public class FunapiEncryptor : FunDebugLog
     {
         public FunapiEncryptor ()
         {
+            public_key = kDefaultPublicKey;
+
             setDebugObject(this);
         }
 
@@ -319,6 +405,11 @@ namespace Fun
                 return;
 
             setDefaultEncryption(type);
+        }
+
+        protected bool hasEncryption (EncryptionType type)
+        {
+            return encryptors_.ContainsKey(type);
         }
 
         protected EncryptionType getEncryption (FunapiMessage message)
@@ -471,6 +562,14 @@ namespace Fun
             return true;
         }
 
+        public static string public_key
+        {
+            set;
+            protected get;
+        }
+
+
+        const string kDefaultPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
         const string kEncryptionHandshakeBegin = "HELLO!";
         const char kDelim1 = '-';
