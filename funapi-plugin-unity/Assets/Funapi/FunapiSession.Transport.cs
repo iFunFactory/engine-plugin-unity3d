@@ -519,26 +519,8 @@ namespace Fun
                     EncryptionType type = getEncryption(message);
                     if (message.msg_type == kEncryptionPublicKey)
                     {
-                        byte[] client_pub_key;
-                        byte[] enc_table, enc_nonce, dec_nonce;
-                        byte[] server_pub_key = System.Text.Encoding.ASCII.GetBytes(public_key);
-
-                        if (type == EncryptionType.kChaCha20Encryption)
-                        {
-                            if (Sodium.GenerateChacha20Secrets(server_pub_key, out client_pub_key,
-                                                               out enc_table, out enc_nonce, out dec_nonce))
-                            {
-                                enc_header = System.Text.Encoding.ASCII.GetString(client_pub_key);
-                            }
-                        }
-                        else if (type == EncryptionType.kAes128Encryption)
-                        {
-                            if (Sodium.GenerateAES128Secrets(server_pub_key, out client_pub_key,
-                                                             out enc_table, out enc_nonce, out dec_nonce))
-                            {
-                                enc_header = System.Text.Encoding.ASCII.GetString(client_pub_key);
-                            }
-                        }
+                        // FIXME(jinuk): public_key 를 byte[] 로 들고 있는게 낫다
+                        enc_header = generatePublicKey(type, Sodium.Unhexify(public_key));
                     }
                     else if (type != EncryptionType.kNoneEncryption)
                     {

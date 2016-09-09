@@ -40,6 +40,12 @@ public class Sodium {
     return 0 == crypto_stream_chacha20_xor_ic(m, m, (ulong)m.Length, nonce, ic, key);
   }
 
+  public static bool StreamChacha20XorIc(
+      ArraySegment<byte> c, ArraySegment<byte> m, byte[] nonce, byte[] key, ulong ic) {
+    return 0 == crypto_stream_chacha20_xor_ic_offset(c.Array, (ulong)c.Offset, m.Array, (ulong)m.Offset, (ulong)m.Count,
+        nonce, ic, key);
+  }
+
   public static byte[] StreamChacha20XorIcBuf(byte[] m, byte[] nonce, byte[] key, ulong ic) {
     byte[] c = new byte[m.Length];
     if (0 == crypto_stream_chacha20_xor_ic(c, m, (ulong)m.Length, nonce, ic, key)) {
@@ -58,6 +64,13 @@ public class Sodium {
   // table 기반으로 xor (inplace)
   public static bool StreamAes128XorTable(byte [] m, byte[] nonce, byte[] table) {
     return 0 == crypto_stream_aes128ctr_xor_afternm(m, m, (ulong)m.Length, nonce, table);
+  }
+
+  public static bool StreamAes128XorTable(
+      ArraySegment<byte> c, ArraySegment<byte> m, byte[] nonce, byte[] table) {
+    return 0 == crypto_stream_aes128ctr_xor_afternm_offset(
+            c.Array, (ulong)c.Offset, m.Array, (ulong)m.Offset, (ulong)m.Count,
+            nonce, table);
   }
 
   public static byte[] StreamAes128XorTableBuf(byte []m, byte[] nonce, byte[] table) {
@@ -96,7 +109,7 @@ public class Sodium {
     return h.Hash;
   }
 
-  public static bool GenerateAES128Secrets(byte[] server_pub_key,
+  public static bool GenerateAes128Secrets(byte[] server_pub_key,
                                            out byte[] client_pub_key,
                                            out byte[] enc_table,
                                            out byte[] enc_nonce,
@@ -107,8 +120,8 @@ public class Sodium {
     dec_nonce = new byte[16];
 
     Array.Copy(secret, 0, enc_key, 0, 16);
-    Array.Copy(secret, 16, enc_nonce, 0, 16);
-    Array.Copy(secret, 32, dec_nonce, 0, 16);
+    Array.Copy(secret, 16, dec_nonce, 0, 16);
+    Array.Copy(secret, 32, enc_nonce, 0, 16);
 
     enc_table = BuildAes128Table(enc_key);
     return true;
@@ -129,7 +142,6 @@ public class Sodium {
     Array.Copy(secret, 40, enc_nonce, 0, 8);
     return true;
   }
-
 
 #region libsodium wrappers
   #if UNITY_IOS
@@ -175,6 +187,14 @@ public class Sodium {
   private static extern int crypto_stream_chacha20_xor_ic(
       byte[] c, byte[] m, ulong mlen, byte[] n, ulong ic, byte[] k);
 
+  #if UNITY_IOS
+  [DllImport("__Internal")]
+  #else
+  [DllImport("sodium")]
+  #endif
+  private static extern int crypto_stream_chacha20_xor_ic_offset(
+      byte[] c, ulong c_offset, byte[] m, ulong m_offset, ulong mlen, byte[] n, ulong ic, byte[] k);
+
 //  int crypto_stream_aes128ctr_xor(unsigned char *out, const unsigned char *in,
 //                                unsigned long long inlen, const unsigned char *n,
 //                                const unsigned char *k);
@@ -205,6 +225,19 @@ public class Sodium {
   #endif
   private static extern int crypto_stream_aes128ctr_xor_afternm(
       byte[] c, byte[] m, ulong len, byte[] nonce, byte[] tbl);
+
+//int crypto_stream_aes128ctr_xor_afternm_offset(unsigned char *out, unsigned long long out_offset,
+//                                               const unsigned char *in, unsigned long long in_offset,
+//                                               unsigned long long len,
+//                                               const unsigned char *nonce,
+//                                               const unsigned char *c);
+  #if UNITY_IOS
+  [DllImport("__Internal")]
+  #else
+  [DllImport("sodium")]
+  #endif
+  private static extern int crypto_stream_aes128ctr_xor_afternm_offset(
+      byte[] c, ulong c_offset, byte[] m, ulong m_offset, ulong len, byte[] nonce, byte[] tbl);
 #endregion
 
   public static string Hexify(byte[] b) {
@@ -212,9 +245,7 @@ public class Sodium {
   }
 
   public static string Hexify(byte[] b, int offset, int length) {
-    byte[] b2 = new byte[length];
-    Array.Copy(b, offset, b2, 0, length);
-    return BitConverter.ToString(b2).Replace("-", "").ToLower();
+    return BitConverter.ToString(b, offset, length).Replace("-", "").ToLower();
   }
 
   public static byte[] Unhexify(string s) {
@@ -232,8 +263,8 @@ public class Sodium {
   public static void PerformanceTest() {
     Init();
 
-    const int N = 100000;
-    byte[] msg = RandomBytes(64);
+    const int N = 100000;  // 알고리즘 반복 시행 횟수
+    byte[] msg = RandomBytes(64);  // 여기가 메시지 길이
     byte[] k16 = RandomBytes(16);
     byte[] k32 = RandomBytes(32);
     byte[] n16 = RandomBytes(16);

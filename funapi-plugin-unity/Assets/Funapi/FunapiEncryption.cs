@@ -27,21 +27,28 @@ namespace Fun
     {
         public static Encryptor Create (EncryptionType type)
         {
-            if (type == EncryptionType.kDummyEncryption)
-                return new Encryptor0();
-            else if (type == EncryptionType.kIFunEngine1Encryption)
-                return new Encryptor1();
-            else if (type == EncryptionType.kIFunEngine2Encryption)
-                return new Encryptor2();
-            else if (type == EncryptionType.kChaCha20Encryption)
-                return new Encryptor3();
-            else if (type == EncryptionType.kAes128Encryption)
-                return new Encryptor4();
+            switch (type)
+            {
+                case EncryptionType.kDummyEncryption:
+                    return new Encryptor0();
 
-            FunDebug.LogWarning("Unknown encryptor: {0}", type);
-            FunDebug.Assert(false);
+                case EncryptionType.kIFunEngine1Encryption:
+                    return new Encryptor1();
 
-            return null;
+                case EncryptionType.kIFunEngine2Encryption:
+                    return new Encryptor2();
+
+                case EncryptionType.kChaCha20Encryption:
+                    return new EncryptorChacha20();
+
+                case EncryptionType.kAes128Encryption:
+                    return new EncryptorAes128();
+
+                default:
+                    FunDebug.LogWarning("Unknown encryptor: {0}", type);
+                    FunDebug.Assert(false);
+                    return null;
+            }
         }
 
         protected Encryptor (EncryptionType type, string name, State initial_state)
@@ -55,6 +62,10 @@ namespace Fun
         {
             FunDebug.Assert(false);
             return true;
+        }
+
+        public virtual string generatePublicKey(byte[] server_pub_key) {
+            return "";
         }
 
         public abstract Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header);
@@ -219,7 +230,6 @@ namespace Fun
             return src.Count;
         }
 
-
         const int kBlockSize = sizeof(UInt32);
 
         UInt32 enc_key_;
@@ -287,9 +297,9 @@ namespace Fun
 
 
     // encryption - chacha20
-    class Encryptor3 : Encryptor
+    class EncryptorChacha20 : Encryptor
     {
-        public Encryptor3 () : base(EncryptionType.kChaCha20Encryption, "chacha20", State.kEstablished)
+        public EncryptorChacha20 () : base(EncryptionType.kChaCha20Encryption, "chacha20", State.kEstablished)
         {
         }
 
@@ -313,22 +323,45 @@ namespace Fun
             return decrypt(src, dst);
         }
 
-        static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        private Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
+            Sodium.StreamChacha20XorIc(dst, src, enc_nonce_, enc_key_, enc_idx_);
+            enc_idx_ += (ulong)src.Count;
             return src.Count;
         }
 
-        static Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        private Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
+            Sodium.StreamChacha20XorIc(dst, src, dec_nonce_, enc_key_, dec_idx_);
+            dec_idx_ += (ulong)src.Count;
             return src.Count;
         }
+
+        public override string generatePublicKey(byte[] server_pub_key) {
+            byte[] client_pub_key;
+            if (Sodium.GenerateChacha20Secrets(server_pub_key, out client_pub_key,
+                                               out enc_key_, out enc_nonce_, out dec_nonce_))
+            {
+                return Sodium.Hexify(client_pub_key);
+            }
+            else
+            {
+                return "";
+            }
+        }
+
+        byte[] enc_key_;
+        byte[] enc_nonce_;
+        byte[] dec_nonce_;
+        ulong enc_idx_;
+        ulong dec_idx_;
     }
 
 
     // encryption - aes128
-    class Encryptor4 : Encryptor
+    class EncryptorAes128 : Encryptor
     {
-        public Encryptor4 () : base(EncryptionType.kAes128Encryption, "aes128", State.kEstablished)
+        public EncryptorAes128 () : base(EncryptionType.kAes128Encryption, "aes128", State.kEstablished)
         {
         }
 
@@ -352,15 +385,36 @@ namespace Fun
             return decrypt(src, dst);
         }
 
-        static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
+            Sodium.StreamAes128XorTable(dst, src, enc_nonce_, enc_table_);
+            Sodium.Increment(enc_nonce_);
             return src.Count;
         }
 
-        static Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
-            return src.Count;
+            Sodium.StreamAes128XorTable(dst, src, dec_nonce_, enc_table_);
+            Sodium.Increment(dec_nonce_);
+            return dst.Count;
         }
+
+        public override string generatePublicKey(byte[] server_pub_key) {
+            byte[] client_pub_key;
+            if (Sodium.GenerateAes128Secrets(server_pub_key, out client_pub_key,
+                                             out enc_table_, out enc_nonce_, out dec_nonce_))
+            {
+                return Sodium.Hexify(client_pub_key);
+            }
+            else
+            {
+                return "";
+            }
+        }
+
+        byte[] enc_table_;
+        byte[] enc_nonce_;
+        byte[] dec_nonce_;
     }
 
 
@@ -562,12 +616,28 @@ namespace Fun
             return true;
         }
 
+        protected virtual string generatePublicKey(
+                EncryptionType type, byte[] server_pub_key) {
+            if (!encryptors_.ContainsKey(type)) {
+                Log("Unknown encryption: {0} requested public key", type);
+                return "";
+            }
+
+            Encryptor encryptor = encryptors_[type];
+            if (encryptor == null)
+            {
+                Log("Invalid encryption: {0}", type);
+                return "";
+            }
+
+            return encryptor.generatePublicKey(server_pub_key);
+        }
+
         public static string public_key
         {
             set;
             protected get;
         }
-
 
         const string kDefaultPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
