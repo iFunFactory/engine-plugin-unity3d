@@ -519,8 +519,7 @@ namespace Fun
                     EncryptionType type = getEncryption(message);
                     if (message.msg_type == kEncryptionPublicKey)
                     {
-                        // FIXME(jinuk): public_key 를 byte[] 로 들고 있는게 낫다
-                        enc_header = generatePublicKey(type, Sodium.Unhexify(public_key));
+                        enc_header = generatePublicKey(type);
                     }
                     else if (type != EncryptionType.kNoneEncryption)
                     {

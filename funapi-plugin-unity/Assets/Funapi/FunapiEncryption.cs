@@ -64,7 +64,8 @@ namespace Fun
             return true;
         }
 
-        public virtual string generatePublicKey(byte[] server_pub_key) {
+        public virtual string generatePublicKey (byte[] server_pub_key)
+        {
             return "";
         }
 
@@ -230,6 +231,7 @@ namespace Fun
             return src.Count;
         }
 
+
         const int kBlockSize = sizeof(UInt32);
 
         UInt32 enc_key_;
@@ -337,18 +339,18 @@ namespace Fun
             return src.Count;
         }
 
-        public override string generatePublicKey(byte[] server_pub_key) {
+        public override string generatePublicKey (byte[] server_pub_key)
+        {
             byte[] client_pub_key;
             if (Sodium.GenerateChacha20Secrets(server_pub_key, out client_pub_key,
                                                out enc_key_, out enc_nonce_, out dec_nonce_))
             {
                 return Sodium.Hexify(client_pub_key);
             }
-            else
-            {
-                return "";
-            }
+
+            return "";
         }
+
 
         byte[] enc_key_;
         byte[] enc_nonce_;
@@ -399,18 +401,18 @@ namespace Fun
             return dst.Count;
         }
 
-        public override string generatePublicKey(byte[] server_pub_key) {
+        public override string generatePublicKey (byte[] server_pub_key)
+        {
             byte[] client_pub_key;
             if (Sodium.GenerateAes128Secrets(server_pub_key, out client_pub_key,
                                              out enc_table_, out enc_nonce_, out dec_nonce_))
             {
                 return Sodium.Hexify(client_pub_key);
             }
-            else
-            {
-                return "";
-            }
+
+            return "";
         }
+
 
         byte[] enc_table_;
         byte[] enc_nonce_;
@@ -616,9 +618,11 @@ namespace Fun
             return true;
         }
 
-        protected virtual string generatePublicKey(
-                EncryptionType type, byte[] server_pub_key) {
-            if (!encryptors_.ContainsKey(type)) {
+        // return value: client public key
+        protected string generatePublicKey (EncryptionType type)
+        {
+            if (!encryptors_.ContainsKey(type))
+            {
                 Log("Unknown encryption: {0} requested public key", type);
                 return "";
             }
@@ -630,14 +634,23 @@ namespace Fun
                 return "";
             }
 
-            return encryptor.generatePublicKey(server_pub_key);
+            return encryptor.generatePublicKey(pub_key_);
         }
 
         public static string public_key
         {
-            set;
-            protected get;
+            set
+            {
+                if (value.Length != 64)
+                {
+                    throw new ArgumentException("public key's length is invalid. The length should be 64 bytes.",
+                                                "FunapiEncryptor.public_key");
+                }
+
+                pub_key_ = Sodium.Unhexify(value);
+            }
         }
+
 
         const string kDefaultPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
@@ -647,5 +660,6 @@ namespace Fun
 
         EncryptionType default_encryptor_ = EncryptionType.kNoneEncryption;
         Dictionary<EncryptionType, Encryptor> encryptors_ = new Dictionary<EncryptionType, Encryptor>();
+        static byte[] pub_key_ = null;
     }
 }
