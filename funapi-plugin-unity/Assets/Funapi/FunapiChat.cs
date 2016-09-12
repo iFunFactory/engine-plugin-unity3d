@@ -15,8 +15,8 @@ namespace Fun
 {
     public class FunapiChatClient : FunapiMulticastClient
     {
-        public FunapiChatClient (FunapiNetwork network, FunEncoding encoding)
-            : base(network, encoding)
+        public FunapiChatClient (FunapiSession session, FunEncoding encoding)
+            : base(session, encoding)
         {
             JoinedCallback += onUserJoined;
             LeftCallback += onUserLeft;

@@ -49,24 +49,17 @@ public class ChattingTest : MonoBehaviour
 
     public void OnCreateChat ()
     {
-        if (network_ == null)
+        if (session_ == null)
         {
             FunDebug.Log("-------- Connect --------");
 
-            network_ = new FunapiNetwork(false);
-            network_.StoppedAllTransportCallback += onStoppedAllTransport;
+            session_ = FunapiSession.Create(kServerIp, false);
+            session_.TransportEventCallback += onTransportEvent;
 
-            FunapiTcpTransport transport = new FunapiTcpTransport(kServerIp, 8012, FunEncoding.kJson);
-            transport.StartedCallback += onTransportStarted;
-            transport.AutoReconnect = true;
-            network_.AttachTransport(transport);
-
-            network_.Start();
+            session_.Connect(TransportProtocol.kTcp, encoding_, 8012);
         }
 
-        FunapiTransport t = network_.GetTransport(TransportProtocol.kTcp);
-
-        chat_ = new FunapiChatClient(network_, t.Encoding);
+        chat_ = new FunapiChatClient(session_, encoding_);
         chat_.sender = "player" + UnityEngine.Random.Range(1, 100);
 
         chat_.ChannelListCallback += delegate(object channel_list) {
@@ -106,17 +99,15 @@ public class ChattingTest : MonoBehaviour
     }
 
 
-    void onTransportStarted (TransportProtocol protocol)
+    void onTransportEvent (TransportProtocol protocol, TransportEventType type)
     {
-        updateButtonState();
-    }
+        if (type == TransportEventType.kStopped)
+        {
+            session_ = null;
+            chat_ = null;
+        }
 
-    void onStoppedAllTransport ()
-    {
-        FunDebug.Log("OnStoppedAllTransport called.");
         updateButtonState();
-        network_ = null;
-        chat_ = null;
     }
 
     void onMulticastChannelList (FunEncoding encoding, object channel_list)
@@ -178,9 +169,10 @@ public class ChattingTest : MonoBehaviour
     // Please change this address to your server.
     const string kServerIp = "127.0.0.1";
     const string kChatTestChannel = "chat";
+    const FunEncoding encoding_ = FunEncoding.kJson;
 
     // Member variables.
-    FunapiNetwork network_ = null;
+    FunapiSession session_ = null;
     FunapiChatClient chat_ = null;
 
     // UI buttons

@@ -21,6 +21,10 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 09/19/2016 (ver.173)
+- FunapiNetwork 사용하는 곳 모두 FunapiSession으로 대체
+  - FunapiMulticastClient, FunapiChatClient, DebugLog 예제
+
 ### 09/13/2016 (ver.172)
 - Aes128 / ChaCha20 암호화 기능 추가
 

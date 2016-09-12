@@ -652,13 +652,7 @@ namespace Fun
         {
             Transport transport = getTransport(protocol);
             if (transport != null)
-            {
-#if !NO_UNITY
-                LogWarning("createTransport - {0} transport already exists.",
-                           convertString(protocol));
-#endif
                 return transport;
-            }
 
             if (option == null)
             {

@@ -41,39 +41,37 @@ public class DebugLogTest : MonoBehaviour
 
     void updateButtonState ()
     {
-        bool enable = network_ == null || !network_.Started;
+        bool enable = session_ == null || !session_.Started;
         buttons_["connect"].interactable = enable;
 
-        enable = network_ != null && network_.Connected;
+        enable = session_ != null && session_.Connected;
         buttons_["disconnect"].interactable = enable;
         buttons_["send"].interactable = enable;
     }
 
     public void OnConnect ()
     {
-        if (network_ == null)
+        if (session_ == null)
         {
-            handler_ = new TestNetwork();
-            network_ = handler_.CreateNetwork(false);
-            network_.StoppedAllTransportCallback += onStoppedAllTransport;
+            session_ = FunapiSession.Create(kServerIp, false);
+            session_.TransportEventCallback += onTransportEvent;
 
-            FunapiTransport transport = handler_.AddTransport(TransportProtocol.kHttp, kServerIp, FunEncoding.kJson);
-            transport.StartedCallback += onTransportStarted;
+            message_helper_ = new MessageHelper(session_, FunEncoding.kJson);
         }
 
-        network_.Start();
+        session_.Connect(TransportProtocol.kHttp, FunEncoding.kJson, 8018);
 
         updateButtonState();
     }
 
     public void OnDisconnect ()
     {
-        handler_.Disconnect();
+        session_.Close();
     }
 
     public void OnSendMessage ()
     {
-        handler_.SendEchoMessage();
+        message_helper_.SendEchoMessage();
     }
 
     public void OnGetLogs ()
@@ -87,12 +85,7 @@ public class DebugLogTest : MonoBehaviour
     }
 
 
-    void onTransportStarted (TransportProtocol protocol)
-    {
-        updateButtonState();
-    }
-
-    void onStoppedAllTransport()
+    void onTransportEvent (TransportProtocol protocol, TransportEventType type)
     {
         updateButtonState();
     }
@@ -102,8 +95,8 @@ public class DebugLogTest : MonoBehaviour
     const string kServerIp = "127.0.0.1";
 
     // Member variables.
-    TestNetwork handler_ = null;
-    FunapiNetwork network_ = null;
+    FunapiSession session_ = null;
+    MessageHelper message_helper_ = null;
 
     // UI buttons
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
