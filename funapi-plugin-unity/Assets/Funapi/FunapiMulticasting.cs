@@ -16,14 +16,14 @@ namespace Fun
 {
     public class FunapiMulticastClient
     {
-        public FunapiMulticastClient (FunapiNetwork network, FunEncoding encoding)
+        public FunapiMulticastClient (FunapiSession session, FunEncoding encoding)
         {
-            FunDebug.Assert(network != null);
+            FunDebug.Assert(session != null);
 
-            network_ = network;
+            session_ = session;
             encoding_ = encoding;
 
-            network_.RegisterHandlerWithProtocol(kMulticastMsgType, TransportProtocol.kTcp, onReceived);
+            session_.ReceivedMessageCallback += onReceived;
         }
 
         public string sender
@@ -38,7 +38,7 @@ namespace Fun
 
         public bool Connected
         {
-            get { return network_ != null && network_.Connected; }
+            get { return session_ != null && session_.Connected; }
         }
 
         public void RequestChannelList ()
@@ -53,15 +53,15 @@ namespace Fun
             {
                 Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
                 mcast_msg[kSender] = sender_;
-                network_.SendMessage(kMulticastMsgType, mcast_msg);
+                session_.SendMessage(kMulticastMsgType, mcast_msg);
             }
             else
             {
-                FunMulticastMessage mcast_msg = new FunMulticastMessage ();
+                FunMulticastMessage mcast_msg = new FunMulticastMessage();
                 mcast_msg.sender = sender_;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
-                network_.SendMessage (kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg);
             }
         }
 
@@ -91,7 +91,7 @@ namespace Fun
                 mcast_msg[kSender] = sender_;
                 mcast_msg[kJoin] = true;
 
-                network_.SendMessage(kMulticastMsgType, mcast_msg);
+                session_.SendMessage(kMulticastMsgType, mcast_msg);
             }
             else
             {
@@ -101,7 +101,7 @@ namespace Fun
                 mcast_msg.join = true;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
-                network_.SendMessage(kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg);
             }
 
             FunDebug.Log("Request to join '{0}' channel", channel_id);
@@ -205,7 +205,7 @@ namespace Fun
             mcast_msg.sender = sender_;
 
             FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
-            network_.SendMessage(kMulticastMsgType, fun_msg);
+            session_.SendMessage(kMulticastMsgType, fun_msg);
             return true;
         }
 
@@ -244,7 +244,7 @@ namespace Fun
 
             json_helper_.SetStringField(json_msg, kSender, sender_);
 
-            network_.SendMessage(kMulticastMsgType, json_msg);
+            session_.SendMessage(kMulticastMsgType, json_msg);
             return true;
         }
 
@@ -258,7 +258,7 @@ namespace Fun
                 mcast_msg[kSender] = sender_;
                 mcast_msg[kLeave] = true;
 
-                network_.SendMessage(kMulticastMsgType, mcast_msg);
+                session_.SendMessage(kMulticastMsgType, mcast_msg);
             }
             else
             {
@@ -268,7 +268,7 @@ namespace Fun
                 mcast_msg.leave = true;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
-                network_.SendMessage(kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg);
             }
         }
 
@@ -432,7 +432,7 @@ namespace Fun
         protected FunEncoding encoding_;
         protected string sender_ = "";
 
-        FunapiNetwork network_ = null;
+        FunapiSession session_ = null;
         object channel_lock_ = new object();
         Dictionary<string, ChannelMessage> channels_ = new Dictionary<string, ChannelMessage>();
     }
