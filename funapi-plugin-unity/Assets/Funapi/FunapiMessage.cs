@@ -31,8 +31,15 @@ namespace Fun
 
             if (encoding == FunEncoding.kJson)
             {
-                string str = json_helper_.Serialize(message);
-                buffer = System.Text.Encoding.UTF8.GetBytes(str);
+                if (message == null)
+                {
+                    buffer = new byte[0];
+                }
+                else
+                {
+                    string str = json_helper_.Serialize(message);
+                    buffer = System.Text.Encoding.UTF8.GetBytes(str);
+                }
             }
             else
             {

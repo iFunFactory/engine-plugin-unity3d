@@ -779,8 +779,7 @@ namespace Fun
             {
                 if (encoding == FunEncoding.kJson)
                 {
-                    object msg = FunapiMessage.Deserialize("{}");
-                    SendMessage(new FunapiMessage(protocol, kEncryptionPublicKey, msg, type));
+                    SendMessage(new FunapiMessage(protocol, kEncryptionPublicKey, null, type));
                 }
                 else if (encoding == FunEncoding.kProtobuf)
                 {
