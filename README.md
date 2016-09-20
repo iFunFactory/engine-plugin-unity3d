@@ -21,6 +21,10 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 09/21/2016 (ver.174)
+- C# Runtime 테스트 관련 수정
+- Json 메시지를 보낼 때 body가 null일 경우 예외 처리 추가
+
 ### 09/19/2016 (ver.173)
 - FunapiNetwork 사용하는 곳 모두 FunapiSession으로 대체
   - FunapiMulticastClient, FunapiChatClient, DebugLog 예제
@@ -43,6 +47,9 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 - 핑 메시지에 이전 Session id가 전송되는 버그 수정
 
 ### 08/26/2016 (ver.164)
+```
+플러그인 버전 164 이상을 사용하려면 서버 버전 1695 이상이 필요하며 protobuf dll을 새로 빌드해야 합니다.
+```
 - FunapiSession에 Redirect 기능 추가
 - FunapiNetwork에 Message Handler 삭제 함수 추가
 - Json 메시지는 모두 JsonHelper를 사용하도록 수정
