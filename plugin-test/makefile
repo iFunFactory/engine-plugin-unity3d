@@ -11,6 +11,7 @@ tester.exe: ${SRC_ROOT}/main.cs \
         ${SRC_ROOT}/client.cs \
         FunMessageSerializer.dll messages.dll protobuf-net.dll \
         ${PLUGIN_ROOT}/Funapi/ConnectList.cs \
+        ${PLUGIN_ROOT}/Funapi/Crypto.cs \
         ${PLUGIN_ROOT}/Funapi/DebugUtils.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiAnnouncement.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiChat.cs \
@@ -32,6 +33,7 @@ tester.exe: ${SRC_ROOT}/main.cs \
         ${SRC_ROOT}/main.cs \
         ${SRC_ROOT}/client.cs \
         ${PLUGIN_ROOT}/Funapi/ConnectList.cs \
+        ${PLUGIN_ROOT}/Funapi/Crypto.cs \
         ${PLUGIN_ROOT}/Funapi/DebugUtils.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiAnnouncement.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiChat.cs \

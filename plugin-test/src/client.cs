@@ -128,14 +128,10 @@ namespace Tester
 
         void onSessionEvent (SessionEventType type, string session_id)
         {
-            FunDebug.Log("[EVENT] Session - {0}.", type);
         }
 
         void onTransportEvent (TransportProtocol protocol, TransportEventType type)
         {
-            FunDebug.Log("[EVENT] {0} transport - {1}.",
-                         protocol.ToString().Substring(1).ToUpper(), type);
-
             if (protocol == TransportProtocol.kTcp && type == TransportEventType.kStarted)
             {
                 connected_ = true;
@@ -149,8 +145,6 @@ namespace Tester
 
         void onTransportError (TransportProtocol protocol, TransportError error)
         {
-            FunDebug.Log("[ERROR] {0} transport - {1}\n{2}.",
-                         protocol.ToString().Substring(1).ToUpper(), error.type, error.message);
         }
 
         void onReceivedMessage (string type, object message)

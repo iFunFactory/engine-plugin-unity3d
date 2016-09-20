@@ -42,22 +42,22 @@ namespace Fun
     // Default json accessor
     public class DictionaryJsonAccessor : JsonAccessor
     {
-        public override object Clone(object json)
+        public override object Clone (object json)
         {
             return new Dictionary<string, object>(getDic(json));
         }
 
-        public override string Serialize(object json)
+        public override string Serialize (object json)
         {
             return Json.Serialize(json);
         }
 
-        public override object Deserialize(string json_string)
+        public override object Deserialize (string json_string)
         {
             return Json.Deserialize(json_string);
         }
 
-        public override bool HasField(object json, string field_name)
+        public override bool HasField (object json, string field_name)
         {
             return getDic(json).ContainsKey(field_name);
         }
@@ -87,22 +87,22 @@ namespace Fun
             getDic(json)[field_name] = value;
         }
 
-        public override string GetStringField(object json, string field_name)
+        public override string GetStringField (object json, string field_name)
         {
             return getDic(json)[field_name] as string;
         }
 
-        public override void SetStringField(object json, string field_name, string value)
+        public override void SetStringField (object json, string field_name, string value)
         {
             getDic(json)[field_name] = value;
         }
 
-        public override Int64 GetIntegerField(object json, string field_name)
+        public override Int64 GetIntegerField (object json, string field_name)
         {
             return Convert.ToInt64(getDic(json)[field_name]);
         }
 
-        public override void SetIntegerField(object json, string field_name, Int64 value)
+        public override void SetIntegerField (object json, string field_name, Int64 value)
         {
             getDic(json)[field_name] = value;
         }
