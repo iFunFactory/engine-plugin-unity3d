@@ -204,7 +204,6 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void Log (string message, params object[] args)
         {
 #if ENABLE_DEBUG
@@ -213,7 +212,6 @@ namespace Fun
             FunDebug.Log(message, args);
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void LogWarning (string message, params object[] args)
         {
 #if ENABLE_DEBUG
@@ -222,7 +220,6 @@ namespace Fun
             FunDebug.LogWarning(message, args);
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void LogError (string message, params object[] args)
         {
 #if ENABLE_DEBUG
@@ -231,7 +228,6 @@ namespace Fun
             FunDebug.LogError(message, args);
         }
 
-        [Conditional("ENABLE_DEBUG")]
         protected void DebugLog (string message, params object[] args)
         {
 #if ENABLE_DEBUG
@@ -240,7 +236,6 @@ namespace Fun
             FunDebug.DebugLog(message, args);
         }
 
-        [Conditional("ENABLE_DEBUG")]
         protected void DebugLogWarning (string message, params object[] args)
         {
 #if ENABLE_DEBUG
@@ -249,7 +244,6 @@ namespace Fun
             FunDebug.DebugLogWarning(message, args);
         }
 
-        [Conditional("ENABLE_DEBUG")]
         protected void DebugLogError (string message, params object[] args)
         {
 #if ENABLE_DEBUG

@@ -62,6 +62,7 @@ namespace Fun
                     if (md5hash != file.hash_front || length == stream.Length)
                     {
                         stream.Close();
+
                         if (on_result != null)
                             on_result(path, file, md5hash == file.hash_front && md5hash == file.hash);
 
