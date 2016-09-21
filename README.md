@@ -1,7 +1,7 @@
 Funapi plugin
 ========================
 
-플러그인 버전 v120 이상을 사용하려면 서버 버전이 v1437 이상이어야 합니다.
+플러그인 버전 v164 이상을 사용하려면 서버 버전이 v1695 이상이어야 합니다.
 
 ## Documentation
 
@@ -20,6 +20,9 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 기존에 JsonHelper는 FunapiTransport에 Protobuf 관련 함수는 FunapiNetwork에 있었으나
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
+
+### 09/22/2016 (ver.175)
+- Redirect 관련 protobuf 메시지 비활성화
 
 ### 09/21/2016 (ver.174)
 - C# Runtime 테스트 관련 수정
