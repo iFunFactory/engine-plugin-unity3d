@@ -94,6 +94,7 @@ namespace Fun
 
         protected static byte circularLeftShift (byte value, int shift_len)
         {
+            shift_len = shift_len % 8;
             return (byte)((value << shift_len) | (value >> (sizeof(byte) * 8 - shift_len)));
         }
 
