@@ -10,6 +10,7 @@ Temp
 *.exe
 *.mdb
 *.zip
+*.unitypackage
 plugin-test/*.dll
 funapi-plugin-unity/Data
 funapi-plugin-unity/Assets/UnityVS/

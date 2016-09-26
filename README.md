@@ -21,6 +21,9 @@ FunapiNetwork와 FunapiDownloader의 Update나 Stop 함수를 호출할 필요�
 이제 FunapiMessage 클래스를 통해 해당 기능을 사용할 수 있습니다. 사용방법은 샘플 코드를 참고해주세요.
 ```
 
+### 10/05/2016 (ver.178)
+- unitypackage 파일 생성 메뉴 추가
+
 ### 09/22/2016 (ver.175)
 - Redirect 관련 protobuf 메시지 비활성화
 

@@ -16,16 +16,10 @@ public class iFunPlugin : ScriptableObject
     const string kDocsUrl = "http://www.ifunfactory.com/engine/documents/reference/ko/client-plugin.html";
 
 
-    [MenuItem("iFun Plugin/About iFun Plugin", false, 0)]
-    static void AboutPlugin ()
+    [MenuItem("iFun Plugin/Export Package", false, 10)]
+    static void MakeExportPackage ()
     {
-        EditorUtility.DisplayDialog("Funapi Plugin", kAboutText, "OK");
-    }
-
-    [MenuItem("iFun Plugin/Documentation", false, 0)]
-    static void OpenDocs ()
-    {
-        Application.OpenURL(kDocsUrl);
+        makePackage();
     }
 
     [MenuItem("iFun Plugin/Download MozRoots", false, 20)]
@@ -35,5 +29,29 @@ public class iFunPlugin : ScriptableObject
 
         string text = string.Format("Download certificates {0}!!", ret ? "succeeded" : "failed");
         EditorUtility.DisplayDialog("Funapi Plugin", text, "OK");
+    }
+
+    [MenuItem("iFun Plugin/Documentation", false, 100)]
+    static void OpenDocs ()
+    {
+        Application.OpenURL(kDocsUrl);
+    }
+
+    [MenuItem("iFun Plugin/About iFun Plugin", false, 100)]
+    static void AboutPlugin ()
+    {
+        EditorUtility.DisplayDialog("Funapi Plugin", kAboutText, "OK");
+    }
+
+
+    static void makePackage ()
+    {
+        string output = string.Format("funapi-plugin-unity-v{0}.unitypackage", Fun.FunapiVersion.kPluginVersion);
+        string[] assets = new string[] { "Assets/Editor", "Assets/Funapi", "Assets/Plugins",
+                                         "Assets/Resources", "Assets/Tester", "Assets/protobuf-net.dll",
+                                         "Assets/FunMessageSerializer.dll", "Assets/messages.dll"};
+
+        AssetDatabase.ExportPackage(assets, "../" + output, ExportPackageOptions.Recurse | ExportPackageOptions.IncludeDependencies);
+        EditorUtility.DisplayDialog("Funapi Plugin", string.Format("Package creation success!\n({0})", output), "OK");
     }
 }
