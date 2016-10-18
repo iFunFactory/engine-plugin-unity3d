@@ -81,6 +81,7 @@ namespace Fun
 
     public class HttpTransportOption : TransportOption
     {
+        public bool Https = false;
         public bool UseWWW = false;
     }
 
