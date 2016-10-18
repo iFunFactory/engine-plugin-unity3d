@@ -28,16 +28,16 @@ public class DownloaderTest : MonoBehaviour
         if (downloader_ != null)
             return;
 
-        string download_url = string.Format("http://{0}:{1}", kServerIp, kServerPort);
+        button_start_.interactable = false;
 
         downloader_ = new FunapiHttpDownloader();
         downloader_.VerifyCallback += onDownloadVerify;
         downloader_.ReadyCallback += onDownloadReady;
         downloader_.UpdateCallback += onDownloadUpdate;
         downloader_.FinishedCallback += onDownloadFinished;
-        downloader_.GetDownloadList(download_url, FunapiUtils.GetLocalDataPath);
 
-        button_start_.interactable = false;
+        string url = string.Format("http://{0}:{1}", kServerIp, kServerPort);
+        downloader_.GetDownloadList(url, FunapiUtils.GetLocalDataPath);
     }
 
 
