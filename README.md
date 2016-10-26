@@ -84,7 +84,7 @@ protobuf를 사용할 경우 서버 프로젝트에서 메시지를 정의하고
 
 ### v164
 FunapiSession에 Redirect 관련 메시지들이 추가되었습니다.
-서버 버전 1695 이상이 필요하며 protobuf를 사용할 경우 dll을 새로 빌드해야 합니다.
+서버 버전 1809 이상이 필요하며 protobuf를 사용할 경우 dll을 새로 빌드해야 합니다.
 
 #### 인터페이스 변경
 JsonAccessor 클래스의 인터페이스가 추가되었습니다. 이전의 JsonAccessor 클래스를 상속받아

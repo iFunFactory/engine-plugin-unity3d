@@ -4,8 +4,6 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-//#define REDIRECT_MESSAGE
-
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,9 +16,7 @@ using System.Threading;
 
 // protobuf
 using funapi.network.fun_message;
-#if REDIRECT_MESSAGE
 using funapi.service.redirect_message;
-#endif
 
 
 namespace Fun
@@ -632,14 +628,12 @@ namespace Fun
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
-#if REDIRECT_MESSAGE
                 FunRedirectConnectMessage msg = new FunRedirectConnectMessage();
                 msg.token = token;
                 FunMessage funmsg = FunapiMessage.CreateFunMessage(msg, MessageType._cs_redirect_connect);
                 funmsg.msgtype = kRedirectConnectType;
                 funmsg.sid = session_id_;
                 transport.SendMessage(new FunapiMessage(transport.protocol, kRedirectConnectType, funmsg));
-#endif
             }
         }
 
@@ -1340,7 +1334,6 @@ namespace Fun
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
-#if REDIRECT_MESSAGE
                 FunMessage msg = message as FunMessage;
                 object obj = FunapiMessage.GetMessage(msg, MessageType._sc_redirect);
                 if (obj == null)
@@ -1360,7 +1353,6 @@ namespace Fun
                     info.option = getTransportOption(flavor, info.protocol);
                     info_list.Add(info);
                 }
-#endif
             }
 
             if (host.Length <= 0 || token.Length <= 0)
@@ -1400,7 +1392,6 @@ namespace Fun
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
-#if REDIRECT_MESSAGE
                 FunMessage msg = message as FunMessage;
                 object obj = FunapiMessage.GetMessage(msg, MessageType._cs_redirect_connect);
                 if (obj == null)
@@ -1416,7 +1407,6 @@ namespace Fun
                     LogWarning("Redirect failed. error code: {0}", redirect.result);
                     onRedirectFailed();
                 }
-#endif
             }
         }
 
