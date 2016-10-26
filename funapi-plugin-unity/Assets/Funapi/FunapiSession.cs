@@ -624,7 +624,7 @@ namespace Fun
                 json_helper_.SetStringField(msg, kMessageTypeField, kRedirectConnectType);
                 json_helper_.SetStringField(msg, kSessionIdField, session_id_);
                 json_helper_.SetStringField(msg, "token", token);
-                transport.SendMessage(new FunapiMessage(transport.protocol, kRedirectConnectType, msg));
+                SendMessage(kRedirectConnectType, msg, transport.protocol);
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
@@ -633,7 +633,7 @@ namespace Fun
                 FunMessage funmsg = FunapiMessage.CreateFunMessage(msg, MessageType._cs_redirect_connect);
                 funmsg.msgtype = kRedirectConnectType;
                 funmsg.sid = session_id_;
-                transport.SendMessage(new FunapiMessage(transport.protocol, kRedirectConnectType, funmsg));
+                SendMessage(kRedirectConnectType, funmsg, transport.protocol);
             }
         }
 
