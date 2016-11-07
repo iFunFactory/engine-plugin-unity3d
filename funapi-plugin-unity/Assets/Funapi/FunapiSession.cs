@@ -24,8 +24,9 @@ namespace Fun
     public enum SessionEventType
     {
         kOpened,
-        kClosed,
         kChanged,
+        kStopped,
+        kClosed,
         kRedirectStarted,
         kRedirectSucceeded,
         kRedirectFailed
@@ -85,12 +86,15 @@ namespace Fun
             event_list.Add(() => startTransport(protocol));
         }
 
-        public void Close ()
+        public void Stop ()
         {
+            if (!Started)
+                return;
+
             stopAllTransports();
         }
 
-        public void Close (TransportProtocol protocol)
+        public void Stop (TransportProtocol protocol)
         {
             Transport transport = getTransport(protocol);
             if (transport == null || mono == null)
@@ -101,6 +105,18 @@ namespace Fun
 #else
             mono.StartCoroutine(() => tryToStopTransport(transport));
 #endif
+        }
+
+        [System.Obsolete("This will be deprecated January 2017. Use 'FunapiSession.Stop()' instead.")]
+        public void Close ()
+        {
+            Stop();
+        }
+
+        [System.Obsolete("This will be deprecated January 2017. Use 'FunapiSession.Stop(TransportProtocol)' instead.")]
+        public void Close (TransportProtocol protocol)
+        {
+            Stop(protocol);
         }
 
         public void SendMessage (MessageType msg_type, object message,
@@ -321,7 +337,13 @@ namespace Fun
 
         protected override void onQuit ()
         {
+            lock (state_lock_)
+            {
+                state_ = State.kUnknown;
+            }
+
             stopAllTransports(true);
+            onSessionEvent(SessionEventType.kStopped);
         }
 
 
@@ -395,8 +417,19 @@ namespace Fun
             }
         }
 
-        void onClose ()
+        void onStopped ()
         {
+            if (!Started)
+                return;
+
+            lock (state_lock_)
+            {
+                if (reliable_session_ || wait_redirect_)
+                    state_ = State.kStopped;
+                else
+                    state_ = State.kUnknown;
+            }
+
             if (!wait_redirect_)
             {
                 releaseUpdater();
@@ -408,6 +441,8 @@ namespace Fun
             {
                 expected_responses_.Clear();
             }
+
+            onSessionEvent(SessionEventType.kStopped);
         }
 
 
@@ -639,7 +674,7 @@ namespace Fun
 
         void onRedirectFailed ()
         {
-            Close();
+            Stop();
             onSessionEvent(SessionEventType.kRedirectFailed);
         }
 
@@ -810,23 +845,12 @@ namespace Fun
 
             if (all_stopped)
             {
-                lock (state_lock_)
-                {
-                    if (reliable_session_ || wait_redirect_)
-                        state_ = State.kStopped;
-                    else
-                        state_ = State.kUnknown;
-                }
-
-                event_list.Add(() => onClose());
+                event_list.Add(() => onStopped());
             }
         }
 
         void stopAllTransports (bool force_stop = false)
         {
-            if (!Started)
-                return;
-
             Log("Stopping a network module.");
 
             if (force_stop)
@@ -1420,7 +1444,7 @@ namespace Fun
             {
                 Log("Session timed out. Resetting session id.");
 
-                stopAllTransports();
+                stopAllTransports(true);
                 closeSession();
             }
             else

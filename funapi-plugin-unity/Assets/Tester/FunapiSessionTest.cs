@@ -68,7 +68,7 @@ public class FunapiSessionTest : MonoBehaviour
             return;
         }
 
-        session_.Close();
+        session_.Stop();
         session_ = null;
 
         updateButtonState();
@@ -187,7 +187,7 @@ public class FunapiSessionTest : MonoBehaviour
 
 
     // Please change this address to your server.
-    const string kServerIp = "127.0.0.1";
+    public string kServerIp = "127.0.0.1";
 
     // Member variables.
     FunapiSession session_ = null;
