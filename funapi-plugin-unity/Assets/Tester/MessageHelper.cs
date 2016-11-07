@@ -29,7 +29,13 @@ public class MessageHelper
         message_handler_["_maintenance"] = onMaintenanceMessage;
     }
 
-    public void SendEchoMessage ()
+    public void Clear ()
+    {
+        session_.ReceivedMessageCallback -= onReceivedMessage;
+        session_.ResponseTimeoutCallback -= onResponseTimedOut;
+    }
+
+    public void SendEchoMessage (TransportProtocol protocol = TransportProtocol.kDefault)
     {
         if (!session_.Connected && !session_.ReliableSession)
         {
@@ -44,14 +50,14 @@ public class MessageHelper
             // by changing FunapiMessage.JsonHelper property.
             Dictionary<string, object> message = new Dictionary<string, object>();
             message["message"] = "hello world";
-            session_.SendMessage("echo", message);
+            session_.SendMessage("echo", message, protocol);
         }
         else if (encoding_ == FunEncoding.kProtobuf)
         {
             PbufEchoMessage echo = new PbufEchoMessage();
             echo.msg = "hello proto";
             FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-            session_.SendMessage(MessageType.pbuf_echo, message);
+            session_.SendMessage(MessageType.pbuf_echo, message, protocol);
         }
     }
 

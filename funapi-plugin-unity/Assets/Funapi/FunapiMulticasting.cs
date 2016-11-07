@@ -26,6 +26,11 @@ namespace Fun
             session_.ReceivedMessageCallback += onReceived;
         }
 
+        public void Clear ()
+        {
+            session_.ReceivedMessageCallback -= onReceived;
+        }
+
         public string sender
         {
             set { sender_ = value; }

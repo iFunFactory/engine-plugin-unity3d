@@ -24,8 +24,9 @@ namespace Fun
     public enum SessionEventType
     {
         kOpened,
-        kClosed,
         kChanged,
+        kStopped,
+        kClosed,
         kRedirectStarted,
         kRedirectSucceeded,
         kRedirectFailed
@@ -85,12 +86,12 @@ namespace Fun
             event_list.Add(() => startTransport(protocol));
         }
 
-        public void Close ()
+        public void Stop ()
         {
             stopAllTransports();
         }
 
-        public void Close (TransportProtocol protocol)
+        public void Stop (TransportProtocol protocol)
         {
             Transport transport = getTransport(protocol);
             if (transport == null || mono == null)
@@ -101,6 +102,18 @@ namespace Fun
 #else
             mono.StartCoroutine(() => tryToStopTransport(transport));
 #endif
+        }
+
+        [System.Obsolete("This will be deprecated January 2017. Use 'FunapiSession.Stop()' instead.")]
+        public void Close ()
+        {
+            Stop();
+        }
+
+        [System.Obsolete("This will be deprecated January 2017. Use 'FunapiSession.Stop(TransportProtocol)' instead.")]
+        public void Close (TransportProtocol protocol)
+        {
+            Stop(protocol);
         }
 
         public void SendMessage (MessageType msg_type, object message,
@@ -395,7 +408,7 @@ namespace Fun
             }
         }
 
-        void onClose ()
+        void onStopped ()
         {
             if (!wait_redirect_)
             {
@@ -408,6 +421,8 @@ namespace Fun
             {
                 expected_responses_.Clear();
             }
+
+            onSessionEvent(SessionEventType.kStopped);
         }
 
 
@@ -639,7 +654,7 @@ namespace Fun
 
         void onRedirectFailed ()
         {
-            Close();
+            Stop();
             onSessionEvent(SessionEventType.kRedirectFailed);
         }
 
@@ -818,7 +833,7 @@ namespace Fun
                         state_ = State.kUnknown;
                 }
 
-                event_list.Add(() => onClose());
+                event_list.Add(() => onStopped());
             }
         }
 

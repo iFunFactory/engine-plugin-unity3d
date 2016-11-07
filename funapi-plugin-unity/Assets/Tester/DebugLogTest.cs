@@ -66,7 +66,7 @@ public class DebugLogTest : MonoBehaviour
 
     public void OnDisconnect ()
     {
-        session_.Close();
+        session_.Stop();
     }
 
     public void OnSendMessage ()
