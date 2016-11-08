@@ -156,6 +156,8 @@ namespace Fun
             stream.Flush();
             stream.Close();
 
+            Log("Logs are saved.\n{0}", path);
+
             ClearLogBuffer();
         }
 

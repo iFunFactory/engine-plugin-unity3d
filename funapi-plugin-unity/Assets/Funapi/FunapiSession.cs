@@ -86,6 +86,17 @@ namespace Fun
             event_list.Add(() => startTransport(protocol));
         }
 
+        public void Reconnect ()
+        {
+            lock (transports_lock_)
+            {
+                foreach (TransportProtocol protocol in transports_.Keys)
+                {
+                    Connect(protocol);
+                }
+            }
+        }
+
         public void Stop ()
         {
             if (!Started)

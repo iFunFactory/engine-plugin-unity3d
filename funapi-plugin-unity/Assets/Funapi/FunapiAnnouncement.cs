@@ -105,7 +105,11 @@ namespace Fun
                     List<object> list = json["list"] as List<object>;
                     if (list == null || list.Count <= 0)
                     {
-                        FunDebug.Log("Invalid announcement list. list: {0}", list);
+                        if (list == null)
+                            FunDebug.Log("Invalid announcement list. list: {0}", list);
+                        else if (list.Count <= 0)
+                            FunDebug.Log("There are no announcements.");
+
                         onResult(AnnounceResult.kListIsNullOrEmpty);
                         return;
                     }
