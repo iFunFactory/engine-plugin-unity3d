@@ -99,6 +99,9 @@ namespace Fun
 
         public void Stop ()
         {
+            if (!Started)
+                return;
+
             stopAllTransports();
         }
 
@@ -345,7 +348,13 @@ namespace Fun
 
         protected override void onQuit ()
         {
+            lock (state_lock_)
+            {
+                state_ = State.kUnknown;
+            }
+
             stopAllTransports(true);
+            onSessionEvent(SessionEventType.kStopped);
         }
 
 
@@ -421,6 +430,17 @@ namespace Fun
 
         void onStopped ()
         {
+            if (!Started)
+                return;
+
+            lock (state_lock_)
+            {
+                if (reliable_session_ || wait_redirect_)
+                    state_ = State.kStopped;
+                else
+                    state_ = State.kUnknown;
+            }
+
             if (!wait_redirect_)
             {
                 releaseUpdater();
@@ -836,23 +856,12 @@ namespace Fun
 
             if (all_stopped)
             {
-                lock (state_lock_)
-                {
-                    if (reliable_session_ || wait_redirect_)
-                        state_ = State.kStopped;
-                    else
-                        state_ = State.kUnknown;
-                }
-
                 event_list.Add(() => onStopped());
             }
         }
 
         void stopAllTransports (bool force_stop = false)
         {
-            if (!Started)
-                return;
-
             Log("Stopping a network module.");
 
             if (force_stop)
@@ -1446,7 +1455,7 @@ namespace Fun
             {
                 Log("Session timed out. Resetting session id.");
 
-                stopAllTransports();
+                stopAllTransports(true);
                 closeSession();
             }
             else
