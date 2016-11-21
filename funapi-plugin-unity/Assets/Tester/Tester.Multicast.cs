@@ -83,10 +83,9 @@ public partial class Tester
                 PbufHelloMessage hello_msg = new PbufHelloMessage();
                 hello_msg.message = "multicast test message";
 
-                FunMulticastMessage mcast_msg = new FunMulticastMessage();
+                FunMulticastMessage mcast_msg = FunapiMessage.CreateFunMessage(hello_msg, MulticastMessageType.pbuf_hello);
                 mcast_msg.channel = kChannelName;
                 mcast_msg.bounce = true;
-                Extensible.AppendValue(mcast_msg, (int)MulticastMessageType.pbuf_hello, hello_msg);
 
                 multicast_.SendToChannel(mcast_msg);
             }
@@ -109,8 +108,8 @@ public partial class Tester
                 FunMulticastMessage mcast_msg = body as FunMulticastMessage;
                 FunDebug.Assert(channel_id == mcast_msg.channel);
 
-                PbufHelloMessage hello_msg = Extensible.GetValue<PbufHelloMessage>(
-                    mcast_msg, (int)MulticastMessageType.pbuf_hello);
+                object obj = FunapiMessage.GetMessage(mcast_msg, MulticastMessageType.pbuf_hello);
+                PbufHelloMessage hello_msg = obj as PbufHelloMessage;
                 if (hello_msg == null)
                     return;
 
