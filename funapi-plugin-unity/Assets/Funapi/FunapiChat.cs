@@ -81,10 +81,9 @@ namespace Fun
                 FunChatMessage chat_msg = new FunChatMessage ();
                 chat_msg.text = text;
 
-                FunMulticastMessage mcast_msg = new FunMulticastMessage ();
+                FunMulticastMessage mcast_msg = FunapiMessage.CreateFunMessage(chat_msg, MulticastMessageType.chat);
                 mcast_msg.channel = channel_id;
                 mcast_msg.bounce = true;
-                Extensible.AppendValue (mcast_msg, (int)MulticastMessageType.chat, chat_msg);
 
                 SendToChannel(mcast_msg);
             }
@@ -132,7 +131,9 @@ namespace Fun
             {
                 FunDebug.Assert(data is FunMulticastMessage);
                 FunMulticastMessage mcast_msg = data as FunMulticastMessage;
-                FunChatMessage chat_msg = Extensible.GetValue<FunChatMessage>(mcast_msg, (int)MulticastMessageType.chat);
+
+                object obj = FunapiMessage.GetMessage(mcast_msg, MulticastMessageType.chat);
+                FunChatMessage chat_msg = obj as FunChatMessage;
 
                 lock (chat_channel_lock_)
                 {

@@ -10,6 +10,7 @@ using System.IO;
 // protobuf
 using ProtoBuf;
 using funapi.network.fun_message;
+using funapi.service.multicast_message;
 
 
 namespace Fun
@@ -60,6 +61,7 @@ namespace Fun
             set { json_helper_ = value; }
         }
 
+        // For FunMessage
         public static FunMessage CreateFunMessage (object msg, MessageType msg_type)
         {
             if (msg is Enum)
@@ -71,6 +73,31 @@ namespace Fun
         }
 
         public static object GetMessage (FunMessage msg, MessageType msg_type)
+        {
+            object _msg = null;
+            bool success = Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
+                                                  (int)msg_type, DataFormat.Default, true, out _msg);
+            if (!success)
+            {
+                FunDebug.Log("Failed to decode {0} {1}", MessageTable.GetType(msg_type), (int)msg_type);
+                return null;
+            }
+
+            return _msg;
+        }
+
+        // For Multicast messages
+        public static FunMulticastMessage CreateFunMessage (object msg, MulticastMessageType msg_type)
+        {
+            if (msg is Enum)
+                msg = (Int32)msg;
+
+            FunMulticastMessage _msg = new FunMulticastMessage();
+            Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
+            return _msg;
+        }
+
+        public static object GetMessage (FunMulticastMessage msg, MulticastMessageType msg_type)
         {
             object _msg = null;
             bool success = Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
