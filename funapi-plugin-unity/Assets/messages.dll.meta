@@ -1,7 +1,22 @@
 fileFormatVersion: 2
-guid: 0b309d6a7cc604ec38f11353226e4f1b
-MonoAssemblyImporter:
+guid: d8eac417c88824833adae09278901fe5
+PluginImporter:
   serializedVersion: 1
   iconMap: {}
   executionOrder: {}
+  isPreloaded: 0
+  platformData:
+    Any:
+      enabled: 1
+      settings: {}
+    Editor:
+      enabled: 0
+      settings:
+        DefaultValueInitialized: true
+    WindowsStoreApps:
+      enabled: 0
+      settings:
+        CPU: AnyCPU
   userData: 
+  assetBundleName: 
+  assetBundleVariant: 
