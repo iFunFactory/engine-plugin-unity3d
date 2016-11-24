@@ -460,7 +460,7 @@ namespace Fun
         //
         // Session-related functions
         //
-        void initSession()
+        void initSession ()
         {
             session_id_ = "";
 
@@ -1142,7 +1142,7 @@ namespace Fun
             }
         }
 
-        void sendUnsentMessages()
+        void sendUnsentMessages ()
         {
             if (unsent_queue_.Count <= 0)
                 return;

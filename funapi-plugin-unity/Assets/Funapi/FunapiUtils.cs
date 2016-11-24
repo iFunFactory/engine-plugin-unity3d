@@ -121,7 +121,7 @@ namespace Fun
                 Updater(deltaTime_);
             }
 
-            void OnApplicationQuit()
+            void OnApplicationQuit ()
             {
                 OnQuit();
             }

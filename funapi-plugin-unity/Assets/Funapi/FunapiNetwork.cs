@@ -150,7 +150,7 @@ namespace Fun
         }
 
         // Starts FunapiNetwork
-        public void Start()
+        public void Start ()
         {
             if (Started)
             {
@@ -1066,7 +1066,7 @@ namespace Fun
             }
         }
 
-        private void SendUnsentMessages()
+        private void SendUnsentMessages ()
         {
             if (unsent_queue_.Count <= 0)
                 return;
@@ -1320,7 +1320,7 @@ namespace Fun
         //---------------------------------------------------------------------
         // Session-related functions
         //---------------------------------------------------------------------
-        private void InitSession()
+        private void InitSession ()
         {
             session_id_ = "";
 

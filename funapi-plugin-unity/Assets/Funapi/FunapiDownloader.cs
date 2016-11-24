@@ -110,7 +110,7 @@ namespace Fun
             }
         }
 
-        public void StartDownload()
+        public void StartDownload ()
         {
             mutex_.WaitOne();
 
@@ -145,7 +145,7 @@ namespace Fun
             }
         }
 
-        public void ContinueDownload()
+        public void ContinueDownload ()
         {
             mutex_.WaitOne();
 
@@ -167,7 +167,7 @@ namespace Fun
             }
         }
 
-        public void Stop()
+        public void Stop ()
         {
             mutex_.WaitOne();
 

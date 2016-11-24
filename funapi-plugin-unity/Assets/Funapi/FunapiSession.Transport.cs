@@ -319,13 +319,13 @@ namespace Fun
             protected abstract void setAddress (HostAddr addr);
 
             // Creates a socket.
-            protected abstract void onStart();
+            protected abstract void onStart ();
 
             // Closes a socket
             protected abstract void onClose ();
 
             // Sends a packet.
-            protected abstract void wireSend();
+            protected abstract void wireSend ();
 
             // Is able to sending?
             protected virtual bool isSendable
@@ -507,7 +507,7 @@ namespace Fun
                 }
             }
 
-            bool buildingMessages()
+            bool buildingMessages ()
             {
                 FunDebug.Assert(state_ >= State.kConnected);
                 FunDebug.Assert(sending_.Count > 0);
@@ -631,7 +631,7 @@ namespace Fun
                 }
             }
 
-            bool tryToDecodeHeader()
+            bool tryToDecodeHeader ()
             {
                 DebugLog("Trying to decode header fields.");
 
@@ -694,7 +694,7 @@ namespace Fun
                 return -1;
             }
 
-            bool tryToDecodeBody()
+            bool tryToDecodeBody ()
             {
                 // Header version
                 FunDebug.Assert(header_fields_.ContainsKey(kVersionHeaderField));
@@ -1008,7 +1008,7 @@ namespace Fun
             //---------------------------------------------------------------------
             // Transport error
             //---------------------------------------------------------------------
-            protected virtual void onFailure()
+            protected virtual void onFailure ()
             {
                 Log("{0} : onFailure - state: {1}, error: {2}\n{3}\n",
                     convertString(protocol_), state_, last_error_code_, last_error_message_);
@@ -1166,7 +1166,7 @@ namespace Fun
                 Log("TCP transport - {0}:{1}", ip, addr.port);
             }
 
-            protected override void onStart()
+            protected override void onStart ()
             {
                 state_ = State.kConnecting;
                 sock_ = new Socket(ip_af_, SocketType.Stream, ProtocolType.Tcp);
@@ -1187,7 +1187,7 @@ namespace Fun
                 }
             }
 
-            protected override void wireSend()
+            protected override void wireSend ()
             {
                 List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
                 lock (sending_lock_)
@@ -1428,7 +1428,7 @@ namespace Fun
                 Log("UDP transport - {0}:{1}", ip, addr.port);
             }
 
-            protected override void onStart()
+            protected override void onStart ()
             {
                 state_ = State.kConnected;
                 sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
@@ -1647,7 +1647,7 @@ namespace Fun
                 Log("HTTP transport - {0}:{1}", http.host, http.port);
             }
 
-            protected override void onStart()
+            protected override void onStart ()
             {
                 state_ = State.kConnected;
                 str_cookie_ = "";
@@ -1677,7 +1677,7 @@ namespace Fun
                 }
             }
 
-            protected override void wireSend()
+            protected override void wireSend ()
             {
                 DebugLog("Send a Message.");
 
