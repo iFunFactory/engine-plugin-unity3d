@@ -862,6 +862,12 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
+            if (!Started)
+            {
+                Log("The network module already stopped.");
+                return;
+            }
+
             Log("Stopping a network module.");
 
             if (force_stop)
