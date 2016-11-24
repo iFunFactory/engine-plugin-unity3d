@@ -61,7 +61,7 @@ namespace Fun
     // TCP, UDP, and HTTP.
     public abstract class FunapiTransport : FunDebugLog
     {
-        public FunapiTransport()
+        public FunapiTransport ()
         {
             state_ = State.kUnknown;
             protocol_ = TransportProtocol.kDefault;
@@ -73,10 +73,10 @@ namespace Fun
         }
 
         // Start connecting
-        internal abstract void Start();
+        internal abstract void Start ();
 
         // Disconnection
-        internal abstract void Stop();
+        internal abstract void Stop ();
 
         // Check connection
         internal abstract bool Started { get; }
@@ -170,15 +170,6 @@ namespace Fun
             get { return cstate_ == ConnectState.kConnecting ||
                          cstate_ == ConnectState.kReconnecting ||
                          cstate_ == ConnectState.kRedirecting; }
-        }
-
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated Oct 2016. " +
-                         "You can use FunapiMessage.JsonHelper instead of this function.")]
-        public JsonAccessor JsonHelper
-        {
-            get { return FunapiMessage.JsonHelper; }
-            set { FunapiMessage.JsonHelper = value; }
         }
 
         public void AddServerList (List<HostAddr> list)
@@ -781,7 +772,7 @@ namespace Fun
     public abstract class FunapiDecodedTransport : FunapiTransport
     {
         // Starts a socket.
-        internal override void Start()
+        internal override void Start ()
         {
             try
             {
@@ -828,13 +819,13 @@ namespace Fun
         }
 
         // Create a socket.
-        protected abstract void StartConnect();
+        protected abstract void StartConnect ();
 
         // Sends a packet.
-        protected abstract void WireSend();
+        protected abstract void WireSend ();
 
         // Stops a socket.
-        internal override void Stop()
+        internal override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1009,7 +1000,7 @@ namespace Fun
             }
         }
 
-        internal bool TryToDecodeHeader()
+        internal bool TryToDecodeHeader ()
         {
             DebugLog("Trying to decode header fields.");
 
@@ -1046,7 +1037,7 @@ namespace Fun
             return false;
         }
 
-        internal bool TryToDecodeBody()
+        internal bool TryToDecodeBody ()
         {
             // Header version
             FunDebug.Assert(header_fields_.ContainsKey(kVersionHeaderField));
@@ -1184,7 +1175,7 @@ namespace Fun
         }
 
         // Stops a socket.
-        internal override void Stop()
+        internal override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1217,7 +1208,7 @@ namespace Fun
         }
 
         // Create a socket.
-        protected override void StartConnect()
+        protected override void StartConnect ()
         {
             state_ = State.kConnecting;
             sock_ = new Socket(ip_af_, SocketType.Stream, ProtocolType.Tcp);
@@ -1247,7 +1238,7 @@ namespace Fun
             Log("TCP transport - {0}:{1}", ip, addr.port);
         }
 
-        protected override void WireSend()
+        protected override void WireSend ()
         {
             List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
             lock (sending_lock_)
@@ -1261,7 +1252,7 @@ namespace Fun
             sock_.BeginSend(list, 0, new AsyncCallback(this.SendBytesCb), this);
         }
 
-        private void StartCb(IAsyncResult ar)
+        private void StartCb (IAsyncResult ar)
         {
             DebugLog("StartCb called.");
 
@@ -1311,7 +1302,7 @@ namespace Fun
             }
         }
 
-        private void SendBytesCb(IAsyncResult ar)
+        private void SendBytesCb (IAsyncResult ar)
         {
             DebugLog("SendBytesCb called.");
 
@@ -1389,7 +1380,7 @@ namespace Fun
             }
         }
 
-        private void ReceiveBytesCb(IAsyncResult ar)
+        private void ReceiveBytesCb (IAsyncResult ar)
         {
             DebugLog("ReceiveBytesCb called.");
 
@@ -1489,7 +1480,7 @@ namespace Fun
         }
 
         // Stops a socket.
-        internal override void Stop()
+        internal override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1514,7 +1505,7 @@ namespace Fun
         }
 
         // Create a socket.
-        protected override void StartConnect()
+        protected override void StartConnect ()
         {
             state_ = State.kConnected;
             sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
@@ -1553,7 +1544,7 @@ namespace Fun
         }
 
         // Send a packet.
-        protected override void WireSend()
+        protected override void WireSend ()
         {
             int offset = 0;
 
@@ -1589,7 +1580,7 @@ namespace Fun
             }
         }
 
-        private void SendBytesCb(IAsyncResult ar)
+        private void SendBytesCb (IAsyncResult ar)
         {
             DebugLog("SendBytesCb called.");
 
@@ -1641,7 +1632,7 @@ namespace Fun
             }
         }
 
-        private void ReceiveBytesCb(IAsyncResult ar)
+        private void ReceiveBytesCb (IAsyncResult ar)
         {
             DebugLog("ReceiveBytesCb called.");
 
@@ -1727,7 +1718,7 @@ namespace Fun
     // HTTP transport layer
 	public class FunapiHttpTransport : FunapiDecodedTransport
     {
-        public FunapiHttpTransport(string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
+        public FunapiHttpTransport (string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
         {
             protocol_ = TransportProtocol.kHttp;
             str_protocol = "Http";
@@ -1748,7 +1739,7 @@ namespace Fun
 
         internal MonoBehaviour mono { set; private get; }
 
-        internal override void Stop()
+        internal override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1780,7 +1771,7 @@ namespace Fun
             set; get;
         }
 
-        protected override void StartConnect()
+        protected override void StartConnect ()
         {
             state_ = State.kConnected;
             str_cookie_ = "";
@@ -1816,7 +1807,7 @@ namespace Fun
             }
         }
 
-        protected override void WireSend()
+        protected override void WireSend ()
         {
             DebugLog("Send a Message.");
 

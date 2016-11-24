@@ -150,7 +150,7 @@ namespace Fun
         }
 
         // Starts FunapiNetwork
-        public void Start()
+        public void Start ()
         {
             if (Started)
             {
@@ -1064,7 +1064,7 @@ namespace Fun
             }
         }
 
-        private void SendUnsentMessages()
+        private void SendUnsentMessages ()
         {
             if (unsent_queue_.Count <= 0)
                 return;
@@ -1318,7 +1318,7 @@ namespace Fun
         //---------------------------------------------------------------------
         // Session-related functions
         //---------------------------------------------------------------------
-        private void InitSession()
+        private void InitSession ()
         {
             session_id_ = "";
 
@@ -1435,44 +1435,6 @@ namespace Fun
             Log("Session timed out. Resetting my session id. The server will send me another one next time.");
 
             Stop();
-        }
-
-
-        //---------------------------------------------------------------------
-        // Ping-related functions
-        //---------------------------------------------------------------------
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated Oct 2016. You can use FunapiTransport.EnablePing property.")]
-        public bool EnablePing
-        {
-            get
-            {
-                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
-                if (transport != null)
-                    return transport.EnablePing;
-
-                return false;
-            }
-            set
-            {
-                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
-                if (transport != null)
-                    transport.EnablePing = value;
-            }
-        }
-
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated Oct 2016. You can use FunapiTransport.PingTime property.")]
-        public int PingTime
-        {
-            get
-            {
-                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
-                if (transport != null)
-                    return transport.PingTime;
-
-                return 0;
-            }
         }
 
 

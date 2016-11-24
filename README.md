@@ -35,7 +35,18 @@ Funapi plugin unity
 필요한 옵션 값들을 수정할 수 있습니다. 서버 주소가 로컬로 되어 있으니 서버가 로컬에 있지 않다면
 *Server Address* 값을 수정해 주세요.
 
-서버를 띄우고 실행을 하면 여러가지 기능들을 테스트해볼 수 있습니다.
+서버를 띄우고 실행을 하면 여러가지 기능들을 테스트해 볼 수 있습니다.
+테스트 코드에서는 서버에 TCP, UDP, HTTP 포트가 모두 열려 있다는 가정하에 작성되어 있습니다.
+포트 번호는 코드에 하드코딩되어 있는데 아래와 같습니다.
+
+```csharp
+  if (protocol == TransportProtocol.kTcp)
+      port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8022);
+  else if (protocol == TransportProtocol.kUdp)
+      port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
+  else if (protocol == TransportProtocol.kHttp)
+      port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
+```
 
 서버를 설치하고 아무것도 변경하지 않았다면 기본적으로 TCP, HTTP의 JSON 포트만 열려 있습니다.
 다른 프로토콜과 메시지 타입을 사용하려면 서버와 클라이언트의 포트 번호를 맞춰서 변경하고 테스트하면 됩니다.

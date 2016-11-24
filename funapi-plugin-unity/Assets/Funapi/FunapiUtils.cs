@@ -17,7 +17,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 186;
+        public static readonly int kPluginVersion = 187;
     }
 
 
@@ -121,7 +121,7 @@ namespace Fun
                 Updater(deltaTime_);
             }
 
-            void OnApplicationQuit()
+            void OnApplicationQuit ()
             {
                 OnQuit();
             }

@@ -460,7 +460,7 @@ namespace Fun
         //
         // Session-related functions
         //
-        void initSession()
+        void initSession ()
         {
             session_id_ = "";
 
@@ -862,6 +862,12 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
+            if (!Started)
+            {
+                Log("The network module already stopped.");
+                return;
+            }
+
             Log("Stopping a network module.");
 
             if (force_stop)
@@ -1142,7 +1148,7 @@ namespace Fun
             }
         }
 
-        void sendUnsentMessages()
+        void sendUnsentMessages ()
         {
             if (unsent_queue_.Count <= 0)
                 return;

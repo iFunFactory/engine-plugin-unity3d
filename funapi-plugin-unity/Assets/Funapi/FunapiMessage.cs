@@ -87,7 +87,7 @@ namespace Fun
         }
 
         // For Multicast messages
-        public static FunMulticastMessage CreateFunMessage (object msg, MulticastMessageType msg_type)
+        public static FunMulticastMessage CreateMulticastMessage (object msg, MulticastMessageType msg_type)
         {
             if (msg is Enum)
                 msg = (Int32)msg;
@@ -97,7 +97,7 @@ namespace Fun
             return _msg;
         }
 
-        public static object GetMessage (FunMulticastMessage msg, MulticastMessageType msg_type)
+        public static object GetMulticastMessage (FunMulticastMessage msg, MulticastMessageType msg_type)
         {
             object _msg = null;
             bool success = Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
