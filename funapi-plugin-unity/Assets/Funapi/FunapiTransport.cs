@@ -176,15 +176,6 @@ namespace Fun
                          cstate_ == ConnectState.kRedirecting; }
         }
 
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated Oct 2016. " +
-                         "You can use FunapiMessage.JsonHelper instead of this function.")]
-        public JsonAccessor JsonHelper
-        {
-            get { return FunapiMessage.JsonHelper; }
-            set { FunapiMessage.JsonHelper = value; }
-        }
-
         public void AddServerList (List<HostAddr> list)
         {
             if (list == null || list.Count <= 0)

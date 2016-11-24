@@ -1441,44 +1441,6 @@ namespace Fun
 
 
         //---------------------------------------------------------------------
-        // Ping-related functions
-        //---------------------------------------------------------------------
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated Oct 2016. You can use FunapiTransport.EnablePing property.")]
-        public bool EnablePing
-        {
-            get
-            {
-                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
-                if (transport != null)
-                    return transport.EnablePing;
-
-                return false;
-            }
-            set
-            {
-                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
-                if (transport != null)
-                    transport.EnablePing = value;
-            }
-        }
-
-        // This function is no longer used.
-        [System.Obsolete("This will be deprecated Oct 2016. You can use FunapiTransport.PingTime property.")]
-        public int PingTime
-        {
-            get
-            {
-                FunapiTransport transport = GetTransport(TransportProtocol.kTcp);
-                if (transport != null)
-                    return transport.PingTime;
-
-                return 0;
-            }
-        }
-
-
-        //---------------------------------------------------------------------
         //---------------------------------------------------------------------
         public ErrorCode LastErrorCode (TransportProtocol protocol)
         {
