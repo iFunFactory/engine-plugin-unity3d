@@ -14,12 +14,14 @@ public partial class Tester
 {
     public class Announce
     {
-        public void Start (string url)
+        public void Start (string host_name)
         {
             announcement_ = new FunapiAnnouncement();
             announcement_.ResultCallback += onAnnouncementResult;
 
+            string url = string.Format("http://{0}:{1}", host_name, 8080);
             announcement_.Init(url);
+
             announcement_.UpdateList(5);
         }
 

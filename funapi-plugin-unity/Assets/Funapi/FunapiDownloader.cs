@@ -52,15 +52,15 @@ namespace Fun
         }
 
         // Start downloading
-        public void GetDownloadList (string hostname_or_ip, UInt16 port, bool https, string target_path)
+        public void GetDownloadList (string hostname_or_ip, UInt16 port, bool https, string target_path, string file_path = "")
         {
             string url = string.Format("{0}://{1}:{2}",
                                        (https ? "https" : "http"), hostname_or_ip, port);
 
-            GetDownloadList(url, target_path);
+            GetDownloadList(url, target_path, file_path);
         }
 
-        public void GetDownloadList (string url, string target_path)
+        public void GetDownloadList (string url, string target_path, string file_path = "")
         {
             mutex_.WaitOne();
 
@@ -98,11 +98,23 @@ namespace Fun
                 total_download_count_ = 0;
                 total_download_size_ = 0;
 
+                if (host_url.ToLower().Contains("https"))
+                    MozRoots.LoadRootCertificates();
+
                 createUpdater();
                 loadCachedList();
 
                 // Gets list file
-                downloadListFile(host_url_);
+                string request_url = host_url_;
+                if (!string.IsNullOrEmpty(file_path))
+                {
+                    if (file_path[0] == '/')
+                        file_path = file_path.Substring(1);
+
+                    request_url += file_path;
+                }
+
+                downloadListFile(request_url);
             }
             finally
             {

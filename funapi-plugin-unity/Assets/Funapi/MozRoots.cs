@@ -12,6 +12,7 @@ using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.IO;
 using System.Net;
+using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using UnityEngine;
@@ -79,6 +80,7 @@ namespace Fun
 
         public static void LoadRootCertificates ()
         {
+#if !NO_UNITY
             if (trustedCerificates != null)
                 return;
 
@@ -140,9 +142,12 @@ namespace Fun
             {
                 FunDebug.LogError("Load certificates file failed. {0}", e.Message);
             }
+#endif
+
+            ServicePointManager.ServerCertificateValidationCallback = certificateValidationCallback;
         }
 
-        public static bool CheckRootCertificate (X509Chain chain)
+        static bool checkRootCertificate (X509Chain chain)
         {
             if (trustedCerificates == null)
                 return false;
@@ -175,6 +180,47 @@ namespace Fun
         {
             byte[] rawdata = decodeOctalString(s);
             return new X509Certificate2(rawdata);
+        }
+
+        static bool certificateValidationCallback (System.Object sender, X509Certificate certificate,
+                                                   X509Chain chain, SslPolicyErrors sslPolicyErrors)
+        {
+#if !NO_UNITY
+            if (sslPolicyErrors == SslPolicyErrors.None)
+                return true;
+
+            for (int i = 0; i < chain.ChainStatus.Length; ++i)
+            {
+                if (chain.ChainStatus[i].Status == X509ChainStatusFlags.RevocationStatusUnknown)
+                {
+                    continue;
+                }
+                else if (chain.ChainStatus[i].Status == X509ChainStatusFlags.UntrustedRoot)
+                {
+                    if (!checkRootCertificate(chain))
+                    {
+                        FunDebug.LogWarning("[MozRoots] Untrusted Root chain - {0}", certificate);
+                        return false;
+                    }
+                    else
+                        continue;
+                }
+                else
+                {
+                    chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EntireChain;
+                    chain.ChainPolicy.RevocationMode = X509RevocationMode.Online;
+                    chain.ChainPolicy.UrlRetrievalTimeout = new TimeSpan(0, 1, 0);
+                    chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+                    if (!chain.Build((X509Certificate2)certificate))
+                    {
+                        FunDebug.LogWarning("[MozRoots] Invalid Certificate - {0}", certificate);
+                        return false;
+                    }
+                }
+            }
+#endif
+
+            return true;
         }
 
 
