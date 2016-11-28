@@ -135,8 +135,7 @@ public partial class Tester : MonoBehaviour
             dashLog("Finished");
         };
 
-        string url = string.Format("http://{0}:{1}", serverAddress, 8080);
-        announce.Start(url);
+        announce.Start(serverAddress);
     }
 
     public void OnDownloadTest ()
@@ -149,8 +148,7 @@ public partial class Tester : MonoBehaviour
             dashLog("Finished");
         };
 
-        string url = string.Format("http://{0}:{1}", serverAddress, 8020);
-        download.Start(url);
+        download.Start(serverAddress);
     }
 
     public void OnDebugLogTest ()

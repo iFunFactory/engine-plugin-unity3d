@@ -19,7 +19,7 @@ public partial class Tester
             button_ = GameObject.Find("ButtonDownloadTest").GetComponent<Button>();
         }
 
-        public void Start (string url)
+        public void Start (string host_name)
         {
             button_.interactable = false;
 
@@ -29,6 +29,7 @@ public partial class Tester
             downloader_.UpdateCallback += onDownloadUpdate;
             downloader_.FinishedCallback += onDownloadFinished;
 
+            string url = string.Format("http://{0}:{1}/", host_name, 8020);
             downloader_.GetDownloadList(url, FunapiUtils.GetLocalDataPath);
         }
 
