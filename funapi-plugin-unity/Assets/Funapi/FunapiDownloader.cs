@@ -568,11 +568,12 @@ namespace Fun
                     File.Delete(file_path);
 
                 // Requests a file.
-                FunDebug.Log("Download file - {0}", file_path);
+                string request_url = host_url_ + info.path;
+                FunDebug.Log("Download a file - {0}\nSave to {1}\n", request_url, file_path);
                 cur_download_path_ = Path.GetDirectoryName(file_path);
                 cur_download_path_ += "/" + Path.GetRandomFileName();
 
-                web_client_.DownloadFileAsync(new Uri(host_url_ + info.path), cur_download_path_, info);
+                web_client_.DownloadFileAsync(new Uri(request_url), cur_download_path_, info);
             }
         }
 
