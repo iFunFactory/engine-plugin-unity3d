@@ -639,7 +639,7 @@ namespace Fun
 
             lock (state_lock_)
             {
-                if (session_id_.Length > 0)
+                if (session_id_.IsValid)
                 {
                     state_ = State.kConnected;
                     response_timer_ = 0f;
@@ -799,7 +799,7 @@ namespace Fun
             if (last_received_.AddSeconds(kFunapiSessionTimeout) < DateTime.Now)
             {
                 Log("Session is too stale. The server might have invalidated my session. Resetting.");
-                session_id_ = "";
+                session_id_.Clear();
             }
 
             FunapiTransport transport = GetTransport(protocol);
@@ -819,10 +819,8 @@ namespace Fun
                     FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kMsgTypeBodyField, msg_type);
 
                     // Encodes a session id, if any.
-                    if (session_id_.Length > 0)
-                    {
-                        FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kSessionIdBodyField, session_id_);
-                    }
+                    if (session_id_.IsValid)
+                        FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kSessionIdBodyField, (string)session_id_);
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -847,10 +845,8 @@ namespace Fun
                     pbuf.msgtype = msg_type;
 
                     // Encodes a session id, if any.
-                    if (session_id_.Length > 0)
-                    {
-                        pbuf.sid = session_id_;
-                    }
+                    if (session_id_.IsValid)
+                        pbuf.sid = (byte[])session_id_;
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -966,15 +962,13 @@ namespace Fun
             }
 
             string msg_type = msg.msg_type;
-            string session_id = "";
 
             if (transport.Encoding == FunEncoding.kJson)
             {
                 try
                 {
                     FunDebug.Assert(FunapiMessage.JsonHelper.GetStringField(message, kSessionIdBodyField) is string);
-                    string session_id_node = FunapiMessage.JsonHelper.GetStringField(message, kSessionIdBodyField);
-                    session_id = session_id_node;
+                    string session_id = FunapiMessage.JsonHelper.GetStringField(message, kSessionIdBodyField);
                     FunapiMessage.JsonHelper.RemoveField(message, kSessionIdBodyField);
 
                     PrepareSession(session_id);
@@ -1012,8 +1006,7 @@ namespace Fun
 
                 try
                 {
-                    session_id = funmsg.sid;
-                    PrepareSession(session_id);
+                    PrepareSession(funmsg.sid);
 
                     if (session_reliability_ && msg.protocol == TransportProtocol.kTcp)
                     {
@@ -1057,7 +1050,7 @@ namespace Fun
 
             if (!message_handlers_.ContainsKey(msg_type))
             {
-                if (session_id_.Length > 0 && transport.state == FunapiTransport.State.kWaitForAck)
+                if (session_id_.IsValid && transport.state == FunapiTransport.State.kWaitForAck)
                 {
                     SetTransportStarted(transport);
                 }
@@ -1091,8 +1084,8 @@ namespace Fun
                     // Encodes a messsage type
                     FunapiMessage.JsonHelper.SetStringField(json, kMsgTypeBodyField, msg.msg_type);
 
-                    if (session_id_.Length > 0)
-                        FunapiMessage.JsonHelper.SetStringField(json, kSessionIdBodyField, session_id_);
+                    if (session_id_.IsValid)
+                        FunapiMessage.JsonHelper.SetStringField(json, kSessionIdBodyField, (string)session_id_);
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -1114,8 +1107,8 @@ namespace Fun
                     FunMessage pbuf = msg.message as FunMessage;
                     pbuf.msgtype = msg.msg_type;
 
-                    if (session_id_.Length > 0)
-                        pbuf.sid = session_id_;
+                    if (session_id_.IsValid)
+                        pbuf.sid = (byte[])session_id_;
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -1166,14 +1159,14 @@ namespace Fun
             if (transport.Encoding == FunEncoding.kJson)
             {
                 object ack_msg = FunapiMessage.Deserialize("{}");
-                FunapiMessage.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
+                FunapiMessage.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, (string)session_id_);
                 FunapiMessage.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.Protocol, "", ack_msg));
             }
             else if (transport.Encoding == FunEncoding.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
-                ack_msg.sid = session_id_;
+                ack_msg.sid = (byte[])session_id_;
                 ack_msg.ack = ack;
                 transport.SendMessage(new FunapiMessage(transport.Protocol, "", ack_msg));
             }
@@ -1320,7 +1313,7 @@ namespace Fun
         //---------------------------------------------------------------------
         private void InitSession ()
         {
-            session_id_ = "";
+            session_id_.Clear();
 
             if (session_reliability_)
             {
@@ -1346,37 +1339,42 @@ namespace Fun
             return 0;
         }
 
-        private void PrepareSession (string session_id)
+        private void PrepareSession (object session_id)
         {
-            if (session_id_.Length == 0)
+            if (!session_id_.IsValid)
             {
-                Log("New session id: {0}", session_id);
-                OpenSession(session_id);
-                return;
+                session_id_.SetId(session_id);
+                Log("New session id: {0}", (string)session_id_);
+
+                OpenSession();
             }
-
-            if (session_id_ != session_id)
+            else if (session_id_ != session_id)
             {
-                Log("Session id changed: {0} => {1}", session_id_, session_id);
+                if (session_id is byte[] && session_id_.IsStringArray &&
+                    (session_id as byte[]).Length == SessionId.kArrayLength)
+                {
+                    session_id_.SetId(session_id);
+                }
+                else
+                {
+                    Log("Session id changed: {0} => {1}", (string)session_id_, SessionId.ToString(session_id));
 
-                session_id_ = session_id;
+                    session_id_.SetId(session_id);
 
-                if (OnSessionInitiated != null)
-                    OnSessionInitiated(session_id_);
+                    if (OnSessionInitiated != null)
+                        OnSessionInitiated((string)session_id_);
+                }
             }
         }
 
-        private void OpenSession (string session_id)
+        private void OpenSession ()
         {
-            FunDebug.Assert(session_id_.Length == 0);
-
             lock (state_lock_)
             {
                 state_ = State.kConnected;
                 response_timer_ = 0f;
             }
 
-            session_id_ = session_id;
             first_receiving_ = true;
 
             lock (transports_lock_)
@@ -1391,7 +1389,7 @@ namespace Fun
             }
 
             if (OnSessionInitiated != null)
-                OnSessionInitiated(session_id_);
+                OnSessionInitiated((string)session_id_);
 
             if (unsent_queue_.Count > 0)
             {
@@ -1416,7 +1414,7 @@ namespace Fun
                 }
             }
 
-            if (session_id_.Length == 0)
+            if (!session_id_.IsValid)
                 return;
 
             InitSession();
@@ -1516,7 +1514,7 @@ namespace Fun
 
         // Member variables.
         private State state_;
-        private string session_id_ = "";
+        private SessionId session_id_ = new SessionId();
         private object state_lock_ = new object();
         private float response_timer_ = 0f;
         private bool stop_with_clear_ = false;

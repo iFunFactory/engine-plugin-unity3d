@@ -17,7 +17,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 189;
+        public static readonly int kPluginVersion = 190;
     }
 
 
@@ -368,6 +368,38 @@ namespace Fun
 
     public class FunapiUtils
     {
+        public static string BytesToHex (byte[] array)
+        {
+            string hex = "";
+            foreach (byte n in array)
+                hex += n.ToString("x2");
+
+            return hex;
+        }
+
+        public static byte[] HexToBytes (string hex)
+        {
+            byte[] array = new byte[hex.Length / 2];
+            for (int i = 0; i < array.Length; ++i)
+                array[i] = (byte)Convert.ToByte(hex.Substring(i * 2, 2), 16);
+
+            return array;
+        }
+
+        public static bool EqualsBytes (byte[] a, byte[] b)
+        {
+            if (a == null || b == null || a.Length != b.Length)
+                return false;
+
+            for (int i = 0; i < a.Length; ++i)
+            {
+                if (a[i] != b[i])
+                    return false;
+            }
+
+            return true;
+        }
+
         // Gets assets path
         public static string GetAssetsPath
         {
