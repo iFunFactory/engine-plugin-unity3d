@@ -58,7 +58,7 @@ namespace Fun
                     read_bytes = stream.Read(buffer, 0, length);
                     md5.TransformFinalBlock(buffer, 0, read_bytes);
 
-                    md5hash = makeHashString(md5.Hash);
+                    md5hash = FunapiUtils.BytesToHex(md5.Hash);
                     if (md5hash != file.hash_front || length == stream.Length)
                     {
                         stream.Close();
@@ -120,18 +120,9 @@ namespace Fun
 
             stream.Close();
 
-            md5hash = makeHashString(md5.Hash);
+            md5hash = FunapiUtils.BytesToHex(md5.Hash);
             if (on_result != null)
                 on_result(path, file, md5hash == file.hash);
-        }
-
-        static string makeHashString (byte[] hash)
-        {
-            string md5hash = "";
-            foreach (byte n in hash)
-                md5hash += n.ToString("x2");
-
-            return md5hash;
         }
 
 

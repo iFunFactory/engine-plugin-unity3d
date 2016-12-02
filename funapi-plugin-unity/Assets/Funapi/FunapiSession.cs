@@ -161,9 +161,9 @@ namespace Fun
                     json_helper_.SetStringField(fun_msg.message, kMessageTypeField, msg_type);
 
                     // Encodes a session id, if any.
-                    if (session_id_.Length > 0)
+                    if (session_id_.IsValid)
                     {
-                        json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
+                        json_helper_.SetStringField(fun_msg.message, kSessionIdField, (string)session_id_);
                     }
 
                     if (reliable_transport || sending_sequence)
@@ -191,10 +191,8 @@ namespace Fun
                     pbuf.msgtype = msg_type;
 
                     // Encodes a session id, if any.
-                    if (session_id_.Length > 0)
-                    {
-                        pbuf.sid = session_id_;
-                    }
+                    if (session_id_.IsValid)
+                        pbuf.sid = (byte[])session_id_;
 
                     if (reliable_transport || sending_sequence)
                     {
@@ -462,7 +460,7 @@ namespace Fun
         //
         void initSession ()
         {
-            session_id_ = "";
+            session_id_.Clear();
 
             if (reliable_session_)
             {
@@ -475,32 +473,39 @@ namespace Fun
             http_seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
         }
 
-        void setSessionId (string session_id)
+        void setSessionId (object session_id)
         {
-            if (session_id_.Length == 0)
+            if (!session_id_.IsValid)
             {
-                Log("New session id: {0}", session_id);
-                openSession(session_id);
-                onSessionEvent(SessionEventType.kOpened);
+                session_id_.SetId(session_id);
+                Log("New session id: {0}", (string)session_id_);
+
+                onSessionOpened();
             }
-
-            if (session_id_ != session_id)
+            else if (session_id_ != session_id)
             {
-                Log("Session id changed: {0} => {1}", session_id_, session_id);
+                if (session_id is byte[] && session_id_.IsStringArray &&
+                    (session_id as byte[]).Length == SessionId.kArrayLength)
+                {
+                    session_id_.SetId(session_id);
+                }
+                else
+                {
+                    Log("Session id changed: {0} => {1}", (string)session_id_, SessionId.ToString(session_id));
 
-                session_id_ = session_id;
-                onSessionEvent(SessionEventType.kChanged);
+                    session_id_.SetId(session_id);
+                    onSessionEvent(SessionEventType.kChanged);
+                }
             }
         }
 
-        void openSession (string session_id)
+        void onSessionOpened ()
         {
             lock (state_lock_)
             {
                 state_ = State.kConnected;
             }
 
-            session_id_ = session_id;
             first_receiving_ = true;
 
             lock (transports_lock_)
@@ -518,9 +523,11 @@ namespace Fun
             {
                 sendUnsentMessages();
             }
+
+            onSessionEvent(SessionEventType.kOpened);
         }
 
-        void closeSession ()
+        void onSessionClosed ()
         {
             unsent_queue_.Clear();
 
@@ -532,7 +539,7 @@ namespace Fun
                 }
             }
 
-            if (session_id_.Length == 0)
+            if (!session_id_.IsValid)
                 return;
 
             onSessionEvent(SessionEventType.kClosed);
@@ -551,7 +558,7 @@ namespace Fun
             Log("EVENT: Session ({0}).", type);
 
             if (SessionEventCallback != null)
-                SessionEventCallback(type, session_id_);
+                SessionEventCallback(type, (string)session_id_);
         }
 
 
@@ -568,7 +575,7 @@ namespace Fun
 
             // Stopping all.
             stopAllTransports(true);
-            closeSession();
+            onSessionClosed();
 
 #if !NO_UNITY
             mono.StartCoroutine(tryToRedirect(list));
@@ -668,7 +675,7 @@ namespace Fun
             {
                 object msg = FunapiMessage.Deserialize("{}");
                 json_helper_.SetStringField(msg, kMessageTypeField, kRedirectConnectType);
-                json_helper_.SetStringField(msg, kSessionIdField, session_id_);
+                json_helper_.SetStringField(msg, kSessionIdField, (string)session_id_);
                 json_helper_.SetStringField(msg, "token", token);
                 SendMessage(kRedirectConnectType, msg, transport.protocol);
             }
@@ -678,7 +685,7 @@ namespace Fun
                 msg.token = token;
                 FunMessage funmsg = FunapiMessage.CreateFunMessage(msg, MessageType._cs_redirect_connect);
                 funmsg.msgtype = kRedirectConnectType;
-                funmsg.sid = session_id_;
+                funmsg.sid = (byte[])session_id_;
                 SendMessage(kRedirectConnectType, funmsg, transport.protocol);
             }
         }
@@ -1023,7 +1030,7 @@ namespace Fun
 
             lock (state_lock_)
             {
-                if (session_id_.Length > 0)
+                if (session_id_.IsValid)
                 {
                     state_ = State.kConnected;
 
@@ -1135,14 +1142,14 @@ namespace Fun
             if (transport.encoding == FunEncoding.kJson)
             {
                 object ack_msg = FunapiMessage.Deserialize("{}");
-                json_helper_.SetStringField(ack_msg, kSessionIdField, session_id_);
+                json_helper_.SetStringField(ack_msg, kSessionIdField, (string)session_id_);
                 json_helper_.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
-                ack_msg.sid = session_id_;
+                ack_msg.sid = (byte[])session_id_;
                 ack_msg.ack = ack;
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
@@ -1175,8 +1182,8 @@ namespace Fun
                     // Encodes a messsage type
                     json_helper_.SetStringField(json, kMessageTypeField, msg.msg_type);
 
-                    if (session_id_.Length > 0)
-                        json_helper_.SetStringField(json, kSessionIdField, session_id_);
+                    if (session_id_.IsValid)
+                        json_helper_.SetStringField(json, kSessionIdField, (string)session_id_);
 
                     if (reliable_transport || sending_sequence)
                     {
@@ -1200,8 +1207,8 @@ namespace Fun
                     FunMessage pbuf = msg.message as FunMessage;
                     pbuf.msgtype = msg.msg_type;
 
-                    if (session_id_.Length > 0)
-                        pbuf.sid = session_id_;
+                    if (session_id_.IsValid)
+                        pbuf.sid = (byte[])session_id_;
 
                     if (reliable_transport || sending_sequence)
                     {
@@ -1254,13 +1261,12 @@ namespace Fun
                 return;
 
             string msg_type = msg.msg_type;
-            string session_id = "";
 
             if (transport.encoding == FunEncoding.kJson)
             {
                 try
                 {
-                    session_id = json_helper_.GetStringField(message, kSessionIdField);
+                    string session_id = json_helper_.GetStringField(message, kSessionIdField);
                     json_helper_.RemoveField(message, kSessionIdField);
                     setSessionId(session_id);
 
@@ -1295,8 +1301,7 @@ namespace Fun
 
                 try
                 {
-                    session_id = funmsg.sid;
-                    setSessionId(session_id);
+                    setSessionId(funmsg.sid);
 
                     if (isReliableTransport(msg.protocol))
                     {
@@ -1341,7 +1346,7 @@ namespace Fun
                 onProcessMessage(msg_type, message);
             }
 
-            if (transport.state == Transport.State.kWaitForAck && session_id_.Length > 0)
+            if (transport.state == Transport.State.kWaitForAck && session_id_.IsValid)
             {
                 setTransportStarted(transport);
             }
@@ -1462,7 +1467,7 @@ namespace Fun
                 Log("Session timed out. Resetting session id.");
 
                 stopAllTransports(true);
-                closeSession();
+                onSessionClosed();
             }
             else
             {
@@ -1690,7 +1695,7 @@ namespace Fun
         object state_lock_ = new object();
 
         // Session-related variables.
-        string session_id_ = "";
+        SessionId session_id_ = new SessionId();
         bool reliable_session_ = false;
         TransportProtocol first_sending_protocol_;
         static System.Random rnd_ = new System.Random();

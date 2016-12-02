@@ -443,10 +443,10 @@ namespace Fun
             }
         }
 
-        internal void SetEstablish (string session_id)
+        internal void SetEstablish (SessionId sid)
         {
             state_ = State.kEstablished;
-            session_id_ = session_id;
+            session_id_.SetId(sid);
 
             if (EnablePing && PingIntervalSeconds > 0)
             {
@@ -592,7 +592,7 @@ namespace Fun
 
         private void SendPingMessage ()
         {
-            if (session_id_.Length <= 0)
+            if (!session_id_.IsValid)
                 return;
 
             long timestamp = DateTime.Now.Ticks;
@@ -601,7 +601,7 @@ namespace Fun
             {
                 object msg = FunapiMessage.Deserialize("{}");
                 FunapiMessage.JsonHelper.SetStringField(msg, kMsgTypeBodyField, kClientPingMessageType);
-                FunapiMessage.JsonHelper.SetStringField(msg, kSessionIdBodyField, session_id_);
+                FunapiMessage.JsonHelper.SetStringField(msg, kSessionIdBodyField, (string)session_id_);
                 FunapiMessage.JsonHelper.SetIntegerField(msg, kPingTimestampField, timestamp);
                 SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
             }
@@ -611,7 +611,7 @@ namespace Fun
                 ping.timestamp = timestamp;
                 FunMessage msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
                 msg.msgtype = kClientPingMessageType;
-                msg.sid = session_id_;
+                msg.sid = (byte[])session_id_;
                 SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
             }
 
@@ -630,10 +630,10 @@ namespace Fun
             {
                 FunapiMessage.JsonHelper.SetStringField(body, kMsgTypeBodyField, kServerPingMessageType);
 
-                if (session_id_.Length <= 0)
-                    session_id_ = FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField);
+                if (!session_id_.IsValid)
+                    session_id_.SetId(FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField));
 
-                FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
+                FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, (string)session_id_);
 
                 SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, FunapiMessage.JsonHelper.Clone(body)));
             }
@@ -644,8 +644,8 @@ namespace Fun
                 if (obj == null)
                     return;
 
-                if (session_id_.Length <= 0)
-                    session_id_ = msg.sid;
+                if (!session_id_.IsValid)
+                    session_id_.SetId(msg.sid);
 
                 FunPingMessage ping = new FunPingMessage();
                 ping.timestamp = obj.timestamp;
@@ -656,7 +656,7 @@ namespace Fun
 
                 FunMessage send_msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
                 send_msg.msgtype = msg.msgtype;
-                send_msg.sid = session_id_;
+                send_msg.sid = (byte[])session_id_;
 
                 SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, send_msg));
             }
@@ -763,7 +763,7 @@ namespace Fun
 
         // Encoding-serializer-related member variables.
         internal FunEncoding encoding_ = FunEncoding.kNone;
-        internal string session_id_ = "";
+        internal SessionId session_id_ = new SessionId();
 
         // Error-related member variables.
         internal ErrorCode last_error_code_ = ErrorCode.kNone;
@@ -851,7 +851,7 @@ namespace Fun
 
         internal override void SetAbolish ()
         {
-            session_id_ = "";
+            session_id_.Clear();
             pending_.Clear();
         }
 
@@ -2154,7 +2154,7 @@ namespace Fun
         {
             // Request
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-            request.ConnectionGroupName = session_id_;
+            request.ConnectionGroupName = (string)session_id_;
             request.Method = "POST";
             request.ContentType = "application/octet-stream";
             request.ContentLength = body.buffer.Count;
