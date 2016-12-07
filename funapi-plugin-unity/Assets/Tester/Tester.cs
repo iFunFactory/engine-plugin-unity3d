@@ -71,6 +71,7 @@ public partial class Tester : MonoBehaviour
 
     public void OnCreateSession ()
     {
+        GameObject.Find("ServerIP").GetComponent<Text>().text = serverAddress;
         buttons_["create"].interactable = false;
 
         createSession();

@@ -17,7 +17,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 190;
+        public static readonly int kPluginVersion = 191;
     }
 
 
