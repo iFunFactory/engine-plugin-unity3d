@@ -1,5 +1,3 @@
-// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
-//
 // Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
@@ -49,6 +47,9 @@ namespace Fun
         kConnectFailed,
         kSendFailed,
         kReceiveFailed,
+        kEncryptionFailed,
+        kInvalidEncryption,
+        kUnknownEncryption,
         kRequestTimeout,
         kDisconnected,
         kExceptionError
@@ -57,7 +58,7 @@ namespace Fun
 
     // Abstract class to represent Transport used by Funapi
     // TCP, UDP, and HTTP.
-    public abstract class FunapiTransport : FunDebugLog
+    public abstract class FunapiTransport : FunapiEncryptor
     {
         public FunapiTransport ()
         {
@@ -78,6 +79,12 @@ namespace Fun
 
         // Check connection
         internal abstract bool Started { get; }
+
+        // Set Encryption type
+        internal void SetEncryption (EncryptionType encryption)
+        {
+            setEncryption(encryption);
+        }
 
         internal float PingWaitTime
         {
@@ -697,6 +704,7 @@ namespace Fun
         {
             kUnknown = 0,
             kConnecting,
+            kEncryptionHandshaking,
             kConnected,
             kWaitForSessionId,
             kWaitForAck,
@@ -711,6 +719,12 @@ namespace Fun
             kRedirecting,
             kConnected
         };
+
+        internal enum EncryptionMethod
+        {
+            kNone = 0,
+            kIFunEngine1
+        }
 
 
         // constants.
@@ -767,7 +781,7 @@ namespace Fun
 
 
     // Transport class for socket
-    public abstract class FunapiDecodedTransport : FunapiTransport
+    public abstract class FunapiEncryptedTransport : FunapiTransport
     {
         // Starts a socket.
         internal override void Start ()
@@ -860,30 +874,14 @@ namespace Fun
             get { return sending_.Count == 0; }
         }
 
-        internal override void SendMessage (FunapiMessage msg_body)
+        internal override void SendMessage (FunapiMessage fun_msg)
         {
             try
             {
                 lock (sending_lock_)
                 {
-                    byte[] buffer = msg_body.GetBytes(encoding_);
-
-                    StringBuilder header = new StringBuilder();
-                    header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
-                	if (first_sending_)
-                    {
-                        header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kPluginVersion, kHeaderDelimeter);
-                    	first_sending_ = false;
-                    }
-                    header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, buffer.Length, kHeaderDelimeter);
-                    header.Append(kHeaderDelimeter);
-
-                    FunapiMessage msg_header = new FunapiMessage(msg_body.protocol, msg_body.msg_type, header);
-                    msg_header.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
-                    msg_body.buffer = new ArraySegment<byte>(buffer);
-
-                    pending_.Add(msg_header);
-                    pending_.Add(msg_body);
+                    fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
+                    pending_.Add(fun_msg);
 
                     if (Started && IsSendable)
                     {
@@ -896,8 +894,62 @@ namespace Fun
                 last_error_code_ = ErrorCode.kSendFailed;
                 last_error_message_ = "Failure in SendMessage: " + e.ToString();
                 Log(last_error_message_);
-                AddFailureCallback(msg_body);
+                AddFailureCallback(fun_msg);
             }
+        }
+
+        internal bool EncryptThenSendMessage ()
+        {
+            FunDebug.Assert(state_ >= State.kConnected);
+            FunDebug.Assert(sending_.Count > 0);
+
+            for (int i = 0; i < sending_.Count; i+=2)
+            {
+                FunapiMessage message = sending_[i];
+
+                string enc_header = "";
+                EncryptionType type = getEncryption(message);
+                if (message.msg_type == kEncryptionPublicKey)
+                {
+                    enc_header = generatePublicKey(type);
+                }
+                else if (type != EncryptionType.kNoneEncryption)
+                {
+                    if (!encryptMessage(message, type, ref enc_header))
+                    {
+                        last_error_code_ = ErrorCode.kEncryptionFailed;
+                        last_error_message_ = string.Format("Encrypt message failed. type:{0}", (int)type);
+                        Log(last_error_message_);
+                        AddFailureCallback(message);
+                        return false;
+                    }
+                }
+
+                StringBuilder header = new StringBuilder();
+                header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
+                if (first_sending_)
+                {
+                    header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kPluginVersion, kHeaderDelimeter);
+                    first_sending_ = false;
+                }
+                header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, message.buffer.Count, kHeaderDelimeter);
+                if (type != EncryptionType.kNoneEncryption)
+                {
+                    header.AppendFormat("{0}{1}{2}", kEncryptionHeaderField, kHeaderFieldDelimeter, Convert.ToInt32(type));
+                    header.AppendFormat("-{0}{1}", enc_header, kHeaderDelimeter);
+                }
+                header.Append(kHeaderDelimeter);
+
+                FunapiMessage header_buffer = new FunapiMessage(protocol_, message.msg_type, header);
+                header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
+                sending_.Insert(i, header_buffer);
+
+                //DebugLog("Header to send: {0}", header.ToString());
+            }
+
+            WireSend();
+
+            return true;
         }
 
         internal void SendPendingMessages ()
@@ -917,7 +969,7 @@ namespace Fun
                     sending_ = pending_;
                     pending_ = tmp;
 
-                    WireSend();
+                    EncryptThenSendMessage();
                 }
             }
         }
@@ -1055,12 +1107,48 @@ namespace Fun
                 return false;
             }
 
+            // Encryption
+            string encryption_type = "";
+            string encryption_header = "";
+            if (header_fields_.TryGetValue(kEncryptionHeaderField, out encryption_header))
+                parseEncryptionHeader(ref encryption_type, ref encryption_header);
+
+            if (state_ == State.kEncryptionHandshaking)
+            {
+                FunDebug.Assert(body_length == 0);
+
+                if (doHandshaking(encryption_type, encryption_header))
+                {
+                    if (hasEncryption(EncryptionType.kChaCha20Encryption))
+                        SendPublicKey(EncryptionType.kChaCha20Encryption);
+
+                    if (hasEncryption(EncryptionType.kAes128Encryption))
+                        SendPublicKey(EncryptionType.kAes128Encryption);
+
+                    // Makes a state transition.
+                    state_ = State.kConnected;
+                    DebugLog("Ready to receive.");
+
+                    event_.Add(OnHandshakeComplete);
+                }
+            }
+
             if (body_length > 0)
             {
                 if (state_ < State.kConnected)
                 {
                     Log("Unexpected message. state:{0}", state_);
                     return false;
+                }
+
+                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
+                FunDebug.Assert(body.Count == body_length);
+                next_decoding_offset_ += body_length;
+
+                if (encryption_type.Length > 0)
+                {
+                    if (!decryptMessage(body, encryption_type, encryption_header))
+                        return false;
                 }
 
                 if (first_receiving_)
@@ -1072,9 +1160,6 @@ namespace Fun
                     connect_timeout_id_ = 0;
                 }
 
-                ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
-                next_decoding_offset_ += body_length;
-
                 // The network module eats the fields and invoke registered handler.
                 OnReceived(header_fields_, body);
             }
@@ -1085,7 +1170,35 @@ namespace Fun
             return true;
         }
 
-        internal virtual void OnFailure()
+        void SendPublicKey (EncryptionType type)
+        {
+            if (encoding_ == FunEncoding.kJson)
+            {
+                SendMessage(new FunapiMessage(protocol_, kEncryptionPublicKey, null, type));
+            }
+            else if (encoding_ == FunEncoding.kProtobuf)
+            {
+                FunMessage msg = new FunMessage();
+                SendMessage(new FunapiMessage(protocol_, kEncryptionPublicKey, msg, type));
+            }
+
+            DebugLog("{0} sending a {1}-pubkey message.", str_protocol, (int)type);
+        }
+
+        // Sends messages & Calls start callback
+        private void OnHandshakeComplete ()
+        {
+            lock (sending_lock_)
+            {
+                if (Started && IsSendable)
+                {
+                    SendPendingMessages();
+                    OnStartedInternal();
+                }
+            }
+        }
+
+        internal virtual void OnFailure ()
         {
             Log("OnFailure({0}) - state: {1}\n{2}:{3}",
                 str_protocol, state_, last_error_code_, last_error_message_);
@@ -1133,9 +1246,13 @@ namespace Fun
         // Funapi header-related constants.
         internal static readonly string kHeaderDelimeter = "\n";
         internal static readonly string kHeaderFieldDelimeter = ":";
-        internal static readonly string kPluginVersionHeaderField = "PVER";
         internal static readonly string kVersionHeaderField = "VER";
+        internal static readonly string kPluginVersionHeaderField = "PVER";
         internal static readonly string kLengthHeaderField = "LEN";
+        internal static readonly string kEncryptionHeaderField = "ENC";
+
+        // Encryption-related constants.
+        private static readonly string kEncryptionPublicKey = "_pub_key";
 
         // for speed-up.
         private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
@@ -1159,7 +1276,7 @@ namespace Fun
 
 
     // TCP transport layer
-    public class FunapiTcpTransport : FunapiDecodedTransport
+    public class FunapiTcpTransport : FunapiEncryptedTransport
     {
         public FunapiTcpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
@@ -1275,12 +1392,11 @@ namespace Fun
                 }
                 Log("Connected.");
 
-                state_ = State.kConnected;
-
-                OnStartedInternal();
+                state_ = State.kEncryptionHandshaking;
 
                 lock (receive_lock_)
                 {
+                    // Wait for encryption handshaking message.
                     ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
                     List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                     buffer.Add(wrapped);
@@ -1465,7 +1581,7 @@ namespace Fun
 
 
     // UDP transport layer
-    public class FunapiUdpTransport : FunapiDecodedTransport
+    public class FunapiUdpTransport : FunapiEncryptedTransport
     {
         public FunapiUdpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
         {
@@ -1609,7 +1725,7 @@ namespace Fun
                     }
 
                     FunDebug.Assert(nSent == nToSend,
-                        string.Format("Failed to sending whole messages. {0}:{1}", nToSend, nSent));
+                                    string.Format("Failed to sending whole messages. {0}:{1}", nToSend, nSent));
 
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
@@ -1714,7 +1830,7 @@ namespace Fun
 
 
     // HTTP transport layer
-	public class FunapiHttpTransport : FunapiDecodedTransport
+    public class FunapiHttpTransport : FunapiEncryptedTransport
     {
         public FunapiHttpTransport (string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
         {
@@ -1824,7 +1940,10 @@ namespace Fun
                         if (list[i].Length <= 0)
                             break;
 
-                        headers.Add(list[i], list[i+1]);
+                        if (list[i] == kEncryptionHeaderField)
+                            headers.Add(kEncryptionHttpHeaderField, list[i+1]);
+                        else
+                            headers.Add(list[i], list[i+1]);
                     }
 
                     if (str_cookie_.Length > 0)
@@ -1928,6 +2047,9 @@ namespace Fun
                     case "content-length":
                         body_length = Convert.ToInt32(value);
                         buffer.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                        break;
+                    case "x-ifun-enc":
+                        buffer.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
                         break;
                     default:
                         buffer.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, value, kHeaderDelimeter);
@@ -2128,7 +2250,7 @@ namespace Fun
                 foreach (KeyValuePair<string, string> item in www.responseHeaders)
                 {
                     headers.AppendFormat("{0}{1}{2}{3}",
-                        item.Key, kHeaderFieldDelimeter, item.Value, kHeaderDelimeter);
+                                         item.Key, kHeaderFieldDelimeter, item.Value, kHeaderDelimeter);
                 }
                 headers.Append(kHeaderDelimeter);
 
@@ -2210,8 +2332,10 @@ namespace Fun
 
 
         // Funapi header-related constants.
-        private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
+        private static readonly string kEncryptionHttpHeaderField = "X-iFun-Enc";
         private static readonly string kCookieHeaderField = "Cookie";
+
+        private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
 
         // waiting time for response
         private static readonly float kTimeoutSeconds = 30f;

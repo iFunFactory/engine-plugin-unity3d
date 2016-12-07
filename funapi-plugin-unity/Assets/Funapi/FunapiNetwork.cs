@@ -1,5 +1,3 @@
-// vim: tabstop=4 softtabstop=4 shiftwidth=4 expandtab
-//
 // Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
@@ -762,30 +760,32 @@ namespace Fun
         }
 
         public void SendMessage (MessageType msg_type, object message,
+                                 EncryptionType encryption = EncryptionType.kDefaultEncryption,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
                                  string expected_reply_type = null, float expected_reply_time = 0f,
                                  TimeoutEventHandler onReplyMissed = null)
         {
             string _msg_type = MessageTable.Lookup(msg_type);
-            SendMessage(_msg_type, message, protocol, expected_reply_type, expected_reply_time, onReplyMissed);
+            SendMessage(_msg_type, message, encryption, protocol, expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage (MessageType msg_type, object message,
                                  string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
             string _msg_type = MessageTable.Lookup(msg_type);
-            SendMessage(_msg_type, message, GetMessageProtocol(_msg_type),
+            SendMessage(_msg_type, message, EncryptionType.kDefaultEncryption, GetMessageProtocol(_msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage (string msg_type, object message,
                                  string expected_reply_type, float expected_reply_time, TimeoutEventHandler onReplyMissed)
         {
-            SendMessage(msg_type, message, GetMessageProtocol(msg_type),
+            SendMessage(msg_type, message, EncryptionType.kDefaultEncryption, GetMessageProtocol(msg_type),
                         expected_reply_type, expected_reply_time, onReplyMissed);
         }
 
         public void SendMessage (string msg_type, object message,
+                                 EncryptionType encryption = EncryptionType.kDefaultEncryption,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
                                  string expected_reply_type = null, float expected_reply_time = 0f,
                                  TimeoutEventHandler onReplyMissed = null)
@@ -813,7 +813,7 @@ namespace Fun
 
                 if (transport.Encoding == FunEncoding.kJson)
                 {
-                    fun_msg = new FunapiMessage(protocol, msg_type, FunapiMessage.JsonHelper.Clone(message));
+                    fun_msg = new FunapiMessage(protocol, msg_type, FunapiMessage.JsonHelper.Clone(message), encryption);
 
                     // Encodes a messsage type
                     FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kMsgTypeBodyField, msg_type);
@@ -839,7 +839,7 @@ namespace Fun
                 }
                 else if (transport.Encoding == FunEncoding.kProtobuf)
                 {
-                    fun_msg = new FunapiMessage(protocol, msg_type, message);
+                    fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
 
                     FunMessage pbuf = fun_msg.message as FunMessage;
                     pbuf.msgtype = msg_type;
@@ -879,14 +879,14 @@ namespace Fun
                 if (transport.Encoding == FunEncoding.kJson)
                 {
                     if (transport == null)
-                        fun_msg = new FunapiMessage(protocol, msg_type, message);
+                        fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
                     else
                         fun_msg = new FunapiMessage(protocol, msg_type,
-                                                    FunapiMessage.JsonHelper.Clone(message));
+                                                    FunapiMessage.JsonHelper.Clone(message), encryption);
                 }
                 else if (transport.Encoding == FunEncoding.kProtobuf)
                 {
-                    fun_msg = new FunapiMessage(protocol, msg_type, message);
+                    fun_msg = new FunapiMessage(protocol, msg_type, message, encryption);
                 }
 
                 if (fun_msg != null)
