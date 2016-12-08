@@ -118,23 +118,32 @@ public class OldTester : MonoBehaviour
         if (protocol == TransportProtocol.kTcp)
         {
             FunapiTcpTransport tcp = new FunapiTcpTransport(serverAddress, port, encoding);
-            tcp.SetEncryption(tcpEncryption);
             tcp.AutoReconnect = autoReconnect;
             tcp.DisableNagle = disableNagle;
             tcp.EnablePing = usePing;
+
+            if (tcpEncryption != EncryptionType.kDefaultEncryption)
+                tcp.SetEncryption(tcpEncryption);
+
             transport = tcp;
         }
         else if (protocol == TransportProtocol.kUdp)
         {
             FunapiUdpTransport udp = new FunapiUdpTransport(serverAddress, port, encoding);
-            udp.SetEncryption(udpEncryption);
+
+            if (udpEncryption != EncryptionType.kDefaultEncryption)
+                udp.SetEncryption(udpEncryption);
+
             transport = udp;
         }
         else if (protocol == TransportProtocol.kHttp)
         {
             FunapiHttpTransport http = new FunapiHttpTransport(serverAddress, port, false, encoding);
-            http.SetEncryption(httpEncryption);
             http.UseWWW = useWWW;
+
+            if (httpEncryption != EncryptionType.kDefaultEncryption)
+                http.SetEncryption(httpEncryption);
+
             transport = http;
         }
 

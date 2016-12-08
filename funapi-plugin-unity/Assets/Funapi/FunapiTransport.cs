@@ -720,12 +720,6 @@ namespace Fun
             kConnected
         };
 
-        internal enum EncryptionMethod
-        {
-            kNone = 0,
-            kIFunEngine1
-        }
-
 
         // constants.
         private static readonly int kMaxReconnectCount = 3;
