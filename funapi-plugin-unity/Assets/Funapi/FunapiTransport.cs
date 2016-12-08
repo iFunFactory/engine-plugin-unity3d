@@ -720,12 +720,6 @@ namespace Fun
             kConnected
         };
 
-        internal enum EncryptionMethod
-        {
-            kNone = 0,
-            kIFunEngine1
-        }
-
 
         // constants.
         private static readonly int kMaxReconnectCount = 3;
@@ -1725,7 +1719,7 @@ namespace Fun
                     }
 
                     FunDebug.Assert(nSent == nToSend,
-                        string.Format("Failed to sending whole messages. {0}:{1}", nToSend, nSent));
+                                    string.Format("Failed to sending whole messages. {0}:{1}", nToSend, nSent));
 
                     last_error_code_ = ErrorCode.kNone;
                     last_error_message_ = "";
@@ -2250,7 +2244,7 @@ namespace Fun
                 foreach (KeyValuePair<string, string> item in www.responseHeaders)
                 {
                     headers.AppendFormat("{0}{1}{2}{3}",
-                        item.Key, kHeaderFieldDelimeter, item.Value, kHeaderDelimeter);
+                                         item.Key, kHeaderFieldDelimeter, item.Value, kHeaderDelimeter);
                 }
                 headers.Append(kHeaderDelimeter);
 

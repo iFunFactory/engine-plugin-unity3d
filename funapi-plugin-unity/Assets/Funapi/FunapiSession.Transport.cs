@@ -331,11 +331,11 @@ namespace Fun
                 get { lock (sending_lock_) { return sending_.Count == 0; } }
             }
 
-            void applyOption (TransportOption option)
+            void applyOption (TransportOption opt)
             {
                 if (protocol_ == TransportProtocol.kTcp)
                 {
-                    TcpTransportOption tcp_option = option as TcpTransportOption;
+                    TcpTransportOption tcp_option = opt as TcpTransportOption;
                     auto_reconnect_ = tcp_option.AutoReconnect;
                     enable_ping_ = tcp_option.EnablePing;
                     enable_ping_log_ = tcp_option.EnablePingLog;
@@ -343,8 +343,8 @@ namespace Fun
                     ping_timeout_ = tcp_option.PingTimeoutSeconds;
                 }
 
-                if (option.Encryption != EncryptionType.kDefaultEncryption)
-                    setEncryption(option.Encryption);
+                if (opt.Encryption != EncryptionType.kDefaultEncryption)
+                    setEncryption(opt.Encryption);
             }
 
             protected void initAddress (string hostname, UInt16 port)

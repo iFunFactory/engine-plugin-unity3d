@@ -29,25 +29,25 @@ namespace Fun
         {
             switch (type)
             {
-                case EncryptionType.kDummyEncryption:
-                    return new Encryptor0();
+            case EncryptionType.kDummyEncryption:
+                return new Encryptor0();
 
-                case EncryptionType.kIFunEngine1Encryption:
-                    return new Encryptor1();
+            case EncryptionType.kIFunEngine1Encryption:
+                return new Encryptor1();
 
-                case EncryptionType.kIFunEngine2Encryption:
-                    return new Encryptor2();
+            case EncryptionType.kIFunEngine2Encryption:
+                return new Encryptor2();
 
-                case EncryptionType.kChaCha20Encryption:
-                    return new EncryptorChacha20();
+            case EncryptionType.kChaCha20Encryption:
+                return new EncryptorChacha20();
 
-                case EncryptionType.kAes128Encryption:
-                    return new EncryptorAes128();
+            case EncryptionType.kAes128Encryption:
+                return new EncryptorAes128();
 
-                default:
-                    FunDebug.LogWarning("Unknown encryptor: {0}", type);
-                    FunDebug.Assert(false);
-                    return null;
+            default:
+                FunDebug.LogWarning("Unknown encryptor: {0}", type);
+                FunDebug.Assert(false);
+                return null;
             }
         }
 
