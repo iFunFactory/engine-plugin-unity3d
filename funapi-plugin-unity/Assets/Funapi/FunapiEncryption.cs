@@ -453,7 +453,7 @@ namespace Fun
                 return;
 
             default_encryptor_ = type;
-            Log("Set default encryption: {0}", (int)type);
+            Log("Set default encryption: {0}", type);
         }
 
         protected void setEncryption (EncryptionType type)
@@ -527,23 +527,23 @@ namespace Fun
             {
                 // Encryption handshake message
                 EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
-                Encryptor encryptor = encryptors_[type];
-                if (encryptor == null)
+                if (!encryptors_.ContainsKey(type))
                 {
-                    Log("Unknown encryption: {0}", encryption_type);
+                    LogWarning("Unavailable encryption type: {0}", type);
                     return false;
                 }
 
+                Encryptor encryptor = encryptors_[type];
                 if (encryptor.state != Encryptor.State.kHandshaking)
                 {
-                    Log("Unexpected handshake message: {0}", encryptor.name);
+                    LogWarning("Unexpected handshake message: {0}", encryptor.name);
                     return false;
                 }
 
                 string out_header = "";
                 if (!encryptor.Handshake(encryption_header, ref out_header))
                 {
-                    Log("Encryption handshake failure: {0}", encryptor.name);
+                    LogWarning("Encryption handshake failure: {0}", encryptor.name);
                     return false;
                 }
 
@@ -567,14 +567,14 @@ namespace Fun
         {
             if (!encryptors_.ContainsKey(type))
             {
-                Log("Unknown encryption: {0}", type);
+                LogWarning("Unavailable encryption type: {0}", type);
                 return false;
             }
 
             Encryptor encryptor = encryptors_[type];
-            if (encryptor == null || encryptor.state != Encryptor.State.kEstablished)
+            if (encryptor.state != Encryptor.State.kEstablished)
             {
-                Log("Invalid encryption: {0}", type);
+                LogWarning("Can't encrypt '{0}' message. The Encryption state is '{1}'", message.msg_type, type);
                 return false;
             }
 
@@ -583,7 +583,7 @@ namespace Fun
                 Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref header);
                 if (nSize <= 0)
                 {
-                    Log("Failed to encrypt.");
+                    LogWarning("Failed to encrypt.");
                     return false;
                 }
 
@@ -598,21 +598,15 @@ namespace Fun
             EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
             if (!encryptors_.ContainsKey(type))
             {
-                Log("Unknown encryption: {0}", type);
+                LogWarning("Unavailable encryption type: {0}", type);
                 return false;
             }
 
             Encryptor encryptor = encryptors_[type];
-            if (encryptor == null)
-            {
-                Log("Invalid encryption: {0}", type);
-                return false;
-            }
-
             Int64 nSize = encryptor.Decrypt(buffer, buffer, encryption_header);
             if (nSize <= 0)
             {
-                Log("Failed to decrypt.");
+                LogWarning("Failed to decrypt.");
                 return false;
             }
 
@@ -624,18 +618,11 @@ namespace Fun
         {
             if (!encryptors_.ContainsKey(type))
             {
-                Log("Unknown encryption: {0} requested public key", type);
+                LogWarning("Unavailable encryption: {0} requested public key", type);
                 return "";
             }
 
-            Encryptor encryptor = encryptors_[type];
-            if (encryptor == null)
-            {
-                Log("Invalid encryption: {0}", type);
-                return "";
-            }
-
-            return encryptor.generatePublicKey(pub_key_);
+            return encryptors_[type].generatePublicKey(pub_key_);
         }
 
         public static string public_key
