@@ -730,7 +730,7 @@ namespace Fun
             }
             else if (protocol == TransportProtocol.kHttp)
             {
-                bool https = ((HttpTransportOption)option).Https;
+                bool https = ((HttpTransportOption)option).HTTPS;
                 HttpTransport http_transport = new HttpTransport(server_address_, port, https, encoding);
                 transport = http_transport;
             }
