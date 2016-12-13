@@ -79,7 +79,7 @@ namespace Fun
 
     public class HttpTransportOption : TransportOption
     {
-        public bool Https = false;
+        public bool HTTPS = false;
         public bool UseWWW = false;
     }
 
