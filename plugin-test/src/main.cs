@@ -48,6 +48,7 @@ namespace Tester
             testSendReceive();
 
             t.Abort();
+            writeTitle("FINISH");
         }
 
         void onUpdate ()
@@ -169,7 +170,7 @@ namespace Tester
 
             connect();
 
-            for (int i = 0; i < 100; ++i)
+            for (int i = 0; i < 10; ++i)
                 sendMessage();
 
             stop();
@@ -177,7 +178,8 @@ namespace Tester
 
         void writeTitle (string message)
         {
-            Console.WriteLine("\n---------------------- "
+            Console.WriteLine("");
+            Console.WriteLine("---------------------- "
                               + message
                               + " -----------------------");
         }

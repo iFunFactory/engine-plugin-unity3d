@@ -8,14 +8,16 @@
 // from https://github.com/mono/mono/blob/master/mcs/tools/security/mozroots.cs
 //
 
-using ICSharpCode.SharpZipLib.Zip;
 using System;
 using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+#if !NO_UNITY
+using ICSharpCode.SharpZipLib.Zip;
 using UnityEngine;
+#endif
 
 
 namespace Fun
@@ -24,6 +26,7 @@ namespace Fun
     {
         public static bool DownloadMozRoots ()
         {
+#if !NO_UNITY
             string tempPath = FunapiUtils.GetLocalDataPath + "/" + Path.GetRandomFileName();
             try
             {
@@ -74,6 +77,7 @@ namespace Fun
                 FunDebug.LogError("The creation of the zip file of certificates failed. {0}", e.Message);
                 return false;
             }
+#endif
 
             return true;
         }

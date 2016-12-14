@@ -48,6 +48,10 @@ namespace Tester
                         tcp_option.PingTimeoutSeconds = 3;
                         option = tcp_option;
                     }
+                    else if (protocols[i] == TransportProtocol.kHttp)
+                    {
+                        option = new HttpTransportOption();
+                    }
                     else
                     {
                         option = new TransportOption();
@@ -76,7 +80,7 @@ namespace Tester
         public void Stop ()
         {
             if (session_ != null)
-                session_.Close();
+                session_.Stop();
         }
 
         public bool Connected
@@ -128,18 +132,16 @@ namespace Tester
 
         void onSessionEvent (SessionEventType type, string session_id)
         {
+            if (type == SessionEventType.kStopped)
+                connected_ = false;
         }
 
         void onTransportEvent (TransportProtocol protocol, TransportEventType type)
         {
-            if (protocol == TransportProtocol.kTcp && type == TransportEventType.kStarted)
+            if (type == TransportEventType.kStarted)
             {
-                connected_ = true;
-            }
-            else
-            {
-                if (!session_.Started)
-                    connected_ = false;
+                if (!connected_)
+                    connected_ = true;
             }
         }
 
