@@ -165,6 +165,8 @@ public class Sodium
 #region libsodium wrappers
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -176,12 +178,18 @@ public class Sodium
     [DllImport("__Internal")]
     private static extern void sodium_increment (byte[] n, UIntPtr nlen);
 #else
+#if (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
+#else
     [DllImport("sodium")]
+#endif
     private static extern void sodium_increment (byte[] n, UIntPtr nlen);
 #endif
 
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -189,6 +197,8 @@ public class Sodium
 
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -200,6 +210,8 @@ public class Sodium
     //                                   const unsigned char *k);
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -208,6 +220,8 @@ public class Sodium
 
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -219,6 +233,8 @@ public class Sodium
     //                                 const unsigned char *k);
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -228,6 +244,8 @@ public class Sodium
     //int crypto_stream_aes128ctr_beforenm (unsigned char *c, const unsigned char *k);
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -239,6 +257,8 @@ public class Sodium
     //                                         const unsigned char *c);
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
@@ -252,6 +272,8 @@ public class Sodium
     //                                                const unsigned char *c);
 #if UNITY_IOS
     [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("sodium64")]
 #else
     [DllImport("sodium")]
 #endif
