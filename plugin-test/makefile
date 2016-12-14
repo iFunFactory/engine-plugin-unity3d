@@ -26,9 +26,11 @@ tester.exe: ${SRC_ROOT}/main.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
         ${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
         ${PLUGIN_ROOT}/Funapi/MD5Async.cs \
+        ${PLUGIN_ROOT}/Funapi/MozRoots.cs \
+        ${PLUGIN_ROOT}/Funapi/SessionId.cs \
         ${PLUGIN_ROOT}/plugins/MiniJSON.cs
 
-	mcs /debug -define:NO_UNITY \
+    mcs /debug -define:NO_UNITY \
         -target:exe -out:$@ \
         ${SRC_ROOT}/main.cs \
         ${SRC_ROOT}/client.cs \
@@ -48,6 +50,8 @@ tester.exe: ${SRC_ROOT}/main.cs \
         ${PLUGIN_ROOT}/Funapi/FunapiUtils.cs \
         ${PLUGIN_ROOT}/Funapi/JsonAccessor.cs \
         ${PLUGIN_ROOT}/Funapi/MD5Async.cs \
+        ${PLUGIN_ROOT}/Funapi/MozRoots.cs \
+        ${PLUGIN_ROOT}/Funapi/SessionId.cs \
         ${PLUGIN_ROOT}/plugins/MiniJSON.cs \
         /r:FunMessageSerializer.dll \
         /r:messages.dll \
@@ -55,10 +59,10 @@ tester.exe: ${SRC_ROOT}/main.cs \
 
 
 FunMessageSerializer.dll: ${PLUGIN_ROOT}/FunMessageSerializer.dll
-	cp $^ .
+    cp $^ .
 
 messages.dll: ${PLUGIN_ROOT}/messages.dll
-	cp $^ .
+    cp $^ .
 
 protobuf-net.dll: ${PLUGIN_ROOT}/protobuf-net.dll
-	cp $^ .
+    cp $^ .
