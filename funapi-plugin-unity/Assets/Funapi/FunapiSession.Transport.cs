@@ -1430,6 +1430,10 @@ namespace Fun
             {
                 state_ = State.kConnected;
                 sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
+                if (ip_af_ == AddressFamily.InterNetwork)
+                    sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
+                else
+                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
 
                 lock (receive_lock_)
                 {
