@@ -58,8 +58,6 @@ public partial class Tester : MonoBehaviour
 
     void Awake ()
     {
-        GameObject.Find("ServerIP").GetComponent<Text>().text = serverAddress;
-
         buttons_["create"] = GameObject.Find("ButtonCreateSession").GetComponent<Button>();
         buttons_["close"] = GameObject.Find("ButtonCloseSession").GetComponent<Button>();
         buttons_["session"] = GameObject.Find("ButtonSessionTest").GetComponent<Button>();
@@ -69,9 +67,20 @@ public partial class Tester : MonoBehaviour
         setButtonState(false);
     }
 
+    public void OnToggleSession (GameObject panel)
+    {
+        if (panel != null)
+            panel.SetActive(!panel.activeSelf);
+    }
+
+    public void OnToggleOthers (GameObject panel)
+    {
+        if (panel != null)
+            panel.SetActive(!panel.activeSelf);
+    }
+
     public void OnCreateSession ()
     {
-        GameObject.Find("ServerIP").GetComponent<Text>().text = serverAddress;
         buttons_["create"].interactable = false;
 
         createSession();
@@ -156,7 +165,7 @@ public partial class Tester : MonoBehaviour
     {
         if (FunDebug.GetLogLength() <= 0)
         {
-            FunDebug.Log("There are no logs or you should turn on 'ENABLE_SAVE_LOG' define.");
+            FunDebug.Log("There are no logs or you should define 'ENABLE_SAVE_LOG' symbol.");
             return;
         }
 
