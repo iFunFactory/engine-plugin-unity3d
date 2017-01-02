@@ -4,7 +4,6 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-using Fun;
 using UnityEngine;
 using System.Collections;
 
@@ -16,7 +15,7 @@ public class UILogs : MonoBehaviour
         content_ = transform.GetComponentInChildren<UILogContent>();
 
 #if ENABLE_OUTPUT
-        FunDebug.OutputCallback += OnOutput;
+        Fun.FunDebug.OutputCallback += OnOutput;
 #endif
     }
 

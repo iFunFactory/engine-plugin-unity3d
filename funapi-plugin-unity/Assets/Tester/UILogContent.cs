@@ -14,7 +14,7 @@ public class UILogContent : MonoBehaviour
 {
     void Start ()
     {
-        view_rect_ = transform.parent.GetComponent<RectTransform>().rect;
+        view_rect_ = transform.parent.GetComponent<RectTransform>();
         content_rect_ = transform.GetComponent<RectTransform>();
     }
 
@@ -47,10 +47,11 @@ public class UILogContent : MonoBehaviour
             GameObject item = GameObject.Instantiate(Resources.Load("LogItem")) as GameObject;
             if (item != null)
             {
-                item.name = "LogItem";
+                item.name = "LogItem_" + count;
                 item.transform.SetParent(transform);
                 item.transform.localScale = Vector3.one;
                 item.transform.localPosition = new Vector3(kBorder, content_height, 0f);
+                ++count;
 
                 Text item_text = item.transform.FindChild("Text").GetComponent<Text>();
                 item_text.text = text;
@@ -65,8 +66,8 @@ public class UILogContent : MonoBehaviour
                 float height = Mathf.Abs(content_height) + kBorder;
                 content_rect_.sizeDelta = new Vector2(width, height);
 
-                if (height > view_rect_.height)
-                    content_rect_.localPosition = new Vector3(0f, height - view_rect_.height);
+                if (height > view_rect_.rect.height)
+                    content_rect_.localPosition = new Vector3(0f, height - view_rect_.rect.height);
             }
 
             running_ = false;
@@ -76,11 +77,12 @@ public class UILogContent : MonoBehaviour
 
     const float kBorder = 15f;
 
-    Rect view_rect_;
+    RectTransform view_rect_;
     RectTransform content_rect_;
     float content_height = -kBorder;
 
     bool running_ = false;
     object lock_ = new object();
     List<string> list_ = new List<string>();
+    public int count = 0;
 }
