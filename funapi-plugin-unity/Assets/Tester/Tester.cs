@@ -20,29 +20,11 @@ using funapi.service.multicast_message;
 
 public partial class Tester : MonoBehaviour
 {
-    public string serverAddress = "127.0.0.1";
-
-    public bool sessionReliability = false;
-    public bool sequenceValidation = false;
-    public FunEncoding encoding = FunEncoding.kJson;
-    public int sendingCount = 10;
-
-    [Header("TCP Option")]
-    public EncryptionType tcpEncryption = EncryptionType.kDefaultEncryption;
-    public bool autoReconnect = false;
-    public bool disableNagle = false;
-    public bool usePing = false;
-
-    [Header("UDP Option")]
-    public EncryptionType udpEncryption = EncryptionType.kDefaultEncryption;
-
-    [Header("HTTP Option")]
-    public EncryptionType httpEncryption = EncryptionType.kDefaultEncryption;
-    public bool useWWW = false;
+    static int sendingCount = 1;
 
     public abstract class Base
     {
-        public abstract IEnumerator Start (params object[] param);
+        public abstract IEnumerator Start (FunapiSession session, UIOption option);
 
         public void OnFinished ()
         {
@@ -58,6 +40,9 @@ public partial class Tester : MonoBehaviour
 
     void Awake ()
     {
+        option_ = optionPopup.GetComponent<UIOption>();
+        option_.Init();
+
         buttons_["create"] = GameObject.Find("ButtonCreateSession").GetComponent<Button>();
         buttons_["close"] = GameObject.Find("ButtonCloseSession").GetComponent<Button>();
         buttons_["session"] = GameObject.Find("ButtonSessionTest").GetComponent<Button>();
@@ -104,7 +89,7 @@ public partial class Tester : MonoBehaviour
             buttons_["session"].interactable = true;
         };
 
-        StartCoroutine(session.Start(session_, encoding, sendingCount));
+        StartCoroutine(session.Start(session_, option_));
     }
 
     public void OnMulticastTest ()
@@ -118,7 +103,7 @@ public partial class Tester : MonoBehaviour
             buttons_["multicast"].interactable = true;
         };
 
-        StartCoroutine(multicast.Start(session_, encoding, sendingCount));
+        StartCoroutine(multicast.Start(session_, option_));
     }
 
     public void OnChattingTest ()
@@ -132,7 +117,7 @@ public partial class Tester : MonoBehaviour
             buttons_["chatting"].interactable = true;
         };
 
-        StartCoroutine(chatting.Start(session_, encoding, sendingCount));
+        StartCoroutine(chatting.Start(session_, option_));
     }
 
     public void OnAnnounceTest ()
@@ -145,7 +130,7 @@ public partial class Tester : MonoBehaviour
             dashLog("Finished");
         };
 
-        announce.Start(serverAddress);
+        announce.Start(option_.serverAddress);
     }
 
     public void OnDownloadTest ()
@@ -158,7 +143,7 @@ public partial class Tester : MonoBehaviour
             dashLog("Finished");
         };
 
-        download.Start(serverAddress);
+        download.Start(option_.serverAddress);
     }
 
     public void OnDebugLogTest ()
@@ -172,19 +157,30 @@ public partial class Tester : MonoBehaviour
         FunDebug.SaveLogs();
     }
 
+    public void OnOption ()
+    {
+        if (optionPopup != null)
+            optionPopup.SetActive(true);
+    }
+
 
     void createSession ()
     {
         if (session_ != null)
             return;
 
-        session_ = FunapiSession.Create(serverAddress, sessionReliability);
+        session_ = FunapiSession.Create(option_.serverAddress, option_.sessionReliability);
         session_.SessionEventCallback += onSessionEvent;
         session_.TransportEventCallback += onTransportEvent;
 
-        tryConnect(TransportProtocol.kTcp);
-        tryConnect(TransportProtocol.kUdp);
-        tryConnect(TransportProtocol.kHttp);
+        if (option_.connectTcp)
+            tryConnect(TransportProtocol.kTcp);
+
+        if (option_.connectUdp)
+            tryConnect(TransportProtocol.kUdp);
+
+        if (option_.connectHttp)
+            tryConnect(TransportProtocol.kHttp);
     }
 
     void closeSession ()
@@ -201,8 +197,9 @@ public partial class Tester : MonoBehaviour
 
     void tryConnect (TransportProtocol protocol)
     {
+        FunEncoding encoding = getEncoding(protocol, option_);
         TransportOption option = makeOption(protocol);
-        ushort port = getPort(protocol, encoding);
+        ushort port = getPort(protocol);
 
         session_.Connect(protocol, encoding, port, option);
     }
@@ -214,11 +211,11 @@ public partial class Tester : MonoBehaviour
         if (protocol == TransportProtocol.kTcp)
         {
             TcpTransportOption tcp_option = new TcpTransportOption();
-            tcp_option.Encryption = tcpEncryption;
-            tcp_option.AutoReconnect = autoReconnect;
-            tcp_option.DisableNagle = disableNagle;
+            tcp_option.Encryption = option_.tcpEncryption;
+            tcp_option.AutoReconnect = option_.autoReconnect;
+            tcp_option.DisableNagle = option_.disableNagle;
 
-            if (usePing)
+            if (option_.usePing)
                 tcp_option.SetPing(1, 20, true);
 
             option = tcp_option;
@@ -226,34 +223,46 @@ public partial class Tester : MonoBehaviour
         else if (protocol == TransportProtocol.kUdp)
         {
             option = new TransportOption();
-            option.Encryption = udpEncryption;
+            option.Encryption = option_.udpEncryption;
         }
         else if (protocol == TransportProtocol.kHttp)
         {
             HttpTransportOption http_option = new HttpTransportOption();
-            http_option.Encryption = httpEncryption;
-            http_option.UseWWW = useWWW;
+            http_option.Encryption = option_.httpEncryption;
+            http_option.HTTPS = option_.HTTPS;
+            http_option.UseWWW = option_.useWWW;
 
             option = http_option;
         }
 
         option.ConnectionTimeout = 10f;
-        option.SequenceValidation = sequenceValidation;
+        option.SequenceValidation = option_.sequenceValidation;
 
         return option;
     }
 
-    ushort getPort (TransportProtocol protocol, FunEncoding encoding)
+    static FunEncoding getEncoding(TransportProtocol protocol, UIOption option)
     {
-        ushort port = 0;
         if (protocol == TransportProtocol.kTcp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8022);
+            return option.tcpEncoding;
         else if (protocol == TransportProtocol.kUdp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
+            return option.udpEncoding;
         else if (protocol == TransportProtocol.kHttp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
+            return option.httpEncoding;
 
-        return port;
+        return FunEncoding.kJson;
+    }
+
+    ushort getPort (TransportProtocol protocol)
+    {
+        if (protocol == TransportProtocol.kTcp)
+            return option_.tcpPort;
+        else if (protocol == TransportProtocol.kUdp)
+            return option_.udpPort;
+        else if (protocol == TransportProtocol.kHttp)
+            return option_.httpPort;
+
+        return 0;
     }
 
     void dashLog (string text)
@@ -327,5 +336,8 @@ public partial class Tester : MonoBehaviour
 
     FunapiSession session_ = null;
     bool session_test_ = false;
+
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
+    public GameObject optionPopup;
+    UIOption option_;
 }
