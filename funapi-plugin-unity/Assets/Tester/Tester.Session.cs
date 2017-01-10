@@ -20,27 +20,23 @@ public partial class Tester
 {
     public class Session : Base
     {
-        public override IEnumerator Start (params object[] param)
+        public override IEnumerator Start (FunapiSession session, UIOption option)
         {
-            session_ = (FunapiSession)param[0];
-            encoding_ = (FunEncoding)param[1];
-            int sendingCount = (int)param[2];
+            session_ = session;
+            option_ = option;
 
             registerHandler();
 
-            for (int i = 0; i < sendingCount; ++i)
-            {
-                session_.Stop();
-                while (session_.Started)
-                    yield return new WaitForSeconds(0.1f);
+            //session_.Stop();
+            //while (session_.Started)
+            //    yield return new WaitForSeconds(0.1f);
 
-                session_.Reconnect();
-                while (!session_.Connected)
-                    yield return new WaitForSeconds(0.1f);
+            //session_.Reconnect();
+            //while (!session_.Connected)
+            //    yield return new WaitForSeconds(0.1f);
 
-                sendMessages(sendingCount);
-                yield return new WaitForSeconds(0.2f);
-            }
+            sendMessages(sendingCount);
+            yield return new WaitForSeconds(0.2f);
 
             deregisterHandler();
 
@@ -67,14 +63,23 @@ public partial class Tester
         {
             int i;
 
-            for (i = 0; i < sendingCount; ++i)
-                sendEchoMessage(TransportProtocol.kTcp);
+            if (option_.connectTcp)
+            {
+                for (i = 0; i < sendingCount; ++i)
+                    sendEchoMessage(TransportProtocol.kTcp);
+            }
 
-            for (i = 0; i < sendingCount; ++i)
-                sendEchoMessage(TransportProtocol.kUdp);
+            if (option_.connectUdp)
+            {
+                for (i = 0; i < sendingCount; ++i)
+                    sendEchoMessage(TransportProtocol.kUdp);
+            }
 
-            for (i = 0; i < sendingCount; ++i)
-                sendEchoMessage(TransportProtocol.kHttp);
+            if (option_.connectHttp)
+            {
+                for (i = 0; i < sendingCount; ++i)
+                    sendEchoMessage(TransportProtocol.kHttp);
+            }
         }
 
         public void sendEchoMessage (TransportProtocol protocol = TransportProtocol.kDefault)
@@ -85,7 +90,8 @@ public partial class Tester
                 return;
             }
 
-            if (encoding_ == FunEncoding.kJson)
+            FunEncoding encoding = getEncoding(protocol, option_);
+            if (encoding == FunEncoding.kJson)
             {
                 // In this example, we are using Dictionary<string, object>.
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
@@ -94,7 +100,7 @@ public partial class Tester
                 message["message"] = string.Format("[{0}] hello json", protocol.ToString().Substring(1).ToLower());
                 session_.SendMessage("echo", message, protocol);
             }
-            else if (encoding_ == FunEncoding.kProtobuf)
+            else if (encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = string.Format("[{0}] hello proto", protocol.ToString().Substring(1).ToLower());
@@ -141,7 +147,7 @@ public partial class Tester
 
         void onMaintenanceMessage (object message)
         {
-            if (encoding_ == FunEncoding.kJson)
+            if (option_.tcpEncoding == FunEncoding.kJson)
             {
                 JsonAccessor json_helper = FunapiMessage.JsonHelper;
                 FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
@@ -149,7 +155,7 @@ public partial class Tester
                              json_helper.GetStringField(message, "date_end"),
                              json_helper.GetStringField(message, "messages"));
             }
-            else if (encoding_ == FunEncoding.kProtobuf)
+            else if (option_.tcpEncoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
                 object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_maintenance);
@@ -166,8 +172,8 @@ public partial class Tester
         delegate void MessageHandler (object message);
 
         // Member variables.
-        FunapiSession session_ = null;
-        FunEncoding encoding_ = FunEncoding.kJson;
+        FunapiSession session_;
+        UIOption option_;
         Dictionary<string, MessageHandler> message_handler_ = new Dictionary<string, MessageHandler>();
     }
 }

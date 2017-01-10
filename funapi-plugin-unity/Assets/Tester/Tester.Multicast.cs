@@ -19,11 +19,11 @@ public partial class Tester
 {
     public class Multicast : Base
     {
-        public override IEnumerator Start (params object[] param)
+        public override IEnumerator Start (FunapiSession session, UIOption option)
         {
             // MulticastClient
-            FunEncoding encoding = (FunEncoding)param[1];
-            multicast_ = new FunapiMulticastClient((FunapiSession)param[0], encoding);
+            FunEncoding encoding = option.tcpEncoding;
+            multicast_ = new FunapiMulticastClient(session, encoding);
             multicast_.sender = "player_" + UnityEngine.Random.Range(1, 100);
 
             multicast_.ChannelListCallback += delegate (object channel_list) {
@@ -46,7 +46,6 @@ public partial class Tester
             yield return new WaitForSeconds(0.1f);
 
             // Send messages
-            int sendingCount = (int)param[2];
             for (int i = 0; i < sendingCount; ++i)
             {
                 sendMulticastMessage();
