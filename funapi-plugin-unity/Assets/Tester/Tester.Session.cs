@@ -47,10 +47,10 @@ public partial class Tester
         {
             session_.ReceivedMessageCallback += onReceivedMessage;
             session_.ResponseTimeoutCallback += onResponseTimedOut;
+            session_.MaintenanceCallback += onMaintenanceMessage;
 
             message_handler_["echo"] = onEcho;
             message_handler_["pbuf_echo"] = onEchoWithProtobuf;
-            message_handler_["_maintenance"] = onMaintenanceMessage;
         }
 
         void deregisterHandler ()
@@ -145,9 +145,9 @@ public partial class Tester
             FunDebug.Log("Received an echo message: {0}", echo.msg);
         }
 
-        void onMaintenanceMessage (object message)
+        void onMaintenanceMessage (FunEncoding encoding, object message)
         {
-            if (option_.tcpEncoding == FunEncoding.kJson)
+            if (encoding == FunEncoding.kJson)
             {
                 JsonAccessor json_helper = FunapiMessage.JsonHelper;
                 FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
@@ -155,7 +155,7 @@ public partial class Tester
                              json_helper.GetStringField(message, "date_end"),
                              json_helper.GetStringField(message, "messages"));
             }
-            else if (option_.tcpEncoding == FunEncoding.kProtobuf)
+            else if (encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
                 object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_maintenance);
