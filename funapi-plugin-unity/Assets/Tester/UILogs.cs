@@ -32,6 +32,11 @@ public class UILogs : MonoBehaviour
         content_.AddLog(string.Format("{0} {1}", type, message));
     }
 
+    public void Clear ()
+    {
+        content_.ClearAll();
+    }
+
 
     UILogContent content_;
 }

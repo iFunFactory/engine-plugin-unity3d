@@ -20,8 +20,6 @@ using funapi.service.multicast_message;
 
 public partial class Tester : MonoBehaviour
 {
-    static int sendingCount = 1;
-
     public abstract class Base
     {
         public abstract IEnumerator Start (FunapiSession session, UIOption option);
@@ -161,6 +159,11 @@ public partial class Tester : MonoBehaviour
     {
         if (optionPopup != null)
             optionPopup.SetActive(true);
+    }
+
+    public void OnClearLogs ()
+    {
+        logs.Clear();
     }
 
 
@@ -334,10 +337,13 @@ public partial class Tester : MonoBehaviour
     }
 
 
+    static int sendingCount = 1;
+
     FunapiSession session_ = null;
     bool session_test_ = false;
 
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
     public GameObject optionPopup;
     UIOption option_;
+    public UILogs logs;
 }
