@@ -129,8 +129,8 @@ public partial class Tester
         void onEcho (object message)
         {
             FunDebug.Assert(message is Dictionary<string, object>);
-            string strJson = Json.Serialize(message);
-            FunDebug.Log("Received an echo message: {0}", strJson);
+            Dictionary<string, object> json = message as Dictionary<string, object>;
+            FunDebug.Log("Received an echo message: {0}", json["message"]);
         }
 
         void onEchoWithProtobuf (object message)

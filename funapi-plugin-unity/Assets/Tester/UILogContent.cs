@@ -16,6 +16,7 @@ public class UILogContent : MonoBehaviour
     {
         view_rect_ = transform.parent.GetComponent<RectTransform>();
         content_rect_ = transform.GetComponent<RectTransform>();
+        content_rect_.sizeDelta = Vector2.zero;
     }
 
     void Update ()
@@ -35,6 +36,26 @@ public class UILogContent : MonoBehaviour
         lock (lock_)
         {
             list_.Add(text);
+        }
+    }
+
+    public void ClearAll ()
+    {
+        if (transform.childCount <= 0)
+            return;
+
+        lock (lock_)
+        {
+            foreach (Transform t in transform)
+            {
+                GameObject.Destroy(t.gameObject);
+            }
+            transform.DetachChildren();
+
+            count = 0;
+            content_height = -kBorder;
+            content_rect_.sizeDelta = Vector2.zero;
+            content_rect_.localPosition = Vector3.zero;
         }
     }
 
