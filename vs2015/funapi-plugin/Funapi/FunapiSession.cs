@@ -118,18 +118,6 @@ namespace Fun
 #endif
         }
 
-        [System.Obsolete("This will be deprecated January 2017. Use 'FunapiSession.Stop()' instead.")]
-        public void Close ()
-        {
-            Stop();
-        }
-
-        [System.Obsolete("This will be deprecated January 2017. Use 'FunapiSession.Stop(TransportProtocol)' instead.")]
-        public void Close (TransportProtocol protocol)
-        {
-            Stop(protocol);
-        }
-
         public void SendMessage (MessageType msg_type, object message,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
                                  EncryptionType enc_type = EncryptionType.kDefaultEncryption)
@@ -1343,7 +1331,7 @@ namespace Fun
                     return;
                 }
 
-                onProcessMessage(msg_type, message);
+                onProcessMessage(transport.encoding, msg_type, message);
             }
 
             if (transport.state == Transport.State.kWaitForAck && session_id_.IsValid)
@@ -1456,7 +1444,7 @@ namespace Fun
             }
         }
 
-        void onProcessMessage (string msg_type, object message)
+        void onProcessMessage (FunEncoding encoding, string msg_type, object message)
         {
             if (msg_type == kSessionOpenedType)
             {
@@ -1468,6 +1456,11 @@ namespace Fun
 
                 stopAllTransports(true);
                 onSessionClosed();
+            }
+            else if (msg_type == kMaintenanceType)
+            {
+                if (MaintenanceCallback != null)
+                    MaintenanceCallback(encoding, message);
             }
             else
             {
@@ -1633,6 +1626,7 @@ namespace Fun
         const string kAckNumberField = "_ack";
         const string kSessionOpenedType = "_session_opened";
         const string kSessionClosedType = "_session_closed";
+        const string kMaintenanceType = "_maintenance";
         const string kRedirectType = "_sc_redirect";
         const string kRedirectConnectType = "_cs_redirect_connect";
 
@@ -1641,6 +1635,7 @@ namespace Fun
         public delegate TransportOption TransportOptionHandler (string flavor, TransportProtocol protocol);
         public delegate void TransportEventHandler (TransportProtocol protocol, TransportEventType type);
         public delegate void TransportErrorHandler (TransportProtocol protocol, TransportError type);
+        public delegate void MaintenanceHandler (FunEncoding encoding, object message);
         public delegate void ReceivedMessageHandler (string msg_type, object message);
         public delegate void ResponseTimeoutHandler (string msg_type);
 
@@ -1651,6 +1646,7 @@ namespace Fun
         public event TransportErrorHandler TransportErrorCallback;
         public event ReceivedMessageHandler ReceivedMessageCallback;
         public event ResponseTimeoutHandler ResponseTimeoutCallback;
+        public event MaintenanceHandler MaintenanceCallback;
 
         class ExpectedResponse
         {

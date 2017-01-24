@@ -1,4 +1,4 @@
-﻿// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
+// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -6,7 +6,9 @@
 
 using System;
 using System.Collections.Generic;
-#if !NO_UNITY
+#if NO_UNITY
+using System.Threading;
+#else
 using UnityEngine;
 #endif
 
@@ -17,7 +19,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 196;
+        public static readonly int kPluginVersion = 200;
     }
 
 
@@ -458,7 +460,8 @@ namespace Fun
     {
         public void StartCoroutine (Action func)
         {
-            func();
+            Thread t = new Thread(new ThreadStart(func));
+            t.Start();
         }
     }
 #endif
