@@ -46,37 +46,67 @@ namespace Fun
         [Conditional("ENABLE_LOG")]
         public static void Log (string message, params object[] args)
         {
-            UnityEngine.Debug.Log(getTimeLog(string.Format(message, args)));
+            string text = getTimeLog(string.Format(message, args));
+            UnityEngine.Debug.Log(text);
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("I", text);
+#endif
         }
 
         [Conditional("ENABLE_LOG")]
         public static void LogWarning (string message, params object[] args)
         {
-            UnityEngine.Debug.LogWarning(getTimeLog(string.Format(message, args)));
+            string text = getTimeLog(string.Format(message, args));
+            UnityEngine.Debug.LogWarning(text);
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("W", text);
+#endif
         }
 
         [Conditional("ENABLE_LOG")]
         public static void LogError (string message, params object[] args)
         {
-            UnityEngine.Debug.LogError(getTimeLog(string.Format(message, args)));
+            string text = getTimeLog(string.Format(message, args));
+            UnityEngine.Debug.LogError(text);
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("E", text);
+#endif
         }
 
         [Conditional("ENABLE_DEBUG")]
         public static void DebugLog (string message, params object[] args)
         {
-            UnityEngine.Debug.Log(getTimeLog(string.Format(message, args)));
+            string text = getTimeLog(string.Format(message, args));
+            UnityEngine.Debug.Log(text);
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("I", text);
+#endif
         }
 
         [Conditional("ENABLE_DEBUG")]
         public static void DebugLogWarning (string message, params object[] args)
         {
-            UnityEngine.Debug.LogWarning(getTimeLog(string.Format(message, args)));
+            string text = getTimeLog(string.Format(message, args));
+            UnityEngine.Debug.LogWarning(text);
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("W", text);
+#endif
         }
 
         [Conditional("ENABLE_DEBUG")]
         public static void DebugLogError (string message, params object[] args)
         {
-            UnityEngine.Debug.LogError(getTimeLog(string.Format(message, args)));
+            string text = getTimeLog(string.Format(message, args));
+            UnityEngine.Debug.LogError(text);
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("E", text);
+#endif
         }
 #else
         public static void Log (string message, params object[] args)
@@ -193,6 +223,12 @@ namespace Fun
         public static int GetLogLength() { return 0; }
         public static string GetLogString() { return ""; }
         public static void RemoveAllLogFiles () {}
+#endif
+
+
+#if ENABLE_OUTPUT
+        public delegate void OutputListener (string type, string message);
+        public static event OutputListener OutputCallback;
 #endif
     }
 
