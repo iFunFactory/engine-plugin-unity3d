@@ -67,23 +67,43 @@ namespace Fun
             if (msg is Enum)
                 msg = (Int32)msg;
 
-            FunMessage _msg = new FunMessage();
-            Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
-            return _msg;
+            try
+            {
+                FunMessage _msg = new FunMessage();
+                Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
+                return _msg;
+            }
+            catch (Exception e)
+            {
+                Type type = MessageTable.GetType(msg_type);
+                FunDebug.LogError("Failed to create {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+
+                if (ParsingErrorCallback != null)
+                    ParsingErrorCallback(type);
+            }
+
+            return null;
         }
 
         public static object GetMessage (FunMessage msg, MessageType msg_type)
         {
-            object _msg = null;
-            bool success = Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
-                                                  (int)msg_type, DataFormat.Default, true, out _msg);
-            if (!success)
+            try
             {
-                FunDebug.Log("Failed to decode {0} {1}", MessageTable.GetType(msg_type), (int)msg_type);
-                return null;
+                object _msg = null;
+                Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
+                                       (int)msg_type, DataFormat.Default, true, out _msg);
+                return _msg;
+            }
+            catch (Exception e)
+            {
+                Type type = MessageTable.GetType(msg_type);
+                FunDebug.LogError("Failed to decode {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+
+                if (ParsingErrorCallback != null)
+                    ParsingErrorCallback(type);
             }
 
-            return _msg;
+            return null;
         }
 
         // For Multicast messages
@@ -92,23 +112,43 @@ namespace Fun
             if (msg is Enum)
                 msg = (Int32)msg;
 
-            FunMulticastMessage _msg = new FunMulticastMessage();
-            Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
-            return _msg;
+            try
+            {
+                FunMulticastMessage _msg = new FunMulticastMessage();
+                Extensible.AppendValue(serializer_, _msg, (int)msg_type, DataFormat.Default, msg);
+                return _msg;
+            }
+            catch (Exception e)
+            {
+                Type type = MessageTable.GetType(msg_type);
+                FunDebug.LogError("Failed to create {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+
+                if (ParsingErrorCallback != null)
+                    ParsingErrorCallback(type);
+            }
+
+            return null;
         }
 
         public static object GetMulticastMessage (FunMulticastMessage msg, MulticastMessageType msg_type)
         {
-            object _msg = null;
-            bool success = Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
-                                                  (int)msg_type, DataFormat.Default, true, out _msg);
-            if (!success)
+            try
             {
-                FunDebug.Log("Failed to decode {0} {1}", MessageTable.GetType(msg_type), (int)msg_type);
-                return null;
+                object _msg = null;
+                Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
+                                       (int)msg_type, DataFormat.Default, true, out _msg);
+                return _msg;
+            }
+            catch (Exception e)
+            {
+                Type type = MessageTable.GetType(msg_type);
+                FunDebug.LogError("Failed to decode {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+
+                if (ParsingErrorCallback != null)
+                    ParsingErrorCallback(type);
             }
 
-            return _msg;
+            return null;
         }
 
         public static object Deserialize (string buffer)
@@ -148,5 +188,9 @@ namespace Fun
         // protobuf-related members.
         static Type funmsg_type_ = typeof(FunMessage);
         static FunMessageSerializer serializer_ = new FunMessageSerializer();
+
+        // message error callback
+        public delegate void ParsingErrorHandler (Type msg_type);
+        public static event ParsingErrorHandler ParsingErrorCallback;
     }
 }
