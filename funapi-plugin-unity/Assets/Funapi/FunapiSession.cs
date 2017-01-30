@@ -334,12 +334,12 @@ namespace Fun
 
         protected override void onQuit ()
         {
+            stopAllTransports(true);
+
             lock (state_lock_)
             {
                 state_ = State.kUnknown;
             }
-
-            stopAllTransports(true);
             onSessionEvent(SessionEventType.kStopped);
         }
 

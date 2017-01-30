@@ -61,7 +61,7 @@ Funapi plugin unity
 ```
 
 위의 폴더 중 ``Funapi``, ``Plugins`` 폴더를 플러그인을 사용할 프로젝트의 ``Assets`` 폴더로
-복사하면 됩니다. **HTTPs**  를 사용한다면 ``Editor``와 ``Resources`` 폴더도 함께 복사해 주세요.
+복사하면 됩니다. **HTTPS**  를 사용한다면 ``Editor``와 ``Resources`` 폴더도 함께 복사해 주세요.
 
 아래 세 개의 DLL은 Protobuf 메시지를 사용하기 위한 DLL인데 포함된 DLL들은 샘플용 메시지이므로
 Protobuf를 사용할 경우 서버 프로젝트에서 메시지를 정의하고 만든 DLL을 사용해야 합니다.
