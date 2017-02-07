@@ -13,7 +13,9 @@ using System.Security.Cryptography;
 
 public class Sodium
 {
-  // 라이브러리 초기화를 위해 프로그램 시작 시점에 한 번 호출해줘야 한다.
+    static RNGCryptoServiceProvider random = new RNGCryptoServiceProvider();
+
+    // 라이브러리 초기화를 위해 프로그램 시작 시점에 한 번 호출해줘야 한다.
     public static void Init ()
     {
         sodium_init();
@@ -21,7 +23,6 @@ public class Sodium
 
     public static byte[] RandomBytes (uint size)
     {
-        var random = new RNGCryptoServiceProvider();
         byte[] buf = new byte[size];
         random.GetBytes(buf);
         return buf;
