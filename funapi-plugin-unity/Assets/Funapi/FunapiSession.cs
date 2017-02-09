@@ -1,4 +1,4 @@
-﻿// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
+// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -334,12 +334,12 @@ namespace Fun
 
         protected override void onQuit ()
         {
-            stopAllTransports(true);
-
             lock (state_lock_)
             {
                 state_ = State.kUnknown;
             }
+
+            stopAllTransports(true);
             onSessionEvent(SessionEventType.kStopped);
         }
 
@@ -857,12 +857,6 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
-            if (!Started)
-            {
-                Log("The network module already stopped.");
-                return;
-            }
-
             Log("Stopping a network module.");
 
             if (force_stop)
@@ -1054,6 +1048,27 @@ namespace Fun
                 return;
 
             Log("{0} transport stopped.", convertString(protocol));
+
+            if (isReliableTransport(protocol) && send_queue_.Count > 0)
+            {
+                lock(send_queue_)
+                {
+                    Queue<FunapiMessage> new_send_queue = new Queue<FunapiMessage>();
+                    while (send_queue_.Count > 0)
+                    {
+                        FunapiMessage message = send_queue_.Dequeue();
+                        if (message.protocol == protocol)
+                        {
+                            unsent_queue_.Enqueue(message);
+                        }
+                        else
+                        {
+                            new_send_queue.Enqueue(message);
+                        }
+                    }
+                    send_queue_ = new_send_queue;
+                }
+            }
 
             checkTransportStatus(protocol);
             onTransportEvent(protocol, TransportEventType.kStopped);
