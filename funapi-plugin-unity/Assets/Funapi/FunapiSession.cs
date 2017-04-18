@@ -1,4 +1,4 @@
-// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
+﻿// Copyright 2013-2016 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -209,13 +209,27 @@ namespace Fun
             else if (transport != null &&
                      (reliable_transport || transport.state == Transport.State.kEstablished))
             {
+                FunapiMessage fun_msg = null;
+                bool sending_sequence = isSendingSequence(transport);
                 if (transport.encoding == FunEncoding.kJson)
                 {
-                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type));
+                    fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type);
+                    if (reliable_transport || sending_sequence)
+                    {
+                        UInt32 seq = getNextSeq(protocol);
+                        json_helper_.SetIntegerField(fun_msg.message, kSeqNumberField, seq);
+                    }
+                    unsent_queue_.Enqueue(fun_msg);
                 }
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
-                    unsent_queue_.Enqueue(new FunapiMessage(protocol, msg_type, message, enc_type));
+                    fun_msg = new FunapiMessage(protocol, msg_type, message, enc_type);
+                    FunMessage pbuf = fun_msg.message as FunMessage;
+                    if (reliable_transport || sending_sequence)
+                    {
+                        pbuf.seq = getNextSeq(protocol);
+                    }
+                    unsent_queue_.Enqueue(fun_msg);
                 }
 
                 Log("SendMessage - '{0}' message queued.", msg_type);
@@ -1190,14 +1204,11 @@ namespace Fun
 
                     if (reliable_transport || sending_sequence)
                     {
-                        UInt32 seq = getNextSeq(transport.protocol);
-                        json_helper_.SetIntegerField(json, kSeqNumberField, seq);
-
                         if (reliable_transport)
                             send_queue_.Enqueue(msg);
 
                         Log("{0} send unsent message - msgtype:{1} seq:{2}",
-                            convertString(transport.protocol), msg.msg_type, seq);
+                            convertString(transport.protocol), msg.msg_type, json_helper_.GetIntegerField(json, kSeqNumberField));
                     }
                     else
                     {
@@ -1215,8 +1226,6 @@ namespace Fun
 
                     if (reliable_transport || sending_sequence)
                     {
-                        pbuf.seq = getNextSeq(transport.protocol);
-
                         if (reliable_transport)
                             send_queue_.Enqueue(msg);
 
