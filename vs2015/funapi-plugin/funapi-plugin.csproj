@@ -49,25 +49,25 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Funapi\ConnectList.cs" />
-    <Compile Include="Funapi\Crypto.cs" />
-    <Compile Include="Funapi\DebugUtils.cs" />
-    <Compile Include="Funapi\FunapiAnnouncement.cs" />
-    <Compile Include="Funapi\FunapiChat.cs" />
-    <Compile Include="Funapi\FunapiDownloader.cs" />
-    <Compile Include="Funapi\FunapiEncryption.cs" />
-    <Compile Include="Funapi\FunapiMessage.cs" />
-    <Compile Include="Funapi\FunapiMulticasting.cs" />
-    <Compile Include="Funapi\FunapiNetwork.cs" />
-    <Compile Include="Funapi\FunapiSession.cs" />
-    <Compile Include="Funapi\FunapiSession.Transport.cs" />
-    <Compile Include="Funapi\FunapiTransport.cs" />
-    <Compile Include="Funapi\FunapiUtils.cs" />
-    <Compile Include="Funapi\JsonAccessor.cs" />
-    <Compile Include="Funapi\MD5Async.cs" />
-    <Compile Include="Funapi\MozRoots.cs" />
-    <Compile Include="Funapi\SessionId.cs" />
-    <Compile Include="Plugins\MiniJSON.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\ConnectList.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\Crypto.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\DebugUtils.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiAnnouncement.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiChat.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiDownloader.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiEncryption.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiMessage.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiMulticasting.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiNetwork.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiSession.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiSession.Transport.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiTransport.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\FunapiUtils.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\JsonAccessor.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\MD5Async.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\MozRoots.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\SessionId.cs" />
+    <Compile Include="..\..\funapi-plugin-unity\Assets\Plugins\MiniJSON.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

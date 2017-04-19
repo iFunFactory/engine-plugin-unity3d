@@ -7,7 +7,6 @@
 // consent of iFunFactory Inc.
 
 using Fun;
-using MiniJSON;
 using System.Collections.Generic;
 
 // protobuf
@@ -37,7 +36,7 @@ namespace funapi_plugin_tester
                 session_.TransportErrorCallback += onTransportError;
                 session_.ReceivedMessageCallback += onReceivedMessage;
 
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < protocols.Count; ++i)
                 {
                     TransportOption option = new TransportOption();
                     if (protocols[i] == TransportProtocol.kTcp)
@@ -59,18 +58,13 @@ namespace funapi_plugin_tester
 
                     option.ConnectionTimeout = 3f;
 
-                    //if (protocols[i] == TransportProtocol.kTcp)
-                    //    option.Encryption = EncryptionType.kIFunEngine1Encryption;
-                    //else
-                    //    option.Encryption = EncryptionType.kIFunEngine2Encryption;
-
                     ushort port = getPort(protocols[i], encodings[i]);
                     session_.Connect(protocols[i], encodings[i], port, option);
                 }
             }
             else
             {
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < protocols.Count; ++i)
                 {
                     session_.Connect(protocols[i]);
                 }
@@ -101,19 +95,9 @@ namespace funapi_plugin_tester
 
         public void SendMessage (TransportProtocol protocol, string message)
         {
-            if (protocol == TransportProtocol.kTcp)
-            {
-                PbufEchoMessage echo = new PbufEchoMessage();
-                echo.msg = message;
-                FunMessage fmsg = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-                session_.SendMessage(MessageType.pbuf_echo, fmsg, protocol);
-            }
-            else
-            {
-                Dictionary<string, object> echo = new Dictionary<string, object>();
-                echo["message"] = message;
-                session_.SendMessage("echo", echo, protocol);
-            }
+            Dictionary<string, object> echo = new Dictionary<string, object>();
+            echo["message"] = message;
+            session_.SendMessage("echo", echo, protocol);
         }
 
 
@@ -172,11 +156,11 @@ namespace funapi_plugin_tester
 
         // Protocol constants.
         static readonly List<TransportProtocol> protocols = new List<TransportProtocol>() {
-            TransportProtocol.kTcp, TransportProtocol.kUdp, TransportProtocol.kHttp };
+            TransportProtocol.kTcp, TransportProtocol.kHttp };
 
         // Encoding constants.
         static readonly List<FunEncoding> encodings = new List<FunEncoding>() {
-            FunEncoding.kProtobuf, FunEncoding.kJson, FunEncoding.kJson };
+            FunEncoding.kJson, FunEncoding.kJson };
 
 
         // Member variables.

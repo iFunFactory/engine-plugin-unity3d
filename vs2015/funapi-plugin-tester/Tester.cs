@@ -19,7 +19,7 @@ namespace funapi_plugin_tester
     public class Tester
     {
         const int kClientMax = 10;
-        const bool reliableSession = true;
+        const bool reliableSession = false;
         const string kServerIp = "127.0.0.1";
 
         List<Client> list_ = new List<Client>();
@@ -137,7 +137,6 @@ namespace funapi_plugin_tester
             foreach (Client c in list_)
             {
                 c.SendMessage(TransportProtocol.kTcp, "tcp message");
-                c.SendMessage(TransportProtocol.kUdp, "udp message");
                 c.SendMessage(TransportProtocol.kHttp, "http message");
             }
 

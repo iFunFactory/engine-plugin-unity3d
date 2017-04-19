@@ -169,7 +169,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int sodium_init();
 
@@ -182,7 +182,7 @@ public class Sodium
 #if (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern void sodium_increment (byte[] n, UIntPtr nlen);
 #endif
@@ -192,7 +192,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_scalarmult_base (byte[] q, byte[] n);
 
@@ -201,7 +201,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_scalarmult (byte[] q, byte[] n, byte[] p);
 
@@ -214,7 +214,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_stream_chacha20_xor_ic (
         byte[] c, byte[] m, ulong mlen, byte[] n, ulong ic, byte[] k);
@@ -224,7 +224,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_stream_chacha20_xor_ic_offset (
         byte[] c, ulong c_offset, byte[] m, ulong m_offset, ulong mlen, byte[] n, ulong ic, byte[] k);
@@ -237,7 +237,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_stream_aes128ctr_xor (
         byte[] c, byte[] m, ulong inlen, byte[] n, byte[] k);
@@ -248,7 +248,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_stream_aes128ctr_beforenm (byte[] tbl, byte[] k);
 
@@ -261,7 +261,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_stream_aes128ctr_xor_afternm (
         byte[] c, byte[] m, ulong len, byte[] nonce, byte[] tbl);
@@ -276,7 +276,7 @@ public class Sodium
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
 #else
-    [DllImport("sodium")]
+    [DllImport("sodium", CallingConvention = CallingConvention.Cdecl)]
 #endif
     private static extern int crypto_stream_aes128ctr_xor_afternm_offset (
         byte[] c, ulong c_offset, byte[] m, ulong m_offset, ulong len, byte[] nonce, byte[] tbl);
