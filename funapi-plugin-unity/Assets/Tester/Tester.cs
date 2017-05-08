@@ -38,6 +38,8 @@ public partial class Tester : MonoBehaviour
 
     void Awake ()
     {
+        FunapiEncryptor.public_key = encryptionPublicKey;
+
         option_ = optionPopup.GetComponent<UIOption>();
         option_.Init();
 
@@ -163,7 +165,7 @@ public partial class Tester : MonoBehaviour
 
     public void OnClearLogs ()
     {
-        logs.Clear();
+        logPanel.Clear();
     }
 
 
@@ -337,13 +339,15 @@ public partial class Tester : MonoBehaviour
     }
 
 
-    static int sendingCount = 1;
+    static readonly int sendingCount = 1;
+    static readonly string encryptionPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
     FunapiSession session_ = null;
     bool session_test_ = false;
 
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
-    public GameObject optionPopup;
     UIOption option_;
-    public UILogs logs;
+
+    public GameObject optionPopup;
+    public UILogs logPanel;
 }

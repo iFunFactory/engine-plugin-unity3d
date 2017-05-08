@@ -425,8 +425,6 @@ namespace Fun
     {
         public FunapiEncryptor ()
         {
-            public_key = kDefaultPublicKey;
-
             setDebugObject(this);
         }
 
@@ -639,8 +637,6 @@ namespace Fun
             }
         }
 
-
-        const string kDefaultPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
         const string kEncryptionHandshakeBegin = "HELLO!";
         const char kDelim1 = '-';
