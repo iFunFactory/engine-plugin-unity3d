@@ -28,8 +28,6 @@ public partial class Tester : MonoBehaviour
         {
             if (FinishedCallback != null)
                 FinishedCallback();
-
-            FunDebug.Log("---------- Finished ----------");
         }
 
         public event Action FinishedCallback;
@@ -66,6 +64,7 @@ public partial class Tester : MonoBehaviour
 
     public void OnCreateSession ()
     {
+        dashLog("Start Test");
         buttons_["create"].interactable = false;
 
         createSession();
@@ -80,12 +79,10 @@ public partial class Tester : MonoBehaviour
     {
         dashLog("Session Test");
         buttons_["session"].interactable = false;
-        session_test_ = true;
 
         Session session = new Session();
         session.FinishedCallback += delegate() {
             session = null;
-            session_test_ = false;
             buttons_["session"].interactable = true;
         };
 
@@ -127,7 +124,6 @@ public partial class Tester : MonoBehaviour
         Announce announce = new Announce();
         announce.FinishedCallback += delegate() {
             announce = null;
-            dashLog("Finished");
         };
 
         announce.Start(option_.serverAddress);
@@ -140,7 +136,6 @@ public partial class Tester : MonoBehaviour
         Download download = new Download();
         download.FinishedCallback += delegate() {
             download = null;
-            dashLog("Finished");
         };
 
         download.Start(option_.serverAddress);
@@ -171,12 +166,13 @@ public partial class Tester : MonoBehaviour
 
     void createSession ()
     {
-        if (session_ != null)
-            return;
-
-        session_ = FunapiSession.Create(option_.serverAddress, option_.sessionReliability);
-        session_.SessionEventCallback += onSessionEvent;
-        session_.TransportEventCallback += onTransportEvent;
+        if (session_ == null || option_.bChanged)
+        {
+            session_ = FunapiSession.Create(option_.serverAddress, option_.sessionReliability);
+            session_.SessionEventCallback += onSessionEvent;
+            session_.TransportEventCallback += onTransportEvent;
+            option_.bChanged = false;
+        }
 
         if (option_.connectTcp)
             tryConnect(TransportProtocol.kTcp);
@@ -193,7 +189,6 @@ public partial class Tester : MonoBehaviour
         if (session_ != null)
         {
             session_.Stop();
-            session_ = null;
         }
 
         buttons_["create"].interactable = true;
@@ -291,13 +286,16 @@ public partial class Tester : MonoBehaviour
         }
         else if (type == SessionEventType.kStopped)
         {
-            if (!session_test_)
-                closeSession();
         }
     }
 
     void onTransportEvent (TransportProtocol protocol, TransportEventType type)
     {
+        if (type == TransportEventType.kStarted)
+        {
+            if (!buttons_["close"].IsInteractable())
+                setButtonState(true);
+        }
     }
 
     static void onMulticastChannelList (FunEncoding encoding, object channel_list)
@@ -343,7 +341,6 @@ public partial class Tester : MonoBehaviour
     static readonly string encryptionPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
     FunapiSession session_ = null;
-    bool session_test_ = false;
 
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
     UIOption option_;
