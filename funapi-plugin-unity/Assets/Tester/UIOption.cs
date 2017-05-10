@@ -58,6 +58,9 @@ public partial class UIOption : MonoBehaviour
 
     void saveData ()
     {
+        if (!checkChanges())
+            return;
+
         data_.serverAddress = fields_.serverAddress.text;
         data_.sessionReliability = fields_.sessionReliability.isOn;
         data_.sequenceValidation = fields_.sequenceValidation.isOn;
@@ -81,6 +84,38 @@ public partial class UIOption : MonoBehaviour
         data_.httpEncryption = fields_.httpEncryption.typeInt;
         data_.HTTPS = fields_.HTTPS.isOn;
         data_.useWWW = fields_.useWWW.isOn;
+    }
+
+    bool checkChanges ()
+    {
+        if (bChanged)
+            return true;
+
+        if (data_.serverAddress != fields_.serverAddress.text ||
+            data_.sessionReliability != fields_.sessionReliability.isOn ||
+            data_.sequenceValidation != fields_.sequenceValidation.isOn ||
+            data_.connectTcp != fields_.connectTcp.isOn ||
+            data_.tcpPort != int.Parse(fields_.tcpPort.text) ||
+            data_.tcpEncoding != fields_.tcpEncoding.typeInt ||
+            data_.tcpEncryption != fields_.tcpEncryption.typeInt ||
+            data_.autoReconnect != fields_.autoReconnect.isOn ||
+            data_.disableNagle != fields_.disableNagle.isOn ||
+            data_.usePing != fields_.usePing.isOn ||
+            data_.connectUdp != fields_.connectUdp.isOn ||
+            data_.udpPort != int.Parse(fields_.udpPort.text) ||
+            data_.udpEncoding != fields_.udpEncoding.typeInt ||
+            data_.udpEncryption != fields_.udpEncryption.typeInt ||
+            data_.connectHttp != fields_.connectHttp.isOn ||
+            data_.httpPort != int.Parse(fields_.httpPort.text) ||
+            data_.httpEncoding != fields_.httpEncoding.typeInt ||
+            data_.httpEncryption != fields_.httpEncryption.typeInt ||
+            data_.HTTPS != fields_.HTTPS.isOn ||
+            data_.useWWW != fields_.useWWW.isOn)
+        {
+            bChanged = true;
+        }
+
+        return bChanged;
     }
 
 
@@ -107,6 +142,8 @@ public partial class UIOption : MonoBehaviour
     public EncryptionType httpEncryption { get { return fields_.httpEncryption.type; } }
     public bool HTTPS { get { return fields_.HTTPS.isOn; } }
     public bool useWWW { get { return fields_.useWWW; } }
+
+    public bool bChanged { get; set; }
 
     public GameObject fieldsObject;
 
