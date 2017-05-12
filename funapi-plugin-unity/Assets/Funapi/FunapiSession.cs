@@ -148,12 +148,6 @@ namespace Fun
                     // Encodes a messsage type
                     json_helper_.SetStringField(fun_msg.message, kMessageTypeField, msg_type);
 
-                    // Encodes a session id, if any.
-                    if (session_id_.IsValid)
-                    {
-                        json_helper_.SetStringField(fun_msg.message, kSessionIdField, (string)session_id_);
-                    }
-
                     if (reliable_transport || sending_sequence)
                     {
                         UInt32 seq = getNextSeq(protocol);
@@ -177,10 +171,6 @@ namespace Fun
 
                     FunMessage pbuf = fun_msg.message as FunMessage;
                     pbuf.msgtype = msg_type;
-
-                    // Encodes a session id, if any.
-                    if (session_id_.IsValid)
-                        pbuf.sid = (byte[])session_id_;
 
                     if (reliable_transport || sending_sequence)
                     {
@@ -672,7 +662,6 @@ namespace Fun
             {
                 object msg = FunapiMessage.Deserialize("{}");
                 json_helper_.SetStringField(msg, kMessageTypeField, kRedirectConnectType);
-                json_helper_.SetStringField(msg, kSessionIdField, (string)session_id_);
                 json_helper_.SetStringField(msg, "token", token);
                 SendMessage(kRedirectConnectType, msg, transport.protocol);
             }
@@ -682,7 +671,6 @@ namespace Fun
                 msg.token = token;
                 FunMessage funmsg = FunapiMessage.CreateFunMessage(msg, MessageType._cs_redirect_connect);
                 funmsg.msgtype = kRedirectConnectType;
-                funmsg.sid = (byte[])session_id_;
                 SendMessage(kRedirectConnectType, funmsg, transport.protocol);
             }
         }
@@ -1154,14 +1142,12 @@ namespace Fun
             if (transport.encoding == FunEncoding.kJson)
             {
                 object ack_msg = FunapiMessage.Deserialize("{}");
-                json_helper_.SetStringField(ack_msg, kSessionIdField, (string)session_id_);
                 json_helper_.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
-                ack_msg.sid = (byte[])session_id_;
                 ack_msg.ack = ack;
                 transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
             }
@@ -1194,9 +1180,6 @@ namespace Fun
                     // Encodes a messsage type
                     json_helper_.SetStringField(json, kMessageTypeField, msg.msg_type);
 
-                    if (session_id_.IsValid)
-                        json_helper_.SetStringField(json, kSessionIdField, (string)session_id_);
-
                     if (reliable_transport || sending_sequence)
                     {
                         if (reliable_transport)
@@ -1215,9 +1198,6 @@ namespace Fun
                 {
                     FunMessage pbuf = msg.message as FunMessage;
                     pbuf.msgtype = msg.msg_type;
-
-                    if (session_id_.IsValid)
-                        pbuf.sid = (byte[])session_id_;
 
                     if (reliable_transport || sending_sequence)
                     {

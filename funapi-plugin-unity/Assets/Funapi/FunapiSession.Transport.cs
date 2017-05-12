@@ -202,6 +202,26 @@ namespace Fun
             {
                 try
                 {
+                    if (session_id_.IsValid && fun_msg.message != null)
+                    {
+                        if (fun_msg.msg_type == kEncryptionPublicKey)
+                        {
+                            // Do not send session id
+                        }
+                        else
+                        {
+                            if (encoding == FunEncoding.kJson)
+                            {
+                                json_helper_.SetStringField(fun_msg.message, kSessionIdField, (string)session_id_);
+                            }
+                            else if (encoding == FunEncoding.kProtobuf)
+                            {
+                                FunMessage msg = fun_msg.message as FunMessage;
+                                msg.sid = (byte[])session_id_;
+                            }
+                        }
+                    }
+
                     lock (sending_lock_)
                     {
                         fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
@@ -914,7 +934,6 @@ namespace Fun
                 {
                     object msg = FunapiMessage.Deserialize("{}");
                     json_helper_.SetStringField(msg, kMessageTypeField, kClientPingMessageType);
-                    json_helper_.SetStringField(msg, kSessionIdField, (string)session_id_);
                     json_helper_.SetIntegerField(msg, kPingTimestampField, timestamp);
                     SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
                 }
@@ -924,7 +943,6 @@ namespace Fun
                     ping.timestamp = timestamp;
                     FunMessage msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
                     msg.msgtype = kClientPingMessageType;
-                    msg.sid = (byte[])session_id_;
                     SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
                 }
 
@@ -941,8 +959,6 @@ namespace Fun
 
                     if (!session_id_.IsValid)
                         session_id_.SetId(json_helper_.GetStringField(body, kSessionIdField));
-
-                    json_helper_.SetStringField(body, kSessionIdField, (string)session_id_);
 
                     SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, json_helper_.Clone(body)));
                 }
@@ -965,7 +981,6 @@ namespace Fun
 
                     FunMessage send_msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
                     send_msg.msgtype = msg.msgtype;
-                    send_msg.sid = (byte[])session_id_;
 
                     SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, send_msg));
                 }
