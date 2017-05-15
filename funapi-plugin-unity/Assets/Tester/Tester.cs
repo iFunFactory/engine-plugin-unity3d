@@ -22,7 +22,7 @@ public partial class Tester : MonoBehaviour
 {
     public abstract class Base
     {
-        public abstract IEnumerator Start (FunapiSession session, UIOption option);
+        public abstract IEnumerator Start (FunapiSession session);
 
         public void OnFinished ()
         {
@@ -86,7 +86,7 @@ public partial class Tester : MonoBehaviour
             buttons_["session"].interactable = true;
         };
 
-        StartCoroutine(session.Start(session_, option_));
+        StartCoroutine(session.Start(session_));
     }
 
     public void OnMulticastTest ()
@@ -100,7 +100,7 @@ public partial class Tester : MonoBehaviour
             buttons_["multicast"].interactable = true;
         };
 
-        StartCoroutine(multicast.Start(session_, option_));
+        StartCoroutine(multicast.Start(session_));
     }
 
     public void OnChattingTest ()
@@ -114,7 +114,7 @@ public partial class Tester : MonoBehaviour
             buttons_["chatting"].interactable = true;
         };
 
-        StartCoroutine(chatting.Start(session_, option_));
+        StartCoroutine(chatting.Start(session_));
     }
 
     public void OnAnnounceTest ()

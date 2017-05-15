@@ -88,7 +88,7 @@ namespace Fun
     {
         // Abstract class to represent Transport used by Funapi
         // TCP, UDP, and HTTP.
-        private abstract class Transport : FunapiEncryptor
+        public abstract class Transport : FunapiEncryptor
         {
             public Transport ()
             {
@@ -263,6 +263,11 @@ namespace Fun
             //
             // Properties
             //
+            public HostAddr address
+            {
+                get { return ip_list_.GetCurAddress(); }
+            }
+
             public TransportProtocol protocol
             {
                 get { return protocol_; }
@@ -2113,8 +2118,8 @@ namespace Fun
 
 
         // Event handler delegate
-        delegate void EventNotifyHandler (TransportProtocol protocol);
-        delegate void MessageNotifyHandler (FunapiMessage message);
+        public delegate void EventNotifyHandler (TransportProtocol protocol);
+        public delegate void MessageNotifyHandler (FunapiMessage message);
     }
 
 }  // namespace Fun

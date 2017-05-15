@@ -16,10 +16,17 @@ public partial class Tester
 {
     public class Chatting : Base
     {
-        public override IEnumerator Start (FunapiSession session, UIOption option)
+        public override IEnumerator Start (FunapiSession session)
         {
+            FunapiSession.Transport transport = session.GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+            {
+                FunDebug.Log("Can't find TCP transport.");
+                yield return null;
+            }
+
             // MulticastClient
-            FunEncoding encoding = option.tcpEncoding;
+            FunEncoding encoding = transport.encoding;
             chat_ = new FunapiChatClient(session, encoding);
             chat_.sender = "player_" + UnityEngine.Random.Range(1, 100);
 

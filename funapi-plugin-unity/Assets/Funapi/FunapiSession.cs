@@ -101,7 +101,7 @@ namespace Fun
                 createUpdater();
             }
 
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport == null || transport.Started)
                 return;
 
@@ -129,7 +129,7 @@ namespace Fun
 
         public void Stop (TransportProtocol protocol)
         {
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport == null || mono == null)
                 return;
 
@@ -139,6 +139,39 @@ namespace Fun
             mono.StartCoroutine(() => tryToStopTransport(transport));
 #endif
         }
+
+
+        public Dictionary<TransportProtocol, HostAddr> GetAddressList()
+        {
+            Dictionary<TransportProtocol, HostAddr> list = new Dictionary<TransportProtocol, HostAddr>();
+            lock (transports_lock_)
+            {
+                foreach (Transport t in transports_.Values)
+                    list.Add(t.protocol, t.address);
+            }
+
+            return list;
+        }
+
+        public bool HasTransport (TransportProtocol protocol)
+        {
+            lock (transports_lock_)
+            {
+                return transports_.ContainsKey(protocol);
+            }
+        }
+
+        public Transport GetTransport (TransportProtocol protocol)
+        {
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(protocol))
+                    return transports_[protocol];
+            }
+
+            return null;
+        }
+
 
         public void SendMessage (MessageType msg_type, object message,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
@@ -154,7 +187,7 @@ namespace Fun
             if (protocol == TransportProtocol.kDefault)
                 protocol = default_protocol_;
 
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             bool reliable_transport = isReliableTransport(protocol);
 
             if (transport != null && transport.state == Transport.State.kEstablished &&
@@ -329,6 +362,19 @@ namespace Fun
                 }
 
                 return false;
+            }
+        }
+
+        // ping time in milliseconds
+        public int PingTime
+        {
+            get
+            {
+                Transport transport = GetTransport(TransportProtocol.kTcp);
+                if (transport != null)
+                    return transport.PingTime;
+
+                return 0;
             }
         }
 
@@ -665,7 +711,7 @@ namespace Fun
             if (succeeded)
             {
                 // Sending token.
-                Transport transport = getTransport(default_protocol_);
+                Transport transport = GetTransport(default_protocol_);
                 sendRedirectToken(transport, redirect_token_);
             }
             else
@@ -710,7 +756,7 @@ namespace Fun
         Transport createTransport (TransportProtocol protocol, FunEncoding encoding,
                                    UInt16 port, TransportOption option = null)
         {
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport != null)
                 return transport;
 
@@ -794,7 +840,7 @@ namespace Fun
 
         void startTransport (TransportProtocol protocol)
         {
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport == null)
                 return;
 
@@ -989,17 +1035,6 @@ namespace Fun
             return transport.SequenceValidation;
         }
 
-        Transport getTransport (TransportProtocol protocol)
-        {
-            lock (transports_lock_)
-            {
-                if (transports_.ContainsKey(protocol))
-                    return transports_[protocol];
-            }
-
-            return null;
-        }
-
         Transport findConnectedTransport (TransportProtocol except_protocol)
         {
             lock (transports_lock_)
@@ -1025,7 +1060,7 @@ namespace Fun
         //
         void onTransportStarted (TransportProtocol protocol)
         {
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport == null)
                 return;
 
@@ -1062,7 +1097,7 @@ namespace Fun
 
         void onTransportStopped (TransportProtocol protocol)
         {
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport == null)
                 return;
 
@@ -1074,7 +1109,7 @@ namespace Fun
 
         void onTransportError (TransportProtocol protocol)
         {
-            Transport transport = getTransport(protocol);
+            Transport transport = GetTransport(protocol);
             if (transport == null)
                 return;
 
@@ -1093,7 +1128,7 @@ namespace Fun
         {
             Log("{0} transport connection timed out.", convertString(protocol));
 
-            stopTransport(getTransport(protocol));
+            stopTransport(GetTransport(protocol));
 
             onTransportEvent(protocol, TransportEventType.kConnectionTimedOut);
         }
@@ -1163,7 +1198,7 @@ namespace Fun
 
             foreach (FunapiMessage msg in unsent_queue_)
             {
-                Transport transport = getTransport(msg.protocol);
+                Transport transport = GetTransport(msg.protocol);
                 if (transport == null || transport.state != Transport.State.kEstablished)
                 {
                     Log("sendUnsentMessages - {0} transport is invalid. '{1}' message skipped.",
@@ -1244,7 +1279,7 @@ namespace Fun
                 return;
             }
 
-            Transport transport = getTransport(msg.protocol);
+            Transport transport = GetTransport(msg.protocol);
             if (transport == null)
                 return;
 

@@ -19,10 +19,17 @@ public partial class Tester
 {
     public class Multicast : Base
     {
-        public override IEnumerator Start (FunapiSession session, UIOption option)
+        public override IEnumerator Start (FunapiSession session)
         {
+            FunapiSession.Transport transport = session.GetTransport(TransportProtocol.kTcp);
+            if (transport == null)
+            {
+                FunDebug.Log("Can't find TCP transport.");
+                yield return null;
+            }
+
             // MulticastClient
-            FunEncoding encoding = option.tcpEncoding;
+            FunEncoding encoding = transport.encoding;
             multicast_ = new FunapiMulticastClient(session, encoding);
             multicast_.sender = "player_" + UnityEngine.Random.Range(1, 100);
 
