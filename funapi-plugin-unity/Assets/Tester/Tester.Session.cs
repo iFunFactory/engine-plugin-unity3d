@@ -20,10 +20,9 @@ public partial class Tester
 {
     public class Session : Base
     {
-        public override IEnumerator Start (FunapiSession session, UIOption option)
+        public override IEnumerator Start (FunapiSession session)
         {
             session_ = session;
-            option_ = option;
 
             registerHandler();
 
@@ -63,26 +62,26 @@ public partial class Tester
         {
             int i;
 
-            if (option_.connectTcp)
+            if (session_.HasTransport(TransportProtocol.kTcp))
             {
                 for (i = 0; i < sendingCount; ++i)
                     sendEchoMessage(TransportProtocol.kTcp);
             }
 
-            if (option_.connectUdp)
+            if (session_.HasTransport(TransportProtocol.kUdp))
             {
                 for (i = 0; i < sendingCount; ++i)
                     sendEchoMessage(TransportProtocol.kUdp);
             }
 
-            if (option_.connectHttp)
+            if (session_.HasTransport(TransportProtocol.kHttp))
             {
                 for (i = 0; i < sendingCount; ++i)
                     sendEchoMessage(TransportProtocol.kHttp);
             }
         }
 
-        public void sendEchoMessage (TransportProtocol protocol = TransportProtocol.kDefault)
+        public void sendEchoMessage (TransportProtocol protocol)
         {
             if (!session_.Connected && !session_.ReliableSession)
             {
@@ -90,8 +89,11 @@ public partial class Tester
                 return;
             }
 
-            FunEncoding encoding = getEncoding(protocol, option_);
-            if (encoding == FunEncoding.kJson)
+            FunapiSession.Transport transport = session_.GetTransport(protocol);
+            if (transport == null)
+                return;
+
+            if (transport.encoding == FunEncoding.kJson)
             {
                 // In this example, we are using Dictionary<string, object>.
                 // But you can use your preferred Json implementation (e.g., Json.net) instead of Dictionary,
@@ -100,7 +102,7 @@ public partial class Tester
                 message["message"] = string.Format("[{0}] hello json", protocol.ToString().Substring(1).ToLower());
                 session_.SendMessage("echo", message, protocol);
             }
-            else if (encoding == FunEncoding.kProtobuf)
+            else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = string.Format("[{0}] hello proto", protocol.ToString().Substring(1).ToLower());
@@ -173,7 +175,6 @@ public partial class Tester
 
         // Member variables.
         FunapiSession session_;
-        UIOption option_;
         Dictionary<string, MessageHandler> message_handler_ = new Dictionary<string, MessageHandler>();
     }
 }

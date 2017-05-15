@@ -42,7 +42,8 @@ namespace Fun
             this.https = https;
         }
 
-        public bool https;    }
+        public bool https;
+    }
 
 
     public class ConnectList

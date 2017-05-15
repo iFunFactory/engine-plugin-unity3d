@@ -11,7 +11,7 @@ using System.Text;
 
 namespace Fun
 {
-    class SessionId
+    public class SessionId
     {
         public void SetId (object obj)
         {
