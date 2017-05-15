@@ -172,6 +172,7 @@ public class UIOptionFields : MonoBehaviour
     public InputField serverAddress;
     public Toggle sessionReliability;
     public Toggle sequenceValidation;
+    public Toggle sendSessionIdOnlyOnce;
 
     public Toggle connectTcp;
     public InputField tcpPort;

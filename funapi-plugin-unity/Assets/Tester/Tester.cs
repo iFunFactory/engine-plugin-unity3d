@@ -168,9 +168,14 @@ public partial class Tester : MonoBehaviour
     {
         if (session_ == null || option_.bChanged)
         {
-            session_ = FunapiSession.Create(option_.serverAddress, option_.sessionReliability);
+            SessionOption session_option = new SessionOption();
+            session_option.sessionReliability = option_.sessionReliability;
+            session_option.sendSessionIdOnlyOnce = option_.sendSessionIdOnlyOnce;
+
+            session_ = FunapiSession.Create(option_.serverAddress, session_option);
             session_.SessionEventCallback += onSessionEvent;
             session_.TransportEventCallback += onTransportEvent;
+
             option_.bChanged = false;
         }
 
