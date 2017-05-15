@@ -32,25 +32,47 @@ namespace Fun
         kRedirectFailed
     };
 
+    // Session option
+    public class SessionOption
+    {
+        public bool sessionReliability = false;
+        public bool sendSessionIdOnlyOnce = false;
+    }
+
 
     public partial class FunapiSession : FunapiUpdater
     {
         //
         // Create an instance of FunapiSession.
         //
-        public static FunapiSession Create (string hostname_or_ip, bool session_reliability)
+        public static FunapiSession Create (string hostname_or_ip, SessionOption option = null)
         {
-            return new FunapiSession(hostname_or_ip, session_reliability);
+            if (option == null)
+                option = new SessionOption();
+
+            return new FunapiSession(hostname_or_ip, option);
         }
 
-        private FunapiSession (string hostname_or_ip, bool session_reliability)
+        [System.Obsolete("This will be deprecated October 2017. Please use 'FunapiSession.Create(string, SessionOption)' instead.")]
+        public static FunapiSession Create (string hostname_or_ip, bool session_reliability)
         {
+            SessionOption option = new SessionOption();
+            option.sessionReliability = session_reliability;
+
+            return new FunapiSession(hostname_or_ip, option);
+        }
+
+        private FunapiSession (string hostname_or_ip, SessionOption option)
+        {
+            FunDebug.Assert(option != null);
+
             state_ = State.kUnknown;
             server_address_ = hostname_or_ip;
-            reliable_session_ = session_reliability;
+            option_ = option;
 
             initSession();
         }
+
 
         //
         // Public functions.
@@ -273,7 +295,7 @@ namespace Fun
         //
         public bool ReliableSession
         {
-            get { return reliable_session_; }
+            get { return option_.sessionReliability; }
         }
 
         public TransportProtocol DefaultProtocol
@@ -420,7 +442,7 @@ namespace Fun
 
             lock (state_lock_)
             {
-                if (reliable_session_ || wait_redirect_)
+                if (option_.sessionReliability || wait_redirect_)
                     state_ = State.kStopped;
                 else
                     state_ = State.kUnknown;
@@ -449,7 +471,7 @@ namespace Fun
         {
             session_id_.Clear();
 
-            if (reliable_session_)
+            if (option_.sessionReliability)
             {
                 seq_recvd_ = 0;
                 send_queue_.Clear();
@@ -801,7 +823,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            transport.SetEstablish(session_id_);
+            transport.SetEstablish(session_id_, option_.sendSessionIdOnlyOnce);
 
             onTransportEvent(transport.protocol, TransportEventType.kStarted);
 
@@ -956,7 +978,7 @@ namespace Fun
 
         bool isReliableTransport (TransportProtocol protocol)
         {
-            return reliable_session_ && protocol == TransportProtocol.kTcp;
+            return option_.sessionReliability && protocol == TransportProtocol.kTcp;
         }
 
         bool isSendingSequence (Transport transport)
@@ -1232,9 +1254,12 @@ namespace Fun
             {
                 try
                 {
-                    string session_id = json_helper_.GetStringField(message, kSessionIdField);
-                    json_helper_.RemoveField(message, kSessionIdField);
-                    setSessionId(session_id);
+                    if (json_helper_.HasField(message, kSessionIdField))
+                    {
+                        string session_id = json_helper_.GetStringField(message, kSessionIdField);
+                        json_helper_.RemoveField(message, kSessionIdField);
+                        setSessionId(session_id);
+                    }
 
                     if (isReliableTransport(msg.protocol))
                     {
@@ -1267,7 +1292,8 @@ namespace Fun
 
                 try
                 {
-                    setSessionId(funmsg.sid);
+                    if (funmsg.sid != null)
+                        setSessionId(funmsg.sid);
 
                     if (isReliableTransport(msg.protocol))
                     {
@@ -1670,7 +1696,7 @@ namespace Fun
 
         // Session-related variables.
         SessionId session_id_ = new SessionId();
-        bool reliable_session_ = false;
+        SessionOption option_ = null;
         TransportProtocol first_sending_protocol_;
         static System.Random rnd_ = new System.Random();
 

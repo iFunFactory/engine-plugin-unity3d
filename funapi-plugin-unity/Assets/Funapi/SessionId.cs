@@ -40,7 +40,7 @@ namespace Fun
                 }
                 else
                 {
-                    FunDebug.LogError("Wrong session id type. obj:{0}", obj);
+                    FunDebug.LogError("Wrong object type for session id. obj:{0}", obj);
                 }
             }
         }

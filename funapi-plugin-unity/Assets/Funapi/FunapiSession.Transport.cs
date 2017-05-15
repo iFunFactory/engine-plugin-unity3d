@@ -170,6 +170,7 @@ namespace Fun
                 timer_.Clear();
                 stopPingTimer();
                 connect_timer_id_ = 0;
+                session_id_has_been_sent = false;
 
                 onClose();
 
@@ -180,10 +181,12 @@ namespace Fun
                     StoppedCallback(protocol_);
             }
 
-            public void SetEstablish (SessionId sid)
+            public void SetEstablish (SessionId sid, bool sendSessionIdOnlyOnce)
             {
                 state_ = State.kEstablished;
+
                 session_id_.SetId(sid);
+                send_session_id_only_once_ = sendSessionIdOnlyOnce;
 
                 if (enable_ping_ && ping_interval_ > 0)
                 {
@@ -202,14 +205,21 @@ namespace Fun
             {
                 try
                 {
+                    // Add session id to message
                     if (session_id_.IsValid && fun_msg.message != null)
                     {
-                        if (fun_msg.msg_type == kEncryptionPublicKey)
+                        bool do_not_send = (protocol == TransportProtocol.kTcp || protocol == TransportProtocol.kUdp)
+                                           && send_session_id_only_once_ && session_id_has_been_sent;
+
+                        if (do_not_send || fun_msg.msg_type == kEncryptionPublicKey)
                         {
                             // Do not send session id
                         }
                         else
                         {
+                            if (send_session_id_only_once_)
+                                session_id_has_been_sent = true;
+
                             if (encoding == FunEncoding.kJson)
                             {
                                 json_helper_.SetStringField(fun_msg.message, kSessionIdField, (string)session_id_);
@@ -1127,6 +1137,8 @@ namespace Fun
             bool first_sending_ = true;
             bool first_receiving_ = true;
             bool header_decoded_ = false;
+            bool send_session_id_only_once_ = false;
+            bool session_id_has_been_sent = false;
             Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
 
             protected int received_size_ = 0;

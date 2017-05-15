@@ -55,6 +55,12 @@ public partial class UIOption
             set { PlayerPrefs.SetInt("sequenceValidation", value ? 1 : 0); }
         }
 
+        public bool sendSessionIdOnlyOnce
+        {
+            get { return PlayerPrefs.GetInt("sendSessionIdOnlyOnce") == 1; }
+            set { PlayerPrefs.SetInt("sendSessionIdOnlyOnce", value ? 1 : 0); }
+        }
+
         public bool connectTcp
         {
             get { return PlayerPrefs.GetInt("connectTcp") == 1; }

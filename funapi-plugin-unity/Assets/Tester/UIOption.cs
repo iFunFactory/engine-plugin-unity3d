@@ -34,6 +34,7 @@ public partial class UIOption : MonoBehaviour
         fields_.serverAddress.text = data_.serverAddress;
         fields_.sessionReliability.isOn = data_.sessionReliability;
         fields_.sequenceValidation.isOn = data_.sequenceValidation;
+        fields_.sendSessionIdOnlyOnce.isOn = data_.sendSessionIdOnlyOnce;
 
         fields_.connectTcp.isOn = data_.connectTcp;
         fields_.tcpPort.text = data_.tcpPort.ToString();
@@ -64,6 +65,7 @@ public partial class UIOption : MonoBehaviour
         data_.serverAddress = fields_.serverAddress.text;
         data_.sessionReliability = fields_.sessionReliability.isOn;
         data_.sequenceValidation = fields_.sequenceValidation.isOn;
+        data_.sendSessionIdOnlyOnce = fields_.sendSessionIdOnlyOnce.isOn;
 
         data_.connectTcp = fields_.connectTcp.isOn;
         data_.tcpPort = int.Parse(fields_.tcpPort.text);
@@ -94,6 +96,7 @@ public partial class UIOption : MonoBehaviour
         if (data_.serverAddress != fields_.serverAddress.text ||
             data_.sessionReliability != fields_.sessionReliability.isOn ||
             data_.sequenceValidation != fields_.sequenceValidation.isOn ||
+            data_.sendSessionIdOnlyOnce != fields_.sendSessionIdOnlyOnce.isOn ||
             data_.connectTcp != fields_.connectTcp.isOn ||
             data_.tcpPort != int.Parse(fields_.tcpPort.text) ||
             data_.tcpEncoding != fields_.tcpEncoding.typeInt ||
@@ -122,6 +125,7 @@ public partial class UIOption : MonoBehaviour
     public string serverAddress { get { return fields_.serverAddress.text; } }
     public bool sessionReliability { get { return fields_.sessionReliability.isOn; } }
     public bool sequenceValidation { get { return fields_.sequenceValidation.isOn; } }
+    public bool sendSessionIdOnlyOnce { get { return fields_.sendSessionIdOnlyOnce.isOn; } }
 
     public bool connectTcp { get { return fields_.connectTcp.isOn; } }
     public ushort tcpPort { get { return ushort.Parse(fields_.tcpPort.text); } }
