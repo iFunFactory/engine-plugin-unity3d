@@ -191,7 +191,8 @@ namespace Fun
             bool reliable_transport = isReliableTransport(protocol);
 
             if (transport != null && transport.state == Transport.State.kEstablished &&
-                (reliable_transport == false || unsent_queue_.Count <= 0))
+                (reliable_transport == false || unsent_queue_.Count <= 0) &&
+                (wait_redirect_ == false || msg_type == kRedirectConnectType))
             {
                 FunapiMessage fun_msg = null;
                 bool sending_sequence = isSendingSequence(transport);
@@ -251,7 +252,7 @@ namespace Fun
 
                 transport.SendMessage(fun_msg);
             }
-            else if (transport != null &&
+            else if (transport != null && wait_redirect_ == false &&
                      (reliable_transport || transport.state == Transport.State.kEstablished))
             {
                 FunapiMessage fun_msg = null;
@@ -283,7 +284,9 @@ namespace Fun
             {
                 StringBuilder strlog = new StringBuilder();
                 strlog.AppendFormat("SendMessage - '{0}' message skipped. ", msg_type);
-                if (transport == null)
+                if (wait_redirect_)
+                    strlog.Append("Now redirecting to another server.");
+                else if (transport == null)
                     strlog.AppendFormat("There's no {0} transport.", convertString(protocol));
                 else if (transport.state != Transport.State.kEstablished)
                     strlog.AppendFormat("Transport's state is '{0}'.", transport.state);
@@ -622,15 +625,14 @@ namespace Fun
         //
         bool startRedirect (string host, List<RedirectInfo> list)
         {
-            // Notify start to redirect.
-            onSessionEvent(SessionEventType.kRedirectStarted);
-
             wait_redirect_ = true;
             server_address_ = host;
 
-            // Stopping all.
-            stopAllTransports(true);
-            onSessionClosed();
+            // Notify start to redirect.
+            onSessionEvent(SessionEventType.kRedirectStarted);
+
+            // Stopping all transports.
+            stopAllTransports();
 
 #if !NO_UNITY
             mono.StartCoroutine(tryToRedirect(list));
@@ -655,6 +657,8 @@ namespace Fun
                 Thread.Sleep(100);
 #endif
             }
+
+            onSessionClosed();
 
             // Removes transports.
             lock (transports_lock_)
