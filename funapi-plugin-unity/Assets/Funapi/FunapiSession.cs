@@ -177,7 +177,14 @@ namespace Fun
                                  TransportProtocol protocol = TransportProtocol.kDefault,
                                  EncryptionType enc_type = EncryptionType.kDefaultEncryption)
         {
-            SendMessage(MessageTable.Lookup(msg_type), message, protocol, enc_type);
+            SendMessage(kIntMessageType + ((int)msg_type).ToString(), message, protocol, enc_type);
+        }
+
+        public void SendMessage (int msg_type, object message,
+                                 TransportProtocol protocol = TransportProtocol.kDefault,
+                                 EncryptionType enc_type = EncryptionType.kDefaultEncryption)
+        {
+            SendMessage(kIntMessageType + msg_type.ToString(), message, protocol, enc_type);
         }
 
         public void SendMessage (string msg_type, object message,
@@ -201,9 +208,6 @@ namespace Fun
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type);
 
-                    // Encodes a messsage type
-                    json_helper_.SetStringField(fun_msg.message, kMessageTypeField, msg_type);
-
                     if (reliable_transport || sending_sequence)
                     {
                         UInt32 seq = getNextSeq(protocol);
@@ -226,7 +230,6 @@ namespace Fun
                     fun_msg = new FunapiMessage(protocol, msg_type, message, enc_type);
 
                     FunMessage pbuf = fun_msg.message as FunMessage;
-                    pbuf.msgtype = msg_type;
 
                     if (reliable_transport || sending_sequence)
                     {
@@ -733,7 +736,6 @@ namespace Fun
             if (transport.encoding == FunEncoding.kJson)
             {
                 object msg = FunapiMessage.Deserialize("{}");
-                json_helper_.SetStringField(msg, kMessageTypeField, kRedirectConnectType);
                 json_helper_.SetStringField(msg, "token", token);
                 SendMessage(kRedirectConnectType, msg, transport.protocol);
             }
@@ -742,7 +744,6 @@ namespace Fun
                 FunRedirectConnectMessage msg = new FunRedirectConnectMessage();
                 msg.token = token;
                 FunMessage funmsg = FunapiMessage.CreateFunMessage(msg, MessageType._cs_redirect_connect);
-                funmsg.msgtype = kRedirectConnectType;
                 SendMessage(kRedirectConnectType, funmsg, transport.protocol);
             }
         }
@@ -1238,9 +1239,6 @@ namespace Fun
                 {
                     object json = msg.message;
 
-                    // Encodes a messsage type
-                    json_helper_.SetStringField(json, kMessageTypeField, msg.msg_type);
-
                     if (reliable_transport || sending_sequence)
                     {
                         if (reliable_transport)
@@ -1258,7 +1256,6 @@ namespace Fun
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
                     FunMessage pbuf = msg.message as FunMessage;
-                    pbuf.msgtype = msg.msg_type;
 
                     if (reliable_transport || sending_sequence)
                     {
@@ -1684,6 +1681,7 @@ namespace Fun
 
 
         // Message-type-related constants.
+        const string kIntMessageType = "_int#";
         const string kMessageTypeField = "_msgtype";
         const string kSessionIdField = "_sid";
         const string kSeqNumberField = "_seq";
