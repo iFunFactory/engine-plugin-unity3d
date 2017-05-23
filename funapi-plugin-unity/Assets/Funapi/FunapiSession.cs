@@ -1349,7 +1349,7 @@ namespace Fun
 
                 try
                 {
-                    if (funmsg.sid != null)
+                    if (funmsg.sidSpecified)
                         setSessionId(funmsg.sid);
 
                     if (isReliableTransport(msg.protocol))

@@ -991,7 +991,7 @@ namespace Fun
                 // Send response
                 if (encoding_ == FunEncoding.kJson)
                 {
-                    if (!session_id_.IsValid)
+                    if (!session_id_.IsValid && json_helper_.HasField(body, kSessionIdField))
                         session_id_.SetId(json_helper_.GetStringField(body, kSessionIdField));
 
                     SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, json_helper_.Clone(body)));
@@ -1003,7 +1003,7 @@ namespace Fun
                     if (obj == null)
                         return;
 
-                    if (!session_id_.IsValid)
+                    if (!session_id_.IsValid && msg.sidSpecified)
                         session_id_.SetId(msg.sid);
 
                     FunPingMessage ping = new FunPingMessage();
