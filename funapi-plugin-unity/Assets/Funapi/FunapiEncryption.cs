@@ -63,6 +63,10 @@ namespace Fun
             return true;
         }
 
+        public virtual void Reset ()
+        {
+        }
+
         public virtual string generatePublicKey (byte[] server_pub_key)
         {
             return "";
@@ -139,6 +143,12 @@ namespace Fun
     {
         public EncryptorChacha20 () : base(EncryptionType.kChaCha20Encryption, "chacha20", State.kEstablished)
         {
+        }
+
+        public override void Reset ()
+        {
+            enc_idx_ = 0;
+            dec_idx_ = 0;
         }
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
@@ -265,6 +275,9 @@ namespace Fun
 
         bool createEncryptor (EncryptionType type)
         {
+            if (encryptors_.ContainsKey(type))
+                return true;
+
             Encryptor encryptor = Encryptor.Create(type);
             if (encryptor == null)
             {
@@ -287,6 +300,14 @@ namespace Fun
 
             default_encryptor_ = type;
             Log("Set default encryption: {0}", type);
+        }
+
+        protected void resetEncryptors ()
+        {
+            foreach (Encryptor encryptor in encryptors_.Values)
+            {
+                encryptor.Reset();
+            }
         }
 
         protected void setEncryption (EncryptionType type)
