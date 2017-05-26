@@ -64,6 +64,10 @@ namespace Fun
             return true;
         }
 
+        public virtual void Reset ()
+        {
+        }
+
         public virtual string generatePublicKey (byte[] server_pub_key)
         {
             return "";
@@ -158,6 +162,11 @@ namespace Fun
         {
             enc_key_ = 0;
             dec_key_ = 0;
+        }
+
+        public override void Reset ()
+        {
+            setState(State.kHandshaking);
         }
 
         public override bool Handshake (string in_header, ref string out_header)
@@ -306,6 +315,12 @@ namespace Fun
         {
         }
 
+        public override void Reset ()
+        {
+            enc_idx_ = 0;
+            dec_idx_ = 0;
+        }
+
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
             FunDebug.Assert(state == State.kEstablished);
@@ -430,6 +445,9 @@ namespace Fun
 
         bool createEncryptor (EncryptionType type)
         {
+            if (encryptors_.ContainsKey(type))
+                return true;
+
             Encryptor encryptor = Encryptor.Create(type);
             if (encryptor == null)
             {
@@ -452,6 +470,14 @@ namespace Fun
 
             default_encryptor_ = type;
             Log("Set default encryption: {0}", type);
+        }
+
+        protected void resetEncryptors ()
+        {
+            foreach (Encryptor encryptor in encryptors_.Values)
+            {
+                encryptor.Reset();
+            }
         }
 
         protected void setEncryption (EncryptionType type)

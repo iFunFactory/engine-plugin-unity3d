@@ -260,6 +260,7 @@ namespace Fun
             {
                 FunapiMessage fun_msg = null;
                 bool sending_sequence = isSendingSequence(transport);
+
                 if (transport.encoding == FunEncoding.kJson)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type);
@@ -1222,13 +1223,21 @@ namespace Fun
 
             Log("sendUnsentMessages - {0} unsent messages.", unsent_queue_.Count);
 
+            Queue<FunapiMessage> remained_queue = null;
+
             foreach (FunapiMessage msg in unsent_queue_)
             {
                 Transport transport = GetTransport(msg.protocol);
                 if (transport == null || transport.state != Transport.State.kEstablished)
                 {
+                    if (remained_queue == null)
+                        remained_queue = new Queue<FunapiMessage>();
+
+                    remained_queue.Enqueue(msg);
+
                     Log("sendUnsentMessages - {0} transport is invalid. '{1}' message skipped.",
                         convertString(msg.protocol), msg.msg_type);
+
                     continue;
                 }
 
@@ -1245,7 +1254,8 @@ namespace Fun
                             send_queue_.Enqueue(msg);
 
                         Log("{0} send unsent message - msgtype:{1} seq:{2}",
-                            convertString(transport.protocol), msg.msg_type, json_helper_.GetIntegerField(json, kSeqNumberField));
+                            convertString(transport.protocol), msg.msg_type,
+                                          json_helper_.GetIntegerField(json, kSeqNumberField));
                     }
                     else
                     {
@@ -1276,6 +1286,11 @@ namespace Fun
             }
 
             unsent_queue_.Clear();
+
+            if (remained_queue != null)
+            {
+                unsent_queue_ = remained_queue;
+            }
         }
 
 
