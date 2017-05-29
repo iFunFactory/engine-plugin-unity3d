@@ -23,16 +23,14 @@ namespace Fun
             ErrorCallback += onError;
         }
 
-        public bool JoinChannel (string channel_id, string my_name, OnChatMessage handler)
-        {
-            sender_ = my_name;
-
-            return this.JoinChannel(channel_id, handler);
-        }
-
         public bool JoinChannel (string channel_id, OnChatMessage handler)
         {
-            if (!base.JoinChannel(channel_id, onReceived))
+            return this.JoinChannel(channel_id, "", handler);
+        }
+
+        public bool JoinChannel (string channel_id, string token, OnChatMessage handler)
+        {
+            if (!base.JoinChannel(channel_id, token, onReceived))
                 return false;
 
             lock (chat_channel_lock_)
@@ -147,9 +145,7 @@ namespace Fun
 
         void onError (string channel_id, FunMulticastMessage.ErrorCode code)
         {
-            if (code == FunMulticastMessage.ErrorCode.EC_FULL_MEMBER ||
-                code == FunMulticastMessage.ErrorCode.EC_ALREADY_LEFT ||
-                code == FunMulticastMessage.ErrorCode.EC_CLOSED)
+            if (code != FunMulticastMessage.ErrorCode.EC_ALREADY_JOINED)
             {
                 lock (chat_channel_lock_)
                 {

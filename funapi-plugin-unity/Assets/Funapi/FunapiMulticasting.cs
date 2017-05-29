@@ -72,6 +72,11 @@ namespace Fun
 
         public bool JoinChannel (string channel_id, ChannelMessage handler)
         {
+            return JoinChannel(channel_id, "", handler);
+        }
+
+        public bool JoinChannel (string channel_id, string token, ChannelMessage handler)
+        {
             if (!Connected)
             {
                 FunDebug.Log("Not connected. First connect before join a multicast channel.");
@@ -96,6 +101,9 @@ namespace Fun
                 mcast_msg[kSender] = sender_;
                 mcast_msg[kJoin] = true;
 
+                if (token != null && token.Length > 0)
+                    mcast_msg[kToken] = token;
+
                 session_.SendMessage(kMulticastMsgType, mcast_msg);
             }
             else
@@ -104,6 +112,9 @@ namespace Fun
                 mcast_msg.channel = channel_id;
                 mcast_msg.sender = sender_;
                 mcast_msg.join = true;
+
+                if (token != null && token.Length > 0)
+                    mcast_msg.token = token;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
                 session_.SendMessage(kMulticastMsgType, fun_msg);
@@ -368,9 +379,7 @@ namespace Fun
                 FunMulticastMessage.ErrorCode code = (FunMulticastMessage.ErrorCode)error_code;
                 FunDebug.LogWarning("Multicast error - channel: {0} code: {1}", channel_id, code);
 
-                if (code == FunMulticastMessage.ErrorCode.EC_FULL_MEMBER ||
-                    code == FunMulticastMessage.ErrorCode.EC_ALREADY_LEFT ||
-                    code == FunMulticastMessage.ErrorCode.EC_CLOSED)
+                if (code != FunMulticastMessage.ErrorCode.EC_ALREADY_JOINED)
                 {
                     lock (channel_lock_)
                     {
@@ -418,6 +427,7 @@ namespace Fun
         const string kChannelId = "_channel";
         const string kSender = "_sender";
         const string kJoin = "_join";
+        const string kToken = "_token";
         const string kLeave = "_leave";
         const string kErrorCode = "_error_code";
 
