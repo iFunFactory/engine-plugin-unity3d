@@ -23,12 +23,12 @@ namespace Fun
             session_ = session;
             encoding_ = encoding;
 
-            session_.ReceivedMessageCallback += onReceived;
+            session_.MulticastMessageCallback += onReceived;
         }
 
         public void Clear ()
         {
-            session_.ReceivedMessageCallback -= onReceived;
+            session_.MulticastMessageCallback -= onReceived;
         }
 
         public string sender
@@ -293,8 +293,6 @@ namespace Fun
 
         void onReceived (string msg_type, object body)
         {
-            FunDebug.Assert(msg_type == kMulticastMsgType);
-
             string channel_id = "";
             string sender = "";
             bool join = false;

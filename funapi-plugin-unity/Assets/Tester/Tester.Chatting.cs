@@ -16,13 +16,13 @@ public partial class Tester
 {
     public class Chatting : Base
     {
-        public override IEnumerator Start (FunapiSession session)
+        public Chatting (FunapiSession session)
         {
             FunapiSession.Transport transport = session.GetTransport(TransportProtocol.kTcp);
             if (transport == null)
             {
                 FunDebug.Log("Can't find TCP transport.");
-                yield return null;
+                return;
             }
 
             // MulticastClient
@@ -40,7 +40,10 @@ public partial class Tester
                 FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
             };
             chat_.ErrorCallback += onMulticastError;
+        }
 
+        public override IEnumerator Start ()
+        {
             // Getting channel list
             chat_.RequestChannelList();
             yield return new WaitForSeconds(0.1f);

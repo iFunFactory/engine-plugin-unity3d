@@ -1517,6 +1517,11 @@ namespace Fun
                 if (MaintenanceCallback != null)
                     MaintenanceCallback(encoding, message);
             }
+            else if (msg_type == kMulticastMsgType)
+            {
+                if (MulticastMessageCallback != null)
+                    MulticastMessageCallback(msg_type, message);
+            }
             else
             {
                 RemoveResponseTimeout(msg_type);
@@ -1683,6 +1688,7 @@ namespace Fun
         const string kSessionOpenedType = "_session_opened";
         const string kSessionClosedType = "_session_closed";
         const string kMaintenanceType = "_maintenance";
+        const string kMulticastMsgType = "_multicast";
         const string kRedirectType = "_sc_redirect";
         const string kRedirectConnectType = "_cs_redirect_connect";
 
@@ -1701,6 +1707,7 @@ namespace Fun
         public event TransportEventHandler TransportEventCallback;
         public event TransportErrorHandler TransportErrorCallback;
         public event ReceivedMessageHandler ReceivedMessageCallback;
+        public event ReceivedMessageHandler MulticastMessageCallback;
         public event ResponseTimeoutHandler ResponseTimeoutCallback;
         public event MaintenanceHandler MaintenanceCallback;
 

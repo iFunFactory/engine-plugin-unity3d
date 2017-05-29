@@ -22,7 +22,7 @@ public partial class Tester : MonoBehaviour
 {
     public abstract class Base
     {
-        public abstract IEnumerator Start (FunapiSession session);
+        public abstract IEnumerator Start ();
 
         public void OnFinished ()
         {
@@ -80,13 +80,12 @@ public partial class Tester : MonoBehaviour
         dashLog("Session Test");
         buttons_["session"].interactable = false;
 
-        Session session = new Session();
-        session.FinishedCallback += delegate() {
-            session = null;
-            buttons_["session"].interactable = true;
-        };
+        StartCoroutine(tester_.Start());
+    }
 
-        StartCoroutine(session.Start(session_));
+    void onSessionTestFinished ()
+    {
+        buttons_["session"].interactable = true;
     }
 
     public void OnMulticastTest ()
@@ -94,13 +93,13 @@ public partial class Tester : MonoBehaviour
         dashLog("Multicast Test");
         buttons_["multicast"].interactable = false;
 
-        Multicast multicast = new Multicast();
+        Multicast multicast = new Multicast(session_);
         multicast.FinishedCallback += delegate() {
             multicast = null;
             buttons_["multicast"].interactable = true;
         };
 
-        StartCoroutine(multicast.Start(session_));
+        StartCoroutine(multicast.Start());
     }
 
     public void OnChattingTest ()
@@ -108,13 +107,13 @@ public partial class Tester : MonoBehaviour
         dashLog("Chatting Test");
         buttons_["chatting"].interactable = false;
 
-        Chatting chatting = new Chatting();
+        Chatting chatting = new Chatting(session_);
         chatting.FinishedCallback += delegate() {
             chatting = null;
             buttons_["chatting"].interactable = true;
         };
 
-        StartCoroutine(chatting.Start(session_));
+        StartCoroutine(chatting.Start());
     }
 
     public void OnAnnounceTest ()
@@ -168,6 +167,7 @@ public partial class Tester : MonoBehaviour
     {
         if (session_ == null || option_.bChanged)
         {
+            // Create session
             SessionOption session_option = new SessionOption();
             session_option.sessionReliability = option_.sessionReliability;
             session_option.sendSessionIdOnlyOnce = option_.sendSessionIdOnlyOnce;
@@ -177,6 +177,10 @@ public partial class Tester : MonoBehaviour
             session_.TransportEventCallback += onTransportEvent;
 
             option_.bChanged = false;
+
+            // Create tester
+            tester_ = new Session(session_);
+            tester_.FinishedCallback += onSessionTestFinished;
         }
 
         if (option_.connectTcp)
@@ -346,6 +350,8 @@ public partial class Tester : MonoBehaviour
     static readonly string encryptionPublicKey = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
 
     FunapiSession session_ = null;
+
+    Session tester_ = null;
 
     Dictionary<string, Button> buttons_ = new Dictionary<string, Button>();
     UIOption option_;

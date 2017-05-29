@@ -20,12 +20,20 @@ public partial class Tester
 {
     public class Session : Base
     {
-        public override IEnumerator Start (FunapiSession session)
+        public Session (FunapiSession session)
         {
             session_ = session;
 
-            registerHandler();
+            session_.ReceivedMessageCallback += onReceivedMessage;
+            session_.ResponseTimeoutCallback += onResponseTimedOut;
+            session_.MaintenanceCallback += onMaintenanceMessage;
 
+            message_handler_["echo"] = onEcho;
+            message_handler_["pbuf_echo"] = onEchoWithProtobuf;
+        }
+
+        public override IEnumerator Start ()
+        {
             //session_.Stop();
             //while (session_.Started)
             //    yield return new WaitForSeconds(0.1f);
@@ -37,25 +45,7 @@ public partial class Tester
             sendMessages(sendingCount);
             yield return new WaitForSeconds(0.2f);
 
-            deregisterHandler();
-
             OnFinished();
-        }
-
-        void registerHandler ()
-        {
-            session_.ReceivedMessageCallback += onReceivedMessage;
-            session_.ResponseTimeoutCallback += onResponseTimedOut;
-            session_.MaintenanceCallback += onMaintenanceMessage;
-
-            message_handler_["echo"] = onEcho;
-            message_handler_["pbuf_echo"] = onEchoWithProtobuf;
-        }
-
-        void deregisterHandler ()
-        {
-            session_.ReceivedMessageCallback -= onReceivedMessage;
-            session_.ResponseTimeoutCallback -= onResponseTimedOut;
         }
 
         void sendMessages (int sendingCount)
