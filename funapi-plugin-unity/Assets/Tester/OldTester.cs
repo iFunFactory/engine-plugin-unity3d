@@ -38,9 +38,15 @@ public class OldTester : MonoBehaviour
     public EncryptionType httpEncryption = EncryptionType.kDefaultEncryption;
     public bool useWWW = false;
 
+    [Header("Encryption")]
+    public string encryptionPublicKey = "";
+
 
     void Awake ()
     {
+        if (encryptionPublicKey.Length > 0)
+            FunapiEncryptor.public_key = encryptionPublicKey;
+
         GameObject.Find("ServerIP").GetComponent<Text>().text = serverAddress;
 
         buttons_["create"] = GameObject.Find("ButtonCreate").GetComponent<Button>();

@@ -420,7 +420,7 @@ namespace Fun
             {
                 FunMessage funmsg = (FunMessage)message;
 
-                if (funmsg.msgtype != null)
+                if (funmsg.msgtypeSpecified)
                 {
                     msg_type = funmsg.msgtype;
                 }
@@ -633,7 +633,7 @@ namespace Fun
             {
                 FunapiMessage.JsonHelper.SetStringField(body, kMsgTypeBodyField, kServerPingMessageType);
 
-                if (!session_id_.IsValid)
+                if (!session_id_.IsValid && FunapiMessage.JsonHelper.HasField(body, kSessionIdBodyField))
                     session_id_.SetId(FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField));
 
                 FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, (string)session_id_);
@@ -647,7 +647,7 @@ namespace Fun
                 if (obj == null)
                     return;
 
-                if (!session_id_.IsValid)
+                if (!session_id_.IsValid && msg.sidSpecified)
                     session_id_.SetId(msg.sid);
 
                 FunPingMessage ping = new FunPingMessage();
@@ -796,6 +796,7 @@ namespace Fun
                 next_decoding_offset_ = 0;
                 header_fields_.Clear();
                 sending_.Clear();
+                resetEncryptors();
                 last_error_code_ = ErrorCode.kNone;
                 last_error_message_ = "";
 
@@ -1113,15 +1114,15 @@ namespace Fun
 
                 if (doHandshaking(encryption_type, encryption_header))
                 {
-                    if (hasEncryption(EncryptionType.kChaCha20Encryption))
-                        SendPublicKey(EncryptionType.kChaCha20Encryption);
+                    state_ = State.kConnected;
+                    DebugLog("Ready to receive.");
 
+                    // Send public key (Do not change this order)
                     if (hasEncryption(EncryptionType.kAes128Encryption))
                         SendPublicKey(EncryptionType.kAes128Encryption);
 
-                    // Makes a state transition.
-                    state_ = State.kConnected;
-                    DebugLog("Ready to receive.");
+                    if (hasEncryption(EncryptionType.kChaCha20Encryption))
+                        SendPublicKey(EncryptionType.kChaCha20Encryption);
 
                     event_.Add(OnHandshakeComplete);
                 }
@@ -1166,14 +1167,22 @@ namespace Fun
 
         void SendPublicKey (EncryptionType type)
         {
+            FunapiMessage fun_msg = null;
             if (encoding_ == FunEncoding.kJson)
             {
-                SendMessage(new FunapiMessage(protocol_, kEncryptionPublicKey, null, type));
+                fun_msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
             }
             else if (encoding_ == FunEncoding.kProtobuf)
             {
                 FunMessage msg = new FunMessage();
-                SendMessage(new FunapiMessage(protocol_, kEncryptionPublicKey, msg, type));
+                fun_msg = new FunapiMessage(protocol_, kEncryptionPublicKey, msg, type);
+            }
+
+            // Add a message to front of pending list...
+            lock (sending_lock_)
+            {
+                fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
+                pending_.Insert(0, fun_msg);
             }
 
             DebugLog("{0} sending a {1}-pubkey message.", str_protocol, (int)type);
