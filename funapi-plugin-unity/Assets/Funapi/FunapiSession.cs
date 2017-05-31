@@ -274,9 +274,10 @@ namespace Fun
                 else if (transport.encoding == FunEncoding.kProtobuf)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, message, enc_type);
-                    FunMessage pbuf = fun_msg.message as FunMessage;
+
                     if (reliable_transport || sending_sequence)
                     {
+                        FunMessage pbuf = fun_msg.message as FunMessage;
                         pbuf.seq = getNextSeq(protocol);
                     }
                     unsent_queue_.Enqueue(fun_msg);
@@ -1109,27 +1110,6 @@ namespace Fun
 
             Log("{0} transport stopped.", convertString(protocol));
 
-            if (isReliableTransport(protocol) && send_queue_.Count > 0)
-            {
-                lock(send_queue_)
-                {
-                    Queue<FunapiMessage> new_send_queue = new Queue<FunapiMessage>();
-                    while (send_queue_.Count > 0)
-                    {
-                        FunapiMessage message = send_queue_.Dequeue();
-                        if (message.protocol == protocol)
-                        {
-                            unsent_queue_.Enqueue(message);
-                        }
-                        else
-                        {
-                            new_send_queue.Enqueue(message);
-                        }
-                    }
-                    send_queue_ = new_send_queue;
-                }
-            }
-
             checkTransportStatus(protocol);
             onTransportEvent(protocol, TransportEventType.kStopped);
         }
@@ -1235,7 +1215,7 @@ namespace Fun
 
                     remained_queue.Enqueue(msg);
 
-                    Log("sendUnsentMessages - {0} transport is invalid. '{1}' message skipped.",
+                    Log("sendUnsentMessages - {0} transport is invalid. will try again '{1}' message next time.",
                         convertString(msg.protocol), msg.msg_type);
 
                     continue;
@@ -1255,7 +1235,7 @@ namespace Fun
 
                         Log("{0} send unsent message - msgtype:{1} seq:{2}",
                             convertString(transport.protocol), msg.msg_type,
-                                          json_helper_.GetIntegerField(json, kSeqNumberField));
+                            json_helper_.GetIntegerField(json, kSeqNumberField));
                     }
                     else
                     {

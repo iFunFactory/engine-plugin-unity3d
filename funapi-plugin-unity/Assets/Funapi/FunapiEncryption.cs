@@ -640,6 +640,13 @@ namespace Fun
         // return value: client public key
         protected string generatePublicKey (EncryptionType type)
         {
+            if (pub_key_ == null)
+            {
+                FunDebug.LogError("Generate {0} public key failed.\n" +
+                                  "You should set 'FunapiEncryptor.public_key' value first.", type);
+                return "";
+            }
+
             if (!encryptors_.ContainsKey(type))
             {
                 LogWarning("Unavailable encryption: {0} requested public key", type);
