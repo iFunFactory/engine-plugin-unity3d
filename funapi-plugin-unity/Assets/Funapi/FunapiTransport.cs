@@ -604,7 +604,7 @@ namespace Fun
             {
                 object msg = FunapiMessage.Deserialize("{}");
                 FunapiMessage.JsonHelper.SetStringField(msg, kMsgTypeBodyField, kClientPingMessageType);
-                FunapiMessage.JsonHelper.SetStringField(msg, kSessionIdBodyField, (string)session_id_);
+                FunapiMessage.JsonHelper.SetStringField(msg, kSessionIdBodyField, session_id_);
                 FunapiMessage.JsonHelper.SetIntegerField(msg, kPingTimestampField, timestamp);
                 SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
             }
@@ -614,7 +614,7 @@ namespace Fun
                 ping.timestamp = timestamp;
                 FunMessage msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
                 msg.msgtype = kClientPingMessageType;
-                msg.sid = (byte[])session_id_;
+                msg.sid = session_id_;
                 SendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
             }
 
@@ -636,7 +636,7 @@ namespace Fun
                 if (!session_id_.IsValid && FunapiMessage.JsonHelper.HasField(body, kSessionIdBodyField))
                     session_id_.SetId(FunapiMessage.JsonHelper.GetStringField(body, kSessionIdBodyField));
 
-                FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, (string)session_id_);
+                FunapiMessage.JsonHelper.SetStringField(body, kSessionIdBodyField, session_id_);
 
                 SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, FunapiMessage.JsonHelper.Clone(body)));
             }
@@ -659,7 +659,7 @@ namespace Fun
 
                 FunMessage send_msg = FunapiMessage.CreateFunMessage(ping, MessageType.cs_ping);
                 send_msg.msgtype = msg.msgtype;
-                send_msg.sid = (byte[])session_id_;
+                send_msg.sid = session_id_;
 
                 SendMessage(new FunapiMessage(protocol_, kServerPingMessageType, send_msg));
             }
@@ -2009,7 +2009,7 @@ namespace Fun
         {
             // Request
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-            request.ConnectionGroupName = (string)session_id_;
+            request.ConnectionGroupName = session_id_;
             request.Method = "POST";
             request.ContentType = "application/octet-stream";
             request.ContentLength = body.buffer.Count;
