@@ -113,12 +113,12 @@ namespace Fun
         }
 
         // Overload operator functions
-        public static explicit operator string (SessionId sid)
+        public static implicit operator string (SessionId sid)
         {
             return sid.id_string;
         }
 
-        public static explicit operator byte[] (SessionId sid)
+        public static implicit operator byte[] (SessionId sid)
         {
             byte[] array = new byte[sid.id_array.Length];
             Buffer.BlockCopy(sid.id_array, 0, array, 0, sid.id_array.Length);

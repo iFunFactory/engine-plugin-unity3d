@@ -819,7 +819,7 @@ namespace Fun
 
                     // Encodes a session id, if any.
                     if (session_id_.IsValid)
-                        FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kSessionIdBodyField, (string)session_id_);
+                        FunapiMessage.JsonHelper.SetStringField(fun_msg.message, kSessionIdBodyField, session_id_);
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -845,7 +845,7 @@ namespace Fun
 
                     // Encodes a session id, if any.
                     if (session_id_.IsValid)
-                        pbuf.sid = (byte[])session_id_;
+                        pbuf.sid = session_id_;
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -1109,7 +1109,7 @@ namespace Fun
                     FunapiMessage.JsonHelper.SetStringField(json, kMsgTypeBodyField, msg.msg_type);
 
                     if (session_id_.IsValid)
-                        FunapiMessage.JsonHelper.SetStringField(json, kSessionIdBodyField, (string)session_id_);
+                        FunapiMessage.JsonHelper.SetStringField(json, kSessionIdBodyField, session_id_);
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -1132,7 +1132,7 @@ namespace Fun
                     pbuf.msgtype = msg.msg_type;
 
                     if (session_id_.IsValid)
-                        pbuf.sid = (byte[])session_id_;
+                        pbuf.sid = session_id_;
 
                     if (transport_reliability || sending_sequence)
                     {
@@ -1188,14 +1188,14 @@ namespace Fun
             if (transport.Encoding == FunEncoding.kJson)
             {
                 object ack_msg = FunapiMessage.Deserialize("{}");
-                FunapiMessage.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, (string)session_id_);
+                FunapiMessage.JsonHelper.SetStringField(ack_msg, kSessionIdBodyField, session_id_);
                 FunapiMessage.JsonHelper.SetIntegerField(ack_msg, kAckNumberField, ack);
                 transport.SendMessage(new FunapiMessage(transport.Protocol, "", ack_msg));
             }
             else if (transport.Encoding == FunEncoding.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
-                ack_msg.sid = (byte[])session_id_;
+                ack_msg.sid = session_id_;
                 ack_msg.ack = ack;
                 transport.SendMessage(new FunapiMessage(transport.Protocol, "", ack_msg));
             }
@@ -1391,7 +1391,7 @@ namespace Fun
                     session_id_.SetId(session_id);
 
                     if (OnSessionInitiated != null)
-                        OnSessionInitiated((string)session_id_);
+                        OnSessionInitiated(session_id_);
                 }
             }
         }
@@ -1418,7 +1418,7 @@ namespace Fun
             }
 
             if (OnSessionInitiated != null)
-                OnSessionInitiated((string)session_id_);
+                OnSessionInitiated(session_id_);
 
             if (unsent_queue_.Count > 0)
             {

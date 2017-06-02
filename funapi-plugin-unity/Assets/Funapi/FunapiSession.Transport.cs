@@ -219,12 +219,12 @@ namespace Fun
 
                             if (encoding == FunEncoding.kJson)
                             {
-                                json_helper_.SetStringField(fun_msg.message, kSessionIdField, (string)session_id_);
+                                json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
                             }
                             else if (encoding == FunEncoding.kProtobuf)
                             {
                                 FunMessage msg = fun_msg.message as FunMessage;
-                                msg.sid = (byte[])session_id_;
+                                msg.sid = session_id_;
                             }
                         }
                     }
@@ -1796,7 +1796,7 @@ namespace Fun
             {
                 // Request
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-                request.ConnectionGroupName = (string)session_id_;
+                request.ConnectionGroupName = session_id_;
                 request.Method = "POST";
                 request.ContentType = "application/octet-stream";
                 request.ContentLength = body.buffer.Count;

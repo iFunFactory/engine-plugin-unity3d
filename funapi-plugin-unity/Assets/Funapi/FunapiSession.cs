@@ -621,7 +621,7 @@ namespace Fun
             Log("EVENT: Session ({0}).", type);
 
             if (SessionEventCallback != null)
-                SessionEventCallback(type, (string)session_id_);
+                SessionEventCallback(type, session_id_);
         }
 
 
