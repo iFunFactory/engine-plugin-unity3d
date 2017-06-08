@@ -38,7 +38,7 @@ namespace Fun
 
         public bool SequenceNumberValidation
         {
-            set; private get;
+            set; get;
         }
 
         public float ResponseTimeout
@@ -55,7 +55,7 @@ namespace Fun
             return transport.Encoding;
         }
 
-        private void OnMaintenanceMessage (string msg_type, object body)
+        void OnMaintenanceMessage (string msg_type, object body)
         {
             if (MaintenanceCallback != null)
             {
@@ -269,7 +269,7 @@ namespace Fun
             }
         }
 
-        private void OnConnectTimeout (TransportProtocol protocol)
+        void OnConnectTimeout (TransportProtocol protocol)
         {
             StopTransport(protocol);
         }
@@ -494,7 +494,7 @@ namespace Fun
             StartTransport(GetTransport(protocol));
         }
 
-        internal void StartTransport (FunapiTransport transport)
+        void StartTransport (FunapiTransport transport)
         {
             if (transport == null)
                 return;
@@ -523,7 +523,7 @@ namespace Fun
             StopTransport(GetTransport(protocol));
         }
 
-        private void StopTransport (FunapiTransport transport)
+        void StopTransport (FunapiTransport transport)
         {
             if (transport == null)
                 return;
@@ -533,7 +533,7 @@ namespace Fun
             transport.Stop();
         }
 
-        private void SetTransportStarted (FunapiTransport transport, bool send_unsent = true)
+        void SetTransportStarted (FunapiTransport transport, bool send_unsent = true)
         {
             if (transport == null)
                 return;
@@ -546,7 +546,7 @@ namespace Fun
             }
         }
 
-        private void CheckTransportConnection (TransportProtocol protocol)
+        void CheckTransportConnection (TransportProtocol protocol)
         {
             lock (state_lock_)
             {
@@ -610,7 +610,7 @@ namespace Fun
             return null;
         }
 
-        private FunapiTransport FindOtherTransport (TransportProtocol protocol)
+        FunapiTransport FindOtherTransport (TransportProtocol protocol)
         {
             lock (transports_lock_)
             {
@@ -629,7 +629,7 @@ namespace Fun
             return null;
         }
 
-        private void OnTransportStarted (TransportProtocol protocol)
+        void OnTransportStarted (TransportProtocol protocol)
         {
             FunapiTransport transport = GetTransport(protocol);
             FunDebug.Assert(transport != null);
@@ -667,7 +667,7 @@ namespace Fun
             }
         }
 
-        private void OnTransportStopped (TransportProtocol protocol)
+        void OnTransportStopped (TransportProtocol protocol)
         {
             FunapiTransport transport = GetTransport(protocol);
             FunDebug.Assert(transport != null);
@@ -676,7 +676,7 @@ namespace Fun
             CheckTransportConnection(protocol);
         }
 
-        private void OnTransportConnectFailure (TransportProtocol protocol)
+        void OnTransportConnectFailure (TransportProtocol protocol)
         {
             Log("'{0}' transport connect failed.", protocol);
 
@@ -686,7 +686,7 @@ namespace Fun
                 TransportConnectFailedCallback(protocol);
         }
 
-        private void OnTransportDisconnected (TransportProtocol protocol)
+        void OnTransportDisconnected (TransportProtocol protocol)
         {
             Log("'{0}' transport disconnected.", protocol);
 
@@ -696,7 +696,7 @@ namespace Fun
                 TransportDisconnectedCallback(protocol);
         }
 
-        private void OnStoppedAllTransportCallback ()
+        void OnStoppedAllTransportCallback ()
         {
             Log("All transports has stopped.");
 
@@ -704,7 +704,7 @@ namespace Fun
                 StoppedAllTransportCallback();
         }
 
-        private void OnTransportReceived (FunapiMessage message)
+        void OnTransportReceived (FunapiMessage message)
         {
             DebugLog("OnTransportReceived invoked.");
             last_received_ = DateTime.Now;
@@ -715,7 +715,7 @@ namespace Fun
             }
         }
 
-        private void OnTransportFailure (TransportProtocol protocol, FunapiMessage fun_msg)
+        void OnTransportFailure (TransportProtocol protocol, FunapiMessage fun_msg)
         {
             if (fun_msg == null || fun_msg.reply == null)
                 return;
@@ -921,7 +921,7 @@ namespace Fun
             }
         }
 
-        private void AddExpectedReply (FunapiMessage fun_msg)
+        void AddExpectedReply (FunapiMessage fun_msg)
         {
             ExpectedReply er = fun_msg.reply as ExpectedReply;
             if (er == null)
@@ -939,7 +939,7 @@ namespace Fun
                 fun_msg.msg_type, er.reply_type, er.reply_timeout);
         }
 
-        private void DeleteExpectedReply (string reply_type)
+        void DeleteExpectedReply (string reply_type)
         {
             lock (expected_reply_lock)
             {
@@ -958,7 +958,7 @@ namespace Fun
             }
         }
 
-        private void ProcessMessage (FunapiMessage msg)
+        void ProcessMessage (FunapiMessage msg)
         {
             FunapiTransport transport = GetTransport(msg.protocol);
             if (transport == null)
@@ -1072,7 +1072,7 @@ namespace Fun
             }
         }
 
-        private void SendUnsentMessages ()
+        void SendUnsentMessages ()
         {
             if (unsent_queue_.Count <= 0)
                 return;
@@ -1163,7 +1163,7 @@ namespace Fun
             }
         }
 
-        private bool SeqLess (UInt32 x, UInt32 y)
+        bool SeqLess (UInt32 x, UInt32 y)
         {
             // 아래 참고
             //  - http://en.wikipedia.org/wiki/Serial_number_arithmetic
@@ -1171,7 +1171,7 @@ namespace Fun
             return (Int32)(y - x) > 0;
         }
 
-        private void SendAck (FunapiTransport transport, UInt32 ack)
+        void SendAck (FunapiTransport transport, UInt32 ack)
         {
             FunDebug.Assert(session_reliability_);
             if (transport == null)
@@ -1201,7 +1201,7 @@ namespace Fun
             }
         }
 
-        private void SendEmptyMessage (TransportProtocol protocol)
+        void SendEmptyMessage (TransportProtocol protocol)
         {
             FunapiTransport transport = GetTransport(protocol);
             if (transport == null)
@@ -1225,7 +1225,7 @@ namespace Fun
             }
         }
 
-        private bool OnSeqReceived (FunapiTransport transport, UInt32 seq)
+        bool OnSeqReceived (FunapiTransport transport, UInt32 seq)
         {
             if (transport == null)
             {
@@ -1258,7 +1258,7 @@ namespace Fun
             return true;
         }
 
-        private void OnAckReceived (FunapiTransport transport, UInt32 ack)
+        void OnAckReceived (FunapiTransport transport, UInt32 ack)
         {
             if (transport == null)
             {
@@ -1340,7 +1340,7 @@ namespace Fun
         //---------------------------------------------------------------------
         // Session-related functions
         //---------------------------------------------------------------------
-        private void InitSession ()
+        void InitSession ()
         {
             session_id_.Clear();
 
@@ -1355,7 +1355,7 @@ namespace Fun
             http_seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
         }
 
-        internal UInt32 GetNextSeq (TransportProtocol protocol)
+        UInt32 GetNextSeq (TransportProtocol protocol)
         {
             if (protocol == TransportProtocol.kTcp) {
                 return ++tcp_seq_;
@@ -1368,7 +1368,7 @@ namespace Fun
             return 0;
         }
 
-        private void PrepareSession (object session_id)
+        void PrepareSession (object session_id)
         {
             if (!session_id_.IsValid)
             {
@@ -1396,7 +1396,7 @@ namespace Fun
             }
         }
 
-        private void OpenSession ()
+        void OpenSession ()
         {
             lock (state_lock_)
             {
@@ -1426,7 +1426,7 @@ namespace Fun
             }
         }
 
-        private void CloseSession ()
+        void CloseSession ()
         {
             lock (state_lock_)
             {
@@ -1452,12 +1452,12 @@ namespace Fun
                 OnSessionClosed();
         }
 
-        private void OnNewSession (string msg_type, object body)
+        void OnNewSession (string msg_type, object body)
         {
             // ignore.
         }
 
-        private void OnSessionTimedout (string msg_type, object body)
+        void OnSessionTimedout (string msg_type, object body)
         {
             Log("Session timed out. Resetting my session id. The server will send me another one next time.");
 
@@ -1532,45 +1532,45 @@ namespace Fun
         public event TransportEventHandler TransportDisconnectedCallback;
 
         // Funapi message-related constants.
-        private static readonly float kFunapiSessionTimeout = 3600.0f;
-        private static readonly string kMsgTypeBodyField = "_msgtype";
-        private static readonly string kSessionIdBodyField = "_sid";
-        private static readonly string kSeqNumberField = "_seq";
-        private static readonly string kAckNumberField = "_ack";
-        private static readonly string kNewSessionMessageType = "_session_opened";
-        private static readonly string kSessionClosedMessageType = "_session_closed";
-        private static readonly string kMaintenanceMessageType = "_maintenance";
+        static readonly float kFunapiSessionTimeout = 3600.0f;
+        static readonly string kMsgTypeBodyField = "_msgtype";
+        static readonly string kSessionIdBodyField = "_sid";
+        static readonly string kSeqNumberField = "_seq";
+        static readonly string kAckNumberField = "_ack";
+        static readonly string kNewSessionMessageType = "_session_opened";
+        static readonly string kSessionClosedMessageType = "_session_closed";
+        static readonly string kMaintenanceMessageType = "_maintenance";
 
         // Member variables.
-        private State state_;
-        private SessionId session_id_ = new SessionId();
-        private object state_lock_ = new object();
-        private float response_timer_ = 0f;
-        private bool stop_with_clear_ = false;
+        State state_;
+        SessionId session_id_ = new SessionId();
+        object state_lock_ = new object();
+        float response_timer_ = 0f;
+        bool stop_with_clear_ = false;
 
         // Reliability-related member variables.
-        private bool session_reliability_ = false;
-        private UInt32 seq_recvd_ = 0;
-        private UInt32 tcp_seq_ = 0;
-        private UInt32 http_seq_ = 0;
-        private bool first_receiving_ = false;
-        private TransportProtocol session_protocol_;
-        private Queue<FunapiMessage> send_queue_ = new Queue<FunapiMessage>();
-        private Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
-        private System.Random rnd_ = new System.Random();
+        bool session_reliability_ = false;
+        UInt32 seq_recvd_ = 0;
+        UInt32 tcp_seq_ = 0;
+        UInt32 http_seq_ = 0;
+        bool first_receiving_ = false;
+        TransportProtocol session_protocol_;
+        Queue<FunapiMessage> send_queue_ = new Queue<FunapiMessage>();
+        Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
+        System.Random rnd_ = new System.Random();
 
         // Transport-related member variables.
-        private object transports_lock_ = new object();
-        private TransportProtocol default_protocol_ = TransportProtocol.kDefault;
-        private Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
+        object transports_lock_ = new object();
+        TransportProtocol default_protocol_ = TransportProtocol.kDefault;
+        Dictionary<TransportProtocol, FunapiTransport> transports_ = new Dictionary<TransportProtocol, FunapiTransport>();
 
         // Message-related member variables.
-        private object message_lock_ = new object();
-        private object expected_reply_lock = new object();
-        private DateTime last_received_ = DateTime.Now;
-        private Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
-        private Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
-        private Dictionary<string, List<ExpectedReply>> expected_replies_ = new Dictionary<string, List<ExpectedReply>>();
-        private List<FunapiMessage> message_buffer_ = new List<FunapiMessage>();
+        object message_lock_ = new object();
+        object expected_reply_lock = new object();
+        DateTime last_received_ = DateTime.Now;
+        Dictionary<string, TransportProtocol> message_protocols_ = new Dictionary<string, TransportProtocol>();
+        Dictionary<string, MessageEventHandler> message_handlers_ = new Dictionary<string, MessageEventHandler>();
+        Dictionary<string, List<ExpectedReply>> expected_replies_ = new Dictionary<string, List<ExpectedReply>>();
+        List<FunapiMessage> message_buffer_ = new List<FunapiMessage>();
     }
 }  // namespace Fun

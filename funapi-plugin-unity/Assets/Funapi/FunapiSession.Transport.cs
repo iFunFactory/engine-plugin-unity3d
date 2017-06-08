@@ -1681,7 +1681,7 @@ namespace Fun
                     MozRoots.LoadRootCertificates();
             }
 
-            public MonoBehaviour mono { set; private get; }
+            public MonoBehaviour mono { private get; set; }
 
             public override bool Started
             {

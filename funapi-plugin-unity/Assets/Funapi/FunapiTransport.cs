@@ -72,33 +72,33 @@ namespace Fun
         }
 
         // Start connecting
-        internal abstract void Start ();
+        public abstract void Start ();
 
         // Disconnection
-        internal abstract void Stop ();
+        public abstract void Stop ();
 
         // Check connection
-        internal abstract bool Started { get; }
+        public abstract bool Started { get; }
 
         // Set Encryption type
-        internal void SetEncryption (EncryptionType encryption)
+        public void SetEncryption (EncryptionType encryption)
         {
             setEncryption(encryption);
         }
 
-        internal float PingWaitTime
+        public float PingWaitTime
         {
             get { return ping_wait_time_; }
             set { ping_wait_time_ = value; }
         }
 
         // Check unsent messages
-        internal abstract bool HasUnsentMessages { get; }
+        public abstract bool HasUnsentMessages { get; }
 
         // Send a message
-        internal abstract void SendMessage (FunapiMessage fun_msg);
+        public abstract void SendMessage (FunapiMessage fun_msg);
 
-        internal State state
+        public State state
         {
             get { return state_; }
             set { state_ = value; }
@@ -162,7 +162,7 @@ namespace Fun
 
         public int PingTime
         {
-            get; internal set;
+            get; private set;
         }
 
         public bool IsConnecting
@@ -198,7 +198,7 @@ namespace Fun
             SetNextAddress();
         }
 
-        internal bool SetNextAddress ()
+        protected bool SetNextAddress ()
         {
             HostAddr addr = ip_list_.GetNextAddress();
             if (addr != null)
@@ -219,10 +219,10 @@ namespace Fun
             return true;
         }
 
-        internal abstract void SetAddress (HostAddr addr);
+        protected abstract void SetAddress (HostAddr addr);
 
         // Connect functions
-        internal void Connect ()
+        public void Connect ()
         {
             Log("'{0}' Try to connect to server.", str_protocol);
             exponential_time_ = 1f;
@@ -231,20 +231,20 @@ namespace Fun
             Start();
         }
 
-        internal void Connect (HostAddr addr)
+        void Connect (HostAddr addr)
         {
             SetAddress(addr);
             Connect();
         }
 
-        internal void Reconnect ()
+        public void Reconnect ()
         {
             Log("'{0}' Try to reconnect to server.", str_protocol);
             cstate_ = ConnectState.kReconnecting;
             Connect();
         }
 
-        internal void Redirect (HostAddr addr)
+        public void Redirect (HostAddr addr)
         {
             Log("Redirect {0} [{1}:{2}]", str_protocol, addr.host, addr.port);
 
@@ -261,7 +261,7 @@ namespace Fun
         }
 
         // Checks connection list
-        internal void CheckConnectList ()
+        protected void CheckConnectList ()
         {
             if (!AutoReconnect || IsReconnecting)
                 return;
@@ -270,7 +270,7 @@ namespace Fun
             exponential_time_ = 1f;
         }
 
-        private bool TryToConnect ()
+        bool TryToConnect ()
         {
             if (reconnect_count_ >= 0)
             {
@@ -314,7 +314,7 @@ namespace Fun
             return true;
         }
 
-        private bool TryToReconnect ()
+        bool TryToReconnect ()
         {
             ++reconnect_count_;
             if (reconnect_count_ > kMaxReconnectCount)
@@ -350,7 +350,7 @@ namespace Fun
             timer_.Update(deltaTime);
         }
 
-        internal void AddFailureCallback (FunapiMessage fun_msg)
+        protected void AddFailureCallback (FunapiMessage fun_msg)
         {
             event_.Add(delegate {
                     OnMessageFailureCallback(fun_msg);
@@ -373,7 +373,7 @@ namespace Fun
         //---------------------------------------------------------------------
         // Callback-related functions
         //---------------------------------------------------------------------
-        internal void OnConnectionTimeout ()
+        protected void OnConnectionTimeout ()
         {
             CheckConnectList();
 
@@ -383,7 +383,7 @@ namespace Fun
             }
         }
 
-        internal void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
+        protected void OnReceived (Dictionary<string, string> header, ArraySegment<byte> body)
         {
             object message = FunapiMessage.Deserialize(body, encoding_);
             if (message == null)
@@ -446,7 +446,7 @@ namespace Fun
             }
         }
 
-        internal void SetEstablish (SessionId sid)
+        public void SetEstablish (SessionId sid)
         {
             state_ = State.kEstablished;
             session_id_.SetId(sid);
@@ -462,9 +462,9 @@ namespace Fun
             }
         }
 
-        internal abstract void SetAbolish ();
+        public abstract void SetAbolish ();
 
-        internal void OnStartedInternal ()
+        protected void OnStartedInternal ()
         {
             if (StartedInternalCallback != null)
             {
@@ -472,7 +472,7 @@ namespace Fun
             }
         }
 
-        internal void OnStopped ()
+        protected void OnStopped ()
         {
             StopPingTimer();
 
@@ -484,14 +484,14 @@ namespace Fun
             event_.Add(CheckConnectState);
         }
 
-        internal void OnDisconnected ()
+        protected void OnDisconnected ()
         {
             Stop();
 
             OnDisconnectedCallback();
         }
 
-        internal void OnConnectFailureCallback ()
+        protected void OnConnectFailureCallback ()
         {
             ip_list_.SetFirst();
             extra_list_.SetFirst();
@@ -502,7 +502,7 @@ namespace Fun
             }
         }
 
-        internal void OnDisconnectedCallback ()
+        protected void OnDisconnectedCallback ()
         {
             if (DisconnectedCallback != null)
             {
@@ -510,7 +510,7 @@ namespace Fun
             }
         }
 
-        internal void OnFailureCallback ()
+        protected void OnFailureCallback ()
         {
             if (FailureCallback != null)
             {
@@ -518,7 +518,7 @@ namespace Fun
             }
         }
 
-        internal void OnMessageFailureCallback (FunapiMessage fun_msg)
+        protected void OnMessageFailureCallback (FunapiMessage fun_msg)
         {
             if (MessageFailureCallback != null)
             {
@@ -526,7 +526,7 @@ namespace Fun
             }
         }
 
-        internal void CheckConnectState ()
+        protected void CheckConnectState ()
         {
             if (cstate_ == ConnectState.kConnecting)
             {
@@ -556,7 +556,7 @@ namespace Fun
         //---------------------------------------------------------------------
         // Ping-related functions
         //---------------------------------------------------------------------
-        private void StartPingTimer ()
+        void StartPingTimer ()
         {
             if (protocol_ != TransportProtocol.kTcp)
                 return;
@@ -571,7 +571,7 @@ namespace Fun
                 PingIntervalSeconds, PingTimeoutSeconds);
         }
 
-        private void StopPingTimer ()
+        void StopPingTimer ()
         {
             if (protocol_ != TransportProtocol.kTcp)
                 return;
@@ -581,7 +581,7 @@ namespace Fun
             PingTime = 0;
         }
 
-        private void OnPingTimerEvent ()
+        void OnPingTimerEvent ()
         {
             if (ping_wait_time_ > PingTimeoutSeconds)
             {
@@ -593,7 +593,7 @@ namespace Fun
             SendPingMessage();
         }
 
-        private void SendPingMessage ()
+        void SendPingMessage ()
         {
             if (!session_id_.IsValid)
                 return;
@@ -626,7 +626,7 @@ namespace Fun
 #endif
         }
 
-        private void OnServerPingMessage (object body)
+        void OnServerPingMessage (object body)
         {
             // Send response
             if (encoding_ == FunEncoding.kJson)
@@ -665,7 +665,7 @@ namespace Fun
             }
         }
 
-        private void OnClientPingMessage (object body)
+        void OnClientPingMessage (object body)
         {
             long timestamp = 0;
 
@@ -700,7 +700,7 @@ namespace Fun
         }
 
 
-        internal enum State
+        public enum State
         {
             kUnknown = 0,
             kConnecting,
@@ -711,7 +711,7 @@ namespace Fun
             kEstablished
         };
 
-        internal enum ConnectState
+        protected enum ConnectState
         {
             kUnknown = 0,
             kConnecting,
@@ -722,18 +722,18 @@ namespace Fun
 
 
         // constants.
-        private static readonly int kMaxReconnectCount = 3;
-        private static readonly float kMaxConnectingTime = 120f;
-        private static readonly float kFixedConnectWaitTime = 10f;
-        private static readonly string kMsgTypeBodyField = "_msgtype";
-        private static readonly string kSessionIdBodyField = "_sid";
+        static readonly int kMaxReconnectCount = 3;
+        static readonly float kMaxConnectingTime = 120f;
+        static readonly float kFixedConnectWaitTime = 10f;
+        static readonly string kMsgTypeBodyField = "_msgtype";
+        static readonly string kSessionIdBodyField = "_sid";
 
         // Ping message-related constants.
-        private static readonly int kPingIntervalSecond = 3;
-        private static readonly float kPingTimeoutSeconds = 20f;
-        private static readonly string kServerPingMessageType = "_ping_s";
-        private static readonly string kClientPingMessageType = "_ping_c";
-        private static readonly string kPingTimestampField = "timestamp";
+        static readonly int kPingIntervalSecond = 3;
+        static readonly float kPingTimeoutSeconds = 20f;
+        static readonly string kServerPingMessageType = "_ping_s";
+        static readonly string kClientPingMessageType = "_ping_c";
+        static readonly string kPingTimestampField = "timestamp";
 
         // Event handlers
         public event TransportEventHandler ConnectTimeoutCallback;
@@ -741,36 +741,36 @@ namespace Fun
         public event TransportEventHandler StoppedCallback;
         public event TransportEventHandler FailureCallback;
 
-        internal event TransportEventHandler StartedInternalCallback;
-        internal event TransportEventHandler DisconnectedCallback;
-        internal event TransportReceivedHandler ReceivedCallback;
-        internal event TransportMessageHandler MessageFailureCallback;
-        internal event TransportEventHandler ConnectFailureCallback;
+        public event TransportEventHandler StartedInternalCallback;
+        public event TransportEventHandler DisconnectedCallback;
+        public event TransportReceivedHandler ReceivedCallback;
+        public event TransportMessageHandler MessageFailureCallback;
+        public event TransportEventHandler ConnectFailureCallback;
 
         // Connect-related member variables.
-        internal ConnectState cstate_ = ConnectState.kUnknown;
-        internal ConnectList ip_list_ = new ConnectList();
-        internal ConnectList extra_list_ = new ConnectList();
-        internal float exponential_time_ = 0f;
-        internal int reconnect_count_ = 0;
+        protected ConnectState cstate_ = ConnectState.kUnknown;
+        protected ConnectList ip_list_ = new ConnectList();
+        protected ConnectList extra_list_ = new ConnectList();
+        protected float exponential_time_ = 0f;
+        protected int reconnect_count_ = 0;
 
         // Ping-related variables.
-        private int ping_timer_id_ = 0;
-        private float ping_wait_time_ = 0f;
+        int ping_timer_id_ = 0;
+        float ping_wait_time_ = 0f;
 
         // Encoding-serializer-related member variables.
-        internal FunEncoding encoding_ = FunEncoding.kNone;
-        internal SessionId session_id_ = new SessionId();
+        protected FunEncoding encoding_ = FunEncoding.kNone;
+        protected SessionId session_id_ = new SessionId();
 
         // Error-related member variables.
-        internal ErrorCode last_error_code_ = ErrorCode.kNone;
-        internal string last_error_message_ = "";
+        protected ErrorCode last_error_code_ = ErrorCode.kNone;
+        protected string last_error_message_ = "";
 
         // member variables.
-        internal State state_;
-        internal TransportProtocol protocol_;
-        internal ThreadSafeEventList event_ = new ThreadSafeEventList();
-        internal ThreadSafeEventList timer_ = new ThreadSafeEventList();
+        protected State state_;
+        protected TransportProtocol protocol_;
+        protected ThreadSafeEventList event_ = new ThreadSafeEventList();
+        protected ThreadSafeEventList timer_ = new ThreadSafeEventList();
     }
 
 
@@ -778,7 +778,7 @@ namespace Fun
     public abstract class FunapiEncryptedTransport : FunapiTransport
     {
         // Starts a socket.
-        internal override void Start ()
+        public override void Start ()
         {
             try
             {
@@ -832,7 +832,7 @@ namespace Fun
         protected abstract void WireSend ();
 
         // Stops a socket.
-        internal override void Stop ()
+        public override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -847,13 +847,13 @@ namespace Fun
             OnStopped();
         }
 
-        internal override void SetAbolish ()
+        public override void SetAbolish ()
         {
             session_id_.Clear();
             pending_.Clear();
         }
 
-        internal override bool HasUnsentMessages
+        public override bool HasUnsentMessages
         {
             get
             {
@@ -864,12 +864,12 @@ namespace Fun
             }
         }
 
-        internal virtual bool IsSendable
+        protected virtual bool IsSendable
         {
             get { return sending_.Count == 0; }
         }
 
-        internal override void SendMessage (FunapiMessage fun_msg)
+        public override void SendMessage (FunapiMessage fun_msg)
         {
             try
             {
@@ -893,7 +893,7 @@ namespace Fun
             }
         }
 
-        internal bool EncryptThenSendMessage ()
+        bool EncryptThenSendMessage ()
         {
             FunDebug.Assert(state_ >= State.kConnected);
             FunDebug.Assert(sending_.Count > 0);
@@ -947,7 +947,7 @@ namespace Fun
             return true;
         }
 
-        internal void SendPendingMessages ()
+        protected void SendPendingMessages ()
         {
             lock (sending_lock_)
             {
@@ -970,7 +970,7 @@ namespace Fun
         }
 
         // Checking the buffer space before starting another async receive.
-        internal void CheckReceiveBuffer (int additional_size = 0)
+        protected void CheckReceiveBuffer (int additional_size = 0)
         {
             int remaining_size = receive_buffer_.Length - (received_size_ + additional_size);
             if (remaining_size > 0)
@@ -1003,7 +1003,7 @@ namespace Fun
         }
 
         // Decoding a messages
-        internal void TryToDecodeMessage ()
+        protected void TryToDecodeMessage ()
         {
             if (IsStream)
             {
@@ -1045,7 +1045,7 @@ namespace Fun
             }
         }
 
-        internal bool TryToDecodeHeader ()
+        bool TryToDecodeHeader ()
         {
             DebugLog("Trying to decode header fields.");
 
@@ -1082,7 +1082,7 @@ namespace Fun
             return false;
         }
 
-        internal bool TryToDecodeBody ()
+        bool TryToDecodeBody ()
         {
             // Header version
             FunDebug.Assert(header_fields_.ContainsKey(kVersionHeaderField));
@@ -1189,7 +1189,7 @@ namespace Fun
         }
 
         // Sends messages & Calls start callback
-        private void OnHandshakeComplete ()
+        void OnHandshakeComplete ()
         {
             lock (sending_lock_)
             {
@@ -1201,7 +1201,7 @@ namespace Fun
             }
         }
 
-        internal virtual void OnFailure ()
+        protected virtual void OnFailure ()
         {
             Log("OnFailure({0}) - state: {1}\n{2}:{3}",
                 str_protocol, state_, last_error_code_, last_error_message_);
@@ -1216,7 +1216,7 @@ namespace Fun
             OnFailureCallback();
         }
 
-        private static int BytePatternMatch (ArraySegment<byte> haystack, ArraySegment<byte> needle)
+        static int BytePatternMatch (ArraySegment<byte> haystack, ArraySegment<byte> needle)
         {
             if (haystack.Count < needle.Count)
             {
@@ -1244,37 +1244,37 @@ namespace Fun
 
 
         // Buffer-related constants.
-        internal static readonly int kUnitBufferSize = 65536;
+        protected static readonly int kUnitBufferSize = 65536;
 
         // Funapi header-related constants.
-        internal static readonly string kHeaderDelimeter = "\n";
-        internal static readonly string kHeaderFieldDelimeter = ":";
-        internal static readonly string kVersionHeaderField = "VER";
-        internal static readonly string kPluginVersionHeaderField = "PVER";
-        internal static readonly string kLengthHeaderField = "LEN";
-        internal static readonly string kEncryptionHeaderField = "ENC";
+        protected static readonly string kHeaderDelimeter = "\n";
+        protected static readonly string kHeaderFieldDelimeter = ":";
+        protected static readonly string kVersionHeaderField = "VER";
+        protected static readonly string kPluginVersionHeaderField = "PVER";
+        protected static readonly string kLengthHeaderField = "LEN";
+        protected static readonly string kEncryptionHeaderField = "ENC";
 
         // Encryption-related constants.
-        private static readonly string kEncryptionPublicKey = "_pub_key";
+        static readonly string kEncryptionPublicKey = "_pub_key";
 
         // for speed-up.
-        private static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
-        private static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
+        static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
+        static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
         // Message-related.
-        private int connect_timeout_id_ = 0;
-        private bool first_sending_ = true;
-        private bool first_receiving_ = true;
-        internal bool header_decoded_ = false;
-        internal int received_size_ = 0;
-        internal int next_decoding_offset_ = 0;
-        internal object sending_lock_ = new object();
-        internal object receive_lock_ = new object();
-        internal byte[] receive_buffer_ = new byte[kUnitBufferSize];
-        internal byte[] send_buffer_ = new byte[kUnitBufferSize];
-        internal List<FunapiMessage> pending_ = new List<FunapiMessage>();
-        internal List<FunapiMessage> sending_ = new List<FunapiMessage>();
-        internal Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
+        int connect_timeout_id_ = 0;
+        bool first_sending_ = true;
+        bool first_receiving_ = true;
+        bool header_decoded_ = false;
+        protected int received_size_ = 0;
+        protected int next_decoding_offset_ = 0;
+        protected object sending_lock_ = new object();
+        protected object receive_lock_ = new object();
+        protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
+        protected byte[] send_buffer_ = new byte[kUnitBufferSize];
+        protected List<FunapiMessage> pending_ = new List<FunapiMessage>();
+        protected List<FunapiMessage> sending_ = new List<FunapiMessage>();
+        Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
     }
 
 
@@ -1293,7 +1293,7 @@ namespace Fun
         }
 
         // Stops a socket.
-        internal override void Stop ()
+        public override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1307,7 +1307,7 @@ namespace Fun
             base.Stop();
         }
 
-        internal override bool Started
+        public override bool Started
         {
             get
             {
@@ -1336,7 +1336,7 @@ namespace Fun
             sock_.BeginConnect(connect_ep_, new AsyncCallback(this.StartCb), this);
         }
 
-        internal override void SetAddress (HostAddr addr)
+        protected override void SetAddress (HostAddr addr)
         {
             IPAddress ip = null;
             if (addr is HostIP)
@@ -1370,7 +1370,7 @@ namespace Fun
             sock_.BeginSend(list, 0, new AsyncCallback(this.SendBytesCb), this);
         }
 
-        private void StartCb (IAsyncResult ar)
+        void StartCb (IAsyncResult ar)
         {
             DebugLog("StartCb called.");
 
@@ -1419,7 +1419,7 @@ namespace Fun
             }
         }
 
-        private void SendBytesCb (IAsyncResult ar)
+        void SendBytesCb (IAsyncResult ar)
         {
             DebugLog("SendBytesCb called.");
 
@@ -1497,7 +1497,7 @@ namespace Fun
             }
         }
 
-        private void ReceiveBytesCb (IAsyncResult ar)
+        void ReceiveBytesCb (IAsyncResult ar)
         {
             DebugLog("ReceiveBytesCb called.");
 
@@ -1577,9 +1577,9 @@ namespace Fun
             }
         }
 
-        internal Socket sock_;
-        private AddressFamily ip_af_;
-        private IPEndPoint connect_ep_;
+        Socket sock_;
+        AddressFamily ip_af_;
+        IPEndPoint connect_ep_;
     }
 
 
@@ -1597,7 +1597,7 @@ namespace Fun
         }
 
         // Stops a socket.
-        internal override void Stop ()
+        public override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1611,7 +1611,7 @@ namespace Fun
             base.Stop();
         }
 
-        internal override bool Started
+        public override bool Started
         {
             get { return sock_ != null && state_ >= State.kConnected; }
         }
@@ -1640,7 +1640,7 @@ namespace Fun
             OnStartedInternal();
         }
 
-        internal override void SetAddress (HostAddr addr)
+        protected override void SetAddress (HostAddr addr)
         {
             IPAddress ip = null;
             if (addr is HostIP)
@@ -1701,7 +1701,7 @@ namespace Fun
             }
         }
 
-        private void SendBytesCb (IAsyncResult ar)
+        void SendBytesCb (IAsyncResult ar)
         {
             DebugLog("SendBytesCb called.");
 
@@ -1753,7 +1753,7 @@ namespace Fun
             }
         }
 
-        private void ReceiveBytesCb (IAsyncResult ar)
+        void ReceiveBytesCb (IAsyncResult ar)
         {
             DebugLog("ReceiveBytesCb called.");
 
@@ -1829,10 +1829,10 @@ namespace Fun
         }
 
 
-        internal Socket sock_;
-        private AddressFamily ip_af_;
-        private IPEndPoint send_ep_;
-        private EndPoint receive_ep_;
+        Socket sock_;
+        AddressFamily ip_af_;
+        IPEndPoint send_ep_;
+        EndPoint receive_ep_;
     }
 
 
@@ -1853,9 +1853,9 @@ namespace Fun
                 MozRoots.LoadRootCertificates();
         }
 
-        internal MonoBehaviour mono { set; private get; }
+        public MonoBehaviour mono { set; get; }
 
-        internal override void Stop ()
+        public override void Stop ()
         {
             if (state_ == State.kUnknown)
                 return;
@@ -1865,7 +1865,7 @@ namespace Fun
             base.Stop();
         }
 
-        internal override bool Started
+        public override bool Started
         {
             get { return state_ >= State.kConnected; }
         }
@@ -1895,7 +1895,7 @@ namespace Fun
             OnStartedInternal();
         }
 
-        internal override void SetAddress (HostAddr addr)
+        protected override void SetAddress (HostAddr addr)
         {
             FunDebug.Assert(addr is HostHttp);
             HostHttp http = (HostHttp)addr;
@@ -1908,7 +1908,7 @@ namespace Fun
             Log("HTTP transport - {0}:{1}", http.host, http.port);
         }
 
-        internal override bool IsSendable
+        protected override bool IsSendable
         {
             get
             {
@@ -1990,7 +1990,7 @@ namespace Fun
         }
 
 #if !NO_UNITY
-        private void SendWWWRequest (Dictionary<string, string> headers, FunapiMessage body)
+        void SendWWWRequest (Dictionary<string, string> headers, FunapiMessage body)
         {
             cancel_www_ = false;
 
@@ -2005,7 +2005,7 @@ namespace Fun
         }
 #endif
 
-        private void SendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage body)
+        void SendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage body)
         {
             // Request
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
@@ -2024,7 +2024,7 @@ namespace Fun
             web_request_.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), body);
         }
 
-        private void OnReceiveHeader (string headers)
+        void OnReceiveHeader (string headers)
         {
             StringBuilder buffer = new StringBuilder();
             string[] lines = headers.Replace("\r", "").Split('\n');
@@ -2081,7 +2081,7 @@ namespace Fun
             received_size_ += header_bytes.Length;
         }
 
-        private void RequestStreamCb (IAsyncResult ar)
+        void RequestStreamCb (IAsyncResult ar)
         {
             DebugLog("RequestStreamCb called.");
 
@@ -2123,7 +2123,7 @@ namespace Fun
             }
         }
 
-        private void ResponseCb (IAsyncResult ar)
+        void ResponseCb (IAsyncResult ar)
         {
             DebugLog("ResponseCb called.");
 
@@ -2172,7 +2172,7 @@ namespace Fun
             }
         }
 
-        private void ReadCb (IAsyncResult ar)
+        void ReadCb (IAsyncResult ar)
         {
             DebugLog("ReadCb called.");
 
@@ -2221,7 +2221,7 @@ namespace Fun
         }
 
 #if !NO_UNITY
-        private IEnumerator WWWPost (WWW www)
+        IEnumerator WWWPost (WWW www)
         {
             cur_www_ = www;
 
@@ -2308,7 +2308,7 @@ namespace Fun
             ClearRequest();
         }
 
-        private void ClearRequest ()
+        void ClearRequest ()
         {
 #if !NO_UNITY
             cur_www_ = null;
@@ -2323,7 +2323,7 @@ namespace Fun
             request_timeout_id_ = 0;
         }
 
-        private void OnRequestTimeout (string msg_type)
+        void OnRequestTimeout (string msg_type)
         {
             last_error_code_ = ErrorCode.kRequestTimeout;
             last_error_message_ = string.Format("Http Request timeout - msg_type:{0}", msg_type);
@@ -2331,7 +2331,7 @@ namespace Fun
             OnFailure();
         }
 
-        internal override void OnFailure ()
+        protected override void OnFailure ()
         {
             CancelRequest();
             base.OnFailure();
@@ -2339,30 +2339,30 @@ namespace Fun
 
 
         // Funapi header-related constants.
-        private static readonly string kEncryptionHttpHeaderField = "X-iFun-Enc";
-        private static readonly string kCookieHeaderField = "Cookie";
+        static readonly string kEncryptionHttpHeaderField = "X-iFun-Enc";
+        static readonly string kCookieHeaderField = "Cookie";
 
-        private static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
+        static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
 
         // waiting time for response
-        private static readonly float kTimeoutSeconds = 30f;
+        static readonly float kTimeoutSeconds = 30f;
 
         // member variables.
-        private string host_url_;
-        private string str_cookie_;
-        private int request_timeout_id_ = 0;
+        string host_url_;
+        string str_cookie_;
+        int request_timeout_id_ = 0;
 
         // WebRequest-related member variables.
-        private HttpWebRequest web_request_ = null;
-        private HttpWebResponse web_response_ = null;
-        private Stream read_stream_ = null;
-        private bool was_aborted_ = false;
+        HttpWebRequest web_request_ = null;
+        HttpWebResponse web_response_ = null;
+        Stream read_stream_ = null;
+        bool was_aborted_ = false;
 
         // WWW-related member variables.
 #if !NO_UNITY
-        private bool using_www_ = false;
-        private bool cancel_www_ = false;
-        private WWW cur_www_ = null;
+        bool using_www_ = false;
+        bool cancel_www_ = false;
+        WWW cur_www_ = null;
 #endif
     }
 
@@ -2370,7 +2370,7 @@ namespace Fun
     // Event handler delegate
     public delegate void TransportEventHandler(TransportProtocol protocol);
     public delegate void TimeoutEventHandler(string msg_type);
-    internal delegate void TransportMessageHandler(TransportProtocol protocol, FunapiMessage fun_msg);
-    internal delegate void TransportReceivedHandler(FunapiMessage message);
+    public delegate void TransportMessageHandler(TransportProtocol protocol, FunapiMessage fun_msg);
+    public delegate void TransportReceivedHandler(FunapiMessage message);
 
 }  // namespace Fun
