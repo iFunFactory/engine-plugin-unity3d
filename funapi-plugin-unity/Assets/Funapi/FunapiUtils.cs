@@ -136,12 +136,12 @@ namespace Fun
 
             public Func<float, bool> Updater
             {
-                set; private get;
+                private get; set;
             }
 
             public Action OnQuit
             {
-                set; private get;
+                private get; set;
             }
 
 #if !NO_UNITY

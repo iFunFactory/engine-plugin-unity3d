@@ -171,14 +171,14 @@ namespace Fun
             return decrypt(src, dst);
         }
 
-        private Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
             Sodium.StreamChacha20XorIc(dst, src, enc_nonce_, enc_key_, enc_idx_);
             enc_idx_ += (ulong)src.Count;
             return src.Count;
         }
 
-        private Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
+        Int64 decrypt (ArraySegment<byte> src, ArraySegment<byte> dst)
         {
             Sodium.StreamChacha20XorIc(dst, src, dec_nonce_, enc_key_, dec_idx_);
             dec_idx_ += (ulong)src.Count;
