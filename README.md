@@ -14,7 +14,9 @@ Funapi plugin unity
 
 ## 서버 버전
 
-플러그인 버전 190 이상은 **서버 버전 1945-stable 이상이 필요** 하며 Protobuf DLL을 새로 빌드해야 할 수도 있습니다.
+플러그인 버전 212 이상은 **서버 버전 2118-experimental 이상이 필요** 하며 Protobuf DLL을
+새로 빌드해야 합니다. FunMulticastMessage를 확장하여 사용하는 경우 필드 번호를 16부터 사용하도록
+수정이 필요합니다.
 
 
 ## 사용방법
@@ -86,7 +88,24 @@ Protobuf를 사용할 경우 서버 프로젝트에서 메시지를 정의하고
 
 ## 버전별 주요 이슈
 
-아래 설명의 버전보다 낮은 버전의 플러그인을 사용하고 있다면 아래 내용을 참고해 주세요.
+아래 설명의 버전보다 낮은 버전의 플러그인을 사용하고 있다면 플러그인 업데이트시 아래 내용을 참고해 주세요.
+
+### v213
+Protobuf의 Message Type을 Integer로 쓸 수 있는 기능이 추가되면서 기존의
+SendMessage (MessageType, ...) 함수로 메시지를 보내면 메시지 타입이 Integer로 전송되게
+변경되었습니다. MessageType을 사용하면서 기존의 String 타입으로 메시지를 보내고 싶다면 Unity의
+Project Setting 에서 Scripting Define Symbols에 PROTOBUF_ENUM_STRING_LEGACY 를
+추가해 주세요.
+
+### v212
+멀티캐스트 채널에 token을 지정할 수 있는 기능이 추가되면서 인터페이스가 중복되는 일이 발생해 부득이하게
+FunapiChat.JoinChannel (string channel_id, string my_name, OnChatMessage handler)
+함수가 삭제되었습니다. 기존에 해당 함수를 사용하던 분들은 아래와 같이 수정해서 사용해주시기 바랍니다.
+
+```
+chat.sender = "nickname";
+chat.JoinChannel("channel id", handler);
+```
 
 ### v164
 JsonAccessor 클래스의 인터페이스가 추가되었습니다. 이전의 JsonAccessor 클래스를 상속받아
