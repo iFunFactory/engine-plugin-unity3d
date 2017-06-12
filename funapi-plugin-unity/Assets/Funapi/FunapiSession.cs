@@ -172,13 +172,21 @@ namespace Fun
             return null;
         }
 
-
+#if PROTOBUF_ENUM_STRING_LEGACY
+        public void SendMessage (MessageType msg_type, object message,
+                                 TransportProtocol protocol = TransportProtocol.kDefault,
+                                 EncryptionType enc_type = EncryptionType.kDefaultEncryption)
+        {
+            SendMessage(MessageTable.Lookup(msg_type), message, protocol, enc_type);
+        }
+#else
         public void SendMessage (MessageType msg_type, object message,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
                                  EncryptionType enc_type = EncryptionType.kDefaultEncryption)
         {
             SendMessage(kIntMessageType + ((int)msg_type).ToString(), message, protocol, enc_type);
         }
+#endif
 
         public void SendMessage (int msg_type, object message,
                                  TransportProtocol protocol = TransportProtocol.kDefault,
