@@ -56,8 +56,12 @@ public class Sodium
     public static bool StreamChacha20XorIc (ArraySegment<byte> c, ArraySegment<byte> m,
                                             byte[] nonce, byte[] key, ulong ic)
     {
-        return 0 == crypto_stream_chacha20_xor_ic_offset(
-            c.Array, (ulong)c.Offset, m.Array, (ulong)m.Offset, (ulong)m.Count, nonce, ic, key);
+        if (c.Count > 0 && c.Count == m.Count && nonce.Length == 8 && key.Length == 32) {
+            return 0 == crypto_stream_chacha20_xor_ic_offset(
+                    c.Array, (ulong)c.Offset, m.Array, (ulong)m.Offset, (ulong)m.Count, nonce, ic, key);
+        } else {
+            return false;
+        }
     }
 
     public static byte[] StreamChacha20XorIcBuf (byte[] m, byte[] nonce, byte[] key, ulong ic)
