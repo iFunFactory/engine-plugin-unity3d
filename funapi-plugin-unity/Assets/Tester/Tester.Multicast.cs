@@ -117,8 +117,7 @@ public partial class Tester
                 FunMulticastMessage mcast_msg = body as FunMulticastMessage;
                 FunDebug.Assert(channel_id == mcast_msg.channel);
 
-                object obj = FunapiMessage.GetMulticastMessage(mcast_msg, MulticastMessageType.pbuf_hello);
-                PbufHelloMessage hello_msg = obj as PbufHelloMessage;
+                PbufHelloMessage hello_msg = FunapiMessage.GetMulticastMessage<PbufHelloMessage>(mcast_msg, MulticastMessageType.pbuf_hello);
                 if (hello_msg == null)
                     return;
 

@@ -643,7 +643,7 @@ namespace Fun
             else if (encoding_ == FunEncoding.kProtobuf)
             {
                 FunMessage msg = body as FunMessage;
-                FunPingMessage obj = (FunPingMessage)FunapiMessage.GetMessage(msg, MessageType.cs_ping);
+                FunPingMessage obj = FunapiMessage.GetMessage<FunPingMessage>(msg, MessageType.cs_ping);
                 if (obj == null)
                     return;
 
@@ -679,11 +679,10 @@ namespace Fun
             else if (encoding_ == FunEncoding.kProtobuf)
             {
                 FunMessage msg = body as FunMessage;
-                object obj = FunapiMessage.GetMessage(msg, MessageType.cs_ping);
-                if (obj == null)
+                FunPingMessage ping = FunapiMessage.GetMessage<FunPingMessage>(msg, MessageType.cs_ping);
+                if (ping == null)
                     return;
 
-                FunPingMessage ping = obj as FunPingMessage;
                 timestamp = ping.timestamp;
             }
 

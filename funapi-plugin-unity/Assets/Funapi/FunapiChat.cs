@@ -127,11 +127,10 @@ namespace Fun
             }
             else
             {
-                FunDebug.Assert(data is FunMulticastMessage);
                 FunMulticastMessage mcast_msg = data as FunMulticastMessage;
-
-                object obj = FunapiMessage.GetMulticastMessage(mcast_msg, MulticastMessageType.chat);
-                FunChatMessage chat_msg = obj as FunChatMessage;
+                FunChatMessage chat_msg = FunapiMessage.GetMulticastMessage<FunChatMessage>(mcast_msg, MulticastMessageType.chat);
+                if (chat_msg == null)
+                    return;
 
                 lock (chat_channel_lock_)
                 {

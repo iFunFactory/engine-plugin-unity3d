@@ -342,10 +342,9 @@ namespace Fun
             else
             {
                 FunMessage msg = body as FunMessage;
-                object obj = FunapiMessage.GetMessage(msg, MessageType.multicast);
-                FunDebug.Assert(obj != null);
-
-                FunMulticastMessage mcast_msg = obj as FunMulticastMessage;
+                FunMulticastMessage mcast_msg = FunapiMessage.GetMessage<FunMulticastMessage>(msg, MessageType.multicast);
+                if (mcast_msg == null)
+                    return;
 
                 if (mcast_msg.channelSpecified)
                     channel_id = mcast_msg.channel;

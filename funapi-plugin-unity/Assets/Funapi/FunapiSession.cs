@@ -1433,11 +1433,10 @@ namespace Fun
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
-                object obj = FunapiMessage.GetMessage(msg, MessageType._sc_redirect);
-                if (obj == null)
+                FunRedirectMessage redirect = FunapiMessage.GetMessage<FunRedirectMessage>(msg, MessageType._sc_redirect);
+                if (redirect == null)
                     return;
 
-                FunRedirectMessage redirect = obj as FunRedirectMessage;
                 host = redirect.host;
                 token = redirect.token;
                 flavor = redirect.flavor;
@@ -1491,11 +1490,10 @@ namespace Fun
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
-                object obj = FunapiMessage.GetMessage(msg, MessageType._cs_redirect_connect);
-                if (obj == null)
+                FunRedirectConnectMessage redirect = FunapiMessage.GetMessage<FunRedirectConnectMessage>(msg, MessageType._cs_redirect_connect);
+                if (redirect == null)
                     return;
 
-                FunRedirectConnectMessage redirect = obj as FunRedirectConnectMessage;
                 if (redirect.result == FunRedirectConnectMessage.Result.OK)
                 {
                     onSessionEvent(SessionEventType.kRedirectSucceeded);
