@@ -97,7 +97,7 @@ public partial class Tester
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = string.Format("[{0}] hello proto", protocol.ToString().Substring(1).ToLower());
                 FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-                session_.SendMessage(MessageType.pbuf_echo, message, protocol);
+                session_.SendMessage("pbuf_echo", message, protocol);
             }
         }
 
@@ -127,13 +127,11 @@ public partial class Tester
 
         void onEchoWithProtobuf (object message)
         {
-            FunDebug.Assert(message is FunMessage);
             FunMessage msg = message as FunMessage;
-            object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_echo);
-            if (obj == null)
+            PbufEchoMessage echo = FunapiMessage.GetMessage<PbufEchoMessage>(msg, MessageType.pbuf_echo);
+            if (echo == null)
                 return;
 
-            PbufEchoMessage echo = obj as PbufEchoMessage;
             FunDebug.Log("Received an echo message: {0}", echo.msg);
         }
 
@@ -150,11 +148,10 @@ public partial class Tester
             else if (encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
-                object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_maintenance);
-                if (obj == null)
+                MaintenanceMessage maintenance = FunapiMessage.GetMessage<MaintenanceMessage>(msg, MessageType.pbuf_maintenance);
+                if (maintenance == null)
                     return;
 
-                MaintenanceMessage maintenance = obj as MaintenanceMessage;
                 FunDebug.Log("Maintenance message\nstart: {0}\nend: {1}\nmessage: {2}",
                              maintenance.date_start, maintenance.date_end, maintenance.messages);
             }

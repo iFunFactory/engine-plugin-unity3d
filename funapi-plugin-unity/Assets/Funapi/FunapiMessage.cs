@@ -87,12 +87,20 @@ namespace Fun
 
         public static object GetMessage (FunMessage msg, MessageType msg_type)
         {
+            return GetMessage<object>(msg, msg_type);
+        }
+
+        public static T GetMessage<T> (FunMessage msg, MessageType msg_type)
+        {
             try
             {
                 object _msg = null;
                 Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
                                        (int)msg_type, DataFormat.Default, true, out _msg);
-                return _msg;
+
+                FunDebug.Assert(_msg != null, "TryGetValue() failed. Please check the message type.");
+
+                return (T)_msg;
             }
             catch (Exception e)
             {
@@ -103,7 +111,7 @@ namespace Fun
                     ParsingErrorCallback(type);
             }
 
-            return null;
+            return default(T);
         }
 
         // For Multicast messages
@@ -132,12 +140,20 @@ namespace Fun
 
         public static object GetMulticastMessage (FunMulticastMessage msg, MulticastMessageType msg_type)
         {
+            return GetMulticastMessage<object>(msg, msg_type);
+        }
+
+        public static T GetMulticastMessage<T> (FunMulticastMessage msg, MulticastMessageType msg_type)
+        {
             try
             {
                 object _msg = null;
                 Extensible.TryGetValue(serializer_, MessageTable.GetType(msg_type), msg,
                                        (int)msg_type, DataFormat.Default, true, out _msg);
-                return _msg;
+
+                FunDebug.Assert(_msg != null, "TryGetValue() failed. Please check the message type.");
+
+                return (T)_msg;
             }
             catch (Exception e)
             {
@@ -148,7 +164,7 @@ namespace Fun
                     ParsingErrorCallback(type);
             }
 
-            return null;
+            return default(T);
         }
 
         public static object Deserialize (string buffer)

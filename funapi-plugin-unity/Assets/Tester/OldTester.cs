@@ -173,18 +173,18 @@ public class OldTester : MonoBehaviour
 
     void sendMessage (TransportProtocol protocol)
     {
-        if (encoding == FunEncoding.kProtobuf)
-        {
-            PbufEchoMessage echo = new PbufEchoMessage();
-            echo.msg = string.Format("[{0}] hello proto", protocol.ToString().Substring(1).ToLower());
-            FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-            network_.SendMessage(MessageType.pbuf_echo, message, EncryptionType.kDefaultEncryption, protocol);
-        }
         if (encoding == FunEncoding.kJson)
         {
             Dictionary<string, object> message = new Dictionary<string, object>();
             message["message"] = string.Format("[{0}] hello world", protocol.ToString().Substring(1).ToLower());
             network_.SendMessage("echo", message, EncryptionType.kDefaultEncryption, protocol);
+        }
+        else if (encoding == FunEncoding.kProtobuf)
+        {
+            PbufEchoMessage echo = new PbufEchoMessage();
+            echo.msg = string.Format("[{0}] hello proto", protocol.ToString().Substring(1).ToLower());
+            FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+            network_.SendMessage(MessageType.pbuf_echo, message, EncryptionType.kDefaultEncryption, protocol);
         }
     }
 
@@ -216,11 +216,10 @@ public class OldTester : MonoBehaviour
     {
         FunDebug.Assert(body is FunMessage);
         FunMessage msg = body as FunMessage;
-        object obj = FunapiMessage.GetMessage(msg, MessageType.pbuf_echo);
-        if (obj == null)
+        PbufEchoMessage echo = FunapiMessage.GetMessage<PbufEchoMessage>(msg, MessageType.pbuf_echo);
+        if (echo == null)
             return;
 
-        PbufEchoMessage echo = obj as PbufEchoMessage;
         FunDebug.Log("Received an echo message: {0}", echo.msg);
     }
 
