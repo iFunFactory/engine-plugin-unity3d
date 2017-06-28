@@ -1248,7 +1248,10 @@ namespace Fun
                 {
                     foreach (FunapiMessage message in sending_)
                     {
-                        list.Add(message.buffer);
+                        if (message.buffer.Count > 0)
+                        {
+                            list.Add(message.buffer);
+                        }
                     }
                 }
 
@@ -1332,12 +1335,13 @@ namespace Fun
                                 nSent -= sending_[0].buffer.Count;
                                 sending_.RemoveAt(0);
                             }
-                        }
 
-                        while (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
-                        {
-                            DebugLog("Remove empty buffer.");
-                            sending_.RemoveAt(0);
+                            // for empty body.
+                            if (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
+                            {
+                                DebugLog("Remove empty buffer.");
+                                sending_.RemoveAt(0);
+                            }
                         }
 
                         // If the first segment has been sent partially, we need to reconstruct the first segment.
@@ -1519,28 +1523,28 @@ namespace Fun
                     FunDebug.Assert(sending_.Count >= 2);
 
                     int length = sending_[0].buffer.Count + sending_[1].buffer.Count;
-                    if (length > send_buffer_.Length)
+                    if (length > kUdpBufferSize)
                     {
-                        send_buffer_ = new byte[length];
+                        string error = string.Format("'{0}' message's length is {1} bytes " +
+                                                     "but UDP single message can't bigger than {2} bytes.",
+                                                     sending_[1].msg_type, length, kUdpBufferSize);
+                        FunDebug.Assert(false, error);
                     }
 
                     // one header + one body
                     for (int i = 0; i < 2; ++i)
                     {
                         ArraySegment<byte> item = sending_[i].buffer;
-                        Buffer.BlockCopy(item.Array, 0, send_buffer_, offset, item.Count);
-                        offset += item.Count;
+                        if (item.Count > 0)
+                        {
+                            Buffer.BlockCopy(item.Array, 0, send_buffer_, offset, item.Count);
+                            offset += item.Count;
+                        }
                     }
                 }
 
                 if (offset > 0)
                 {
-                    if (offset > kUnitBufferSize)
-                    {
-                        Log("Message is greater than 64KB. It will be truncated.");
-                        FunDebug.Assert(false);
-                    }
-
                     sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
                                       send_ep_, new AsyncCallback(this.sendBytesCb), this);
                 }
@@ -1662,7 +1666,13 @@ namespace Fun
             IPEndPoint send_ep_;
             EndPoint receive_ep_;
 
-            byte[] send_buffer_ = new byte[kUnitBufferSize];
+            // This length is 64KB minus 8 bytes UDP header and 48 bytes IP header.
+            // (IP header size is based on IPV6. IPV4 uses 20 bytes.)
+            // https://en.wikipedia.org/wiki/User_Datagram_Protocol
+            const int kUdpBufferSize = 65479;
+
+            // Sending buffer
+            byte[] send_buffer_ = new byte[kUdpBufferSize];
         }
 
 
@@ -1876,7 +1886,8 @@ namespace Fun
                     FunapiMessage body = (FunapiMessage)ar.AsyncState;
 
                     Stream stream = web_request_.EndGetRequestStream(ar);
-                    stream.Write(body.buffer.Array, 0, body.buffer.Count);
+                    if (body.buffer.Count > 0)
+                        stream.Write(body.buffer.Array, 0, body.buffer.Count);
                     stream.Close();
                     DebugLog("Sent {0}bytes.", body.buffer.Count);
 
