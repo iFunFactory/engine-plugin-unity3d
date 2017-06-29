@@ -18,7 +18,7 @@ namespace Fun
     public enum AnnounceResult
     {
         kSucceeded,
-        kInvalidUrl,
+        kNeedInitialize,
         kInvalidJson,
         kListIsNullOrEmpty,
         kExceptionError
@@ -38,16 +38,17 @@ namespace Fun
                 Directory.CreateDirectory(local_path_);
 
             // Download handler
+            web_client_ = new WebClient();
             web_client_.DownloadDataCompleted += downloadDataCompleteCb;
             web_client_.DownloadFileCompleted += downloadFileCompleteCb;
         }
 
         public void UpdateList (int max_count)
         {
-            if (string.IsNullOrEmpty(host_url_))
+            if (web_client_ == null || string.IsNullOrEmpty(host_url_))
             {
-                FunDebug.Log("url is null or empty.");
-                onResult(AnnounceResult.kInvalidUrl);
+                FunDebug.Log("You must call Init() function first.");
+                onResult(AnnounceResult.kNeedInitialize);
                 return;
             }
 
@@ -85,61 +86,57 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    FunDebug.Log("Exception Error: {0}", ar.Error);
-                    onResult(AnnounceResult.kExceptionError);
-                    FunDebug.Assert(false);
+                    throw ar.Error;
+                }
+
+                // Parse json
+                string data = Encoding.UTF8.GetString(ar.Result);
+                Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
+                if (json == null)
+                {
+                    FunDebug.Log("Deserialize json failed. json: {0}", data);
+                    onResult(AnnounceResult.kInvalidJson);
+                    return;
+                }
+
+                FunDebug.Assert(json.ContainsKey("list"));
+                List<object> list = json["list"] as List<object>;
+                if (list == null || list.Count <= 0)
+                {
+                    if (list == null)
+                        FunDebug.Log("Invalid announcement list. list: {0}", list);
+                    else if (list.Count <= 0)
+                        FunDebug.Log("There are no announcements.");
+
+                    onResult(AnnounceResult.kListIsNullOrEmpty);
+                    return;
+                }
+
+                announce_list_.Clear();
+
+                foreach (Dictionary<string, object> node in list)
+                {
+                    announce_list_.Add(node);
+
+                    // download image
+                    if (node.ContainsKey(kImageUrlKey) && node.ContainsKey(kImageMd5Key))
+                    {
+                        checkDownloadImage(node[kImageUrlKey] as string, node[kImageMd5Key] as string);
+                    }
+                }
+
+                FunDebug.Log("Announcement has been updated. total count: {0}", announce_list_.Count);
+
+                if (image_list_.Count > 0)
+                {
+                    // Request a file.
+                    KeyValuePair<string, string> item = image_list_[0];
+                    web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
+                    FunDebug.Log("Download url: {0}", item.Key);
                 }
                 else
                 {
-                    // Parse json
-                    string data = Encoding.UTF8.GetString(ar.Result);
-                    Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
-                    if (json == null)
-                    {
-                        FunDebug.Log("Deserialize json failed. json: {0}", data);
-                        onResult(AnnounceResult.kInvalidJson);
-                        return;
-                    }
-
-                    FunDebug.Assert(json.ContainsKey("list"));
-                    List<object> list = json["list"] as List<object>;
-                    if (list == null || list.Count <= 0)
-                    {
-                        if (list == null)
-                            FunDebug.Log("Invalid announcement list. list: {0}", list);
-                        else if (list.Count <= 0)
-                            FunDebug.Log("There are no announcements.");
-
-                        onResult(AnnounceResult.kListIsNullOrEmpty);
-                        return;
-                    }
-
-                    announce_list_.Clear();
-
-                    foreach (Dictionary<string, object> node in list)
-                    {
-                        announce_list_.Add(node);
-
-                        // download image
-                        if (node.ContainsKey(kImageUrlKey) && node.ContainsKey(kImageMd5Key))
-                        {
-                            checkDownloadImage(node[kImageUrlKey] as string, node[kImageMd5Key] as string);
-                        }
-                    }
-
-                    FunDebug.Log("Announcement has been updated. total count: {0}", announce_list_.Count);
-
-                    if (image_list_.Count > 0)
-                    {
-                        // Request a file.
-                        KeyValuePair<string, string> item = image_list_[0];
-                        web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                        FunDebug.Log("Download url: {0}", item.Key);
-                    }
-                    else
-                    {
-                        onResult(AnnounceResult.kSucceeded);
-                    }
+                    onResult(AnnounceResult.kSucceeded);
                 }
             }
             catch (Exception e)
@@ -155,24 +152,20 @@ namespace Fun
             {
                 if (ar.Error != null)
                 {
-                    FunDebug.Log("Exception Error: {0}", ar.Error);
-                    onResult(AnnounceResult.kExceptionError);
-                    FunDebug.Assert(false);
+                    throw ar.Error;
+                }
+
+                image_list_.RemoveAt(0);
+                if (image_list_.Count > 0)
+                {
+                    KeyValuePair<string, string> item = image_list_[0];
+                    web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
+                    FunDebug.Log("Download url: {0}", item.Key);
                 }
                 else
                 {
-                    image_list_.RemoveAt(0);
-                    if (image_list_.Count > 0)
-                    {
-                        KeyValuePair<string, string> item = image_list_[0];
-                        web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                        FunDebug.Log("Download url: {0}", item.Key);
-                    }
-                    else
-                    {
-                        FunDebug.Log("Download file completed.");
-                        onResult(AnnounceResult.kSucceeded);
-                    }
+                    FunDebug.Log("Download file completed.");
+                    onResult(AnnounceResult.kSucceeded);
                 }
             }
             catch (Exception e)
@@ -232,7 +225,7 @@ namespace Fun
         // member variables.
         string host_url_ = "";
         string local_path_ = "";
-        WebClient web_client_ = new WebClient();
+        WebClient web_client_ = null;
         List<Dictionary<string, object>> announce_list_ = new List<Dictionary<string, object>>();
         List<KeyValuePair<string, string>> image_list_ = new List<KeyValuePair<string, string>>();
     }
