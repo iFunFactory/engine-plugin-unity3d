@@ -52,7 +52,8 @@ namespace Fun
         }
 
         // Start downloading
-        public void GetDownloadList (string hostname_or_ip, UInt16 port, bool https, string target_path, string file_path = "")
+        public void GetDownloadList (string hostname_or_ip, UInt16 port, bool https,
+                                     string target_path, string file_path = "")
         {
             string url = string.Format("{0}://{1}:{2}",
                                        (https ? "https" : "http"), hostname_or_ip, port);
@@ -495,7 +496,8 @@ namespace Fun
 
             foreach (string path in remove_list)
             {
-                delete_file_list_.Add(target_path_ + path);
+                if (File.Exists(path))
+                    delete_file_list_.Add(target_path_ + path);
             }
 
             remove_list.Clear();
