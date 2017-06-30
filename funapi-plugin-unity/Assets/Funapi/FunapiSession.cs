@@ -638,11 +638,11 @@ namespace Fun
         //
         bool startRedirect (string host, List<RedirectInfo> list)
         {
-            wait_redirect_ = true;
-            server_address_ = host;
-
             // Notify start to redirect.
             onSessionEvent(SessionEventType.kRedirectStarted);
+
+            wait_redirect_ = true;
+            server_address_ = host;
 
             // Stopping all transports.
             stopAllTransports();
@@ -985,17 +985,13 @@ namespace Fun
             // Checks transport's state.
             while (transport.InProcess)
             {
-                lock (state_lock_)
-                {
-                    Log("{0} Stop waiting... ({1})", convertString(transport.protocol),
-                        transport.HasUnsentMessages ? "sending" : "0");
-
+                Log("{0} Stop waiting... ({1})", convertString(transport.protocol),
+                    transport.HasUnsentMessages ? "sending" : "0");
 #if !NO_UNITY
-                    yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(0.1f);
 #else
-                    Thread.Sleep(100);
+                Thread.Sleep(100);
 #endif
-                }
             }
 
             stopTransport(transport);
