@@ -20,22 +20,23 @@ namespace Fun
     {
         public static void Compute (MonoBehaviour mono, ref string path, ref DownloadFileInfo file, OnResult on_result)
         {
-            if (File.Exists(path))
+            if (!File.Exists(path))
             {
-#if !NO_UNITY
-                mono.StartCoroutine(asyncCompute(path, file, on_result));
-#else
-                string path_ = path;
-                DownloadFileInfo file_ = file;
-                mono.StartCoroutine(delegate { asyncCompute(path_, file_, on_result); });
-#endif
+                FunDebug.LogWarning("MD5Async.Compute - Can't find a file.\npath: {0}", path);
+
+                if (on_result != null)
+                    on_result(path, file, false);
+
                 return;
             }
 
-            FunDebug.Log("MD5Async.Compute - Can't find a file.\npath: {0}", path);
-
-            if (on_result != null)
-                on_result(path, file, false);
+#if !NO_UNITY
+            mono.StartCoroutine(asyncCompute(path, file, on_result));
+#else
+            string path_ = path;
+            DownloadFileInfo file_ = file;
+            mono.StartCoroutine(delegate { asyncCompute(path_, file_, on_result); });
+#endif
         }
 
 #if !NO_UNITY

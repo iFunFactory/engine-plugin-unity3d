@@ -52,17 +52,17 @@ namespace Fun
         {
             IPAddress[] list = Dns.GetHostAddresses(hostname);
             if (list == null) {
-                FunDebug.Log("ConnectList - Can't find any ip address with hostname [{0}].", hostname);
+                FunDebug.LogWarning("ConnectList.Add - Can't find any ip address with '{0}' host.", hostname);
                 return;
             }
+
+            FunDebug.DebugLog1("[{0}] Dns address count is {1}.", hostname, list.Length);
 
             foreach (IPAddress ip in list)
             {
                 addr_list_.Add(new HostIP(hostname, ip, port));
-                FunDebug.DebugLog("address > " + ip + " : " + ip.AddressFamily);
+                FunDebug.DebugLog1("  > {0} ({1})", ip, ip.AddressFamily);
             }
-
-            FunDebug.DebugLog("[{0}] Dns address count : {1}", hostname, addr_list_.Count);
         }
 
         public void Add (string hostname, UInt16 port, bool https)
@@ -73,7 +73,7 @@ namespace Fun
         public void Add (List<HostAddr> list)
         {
             if (list == null || list.Count <= 0) {
-                FunDebug.Log("ConnectList - Invalid connect list parameter.");
+                FunDebug.LogWarning("ConnectList.Add - You must pass a list of HostAddr as a parameter.");
                 return;
             }
 

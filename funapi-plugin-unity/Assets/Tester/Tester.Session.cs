@@ -75,7 +75,7 @@ public partial class Tester
         {
             if (!session_.Connected && !session_.ReliableSession)
             {
-                FunDebug.Log("You should connect first.");
+                FunDebug.LogWarning("You should connect first.");
                 return;
             }
 
@@ -115,7 +115,7 @@ public partial class Tester
 
         void onResponseTimedOut (string type)
         {
-            FunDebug.Log("Response timed out. type: {0}", type);
+            FunDebug.LogWarning("Response timed out. type: {0}", type);
         }
 
         void onEcho (object message)

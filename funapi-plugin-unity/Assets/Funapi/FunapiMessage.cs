@@ -82,7 +82,8 @@ namespace Fun
             catch (Exception e)
             {
                 Type type = MessageTable.GetType(msg_type);
-                FunDebug.LogError("Failed to create {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+                FunDebug.LogError("FunapiMessage.CreateFunMessage - Failed to create '{0}' ({1})\n{2}",
+                                  type, msg_type, e.ToString());
 
                 if (ParsingErrorCallback != null)
                     ParsingErrorCallback(type);
@@ -111,7 +112,8 @@ namespace Fun
             catch (Exception e)
             {
                 Type type = MessageTable.GetType(msg_type);
-                FunDebug.LogError("Failed to decode {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+                FunDebug.LogError("FunapiMessage.GetMessage - Failed to decode '{0}' ({1})\n{2}",
+                                  type, msg_type, e.ToString());
 
                 if (ParsingErrorCallback != null)
                     ParsingErrorCallback(type);
@@ -135,7 +137,8 @@ namespace Fun
             catch (Exception e)
             {
                 Type type = MessageTable.GetType(msg_type);
-                FunDebug.LogError("Failed to create {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+                FunDebug.LogError("FunapiMessage.CreateMulticastMessage - Failed to create '{0}' ({1})\n{2}",
+                                  type, msg_type, e.ToString());
 
                 if (ParsingErrorCallback != null)
                     ParsingErrorCallback(type);
@@ -164,7 +167,8 @@ namespace Fun
             catch (Exception e)
             {
                 Type type = MessageTable.GetType(msg_type);
-                FunDebug.LogError("Failed to decode {0} ({1})\n\n{2}", type, msg_type, e.ToString());
+                FunDebug.LogError("FunapiMessage.GetMulticastMessage - Failed to decode '{0}' ({1})\n{2}",
+                                  type, msg_type, e.ToString());
 
                 if (ParsingErrorCallback != null)
                     ParsingErrorCallback(type);
@@ -183,7 +187,7 @@ namespace Fun
             if (encoding == FunEncoding.kJson)
             {
                 string str = System.Text.Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
-                //FunDebug.DebugLog("Parsed json: {0}", str);
+                //FunDebug.DebugLog2("Parsed json: {0}", str);
                 return json_helper_.Deserialize(str);
             }
             else if (encoding == FunEncoding.kProtobuf)

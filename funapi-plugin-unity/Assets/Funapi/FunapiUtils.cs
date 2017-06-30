@@ -19,7 +19,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 213;
+        public static readonly int kPluginVersion = 215;
     }
 
 
@@ -47,7 +47,7 @@ namespace Fun
                     obj.OnQuit = onQuit;
                 }
 
-                DebugLog("'{0}' GameObject was created.", game_object_.name);
+                DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
             }
 #else
             if (funapi_object_ != null)
@@ -65,7 +65,7 @@ namespace Fun
             if (game_object_ == null)
                 return;
 
-            DebugLog("'{0}' GameObject was destroyed", game_object_.name);
+            DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
             GameObject.Destroy(game_object_);
             game_object_ = null;
             funapi_object_ = null;
@@ -298,12 +298,11 @@ namespace Fun
         }
 
         // Adds a action
-        int addItem (Action callback, float start_delay = 0f,
-                             bool repeat = false, float repeat_time = 0f)
+        int addItem (Action callback, float start_delay = 0f, bool repeat = false, float repeat_time = 0f)
         {
             if (callback == null)
             {
-                throw new ArgumentNullException ("callback");
+                throw new ArgumentNullException("callback");
             }
 
             lock (lock_)

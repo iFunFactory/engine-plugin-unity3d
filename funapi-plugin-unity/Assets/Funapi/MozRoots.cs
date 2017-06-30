@@ -36,7 +36,7 @@ namespace Fun
             }
             catch (WebException we)
             {
-                FunDebug.LogError("Download certificates failed. {0}", we.Message);
+                FunDebug.LogError("MozRoots.DownloadMozRoots - Download certificates failed.\n{0}", we.Message);
                 File.Delete(tempPath);
                 return false;
             }
@@ -74,7 +74,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                FunDebug.LogError("The creation of the zip file of certificates failed. {0}", e.Message);
+                FunDebug.LogError("MozRoots.DownloadMozRoots - The creation of the zip file of certificates failed.\n{0}", e.Message);
                 return false;
             }
 #endif
@@ -92,9 +92,9 @@ namespace Fun
             {
                 TextAsset zippedMozRootsRawData = Resources.Load<TextAsset>(kResourceCertificatesPath);
                 if (zippedMozRootsRawData == null)
-                    throw new System.Exception("Certificates file does not exist!");
+                    throw new System.Exception("MozRoots.LoadRootCertificates - Certificates file does not exist!");
                 if (zippedMozRootsRawData.bytes == null || zippedMozRootsRawData.bytes.Length <= 0)
-                    throw new System.Exception("The certificates file is corrupted!");
+                    throw new System.Exception("MozRoots.LoadRootCertificates - The certificates file is corrupted!");
 
                 trustedCerificates = new X509Certificate2Collection();
 
@@ -135,7 +135,7 @@ namespace Fun
                                 }
                                 streamReader.Close();
 
-                                FunDebug.Log("{0} Root certificates loaded.", trustedCerificates.Count);
+                                FunDebug.Log("MozRoots - {0} Root certificates loaded.", trustedCerificates.Count);
                             }
                         }
                         zipInputStream.Close();
@@ -144,7 +144,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                FunDebug.LogError("Load certificates file failed. {0}", e.Message);
+                FunDebug.LogError("MozRoots - Failed to load certificate files.\n{0}", e.Message);
             }
 #endif
 
@@ -203,7 +203,7 @@ namespace Fun
                 {
                     if (!checkRootCertificate(chain))
                     {
-                        FunDebug.LogWarning("[MozRoots] Untrusted Root chain - {0}", certificate);
+                        FunDebug.LogWarning("MozRoots - Untrusted Root chain : {0}", certificate);
                         return false;
                     }
                     else
@@ -217,7 +217,7 @@ namespace Fun
                     chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
                     if (!chain.Build((X509Certificate2)certificate))
                     {
-                        FunDebug.LogWarning("[MozRoots] Invalid Certificate - {0}", certificate);
+                        FunDebug.LogWarning("MozRoots - Invalid Certificate : {0}", certificate);
                         return false;
                     }
                 }

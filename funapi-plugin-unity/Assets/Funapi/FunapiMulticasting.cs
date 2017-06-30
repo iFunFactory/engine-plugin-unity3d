@@ -50,7 +50,8 @@ namespace Fun
         {
             if (!Connected)
             {
-                FunDebug.Log("Not connected. First connect before join a multicast channel.");
+                FunDebug.LogWarning("Multicast.RequestChannelList - Multicast is not connected.\n" +
+                                    "Please connect first before request a channel list.");
                 return;
             }
 
@@ -79,7 +80,8 @@ namespace Fun
         {
             if (!Connected)
             {
-                FunDebug.Log("Not connected. First connect before join a multicast channel.");
+                FunDebug.LogWarning("Multicast.JoinChannel - Multicast is not connected.\n" +
+                                    "Please connect first before join a multicast channel.");
                 return false;
             }
 
@@ -87,7 +89,7 @@ namespace Fun
             {
                 if (channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.Log("Already joined the channel: {0}", channel_id);
+                    FunDebug.LogWarning("Multicast.JoinChannel - Already joined the '{0} channel.", channel_id);
                     return false;
                 }
 
@@ -120,7 +122,7 @@ namespace Fun
                 session_.SendMessage(kMulticastMsgType, fun_msg);
             }
 
-            FunDebug.Log("Request to join '{0}' channel", channel_id);
+            FunDebug.Log("Multicast - Request to join '{0}' channel", channel_id);
 
             return true;
         }
@@ -129,8 +131,9 @@ namespace Fun
         {
             if (!Connected)
             {
-                FunDebug.Log("Not connected. If you are trying to leave a channel in which you were, "
-                               + "connect first while preserving the session id you used for join.");
+                FunDebug.LogWarning("Multicast.LeaveChannel - Multicast is not connected.\n" +
+                                    "If you are trying to leave a channel in which you were, " +
+                                    "connect first while preserving the session id you used for join.");
                 return false;
             }
 
@@ -138,7 +141,7 @@ namespace Fun
             {
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.Log("You are not in the channel: {0}", channel_id);
+                    FunDebug.LogWarning("Multicast.LeaveChannel - You are not in the '{0} channel.", channel_id);
                     return false;
                 }
             }
@@ -172,7 +175,7 @@ namespace Fun
 
                 channels_.Clear();
 
-                FunDebug.Log("Leave all channels.");
+                FunDebug.Log("Multicast - Leave all channels.");
             }
         }
 
@@ -199,7 +202,7 @@ namespace Fun
             string channel_id = mcast_msg.channel;
             if (channel_id == "")
             {
-                FunDebug.LogWarning("You should set a vaild channel id.");
+                FunDebug.LogWarning("Multicast.SendToChannel - You should set a vaild channel id.");
                 return false;
             }
 
@@ -207,13 +210,14 @@ namespace Fun
             {
                 if (!Connected)
                 {
-                    FunDebug.Log("Not connected. If you are trying to leave a channel in which you were, "
-                                   + "connect first while preserving the session id you used for join.");
+                    FunDebug.LogWarning("Multicast.SendToChannel - Multicast is not connected.\n" +
+                                        "If you are trying to send a message in which you were, " +
+                                        "connect first while preserving the session id you used for join.");
                     return false;
                 }
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.Log("You are not in the channel: {0}", channel_id);
+                    FunDebug.LogWarning("Multicast.SendToChannel - You are not in the '{0} channel.", channel_id);
                     return false;
                 }
             }
@@ -239,7 +243,7 @@ namespace Fun
             string channel_id = json_helper_.GetStringField(json_msg, kChannelId);
             if (channel_id == "")
             {
-                FunDebug.LogWarning("You should set a vaild channel id.");
+                FunDebug.LogWarning("Multicast.SendToChannel - You should set a vaild channel id.");
                 return false;
             }
 
@@ -247,13 +251,14 @@ namespace Fun
             {
                 if (!Connected)
                 {
-                    FunDebug.Log("Not connected. If you are trying to leave a channel in which you were, "
-                                   + "connect first while preserving the session id you used for join.");
+                    FunDebug.LogWarning("Multicast.SendToChannel - Multicast is not connected.\n" +
+                                        "If you are trying to send a message in which you were, " +
+                                        "connect first while preserving the session id you used for join.");
                     return false;
                 }
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.Log("You are not in the channel: {0}", channel_id);
+                    FunDebug.LogWarning("Multicast.SendToChannel - You are not in the '{0} channel.", channel_id);
                     return false;
                 }
             }
@@ -290,14 +295,14 @@ namespace Fun
 
         void onUserJoined (string channel_id, string user_id)
         {
-            FunDebug.Log("{0} joined the '{1}' channel", user_id, channel_id);
+            FunDebug.Log("Multicast - {0} joined the '{1}' channel", user_id, channel_id);
             if (JoinedCallback != null)
                 JoinedCallback(channel_id, user_id);
         }
 
         void onUserLeft (string channel_id, string user_id)
         {
-            FunDebug.Log("{0} left the '{1}' channel", user_id, channel_id);
+            FunDebug.Log("Multicast - {0} left the '{1}' channel", user_id, channel_id);
             if (LeftCallback != null)
                 LeftCallback(channel_id, user_id);
         }
@@ -376,7 +381,7 @@ namespace Fun
             if (error_code != 0)
             {
                 FunMulticastMessage.ErrorCode code = (FunMulticastMessage.ErrorCode)error_code;
-                FunDebug.LogWarning("Multicast error - channel: {0} code: {1}", channel_id, code);
+                FunDebug.LogWarning("Multicast.onReceived - channel: {0} error: {1}", channel_id, code);
 
                 if (code != FunMulticastMessage.ErrorCode.EC_ALREADY_JOINED)
                 {
@@ -397,7 +402,7 @@ namespace Fun
             {
                 if (!channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.Log("You are not in the channel: {0}", channel_id);
+                    FunDebug.LogWarning("Multicast.onReceived - You are not in the '{0} channel.", channel_id);
                     return;
                 }
             }

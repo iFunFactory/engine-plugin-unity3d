@@ -45,8 +45,7 @@ namespace Fun
                 return new EncryptorAes128();
 
             default:
-                FunDebug.LogWarning("Unknown encryptor: {0}", type);
-                FunDebug.Assert(false);
+                FunDebug.LogError("Encryptor.Create - Unknown type: {0}", type);
                 return null;
             }
         }
@@ -60,7 +59,7 @@ namespace Fun
 
         public virtual bool Handshake (string in_header, ref string out_header)
         {
-            FunDebug.Assert(false);
+            FunDebug.LogError("You should override '{0}' Handshake function.", name_);
             return true;
         }
 
@@ -130,8 +129,6 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             if (dst.Count != src.Count)
                 return -1;
 
@@ -145,7 +142,7 @@ namespace Fun
         {
             if (in_header.Length > 0)
             {
-                FunDebug.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("Encryptor0.Decrypt - Wrong encryptor header.");
                 return -1;
             }
 
@@ -194,7 +191,7 @@ namespace Fun
 
             if (in_header.Length > 0)
             {
-                FunDebug.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("Encryptor1.Decrypt - Wrong encryptor header.");
                 return -1;
             }
 
@@ -271,7 +268,7 @@ namespace Fun
 
             if (in_header.Length > 0)
             {
-                FunDebug.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("Encryptor2.Decrypt - Wrong encryptor header.");
                 return -1;
             }
 
@@ -325,18 +322,14 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             return encrypt(src, dst);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             if (in_header.Length > 0)
             {
-                FunDebug.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("EncryptorChacha20.Decrypt - Wrong encryptor header.");
                 return -1;
             }
 
@@ -387,18 +380,14 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             return encrypt(src, dst);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             if (in_header.Length > 0)
             {
-                FunDebug.LogWarning("Wrong encryptor header.");
+                FunDebug.LogWarning("EncryptorAes128.Decrypt - Wrong encryptor header.");
                 return -1;
             }
 
@@ -453,7 +442,7 @@ namespace Fun
             Encryptor encryptor = Encryptor.Create(type);
             if (encryptor == null)
             {
-                LogWarning("Failed to create encryptor: {0}", type);
+                LogWarning("Encryptor - Failed to create '{0}' encryptor", type);
                 return false;
             }
 
@@ -471,7 +460,6 @@ namespace Fun
                 return;
 
             default_encryptor_ = type;
-            Log("Set default encryption: {0}", type);
         }
 
         protected void resetEncryptors ()
@@ -555,21 +543,23 @@ namespace Fun
                 EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
                 if (!encryptors_.ContainsKey(type))
                 {
-                    LogWarning("Unavailable encryption type: {0}", type);
+                    LogWarning("Encryptor.doHandshaking - Unavailable type: {0}", type);
                     return false;
                 }
 
                 Encryptor encryptor = encryptors_[type];
                 if (encryptor.state != Encryptor.State.kHandshaking)
                 {
-                    LogWarning("Unexpected handshake message: {0}", encryptor.name);
+                    LogWarning("Encryptor.doHandshaking - Encryptor state is not handshaking. " +
+                               "state: {0}", encryptor.state);
                     return false;
                 }
 
                 string out_header = "";
                 if (!encryptor.Handshake(encryption_header, ref out_header))
                 {
-                    LogWarning("Encryption handshake failure: {0}", encryptor.name);
+                    LogWarning("Encryptor.doHandshaking - Failure in '{0}' Handshake.",
+                               encryptor.name);
                     return false;
                 }
 
@@ -593,14 +583,16 @@ namespace Fun
         {
             if (!encryptors_.ContainsKey(type))
             {
-                LogWarning("Unavailable encryption type: {0}", type);
+                LogWarning("Encryptor.encryptMessage - Unavailable type: {0}", type);
                 return false;
             }
 
             Encryptor encryptor = encryptors_[type];
             if (encryptor.state != Encryptor.State.kEstablished)
             {
-                LogWarning("Can't encrypt '{0}' message. The Encryption state is '{1}'", message.msg_type, type);
+                LogWarning("Encryptor.encryptMessage - Can't encrypt '{0}' message. " +
+                           "Encryptor state is not established. state: {1}",
+                           message.msg_type, encryptor.state);
                 return false;
             }
 
@@ -609,7 +601,7 @@ namespace Fun
                 Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref header);
                 if (nSize <= 0)
                 {
-                    LogWarning("Failed to encrypt.");
+                    LogWarning("Encryptor.encryptMessage - Failed to encrypt.");
                     return false;
                 }
 
@@ -624,7 +616,7 @@ namespace Fun
             EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
             if (!encryptors_.ContainsKey(type))
             {
-                LogWarning("Unavailable encryption type: {0}", type);
+                LogWarning("Encryptor.decryptMessage - Unavailable type: {0}", type);
                 return false;
             }
 
@@ -632,7 +624,7 @@ namespace Fun
             Int64 nSize = encryptor.Decrypt(buffer, buffer, encryption_header);
             if (nSize <= 0)
             {
-                LogWarning("Failed to decrypt.");
+                LogWarning("Encryptor.decryptMessage - Failed to decrypt.");
                 return false;
             }
 
@@ -644,14 +636,14 @@ namespace Fun
         {
             if (pub_key_ == null)
             {
-                FunDebug.LogError("Generate {0} public key failed.\n" +
-                                  "You should set 'FunapiEncryptor.public_key' value first.", type);
+                LogError("Encryptor.generatePublicKey - Failed to generate {0} public key.\n" +
+                         "You should set 'FunapiEncryptor.public_key' value first.", type);
                 return "";
             }
 
             if (!encryptors_.ContainsKey(type))
             {
-                LogWarning("Unavailable encryption: {0} requested public key", type);
+                LogWarning("Encryptor.generatePublicKey - Unavailable type: {0}", type);
                 return "";
             }
 
@@ -664,7 +656,7 @@ namespace Fun
             {
                 if (value.Length != 64)
                 {
-                    throw new ArgumentException("public key's length is invalid. The length should be 64 bytes.",
+                    throw new ArgumentException("Length of public key is not 64. The length should be 64 bytes.",
                                                 "FunapiEncryptor.public_key");
                 }
 
