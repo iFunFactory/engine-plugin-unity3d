@@ -292,6 +292,11 @@ namespace Fun
                 get { return protocol_; }
             }
 
+            public string str_protocol
+            {
+                get { return str_protocol_; }
+            }
+
             public FunEncoding encoding
             {
                 get { return encoding_; }
@@ -561,9 +566,6 @@ namespace Fun
 
             bool buildingMessages ()
             {
-                FunDebug.Assert(state_ >= State.kConnected);
-                FunDebug.Assert(sending_.Count > 0);
-
                 for (int i = 0; i < sending_.Count; i+=2)
                 {
                     FunapiMessage message = sending_[i];
@@ -586,13 +588,16 @@ namespace Fun
                     }
 
                     StringBuilder header = new StringBuilder();
-                    header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
+                    header.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter,
+                                        FunapiVersion.kProtocolVersion, kHeaderDelimeter);
                     if (first_sending_)
                     {
-                        header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kPluginVersion, kHeaderDelimeter);
+                        header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter,
+                                            FunapiVersion.kPluginVersion, kHeaderDelimeter);
                         first_sending_ = false;
                     }
-                    header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, message.buffer.Count, kHeaderDelimeter);
+                    header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter,
+                                        message.buffer.Count, kHeaderDelimeter);
                     if (type != EncryptionType.kNoneEncryption)
                     {
                         header.AppendFormat("{0}{1}{2}", kEncryptionHeaderField, kHeaderFieldDelimeter, Convert.ToInt32(type));
@@ -600,7 +605,7 @@ namespace Fun
                     }
                     header.Append(kHeaderDelimeter);
 
-                    FunapiMessage header_buffer = new FunapiMessage(protocol_, message.msg_type, header);
+                    FunapiMessage header_buffer = new FunapiMessage(protocol_, message.msg_type + " (header)", header);
                     header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                     sending_.Insert(i, header_buffer);
 
@@ -630,7 +635,8 @@ namespace Fun
                 {
                     Log("Compacting the receive buffer to save {0} bytes.", next_decoding_offset_);
                     // fit in the receive buffer boundary.
-                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0, received_size_ - next_decoding_offset_);
+                    Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0,
+                                     received_size_ - next_decoding_offset_);
                     receive_buffer_ = new_buffer;
                     received_size_ -= next_decoding_offset_;
                     next_decoding_offset_ = 0;
@@ -689,7 +695,8 @@ namespace Fun
 
                 for (; next_decoding_offset_ < received_size_; )
                 {
-                    ArraySegment<byte> haystack = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, received_size_ - next_decoding_offset_);
+                    ArraySegment<byte> haystack = new ArraySegment<byte>(
+                        receive_buffer_, next_decoding_offset_, received_size_ - next_decoding_offset_);
                     int offset = bytePatternMatch(haystack, kHeaderDelimeterAsNeedle);
                     if (offset < 0)
                     {
@@ -698,7 +705,8 @@ namespace Fun
                         return false;
                     }
 
-                    string line = System.Text.Encoding.ASCII.GetString(receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
+                    string line = System.Text.Encoding.ASCII.GetString(
+                        receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
                     next_decoding_offset_ = offset + 1;
 
                     if (line == "")
@@ -1140,6 +1148,7 @@ namespace Fun
             protected State state_;
             protected SessionId session_id_ = new SessionId();
             protected TransportProtocol protocol_;
+            protected string str_protocol_;
             protected FunEncoding encoding_ = FunEncoding.kNone;
             protected TransportOption option_ = null;
             protected ThreadSafeEventList event_ = new ThreadSafeEventList();
@@ -1190,6 +1199,7 @@ namespace Fun
             public TcpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
             {
                 protocol_ = TransportProtocol.kTcp;
+                str_protocol_ = convertString(protocol_);
                 encoding_ = type;
 
                 initAddress(hostname_or_ip, port);
@@ -1350,8 +1360,9 @@ namespace Fun
                             FunDebug.Assert(sending_.Count > 0);
                             ArraySegment<byte> original = sending_[0].buffer;
 
-                            FunDebug.Assert(nSent <= sending_[0].buffer.Count);
-                            ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
+                            FunDebug.Assert(sending_[0].buffer.Count > nSent);
+                            ArraySegment<byte> adjusted = new ArraySegment<byte>(
+                                original.Array, original.Offset + nSent, original.Count - nSent);
                             sending_[0].buffer = adjusted;
                         }
 
@@ -1398,8 +1409,8 @@ namespace Fun
                             checkReceiveBuffer();
 
                             // Starts another async receive
-                            ArraySegment<byte> residual = new ArraySegment<byte>(receive_buffer_, received_size_,
-                                                                                 receive_buffer_.Length - received_size_);
+                            ArraySegment<byte> residual = new ArraySegment<byte>(
+                                receive_buffer_, received_size_, receive_buffer_.Length - received_size_);
 
                             List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                             buffer.Add(residual);
@@ -1452,6 +1463,7 @@ namespace Fun
             public UdpTransport (string hostname_or_ip, UInt16 port, FunEncoding type)
             {
                 protocol_ = TransportProtocol.kUdp;
+                str_protocol_ = convertString(protocol_);
                 encoding_ = type;
 
                 initAddress(hostname_or_ip, port);
@@ -1682,6 +1694,7 @@ namespace Fun
             public HttpTransport(string hostname_or_ip, UInt16 port, bool https, FunEncoding type)
             {
                 protocol_ = TransportProtocol.kHttp;
+                str_protocol_ = convertString(protocol_);
                 encoding_ = type;
 
                 initAddress(hostname_or_ip, port, https);
@@ -1700,7 +1713,7 @@ namespace Fun
             protected override void setAddress (HostAddr addr)
             {
                 FunDebug.Assert(addr is HostHttp);
-                HostHttp http = (HostHttp)addr;
+                HostHttp http = addr as HostHttp;
 
                 // Url
                 host_url_ = string.Format("{0}://{1}:{2}/v{3}/",
@@ -1826,7 +1839,8 @@ namespace Fun
                 string[] lines = headers.Replace("\r", "").Split('\n');
                 int body_length = 0;
 
-                buffer.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kProtocolVersion, kHeaderDelimeter);
+                buffer.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter,
+                                    FunapiVersion.kProtocolVersion, kHeaderDelimeter);
 
                 foreach (string n in lines)
                 {
@@ -1849,17 +1863,21 @@ namespace Fun
                             break;
                         case "content-length":
                             body_length = Convert.ToInt32(value);
-                            buffer.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                            buffer.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField,
+                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
                             break;
                         case "x-ifun-enc":
-                            buffer.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField, kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                            buffer.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField,
+                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
                             break;
                         default:
-                            buffer.AppendFormat("{0}{1}{2}{3}", tuple[0], kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                            buffer.AppendFormat("{0}{1}{2}{3}", tuple[0],
+                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
                             break;
                         }
                     }
-                    else {
+                    else
+                    {
                         break;
                     }
                 }
@@ -1940,14 +1958,16 @@ namespace Fun
                             onReceiveHeader(str_header);
 
                             read_stream_ = web_response_.GetResponseStream();
-                            read_stream_.BeginRead(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
+                            read_stream_.BeginRead(receive_buffer_, received_size_,
+                                                   receive_buffer_.Length - received_size_,
                                                    new AsyncCallback(readCb), null);
                         }
                     }
                     else
                     {
                         last_error_code_ = TransportError.Type.kReceivingFailed;
-                        last_error_message_ = string.Format("Failed response. status:{0}", web_response_.StatusDescription);
+                        last_error_message_ = string.Format("Failed response. status:{0}",
+                                                            web_response_.StatusDescription);
                         event_.Add(onFailure);
                     }
                 }
@@ -1980,7 +2000,8 @@ namespace Fun
                         lock (receive_lock_)
                         {
                             received_size_ += nRead;
-                            read_stream_.BeginRead(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
+                            read_stream_.BeginRead(receive_buffer_, received_size_,
+                                                   receive_buffer_.Length - received_size_,
                                                    new AsyncCallback(readCb), null);
                         }
                     }
