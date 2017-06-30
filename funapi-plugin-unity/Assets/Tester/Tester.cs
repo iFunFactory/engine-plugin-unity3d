@@ -313,12 +313,12 @@ public partial class Tester : MonoBehaviour
         {
             List<object> list = channel_list as List<object>;
             if (list.Count <= 0) {
-                FunDebug.Log("[Channel List] There are no channels.");
+                FunDebug.Log("Multicast - There are no channels.");
                 return;
             }
 
             StringBuilder data = new StringBuilder();
-            data.Append("[Channel List]\n");
+            data.Append("Multicast - channel list\n");
             foreach (Dictionary<string, object> info in list)
             {
                 data.AppendFormat("name:{0} members:{1}", info["_name"], info["_members"]);
@@ -330,12 +330,12 @@ public partial class Tester : MonoBehaviour
         {
             List<FunMulticastChannelListMessage> list = channel_list as List<FunMulticastChannelListMessage>;
             if (list.Count <= 0) {
-                FunDebug.Log("[Channel List] There are no channels.");
+                FunDebug.Log("Multicast There are no channels.");
                 return;
             }
 
             StringBuilder data = new StringBuilder();
-            data.Append("[Channel List]\n");
+            data.Append("Multicast - channel list\n");
             foreach (FunMulticastChannelListMessage info in list)
             {
                 data.AppendFormat("name:{0} members:{1}", info.channel_name, info.num_members);

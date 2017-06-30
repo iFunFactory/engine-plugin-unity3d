@@ -24,7 +24,7 @@ public partial class Tester
             FunapiSession.Transport transport = session.GetTransport(TransportProtocol.kTcp);
             if (transport == null)
             {
-                FunDebug.Log("Can't find TCP transport.");
+                FunDebug.LogWarning("Multicast - Can't find TCP transport.");
                 return;
             }
 
@@ -37,10 +37,10 @@ public partial class Tester
                 onMulticastChannelList(encoding, channel_list);
             };
             multicast_.JoinedCallback += delegate (string channel_id, string sender) {
-                FunDebug.DebugLog("JoinedCallback called. player:{0}", sender);
+                FunDebug.Log("Multicast - JoinedCallback called. player:{0}", sender);
             };
             multicast_.LeftCallback += delegate (string channel_id, string sender) {
-                FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
+                FunDebug.Log("Multicast - LeftCallback called. player:{0}", sender);
             };
             multicast_.ErrorCallback += onMulticastError;
         }
@@ -108,7 +108,7 @@ public partial class Tester
                 FunDebug.Assert(channel != null && channel == channel_id);
 
                 string message = FunapiMessage.JsonHelper.GetStringField(body, "_message");
-                FunDebug.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
+                FunDebug.Log("Multicast - Received a message from the '{0}' channel.\nMessage: {1}",
                              channel_id, message);
             }
             else
@@ -121,7 +121,7 @@ public partial class Tester
                 if (hello_msg == null)
                     return;
 
-                FunDebug.Log("Received a multicast message from the '{0}' channel.\nMessage: {1}",
+                FunDebug.Log("Multicast - Received a message from the '{0}' channel.\nMessage: {1}",
                              channel_id, hello_msg.message);
             }
         }

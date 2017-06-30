@@ -21,7 +21,7 @@ public partial class Tester
             FunapiSession.Transport transport = session.GetTransport(TransportProtocol.kTcp);
             if (transport == null)
             {
-                FunDebug.Log("Can't find TCP transport.");
+                FunDebug.LogWarning("Chatting - Can't find TCP transport.");
                 return;
             }
 
@@ -34,10 +34,10 @@ public partial class Tester
                 onMulticastChannelList(encoding, channel_list);
             };
             chat_.JoinedCallback += delegate (string channel_id, string sender) {
-                FunDebug.DebugLog("JoinedCallback called. player:{0}", sender);
+                FunDebug.Log("Chatting - JoinedCallback called. player:{0}", sender);
             };
             chat_.LeftCallback += delegate (string channel_id, string sender) {
-                FunDebug.DebugLog("LeftCallback called. player:{0}", sender);
+                FunDebug.Log("Chatting - LeftCallback called. player:{0}", sender);
             };
             chat_.ErrorCallback += onMulticastError;
         }
@@ -75,7 +75,7 @@ public partial class Tester
 
         void onChatReceived (string chat_channel, string sender, string text)
         {
-            FunDebug.Log("Received a chat channel message.\nChannel={0}, sender={1}, text={2}",
+            FunDebug.Log("Chatting - Received a message.\nChannel={0}, sender={1}, text={2}",
                          chat_channel, sender, text);
         }
 

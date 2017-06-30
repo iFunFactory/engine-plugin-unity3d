@@ -145,7 +145,7 @@ public partial class UIOption : MonoBehaviour
     public FunEncoding httpEncoding { get { return fields_.httpEncoding.type; } }
     public EncryptionType httpEncryption { get { return fields_.httpEncryption.type; } }
     public bool HTTPS { get { return fields_.HTTPS.isOn; } }
-    public bool useWWW { get { return fields_.useWWW; } }
+    public bool useWWW { get { return fields_.useWWW.isOn; } }
 
     public bool bChanged { get; set; }
 

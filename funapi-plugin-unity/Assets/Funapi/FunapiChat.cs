@@ -37,7 +37,7 @@ namespace Fun
             {
                 if (chat_channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.Log("Already joined the '{0}' channel.", channel_id);
+                    FunDebug.LogWarning("Already joined the '{0}' channel.", channel_id);
                     return false;
                 }
 
@@ -102,7 +102,7 @@ namespace Fun
                 {
                     if (!chat_channels_.ContainsKey(channel_id))
                     {
-                        FunDebug.Log("You are not in the '{0}' channel.", channel_id);
+                        FunDebug.LogWarning("You are not in the '{0}' channel.", channel_id);
                         return;
                     }
 

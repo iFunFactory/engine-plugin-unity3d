@@ -47,7 +47,7 @@ namespace Fun
         {
             if (web_client_ == null || string.IsNullOrEmpty(host_url_))
             {
-                FunDebug.Log("You must call Init() function first.");
+                FunDebug.LogWarning("Announcement.UpdateList - You must call Init() function first.");
                 onResult(AnnounceResult.kNeedInitialize);
                 return;
             }
@@ -94,7 +94,7 @@ namespace Fun
                 Dictionary<string, object> json = Json.Deserialize(data) as Dictionary<string, object>;
                 if (json == null)
                 {
-                    FunDebug.Log("Deserialize json failed. json: {0}", data);
+                    FunDebug.LogWarning("Announcement - Deserialize json failed. json: {0}", data);
                     onResult(AnnounceResult.kInvalidJson);
                     return;
                 }
@@ -104,9 +104,9 @@ namespace Fun
                 if (list == null || list.Count <= 0)
                 {
                     if (list == null)
-                        FunDebug.Log("Invalid announcement list. list: {0}", list);
+                        FunDebug.LogWarning("Announcement - Announcement list is null.");
                     else if (list.Count <= 0)
-                        FunDebug.Log("There are no announcements.");
+                        FunDebug.LogWarning("Announcement - There is no announcement list.");
 
                     onResult(AnnounceResult.kListIsNullOrEmpty);
                     return;
@@ -125,14 +125,14 @@ namespace Fun
                     }
                 }
 
-                FunDebug.Log("Announcement has been updated. total count: {0}", announce_list_.Count);
+                FunDebug.Log("Announcement list has been updated. total list count: {0}", announce_list_.Count);
 
                 if (image_list_.Count > 0)
                 {
                     // Request a file.
                     KeyValuePair<string, string> item = image_list_[0];
                     web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                    FunDebug.Log("Download url: {0}", item.Key);
+                    FunDebug.DebugLog1("Download announcement image: {0}", item.Key);
                 }
                 else
                 {
@@ -141,7 +141,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                FunDebug.Log("Failure in downloadDataCompleteCb: {0}", e.ToString());
+                FunDebug.LogError("Failure in Announcement.downloadDataCompleteCb:\n{0}", e.ToString());
                 onResult(AnnounceResult.kExceptionError);
             }
         }
@@ -160,17 +160,17 @@ namespace Fun
                 {
                     KeyValuePair<string, string> item = image_list_[0];
                     web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                    FunDebug.Log("Download url: {0}", item.Key);
+                    FunDebug.DebugLog1("Download announcement image: {0}", item.Key);
                 }
                 else
                 {
-                    FunDebug.Log("Download file completed.");
+                    FunDebug.Log("All announcement images has been downloaded.\npath:{0}", local_path_);
                     onResult(AnnounceResult.kSucceeded);
                 }
             }
             catch (Exception e)
             {
-                FunDebug.Log("Failure in downloadFileCompleteCb: {0}", e.ToString());
+                FunDebug.LogError("Failure in Announcement.downloadFileCompleteCb:\n{0}", e.ToString());
                 onResult(AnnounceResult.kExceptionError);
             }
         }

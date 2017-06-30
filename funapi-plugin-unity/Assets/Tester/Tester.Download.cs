@@ -35,7 +35,7 @@ public partial class Tester
 
         void onDownloadVerify (string path)
         {
-            FunDebug.DebugLog("Check file - {0}", path);
+            FunDebug.DebugLog2("Check file - {0}", path);
         }
 
         void onDownloadReady (int total_count, UInt64 total_size)
@@ -45,8 +45,8 @@ public partial class Tester
 
         void onDownloadUpdate (string path, long bytes_received, long total_bytes, int percentage)
         {
-            FunDebug.DebugLog("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
-                              path, bytes_received, total_bytes, percentage);
+            FunDebug.DebugLog2("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+                               path, bytes_received, total_bytes, percentage);
         }
 
         void onDownloadFinished (DownloadResult code)
