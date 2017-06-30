@@ -132,7 +132,7 @@ namespace Fun
         {
             FunDebug.Assert(state == State.kEstablished);
 
-            if (dst.Count < src.Count)
+            if (dst.Count != src.Count)
                 return -1;
 
             if (!src.Equals(dst))
@@ -203,7 +203,7 @@ namespace Fun
 
         static Int64 encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref UInt32 key)
         {
-            if (dst.Count < src.Count)
+            if (dst.Count != src.Count)
                 return -1;
 
             // update key
@@ -211,17 +211,18 @@ namespace Fun
 
             int shift_len = (int)(key & 0x0F);
             UInt32 key32 = circularLeftShift(key, shift_len);
+            byte[] kbytes = BitConverter.GetBytes(key32);
 
             // Encrypted in kBlockSize
-            for (int i = 0; i < (src.Count / kBlockSize); ++i)
+            int src_offset = src.Offset, dst_offset = dst.Offset;
+            int i, n, length = src.Count - (src.Count % kBlockSize);
+            for (i = 0; i < length; i += kBlockSize)
             {
-                UInt32 s = BitConverter.ToUInt32(src.Array, src.Offset + i * kBlockSize);
-                byte[] d = BitConverter.GetBytes(s ^ key32);
-                FunDebug.Assert(d.Length == kBlockSize);
+                for (n = 0; n < kBlockSize; ++n)
+                    dst.Array[dst_offset + n] = (byte)(src.Array[src_offset + n] ^ kbytes[n]);
 
-                for (int j = 0; j < d.Length; ++j) {
-                    dst.Array[dst.Offset + i * kBlockSize + j] = d[j];
-                }
+                src_offset += kBlockSize;
+                dst_offset += kBlockSize;
             }
 
             byte key8 = 0;
@@ -232,10 +233,11 @@ namespace Fun
                 key8 = circularLeftShift(k[3], shift_len);
 
             // The remaining values are encrypted in units of 1byte
-            for (int i = 0; i < (src.Count % kBlockSize); ++i)
+            int left = src.Count % kBlockSize;
+            for (i = 0; i < left; ++i)
             {
-                int idx = src.Count - 1 - i;
-                dst.Array[dst.Offset + idx] = (byte)(src.Array[src.Offset + idx] ^ key8);
+                n = src.Count - 1 - i;
+                dst.Array[dst.Offset + n] = (byte)(src.Array[src.Offset + n] ^ key8);
             }
 
             return src.Count;
