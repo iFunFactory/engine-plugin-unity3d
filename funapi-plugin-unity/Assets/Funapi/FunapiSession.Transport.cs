@@ -230,7 +230,8 @@ namespace Fun
                     }
 
                     // Add message type
-                    if (fun_msg.msg_type != null && fun_msg.msg_type.Length > 0)
+                    if (fun_msg.msg_type != null && fun_msg.msg_type.Length > 0 &&
+                        fun_msg.message != null && fun_msg.msg_type != kAckNumberField)
                     {
                         if (encoding == FunEncoding.kJson)
                         {
@@ -838,16 +839,7 @@ namespace Fun
 
             void sendPublicKey (EncryptionType type)
             {
-                FunapiMessage fun_msg = null;
-                if (encoding == FunEncoding.kJson)
-                {
-                    fun_msg = new FunapiMessage(protocol, kEncryptionPublicKey, null, type);
-                }
-                else if (encoding == FunEncoding.kProtobuf)
-                {
-                    FunMessage msg = new FunMessage();
-                    fun_msg = new FunapiMessage(protocol, kEncryptionPublicKey, msg, type);
-                }
+                FunapiMessage fun_msg = new FunapiMessage(protocol, kEncryptionPublicKey, null, type);
 
                 // Add a message to front of pending list...
                 lock (sending_lock_)
@@ -1129,6 +1121,7 @@ namespace Fun
             const string kServerPingMessageType = "_ping_s";
             const string kClientPingMessageType = "_ping_c";
             const string kPingTimestampField = "timestamp";
+            const string kAckNumberField = "_ack";
 
             // for speed-up.
             static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));

@@ -17,7 +17,7 @@ namespace Fun
 {
     public class FunapiMessage
     {
-        public FunapiMessage (TransportProtocol protocol, string msg_type, object message,
+        public FunapiMessage (TransportProtocol protocol, string msg_type, object message = null,
                               EncryptionType enc = EncryptionType.kDefaultEncryption)
         {
             this.protocol = protocol;
@@ -28,31 +28,37 @@ namespace Fun
 
         public byte[] GetBytes (FunEncoding encoding)
         {
-            byte[] buffer = null;
-
             if (encoding == FunEncoding.kJson)
             {
                 if (message == null)
                 {
-                    buffer = new byte[0];
+                    return new byte[0];
                 }
                 else
                 {
                     string str = json_helper_.Serialize(message);
-                    buffer = System.Text.Encoding.UTF8.GetBytes(str);
+                    return System.Text.Encoding.UTF8.GetBytes(str);
                 }
             }
-            else
+            else if (encoding == FunEncoding.kProtobuf)
             {
+                if (message == null)
+                    message = new FunMessage();
+
                 MemoryStream stream = new MemoryStream();
                 serializer_.Serialize(stream, message);
 
-                buffer = new byte[stream.Length];
-                stream.Seek(0, SeekOrigin.Begin);
-                stream.Read(buffer, 0, buffer.Length);
+                byte[] buffer = new byte[stream.Length];
+                if (stream.Length > 0)
+                {
+                    stream.Seek(0, SeekOrigin.Begin);
+                    stream.Read(buffer, 0, buffer.Length);
+                }
+
+                return buffer;
             }
 
-            return buffer;
+            return null;
         }
 
         public static JsonAccessor JsonHelper
