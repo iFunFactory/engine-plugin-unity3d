@@ -1166,16 +1166,7 @@ namespace Fun
             DebugLog("{0} sending a empty message for getting to session id.",
                      convertString(transport.protocol));
 
-            if (transport.encoding == FunEncoding.kJson)
-            {
-                object msg = FunapiMessage.Deserialize("{}");
-                transport.SendMessage(new FunapiMessage(transport.protocol, "", msg));
-            }
-            else if (transport.encoding == FunEncoding.kProtobuf)
-            {
-                FunMessage msg = new FunMessage();
-                transport.SendMessage(new FunapiMessage(transport.protocol, "", msg));
-            }
+            transport.SendMessage(new FunapiMessage(transport.protocol, "_first"));
         }
 
         void sendAck (Transport transport, UInt32 ack)
@@ -1190,13 +1181,13 @@ namespace Fun
             {
                 object ack_msg = FunapiMessage.Deserialize("{}");
                 json_helper_.SetIntegerField(ack_msg, kAckNumberField, ack);
-                transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
+                transport.SendMessage(new FunapiMessage(transport.protocol, kAckNumberField, ack_msg));
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 FunMessage ack_msg = new FunMessage();
                 ack_msg.ack = ack;
-                transport.SendMessage(new FunapiMessage(transport.protocol, "", ack_msg));
+                transport.SendMessage(new FunapiMessage(transport.protocol, kAckNumberField, ack_msg));
             }
         }
 
