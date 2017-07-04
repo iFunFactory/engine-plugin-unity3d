@@ -435,9 +435,24 @@ namespace Fun
                 {
                     DebugLog1("Update messages. count: {0}", message_buffer_.Count);
 
-                    foreach (FunapiMessage message in message_buffer_)
+                    foreach (FunapiMessage msg in message_buffer_)
                     {
-                        processMessage(message);
+                        Transport transport = GetTransport(msg.protocol);
+                        if (transport != null)
+                        {
+                            if (msg.message != null)
+                            {
+                                if (!string.IsNullOrEmpty(msg.msg_type))
+                                    DebugLog2("Received message - '{0}'", msg.msg_type);
+
+                                processMessage(transport, msg);
+                            }
+
+                            if (transport.state == Transport.State.kWaitForAck && session_id_.IsValid)
+                            {
+                                setTransportStarted(transport);
+                            }
+                        }
                     }
 
                     message_buffer_.Clear();
@@ -1284,66 +1299,42 @@ namespace Fun
             }
         }
 
-        void processMessage (FunapiMessage msg)
+        void processMessage (Transport transport, FunapiMessage msg)
         {
-            object message = msg.message;
-            if (message == null)
+            try
             {
-                LogWarning("processMessage - '{0}' message is null.", msg.msg_type);
-                return;
-            }
-
-            Transport transport = GetTransport(msg.protocol);
-            if (transport == null)
-                return;
-
-            string msg_type = msg.msg_type;
-
-            if (!string.IsNullOrEmpty(msg_type))
-                DebugLog2("Received message - '{0}'", msg_type);
-
-            if (transport.encoding == FunEncoding.kJson)
-            {
-                try
+                if (transport.encoding == FunEncoding.kJson)
                 {
-                    if (json_helper_.HasField(message, kSessionIdField))
+                    if (json_helper_.HasField(msg.message, kSessionIdField))
                     {
-                        string session_id = json_helper_.GetStringField(message, kSessionIdField);
-                        json_helper_.RemoveField(message, kSessionIdField);
+                        string session_id = json_helper_.GetStringField(msg.message, kSessionIdField);
+                        json_helper_.RemoveField(msg.message, kSessionIdField);
                         setSessionId(session_id);
                     }
 
                     if (isReliableTransport(msg.protocol))
                     {
-                        if (json_helper_.HasField(message, kAckNumberField))
+                        if (json_helper_.HasField(msg.message, kAckNumberField))
                         {
-                            UInt32 ack = (UInt32)json_helper_.GetIntegerField(message, kAckNumberField);
+                            UInt32 ack = (UInt32)json_helper_.GetIntegerField(msg.message, kAckNumberField);
                             onAckReceived(transport, ack);
                             return;
                         }
 
-                        if (json_helper_.HasField(message, kSeqNumberField))
+                        if (json_helper_.HasField(msg.message, kSeqNumberField))
                         {
-                            UInt32 seq = (UInt32)json_helper_.GetIntegerField(message, kSeqNumberField);
+                            UInt32 seq = (UInt32)json_helper_.GetIntegerField(msg.message, kSeqNumberField);
                             if (!onSeqReceived(transport, seq))
                                 return;
 
-                            json_helper_.RemoveField(message, kSeqNumberField);
+                            json_helper_.RemoveField(msg.message, kSeqNumberField);
                         }
                     }
                 }
-                catch (Exception e)
+                else if (transport.encoding == FunEncoding.kProtobuf)
                 {
-                    LogError("Failure in Session.processMessage: {0}", e.ToString());
-                    return;
-                }
-            }
-            else if (transport.encoding == FunEncoding.kProtobuf)
-            {
-                FunMessage funmsg = message as FunMessage;
+                    FunMessage funmsg = msg.message as FunMessage;
 
-                try
-                {
                     if (funmsg.sidSpecified)
                         setSessionId(funmsg.sid);
 
@@ -1362,37 +1353,32 @@ namespace Fun
                         }
                     }
                 }
-                catch (Exception e)
+                else
                 {
-                    LogError("Failure in Session.processMessage: {0}", e.ToString());
+                    LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
                     return;
                 }
             }
-            else
+            catch (Exception e)
             {
-                LogWarning("The encoding type is invalid. type: {0}", transport.encoding);
+                LogError("Failure in Session.processMessage: {0}", e.ToString());
                 return;
             }
 
-            if (msg_type.Length > 0)
+            if (msg.msg_type.Length > 0)
             {
-                if (msg_type == kRedirectType)
+                if (msg.msg_type == kRedirectType)
                 {
-                    onRedirectMessage(transport, message);
+                    onRedirectMessage(transport, msg.message);
                     return;
                 }
-                else if (msg_type == kRedirectConnectType)
+                else if (msg.msg_type == kRedirectConnectType)
                 {
-                    onRedirectResultMessage(transport, message);
+                    onRedirectResultMessage(transport, msg.message);
                     return;
                 }
 
-                onProcessMessage(transport.encoding, msg_type, message);
-            }
-
-            if (transport.state == Transport.State.kWaitForAck && session_id_.IsValid)
-            {
-                setTransportStarted(transport);
+                onProcessMessage(transport.encoding, msg.msg_type, msg.message);
             }
         }
 
