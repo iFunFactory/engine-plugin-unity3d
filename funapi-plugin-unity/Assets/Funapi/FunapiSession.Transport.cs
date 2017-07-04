@@ -857,6 +857,10 @@ namespace Fun
 
                     onReceived(header_fields_, body);
                 }
+                else
+                {
+                    onReceived(header_fields_, new ArraySegment<byte>());
+                }
 
                 // Prepares a next message.
                 header_decoded_ = false;
@@ -893,6 +897,15 @@ namespace Fun
 
             void onReceived (Dictionary<string, string> header, ArraySegment<byte> body)
             {
+                if (body.Count <= 0)
+                {
+                    if (ReceivedCallback != null)
+                        ReceivedCallback(new FunapiMessage(protocol_, ""));
+
+                    return;
+                }
+
+                // Deserializing a message
                 object message = FunapiMessage.Deserialize(body, encoding_);
                 if (message == null)
                 {
@@ -900,28 +913,14 @@ namespace Fun
                     return;
                 }
 
+                // Gets message type
                 string msg_type = "";
-
                 if (encoding_ == FunEncoding.kJson)
                 {
                     if (json_helper_.HasField(message, kMessageTypeField))
                     {
                         msg_type = json_helper_.GetStringField(message, kMessageTypeField);
                         json_helper_.RemoveField(message, kMessageTypeField);
-                    }
-
-                    if (msg_type.Length > 0)
-                    {
-                        if (msg_type == kServerPingMessageType)
-                        {
-                            onServerPingMessage(message);
-                            return;
-                        }
-                        else if (msg_type == kClientPingMessageType)
-                        {
-                            onClientPingMessage(message);
-                            return;
-                        }
                     }
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)
@@ -936,19 +935,20 @@ namespace Fun
                     {
                         msg_type = MessageTable.Lookup((MessageType)funmsg.msgtype2);
                     }
+                }
 
-                    if (msg_type.Length > 0)
+                // Checks ping messages
+                if (msg_type.Length > 0)
+                {
+                    if (msg_type == kServerPingMessageType)
                     {
-                        if (msg_type == kServerPingMessageType)
-                        {
-                            onServerPingMessage(funmsg);
-                            return;
-                        }
-                        else if (msg_type == kClientPingMessageType)
-                        {
-                            onClientPingMessage(funmsg);
-                            return;
-                        }
+                        onServerPingMessage(message);
+                        return;
+                    }
+                    else if (msg_type == kClientPingMessageType)
+                    {
+                        onClientPingMessage(message);
+                        return;
                     }
                 }
 
