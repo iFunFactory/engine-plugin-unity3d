@@ -70,6 +70,9 @@ namespace Fun
             server_address_ = hostname_or_ip;
             option_ = option;
 
+            Log("SessionReliability: {0}, SendSessionIdOnlyOnce: {1}",
+                option.sessionReliability, option.sendSessionIdOnlyOnce);
+
             initSession();
         }
 
@@ -287,7 +290,7 @@ namespace Fun
                     unsent_queue_.Enqueue(fun_msg);
                 }
 
-                DebugLog1("SendMessage - '{0}' message queued.", msg_type);
+                DebugLog1("SendMessage - '{0}' message queued. state:{1}", msg_type, transport.state);
             }
             else
             {
@@ -443,7 +446,7 @@ namespace Fun
                             if (msg.message != null)
                             {
                                 if (!string.IsNullOrEmpty(msg.msg_type))
-                                    DebugLog2("Received message - '{0}'", msg.msg_type);
+                                    DebugLog2("{0} received message - '{1}'", transport.str_protocol, msg.msg_type);
 
                                 processMessage(transport, msg);
                             }
@@ -633,7 +636,7 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                Log("Redirect: Event: Session ({0}).\nThis event callback is skipped.", type);
+                Log("Redirect: Session event ({0}).\nThis event callback is skipped.", type);
                 return;
             }
 
@@ -694,7 +697,9 @@ namespace Fun
             // Adds transports.
             foreach (RedirectInfo info in list)
             {
-                Log("Redirect: Connect: {0} {1}:{2}", convertString(info.protocol), server_address_, info.port);
+                Log("Redirect: {0} - {1}:{2}, {3}", convertString(info.protocol),
+                    server_address_, info.port, convertString(info.encoding));
+
                 Connect(info.protocol, info.encoding, info.port, info.option);
             }
 
@@ -810,17 +815,17 @@ namespace Fun
 
             if (protocol == TransportProtocol.kTcp)
             {
-                TcpTransport tcp_transport = new TcpTransport(server_address_, port, encoding);
+                TcpTransport tcp_transport = new TcpTransport(server_address_, port, encoding, option);
                 transport = tcp_transport;
             }
             else if (protocol == TransportProtocol.kUdp)
             {
-                transport = new UdpTransport(server_address_, port, encoding);
+                transport = new UdpTransport(server_address_, port, encoding, option);
             }
             else if (protocol == TransportProtocol.kHttp)
             {
                 bool https = ((HttpTransportOption)option).HTTPS;
-                HttpTransport http_transport = new HttpTransport(server_address_, port, https, encoding);
+                HttpTransport http_transport = new HttpTransport(server_address_, port, https, encoding, option);
                 transport = http_transport;
             }
             else
@@ -828,8 +833,6 @@ namespace Fun
                 LogError("createTransport - {0} is invalid protocol type.", convertString(protocol));
                 return null;
             }
-
-            transport.option = option;
 
             // Callback functions
             transport.StartedCallback += onTransportStarted;
@@ -895,7 +898,7 @@ namespace Fun
             if (transport == null || transport.state == Transport.State.kUnknown)
                 return;
 
-            DebugLog1("Stopping {0} transport.", transport.str_protocol);
+            DebugLog1("{0} Stopping transport.", transport.str_protocol);
 
             transport.Stop();
         }
@@ -958,7 +961,7 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
-            DebugLog1("Stopping a network module.");
+            DebugLog1("Stopping a session module.");
 
             if (force_stop)
             {
@@ -1023,7 +1026,7 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                Log("Redirect: Event: {0} transport ({1}).\nThis event callback is skipped.",
+                Log("Redirect: {0} transport ({1}).\nThis event callback is skipped.",
                     convertString(protocol), type);
                 return;
             }
@@ -1038,7 +1041,7 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                LogWarning("Redirect: Error: {0} transport ({1})\nThis event callback is skipped.\n{2}.",
+                LogWarning("Redirect: {0} error ({1})\nThis event callback is skipped.\n{2}.",
                            convertString(protocol), type, message);
                 return;
             }
@@ -1240,40 +1243,23 @@ namespace Fun
                 bool reliable_transport = isReliableTransport(transport.protocol);
                 bool sending_sequence = isSendingSequence(transport);
 
-                if (transport.encoding == FunEncoding.kJson)
+                if (reliable_transport || sending_sequence)
                 {
-                    object json = msg.message;
+                    if (reliable_transport)
+                        send_queue_.Enqueue(msg);
 
-                    if (reliable_transport || sending_sequence)
-                    {
-                        if (reliable_transport)
-                            send_queue_.Enqueue(msg);
+                    UInt32 seq = 0;
+                    if (transport.encoding == FunEncoding.kJson)
+                        seq = (UInt32)json_helper_.GetIntegerField(msg.message, kSeqNumberField);
+                    else if (transport.encoding == FunEncoding.kProtobuf)
+                        seq = (msg.message as FunMessage).seq;
 
-                        Log("{0} send unsent message - {1} (seq : {2})",
-                            transport.str_protocol, msg.msg_type,
-                            json_helper_.GetIntegerField(json, kSeqNumberField));
-                    }
-                    else
-                    {
-                        Log("{0} send unsent message - {1}", transport.str_protocol, msg.msg_type);
-                    }
+                    DebugLog1("{0} send a unsent message - '{1}' (seq : {2})",
+                              transport.str_protocol, msg.msg_type, seq);
                 }
-                else if (transport.encoding == FunEncoding.kProtobuf)
+                else
                 {
-                    FunMessage pbuf = msg.message as FunMessage;
-
-                    if (reliable_transport || sending_sequence)
-                    {
-                        if (reliable_transport)
-                            send_queue_.Enqueue(msg);
-
-                        Log("{0} send unsent message - {1} (seq : {2})",
-                            transport.str_protocol, msg.msg_type, pbuf.seq);
-                    }
-                    else
-                    {
-                        Log("{0} send unsent message - {1}", transport.str_protocol, msg.msg_type);
-                    }
+                    DebugLog1("{0} send a unsent message - '{1}'", transport.str_protocol, msg.msg_type);
                 }
 
                 transport.SendMessage(msg);
@@ -1492,7 +1478,7 @@ namespace Fun
             }
             else if (msg_type == kSessionClosedType)
             {
-                LogWarning("Session timed out. Closes the session.");
+                Log("Session has been closed by server.");
 
                 stopAllTransports(true);
                 onSessionClosed();
@@ -1688,7 +1674,7 @@ namespace Fun
             else if (type == EncryptionType.kAes128Encryption)
                 return "Aes128";
 
-            return "";
+            return "None";
         }
 
 
