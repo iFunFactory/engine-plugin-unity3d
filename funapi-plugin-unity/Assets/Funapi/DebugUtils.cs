@@ -57,7 +57,7 @@ namespace Fun
         public static void Log (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-            string text = getTimeLog(string.Format(message, args));
+            string text = getTimeLog("I", string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
 #if ENABLE_OUTPUT
@@ -70,7 +70,7 @@ namespace Fun
         public static void LogWarning (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-            string text = getTimeLog(string.Format(message, args));
+            string text = getTimeLog("W", string.Format(message, args));
             UnityEngine.Debug.LogWarning(text);
 
 #if ENABLE_OUTPUT
@@ -83,7 +83,7 @@ namespace Fun
         public static void LogError (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-            string text = getTimeLog(string.Format(message, args));
+            string text = getTimeLog("E", string.Format(message, args));
             UnityEngine.Debug.LogError(text);
 
 #if ENABLE_OUTPUT
@@ -96,7 +96,7 @@ namespace Fun
         public static void DebugLog1 (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
-            string text = getTimeLog(string.Format(message, args));
+            string text = getTimeLog("D", string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
 #if ENABLE_OUTPUT
@@ -109,7 +109,7 @@ namespace Fun
         public static void DebugLog2 (string message, params object[] args)
         {
 #if ENABLE_LOG && LOG_LEVEL_3
-            string text = getTimeLog(string.Format(message, args));
+            string text = getTimeLog("D", string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
 #if ENABLE_OUTPUT
@@ -122,42 +122,42 @@ namespace Fun
         public static void Log (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-            Console.WriteLine(getTimeLog(string.Format(message, args)));
+            Console.WriteLine(getTimeLog("I", string.Format(message, args)));
 #endif
         }
 
         public static void LogWarning (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-            Console.WriteLine(getTimeLog(string.Format(message, args)));
+            Console.WriteLine(getTimeLog("W", string.Format(message, args)));
 #endif
         }
 
         public static void LogError (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-            Console.WriteLine(getTimeLog(string.Format(message, args)));
+            Console.WriteLine(getTimeLog("E", string.Format(message, args)));
 #endif
         }
 
         public static void DebugLog1 (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
-            Console.WriteLine(getTimeLog(string.Format(message, args)));
+            Console.WriteLine(getTimeLog("D", string.Format(message, args)));
 #endif
         }
 
         public static void DebugLog2 (string message, params object[] args)
         {
 #if ENABLE_LOG && LOG_LEVEL_3
-            Console.WriteLine(getTimeLog(string.Format(message, args)));
+            Console.WriteLine(getTimeLog("D", string.Format(message, args)));
 #endif
         }
 #endif
 
-        static string getTimeLog (string message)
+        static string getTimeLog (string type, string message)
         {
-            string log = string.Format("[{0}] {1}", DateTime.Now.ToLongTimeString(), message);
+            string log = string.Format("{0}[{1}] {2}", type, DateTime.Now.ToLongTimeString(), message);
 #if ENABLE_SAVE_LOG
             if (log_buffer_.Length + log.Length >= kLogBufferMax)
                 SaveLogs();
@@ -241,7 +241,8 @@ namespace Fun
         protected void setDebugObject (object obj)
         {
 #if ENABLE_LOG && LOG_LEVEL_3
-            hash_ = string.Format("{0:X}", obj.GetHashCode()).Substring(0, 6);
+            string str = string.Format("{0:X}", obj.GetHashCode());
+            hash_ = str.Length < 6 ? str : str.Substring(0, 6);
 #endif
         }
 
