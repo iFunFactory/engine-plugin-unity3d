@@ -54,10 +54,9 @@ namespace Fun
         }
 
 #if !NO_UNITY
-        [Conditional("ENABLE_LOG")]
         public static void Log (string message, params object[] args)
         {
-#if LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
             string text = getTimeLog(string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
@@ -68,10 +67,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         public static void LogWarning (string message, params object[] args)
         {
-#if LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
             string text = getTimeLog(string.Format(message, args));
             UnityEngine.Debug.LogWarning(text);
 
@@ -82,10 +80,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         public static void LogError (string message, params object[] args)
         {
-#if LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
             string text = getTimeLog(string.Format(message, args));
             UnityEngine.Debug.LogError(text);
 
@@ -96,10 +93,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         public static void DebugLog1 (string message, params object[] args)
         {
-#if LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
             string text = getTimeLog(string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
@@ -110,10 +106,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         public static void DebugLog2 (string message, params object[] args)
         {
-#if LOG_LEVEL_3
+#if ENABLE_LOG && LOG_LEVEL_3
             string text = getTimeLog(string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
@@ -243,18 +238,16 @@ namespace Fun
 
     public class FunDebugLog
     {
-        [Conditional("ENABLE_LOG")]
         protected void setDebugObject (object obj)
         {
-#if LOG_LEVEL_3
+#if ENABLE_LOG && LOG_LEVEL_3
             hash_ = string.Format("{0:X}", obj.GetHashCode()).Substring(0, 6);
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void Log (string message, params object[] args)
         {
-#if LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
 #if LOG_LEVEL_3
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
@@ -262,10 +255,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void LogWarning (string message, params object[] args)
         {
-#if LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
 #if LOG_LEVEL_3
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
@@ -273,10 +265,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void LogError (string message, params object[] args)
         {
-#if LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
 #if LOG_LEVEL_3
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
@@ -284,10 +275,9 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void DebugLog1 (string message, params object[] args)
         {
-#if LOG_LEVEL_2 || LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
 #if LOG_LEVEL_3
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
@@ -295,17 +285,16 @@ namespace Fun
 #endif
         }
 
-        [Conditional("ENABLE_LOG")]
         protected void DebugLog2 (string message, params object[] args)
         {
-#if LOG_LEVEL_3
+#if ENABLE_LOG && LOG_LEVEL_3
             message = string.Format("[{0}] {1}", hash_, message);
             FunDebug.DebugLog2(message, args);
 #endif
         }
 
 
-#if LOG_LEVEL_3
+#if ENABLE_LOG && LOG_LEVEL_3
         string hash_ = "";
 #endif
     }
