@@ -1480,6 +1480,9 @@ namespace Fun
             {
                 Log("Session has been closed by server.");
 
+                if (wait_redirect_)
+                    return;
+
                 stopAllTransports(true);
                 onSessionClosed();
             }
