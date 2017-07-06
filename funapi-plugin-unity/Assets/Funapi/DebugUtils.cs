@@ -62,7 +62,7 @@ namespace Fun
 
 #if ENABLE_OUTPUT
             if (OutputCallback != null)
-                OutputCallback("I", text);
+                OutputCallback(text);
 #endif
 #endif
         }
@@ -75,7 +75,7 @@ namespace Fun
 
 #if ENABLE_OUTPUT
             if (OutputCallback != null)
-                OutputCallback("W", text);
+                OutputCallback(text);
 #endif
 #endif
         }
@@ -88,7 +88,7 @@ namespace Fun
 
 #if ENABLE_OUTPUT
             if (OutputCallback != null)
-                OutputCallback("E", text);
+                OutputCallback(text);
 #endif
 #endif
         }
@@ -101,7 +101,7 @@ namespace Fun
 
 #if ENABLE_OUTPUT
             if (OutputCallback != null)
-                OutputCallback("D", text);
+                OutputCallback(text);
 #endif
 #endif
         }
@@ -114,7 +114,7 @@ namespace Fun
 
 #if ENABLE_OUTPUT
             if (OutputCallback != null)
-                OutputCallback("D", text);
+                OutputCallback(text);
 #endif
 #endif
         }
@@ -230,7 +230,7 @@ namespace Fun
 
 
 #if ENABLE_OUTPUT
-        public delegate void OutputListener (string type, string message);
+        public delegate void OutputListener (string message);
         public static event OutputListener OutputCallback;
 #endif
     }
