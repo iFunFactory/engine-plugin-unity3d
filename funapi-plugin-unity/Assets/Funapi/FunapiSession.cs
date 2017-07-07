@@ -37,6 +37,7 @@ namespace Fun
     {
         public bool sessionReliability = false;
         public bool sendSessionIdOnlyOnce = false;
+        public int redirectTimeout = 10;
     }
 
 
@@ -174,6 +175,7 @@ namespace Fun
 
             return null;
         }
+
 
 #if PROTOBUF_ENUM_STRING_LEGACY
         public void SendMessage (MessageType msg_type, object message,
@@ -391,6 +393,11 @@ namespace Fun
 
                 return 0;
             }
+        }
+
+        int transportCount
+        {
+            get { lock (transports_lock_) { return transports_.Count; } }
         }
 
 
@@ -662,17 +669,17 @@ namespace Fun
             stopAllTransports();
 
 #if !NO_UNITY
-            mono.StartCoroutine(tryToRedirect(list));
+            mono.StartCoroutine(tryToRedirect(host, list));
 #else
-            mono.StartCoroutine(() => tryToRedirect(list));
+            mono.StartCoroutine(() => tryToRedirect(host, list));
 #endif
             return true;
         }
 
 #if !NO_UNITY
-        IEnumerator tryToRedirect (List<RedirectInfo> list)
+        IEnumerator tryToRedirect (string host, List<RedirectInfo> list)
 #else
-        void tryToRedirect (List<RedirectInfo> list)
+        void tryToRedirect (string host, List<RedirectInfo> list)
 #endif
         {
             // Wait for stop.
@@ -703,6 +710,9 @@ namespace Fun
                 Connect(info.protocol, info.encoding, info.port, info.option);
             }
 
+            // Convers seconds to ticks.
+            long redirect_timeout = DateTime.UtcNow.Ticks + (option_.redirectTimeout * 1000 * 10000);
+
             // Wait for connect.
             while (true)
             {
@@ -721,6 +731,14 @@ namespace Fun
 
                 if (!be_wait)
                     break;
+
+                if (DateTime.UtcNow.Ticks > redirect_timeout)
+                {
+                    LogWarning("Redirect: Connection timed out. " +
+                               "Stops redirecting to another server. ({0})", host);
+                    break;
+                }
+
 #if !NO_UNITY
                 yield return new WaitForSeconds(0.2f);
 #else
@@ -1118,11 +1136,19 @@ namespace Fun
                 }
                 else if (state_ == State.kStarted || state_ == State.kStopped)
                 {
-                    state_ = State.kWaitForSessionId;
-                    transport.state = Transport.State.kWaitForSessionId;
+                    // If there are other protocols, UDP dose not send the first session message.
+                    if (protocol == TransportProtocol.kUdp && transportCount > 1)
+                    {
+                        transport.state = Transport.State.kWaitForSessionId;
+                    }
+                    else
+                    {
+                        state_ = State.kWaitForSessionId;
+                        transport.state = Transport.State.kWaitForSessionId;
 
-                    // To get a session id
-                    sendFirstMessage(transport);
+                        // To get a session id
+                        sendFirstMessage(transport);
+                    }
                 }
                 else if (state_ == State.kWaitForSessionId)
                 {
