@@ -120,6 +120,8 @@ namespace Fun
                     {
                         timer_.Remove(connect_timer_id_);
                         connect_timer_id_ = timer_.Add(onConnectionTimedout, option_.ConnectionTimeout);
+                        DebugLog1("{0} sets connection timeout - id:{1} timeout:{2}.",
+                                  str_protocol_, connect_timer_id_, option_.ConnectionTimeout);
                     }
 
                     onStart();
@@ -560,7 +562,8 @@ namespace Fun
                 catch (Exception e)
                 {
                     last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = string.Format("{0} failure in sendPendingMessages: {1}", str_protocol_, e.ToString());
+                    last_error_message_ = string.Format("{0} failure in sendPendingMessages: {1}",
+                                                        str_protocol_, e.ToString());
                     event_.Add(onFailure);
                 }
             }
