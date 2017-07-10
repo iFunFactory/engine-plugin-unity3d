@@ -71,7 +71,8 @@ namespace Fun
             server_address_ = hostname_or_ip;
             option_ = option;
 
-            Log("SessionReliability: {0}, SendSessionIdOnlyOnce: {1}",
+            Log("Plugin:{0} Protocol:{1} Reliability: {2}, SessionIdOnce: {3}",
+                FunapiVersion.kPluginVersion, FunapiVersion.kProtocolVersion,
                 option.sessionReliability, option.sendSessionIdOnlyOnce);
 
             initSession();
@@ -105,9 +106,24 @@ namespace Fun
                 createUpdater();
             }
 
+            string str_protocol = convertString(protocol);
             Transport transport = GetTransport(protocol);
-            if (transport == null || transport.Started)
+            if (transport == null)
+            {
+                LogWarning("Session.Connect({0}) - There's no {1} transport. " +
+                           "You should call FunapiSession.Connect(protocol, encoding, port, option) function.",
+                           str_protocol, str_protocol);
                 return;
+            }
+
+            if (transport.Started)
+            {
+                LogWarning("Session.Connect({0}) - {1} has been already connected.",
+                           str_protocol, str_protocol);
+                return;
+            }
+
+            DebugLog1("Session.Connect({0}) called. {1} trys to connect.", str_protocol, str_protocol);
 
             event_list.Add(() => startTransport(protocol));
         }
@@ -125,17 +141,40 @@ namespace Fun
 
         public void Stop ()
         {
+            DebugLog1("Session.Stop() called. (state:{0})", state_);
+
             if (!Started)
+            {
+                LogWarning("Session.Stop() - The session is not connected.");
                 return;
+            }
 
             stopAllTransports();
         }
 
         public void Stop (TransportProtocol protocol)
         {
-            Transport transport = GetTransport(protocol);
-            if (transport == null || mono == null)
+            string str_protocol = convertString(protocol);
+            DebugLog1("Session.Stop({0}) called. (state:{1})", str_protocol, state_);
+
+            if (!Started)
+            {
+                LogWarning("Session.Stop({0}) - The session is not connected.", str_protocol);
                 return;
+            }
+
+            Transport transport = GetTransport(protocol);
+            if (transport == null)
+            {
+                LogWarning("Session.Stop({0}) - Can't find the {1} transport.", str_protocol, str_protocol);
+                return;
+            }
+
+            if (transport.state == Transport.State.kUnknown)
+            {
+                LogWarning("Session.Stop({0}) - {1} has been already stopped.", str_protocol, str_protocol);
+                return;
+            }
 
 #if !NO_UNITY
             mono.StartCoroutine(tryToStopTransport(transport));
@@ -944,6 +983,7 @@ namespace Fun
             if (!Started)
                 return;
 
+            // Checks first sending transport.
             lock (state_lock_)
             {
                 if (state_ == State.kWaitForSessionId && protocol == first_sending_protocol_)
@@ -962,6 +1002,7 @@ namespace Fun
             }
 
             bool all_stopped = true;
+            // Checks that all transport have been stopped.
             lock (transports_lock_)
             {
                 foreach (Transport t in transports_.Values)
