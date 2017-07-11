@@ -269,13 +269,14 @@ namespace Fun
             {
                 FunapiMessage fun_msg = null;
                 bool sending_sequence = isSendingSequence(transport);
+                UInt32 seq = 0;
 
                 if (transport.encoding == FunEncoding.kJson)
                 {
                     fun_msg = new FunapiMessage(protocol, msg_type, json_helper_.Clone(message), enc_type);
                     if (reliable_transport || sending_sequence)
                     {
-                        UInt32 seq = getNextSeq(protocol);
+                        seq = getNextSeq(protocol);
                         json_helper_.SetIntegerField(fun_msg.message, kSeqNumberField, seq);
                     }
                     unsent_queue_.Enqueue(fun_msg);
@@ -287,12 +288,14 @@ namespace Fun
                     if (reliable_transport || sending_sequence)
                     {
                         FunMessage pbuf = fun_msg.message as FunMessage;
-                        pbuf.seq = getNextSeq(protocol);
+                        seq = getNextSeq(protocol);
+                        pbuf.seq = seq;
                     }
                     unsent_queue_.Enqueue(fun_msg);
                 }
 
-                DebugLog1("SendMessage - '{0}' message queued. state:{1}", msg_type, transport.state);
+                DebugLog1("{0} - '{1}' message queued. (seq : {2})\nsession: {3}, transport: {4}",
+                          transport.str_protocol, msg_type, seq, state_, transport.state);
             }
             else
             {
@@ -456,11 +459,11 @@ namespace Fun
                                     DebugLog2("{0} received message - '{1}'", transport.str_protocol, msg.msg_type);
 
                                 processMessage(transport, msg);
-                            }
 
-                            if (transport.state == Transport.State.kWaitForAck && session_id_.IsValid)
-                            {
-                                setTransportStarted(transport);
+                                if (transport.state == Transport.State.kWaitForAck && session_id_.IsValid)
+                                {
+                                    setTransportStarted(transport);
+                                }
                             }
                         }
                     }
