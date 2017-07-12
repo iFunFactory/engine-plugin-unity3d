@@ -611,7 +611,13 @@ namespace Fun
         {
             if (!session_id_.IsValid)
             {
+                // TODO : hotfix for redirect
+                if (prev_session_id_.Equals(session_id))
+                    return;
+
                 session_id_.SetId(session_id);
+                prev_session_id_.SetId(session_id);
+
                 Log("New session id: {0}", (string)session_id_);
 
                 onSessionOpened();
@@ -1827,6 +1833,7 @@ namespace Fun
 
         // Session-related variables.
         SessionId session_id_ = new SessionId();
+        SessionId prev_session_id_ = new SessionId();
         SessionOption option_ = null;
         TransportProtocol first_sending_protocol_;
         static System.Random rnd_ = new System.Random();
