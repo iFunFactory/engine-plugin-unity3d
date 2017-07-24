@@ -155,9 +155,11 @@ namespace Fun
                 state_ = State.kUnknown;
 
                 timer_.Clear();
-                stopPingTimer();
                 connect_timer_id_ = 0;
                 session_id_has_been_sent = false;
+
+                if (enable_ping_)
+                    stopPingTimer();
 
                 onClose();
 
@@ -175,10 +177,8 @@ namespace Fun
                 session_id_.SetId(sid);
                 send_session_id_only_once_ = sendSessionIdOnlyOnce;
 
-                if (enable_ping_ && ping_interval_ > 0)
-                {
+                if (enable_ping_)
                     startPingTimer();
-                }
             }
 
             public void SetAbolish ()
@@ -360,6 +360,25 @@ namespace Fun
             }
 
 
+            public void OnPaused (bool paused)
+            {
+                is_paused_ = paused;
+
+                if (paused)
+                {
+                    if (enable_ping_)
+                        stopPingTimer();
+                }
+                else
+                {
+                    if (enable_ping_)
+                        startPingTimer();
+
+                    if (Started && isSendable)
+                        sendPendingMessages();
+                }
+            }
+
             protected abstract void setAddress (HostAddr addr);
 
             // Creates a socket.
@@ -374,7 +393,13 @@ namespace Fun
             // Is able to sending?
             protected virtual bool isSendable
             {
-                get { lock (sending_lock_) { return sending_.Count == 0; } }
+                get
+                {
+                    lock (sending_lock_)
+                    {
+                        return !is_paused_ && sending_.Count == 0;
+                    }
+                }
             }
 
             void applyOption (TransportOption opt)
@@ -964,6 +989,9 @@ namespace Fun
                 if (protocol_ != TransportProtocol.kTcp)
                     return;
 
+                if (ping_interval_ <= 0)
+                    ping_interval_ = kPingIntervalDefault;
+
                 if (ping_timer_id_ != 0)
                     timer_.Remove(ping_timer_id_);
 
@@ -982,6 +1010,8 @@ namespace Fun
                 timer_.Remove(ping_timer_id_);
                 ping_timer_id_ = 0;
                 ping_time_ = 0;
+
+                Log("{0} ping timer stopped.", str_protocol_);
             }
 
             void onPingTimerEvent ()
@@ -1131,6 +1161,7 @@ namespace Fun
 
             // constants.
             const int kReconnectCountMax = 3;
+            const int kPingIntervalDefault = 3;
 
             // Buffer-related constants.
             protected const int kUnitBufferSize = 65536;
@@ -1173,6 +1204,7 @@ namespace Fun
             protected TransportOption option_ = null;
             protected ThreadSafeEventList event_ = new ThreadSafeEventList();
             protected ThreadSafeEventList timer_ = new ThreadSafeEventList();
+            protected bool is_paused_ = false;
 
             // Connect-related member variables.
             ConnectState cstate_ = ConnectState.kUnknown;
@@ -1787,6 +1819,8 @@ namespace Fun
             {
                 get
                 {
+                    if (is_paused_)
+                        return false;
 #if !NO_UNITY
                     if (cur_www_ != null)
                         return false;

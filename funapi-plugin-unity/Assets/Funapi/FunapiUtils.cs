@@ -44,6 +44,7 @@ namespace Fun
                 {
                     funapi_object_ = obj;
                     obj.Updater = onUpdate;
+                    obj.OnPause = onPaused;
                     obj.OnQuit = onQuit;
                 }
 
@@ -55,6 +56,7 @@ namespace Fun
 
             funapi_object_ = new FunapiObject();
             funapi_object_.Updater = onUpdate;
+            funapi_object_.OnPause = onPaused;
             funapi_object_.OnQuit = onQuit;
 #endif
         }
@@ -86,10 +88,12 @@ namespace Fun
             return true;
         }
 
-        protected virtual void onQuit ()
-        {
-        }
+        protected virtual void onPaused (bool paused) {}
 
+        protected virtual void onQuit () {}
+
+
+        // Properties
         protected MonoBehaviour mono
         {
             get { return funapi_object_; }
@@ -123,6 +127,11 @@ namespace Fun
                 Updater(deltaTime_);
             }
 
+            void OnApplicationPause (bool isPaused)
+            {
+                OnPause(isPaused);
+            }
+
             void OnApplicationQuit ()
             {
                 OnQuit();
@@ -134,15 +143,9 @@ namespace Fun
             }
 #endif
 
-            public Func<float, bool> Updater
-            {
-                private get; set;
-            }
-
-            public Action OnQuit
-            {
-                private get; set;
-            }
+            public Func<float, bool> Updater { private get; set; }
+            public Action<bool> OnPause { private get; set; }
+            public Action OnQuit { private get; set; }
 
 #if !NO_UNITY
             static readonly float kDeltaTimeMax = 0.3f;

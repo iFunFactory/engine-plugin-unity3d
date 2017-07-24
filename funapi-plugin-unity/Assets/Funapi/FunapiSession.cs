@@ -455,6 +455,19 @@ namespace Fun
             return true;
         }
 
+        protected override void onPaused (bool paused)
+        {
+            Log("Session {0}.", paused ? "paused" : "resumed");
+
+            lock (transports_lock_)
+            {
+                foreach (Transport transport in transports_.Values)
+                {
+                    transport.OnPaused(paused);
+                }
+            }
+        }
+
         protected override void onQuit ()
         {
             stopAllTransports(true);
