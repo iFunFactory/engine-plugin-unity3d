@@ -1210,7 +1210,7 @@ namespace Fun
             ConnectState cstate_ = ConnectState.kUnknown;
             ConnectList ip_list_ = new ConnectList();
             bool auto_reconnect_ = false;
-            int connect_timer_id_ = 0;
+            uint connect_timer_id_ = 0;
             float exponential_time_ = 0f;
             int reconnect_count_ = 0;
 
@@ -1218,7 +1218,7 @@ namespace Fun
             bool enable_ping_ = false;
             bool enable_ping_log_ = false;
             int ping_time_ = 0;
-            int ping_timer_id_ = 0;
+            uint ping_timer_id_ = 0;
             int ping_interval_ = 0;
             float ping_timeout_ = 0f;
             float ping_wait_time_ = 0f;
