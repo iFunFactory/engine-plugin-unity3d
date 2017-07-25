@@ -165,67 +165,57 @@ namespace Fun
 
     public class ThreadSafeEventList
     {
-        public int Add (Action callback, float start_delay = 0f)
+        public uint Add (Action callback, float start_delay = 0f)
         {
             return addItem(callback, start_delay);
         }
 
-        public int Add (Action callback, bool repeat, float repeat_time)
+        public uint Add (Action callback, bool repeat, float repeat_time)
         {
             return addItem(callback, 0f, repeat, repeat_time);
         }
 
-        public int Add (Action callback, float start_delay, bool repeat, float repeat_time)
+        public uint Add (Action callback, float start_delay, bool repeat, float repeat_time)
         {
             return addItem(callback, start_delay, repeat, repeat_time);
         }
 
-        public void Remove (int key)
+        public void Remove (uint key)
         {
             if (key <= 0)
                 return;
 
             lock (lock_)
             {
-                if (!original_.ContainsKey(key) && !pending_.ContainsKey(key))
-                    return;
-
-                if (pending_.ContainsKey(key))
+                if (list_.ContainsKey(key) && !expired_.Contains(key))
+                {
+                    expired_.Add(key);
+                }
+                else if (pending_.ContainsKey(key))
                 {
                     pending_.Remove(key);
-                }
-                else if (!removing_.Contains(key))
-                {
-                    removing_.Add(key);
                 }
             }
         }
 
-        public bool ContainsKey (int key)
+        public bool ContainsKey (uint key)
         {
             lock (lock_)
             {
-                return original_.ContainsKey(key) || pending_.ContainsKey(key);
+                return list_.ContainsKey(key) || pending_.ContainsKey(key);
             }
         }
 
         public int Count
         {
-            get
-            {
-                lock (lock_)
-                {
-                    return original_.Count + pending_.Count;
-                }
-            }
+            get { lock (lock_) { return list_.Count + pending_.Count; } }
         }
 
         public void Clear ()
         {
             lock (lock_)
             {
-                pending_.Clear();
-                is_all_clear_ = true;
+                all_clear_ = true;
             }
         }
 
@@ -236,33 +226,34 @@ namespace Fun
 
             lock (lock_)
             {
-                if (is_all_clear_)
+                if (all_clear_)
                 {
-                    original_.Clear();
-                    removing_.Clear();
-                    is_all_clear_ = false;
+                    list_.Clear();
+                    pending_.Clear();
+                    expired_.Clear();
+                    all_clear_ = false;
                     return;
                 }
 
-                checkRemoveList();
+                checkExpiredList();
 
-                // Adds timer
+                // Adds pending items
                 if (pending_.Count > 0)
                 {
-                    foreach (KeyValuePair<int, Item> p in pending_)
+                    foreach (KeyValuePair<uint, Item> p in pending_)
                     {
-                        original_.Add(p.Key, p.Value);
+                        list_.Add(p.Key, p.Value);
                     }
 
                     pending_.Clear();
                 }
 
-                if (original_.Count <= 0)
+                if (list_.Count <= 0)
                     return;
 
-                foreach (KeyValuePair<int, Item> p in original_)
+                foreach (KeyValuePair<uint, Item> p in list_)
                 {
-                    if (removing_.Contains(p.Key))
+                    if (expired_.Contains(p.Key))
                         continue;
 
                     Item item = p.Value;
@@ -276,32 +267,27 @@ namespace Fun
                     if (item.repeat)
                         item.remaining_time = item.repeat_time;
                     else
-                        removing_.Add(p.Key);
+                        expired_.Add(p.Key);
 
                     item.callback();
                 }
 
-                checkRemoveList();
+                checkExpiredList();
             }
         }
 
 
-        // Gets new id
-        int getNewId ()
+        // Gets new key
+        uint getNewKey ()
         {
-            do
-            {
-                ++next_id_;
-                if (next_id_ >= int.MaxValue)
-                    next_id_ = 1;
-            }
-            while (ContainsKey(next_id_));
+            while (ContainsKey(key_))
+                ++key_;
 
-            return next_id_;
+            return key_;
         }
 
         // Adds a action
-        int addItem (Action callback, float start_delay = 0f, bool repeat = false, float repeat_time = 0f)
+        uint addItem (Action callback, float start_delay = 0f, bool repeat = false, float repeat_time = 0f)
         {
             if (callback == null)
             {
@@ -310,25 +296,25 @@ namespace Fun
 
             lock (lock_)
             {
-                int key = getNewId();
+                uint key = getNewKey();
                 pending_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
                 return key;
             }
         }
 
-        // Removes actions from remove list
-        void checkRemoveList ()
+        // Removes items from the expired list
+        void checkExpiredList ()
         {
             lock (lock_)
             {
-                if (removing_.Count <= 0)
+                if (expired_.Count <= 0)
                     return;
 
-                foreach (int key in removing_)
+                foreach (uint key in expired_)
                 {
-                    if (original_.ContainsKey(key))
+                    if (list_.ContainsKey(key))
                     {
-                        original_.Remove(key);
+                        list_.Remove(key);
                     }
                     else if (pending_.ContainsKey(key))
                     {
@@ -336,7 +322,7 @@ namespace Fun
                     }
                 }
 
-                removing_.Clear();
+                expired_.Clear();
             }
         }
 
@@ -359,14 +345,13 @@ namespace Fun
         }
 
 
-        static int next_id_ = 0;
-
         // member variables.
+        uint key_ = 0;
+        bool all_clear_ = false;
         object lock_ = new object();
-        Dictionary<int, Item> original_ = new Dictionary<int, Item>();
-        Dictionary<int, Item> pending_ = new Dictionary<int, Item>();
-        List<int> removing_ = new List<int>();
-        bool is_all_clear_ = false;
+        Dictionary<uint, Item> list_ = new Dictionary<uint, Item>();
+        Dictionary<uint, Item> pending_ = new Dictionary<uint, Item>();
+        List<uint> expired_ = new List<uint>();
     }
 
 

@@ -748,7 +748,7 @@ namespace Fun
         protected int reconnect_count_ = 0;
 
         // Ping-related variables.
-        int ping_timer_id_ = 0;
+        uint ping_timer_id_ = 0;
         float ping_wait_time_ = 0f;
 
         // Encoding-serializer-related member variables.
@@ -1255,7 +1255,7 @@ namespace Fun
         static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
         // Message-related.
-        int connect_timeout_id_ = 0;
+        uint connect_timeout_id_ = 0;
         bool first_sending_ = true;
         bool first_receiving_ = true;
         bool header_decoded_ = false;
@@ -2345,7 +2345,7 @@ namespace Fun
         // member variables.
         string host_url_;
         string str_cookie_;
-        int request_timeout_id_ = 0;
+        uint request_timeout_id_ = 0;
 
         // WebRequest-related member variables.
         HttpWebRequest web_request_ = null;
