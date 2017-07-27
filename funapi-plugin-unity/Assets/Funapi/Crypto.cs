@@ -168,7 +168,7 @@ public class Sodium
     }
 
 #region libsodium wrappers
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -179,7 +179,7 @@ public class Sodium
 
     // NOTE(jinuk): size_t 는 ARM (32), iOS (32/64) 에서 크기가 다르다
     // void sodium_increment (unsigned char *n, const size_t nlen);
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
     private static extern void sodium_increment (byte[] n, UIntPtr nlen);
 #else
@@ -191,7 +191,7 @@ public class Sodium
     private static extern void sodium_increment (byte[] n, UIntPtr nlen);
 #endif
 
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -200,7 +200,7 @@ public class Sodium
 #endif
     private static extern int crypto_scalarmult_base (byte[] q, byte[] n);
 
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -213,7 +213,7 @@ public class Sodium
     //                                   unsigned long long mlen,
     //                                   const unsigned char *n, uint64_t ic,
     //                                   const unsigned char *k);
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -223,7 +223,7 @@ public class Sodium
     private static extern int crypto_stream_chacha20_xor_ic (
         byte[] c, byte[] m, ulong mlen, byte[] n, ulong ic, byte[] k);
 
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -236,7 +236,7 @@ public class Sodium
     //int crypto_stream_aes128ctr_xor (unsigned char *out, const unsigned char *in,
     //                                 unsigned long long inlen, const unsigned char *n,
     //                                 const unsigned char *k);
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -247,7 +247,7 @@ public class Sodium
         byte[] c, byte[] m, ulong inlen, byte[] n, byte[] k);
 
     //int crypto_stream_aes128ctr_beforenm (unsigned char *c, const unsigned char *k);
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -260,7 +260,7 @@ public class Sodium
     //                                         unsigned long long len,
     //                                         const unsigned char *nonce,
     //                                         const unsigned char *c);
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
@@ -275,7 +275,7 @@ public class Sodium
     //                                                unsigned long long len,
     //                                                const unsigned char *nonce,
     //                                                const unsigned char *c);
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     [DllImport("__Internal")]
 #elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
     [DllImport("sodium64")]
