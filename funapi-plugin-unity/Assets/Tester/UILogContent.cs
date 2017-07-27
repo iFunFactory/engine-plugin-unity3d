@@ -74,7 +74,7 @@ public class UILogContent : MonoBehaviour
                 item.transform.localPosition = new Vector3(kBorder, content_height, 0f);
                 ++count;
 
-                Text item_text = item.transform.FindChild("Text").GetComponent<Text>();
+                Text item_text = item.transform.Find("Text").GetComponent<Text>();
                 item_text.text = text;
                 yield return new WaitForEndOfFrame();
 
