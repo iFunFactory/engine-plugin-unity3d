@@ -19,7 +19,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 221;
+        public static readonly int kPluginVersion = 222;
     }
 
 
@@ -32,53 +32,62 @@ namespace Fun
 
         protected void createUpdater ()
         {
-#if !NO_UNITY
-            if (game_object_ != null)
-                return;
-
-            game_object_ = new GameObject(GetType().ToString());
-            if (game_object_ != null)
+            lock (lock_)
             {
-                FunapiObject obj = game_object_.AddComponent(typeof(FunapiObject)) as FunapiObject;
-                if (obj != null)
+#if !NO_UNITY
+                if (game_object_ != null)
+                    return;
+
+                game_object_ = new GameObject(GetType().ToString());
+                if (game_object_ != null)
                 {
-                    funapi_object_ = obj;
-                    obj.Updater = onUpdate;
-                    obj.OnPause = onPaused;
-                    obj.OnQuit = onQuit;
+                    FunapiObject obj = game_object_.AddComponent(typeof(FunapiObject)) as FunapiObject;
+                    if (obj != null)
+                    {
+                        funapi_object_ = obj;
+                        obj.Updater = onUpdate;
+                        obj.OnPause = onPaused;
+                        obj.OnQuit = onQuit;
+                    }
+
+                    DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
                 }
-
-                DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
-            }
 #else
-            if (funapi_object_ != null)
-                return;
+                if (funapi_object_ != null)
+                    return;
 
-            funapi_object_ = new FunapiObject();
-            funapi_object_.Updater = onUpdate;
-            funapi_object_.OnPause = onPaused;
-            funapi_object_.OnQuit = onQuit;
+                funapi_object_ = new FunapiObject();
+                funapi_object_.Updater = onUpdate;
+                funapi_object_.OnPause = onPaused;
+                funapi_object_.OnQuit = onQuit;
 #endif
+            }
         }
 
         protected void releaseUpdater ()
         {
+            lock (lock_)
+            {
 #if !NO_UNITY
-            if (game_object_ == null)
-                return;
+                if (game_object_ == null)
+                    return;
 
-            DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
-            GameObject.Destroy(game_object_);
-            game_object_ = null;
-            funapi_object_ = null;
+                DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
+                GameObject.Destroy(game_object_);
+                game_object_ = null;
 #endif
+                funapi_object_ = null;
+            }
         }
 
 #if NO_UNITY
         public void updateFrame ()
         {
-            if (funapi_object_ != null)
-                funapi_object_.Update();
+            lock (lock_)
+            {
+                if (funapi_object_ != null)
+                    funapi_object_.Update();
+            }
         }
 #endif
 
@@ -96,7 +105,7 @@ namespace Fun
         // Properties
         protected MonoBehaviour mono
         {
-            get { return funapi_object_; }
+            get { lock (lock_) { return funapi_object_; } }
         }
 
         protected ThreadSafeEventList event_list
@@ -117,16 +126,6 @@ namespace Fun
                 DontDestroyOnLoad(gameObject);
             }
 
-            void Update ()
-            {
-                long now = DateTime.UtcNow.Ticks;
-                int milliseconds = (int)((now - prev_ticks_) / 10000);
-                deltaTime_ = Math.Min((float)milliseconds / 1000f, kDeltaTimeMax);
-                prev_ticks_ = now;
-
-                Updater(deltaTime_);
-            }
-
             void OnApplicationPause (bool isPaused)
             {
                 OnPause(isPaused);
@@ -136,25 +135,35 @@ namespace Fun
             {
                 OnQuit();
             }
-#else
-            public void Update ()
-            {
-                Updater(0.03f);
-            }
 #endif
 
+            public void Update ()
+            {
+                long now = DateTime.UtcNow.Ticks;
+                int milliseconds = (int)((now - prev_ticks_) / 10000);
+                deltaTime_ = Math.Min((float)milliseconds / 1000f, kDeltaTimeMax);
+                prev_ticks_ = now;
+
+                Updater(deltaTime_);
+            }
+
             public Func<float, bool> Updater { private get; set; }
+
             public Action<bool> OnPause { private get; set; }
+
             public Action OnQuit { private get; set; }
 
-#if !NO_UNITY
+
+            // Member variables
             static readonly float kDeltaTimeMax = 0.3f;
 
             long prev_ticks_ = 0;
             float deltaTime_ = 0f;
-#endif
         }
 
+
+        // Member variables
+        object lock_ = new object();
 #if !NO_UNITY
         GameObject game_object_ = null;
 #endif
@@ -345,7 +354,7 @@ namespace Fun
         }
 
 
-        // member variables.
+        // Member variables
         uint key_ = 0;
         bool all_clear_ = false;
         object lock_ = new object();
