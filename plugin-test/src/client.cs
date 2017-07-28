@@ -25,19 +25,19 @@ namespace Tester
             server_ip_ = server_ip;
         }
 
-        public void Connect (bool session_reliability)
+        public void Connect (SessionOption session_option)
         {
             message_number_ = 0;
 
             if (session_ == null)
             {
-                session_ = FunapiSession.Create(server_ip_, session_reliability);
+                session_ = FunapiSession.Create(server_ip_, session_option);
                 session_.SessionEventCallback += onSessionEvent;
                 session_.TransportEventCallback += onTransportEvent;
                 session_.TransportErrorCallback += onTransportError;
                 session_.ReceivedMessageCallback += onReceivedMessage;
 
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < protocols.Count; ++i)
                 {
                     TransportOption option = new TransportOption();
                     if (protocols[i] == TransportProtocol.kTcp)
@@ -70,7 +70,7 @@ namespace Tester
             }
             else
             {
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < protocols.Count; ++i)
                 {
                     session_.Connect(protocols[i]);
                 }
@@ -79,7 +79,7 @@ namespace Tester
 
         public void Stop ()
         {
-            if (session_ != null)
+            if (session_ != null && session_.Connected)
                 session_.Stop();
         }
 
@@ -106,7 +106,7 @@ namespace Tester
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = message;
                 FunMessage fmsg = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-                session_.SendMessage(MessageType.pbuf_echo, fmsg, protocol);
+                session_.SendMessage("pbuf_echo", fmsg, protocol);
             }
             else
             {
@@ -133,7 +133,9 @@ namespace Tester
         void onSessionEvent (SessionEventType type, string session_id)
         {
             if (type == SessionEventType.kStopped)
+            {
                 connected_ = false;
+            }
         }
 
         void onTransportEvent (TransportProtocol protocol, TransportEventType type)

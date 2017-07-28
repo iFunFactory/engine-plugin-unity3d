@@ -17,9 +17,9 @@ namespace Tester
     class TesterMain
     {
         const int kClientMax = 10;
-        const bool reliableSession = true;
         const string kServerIp = "127.0.0.1";
 
+        SessionOption option = new SessionOption();
         List<Client> list_ = new List<Client>();
 
 
@@ -33,6 +33,9 @@ namespace Tester
         {
             writeTitle("START");
             FunDebug.Log("Client count is {0}.", kClientMax);
+
+            option.sessionReliability = true;
+            option.sendSessionIdOnlyOnce = false;
 
             for (int i = 0; i < kClientMax; ++i)
             {
@@ -68,7 +71,7 @@ namespace Tester
         {
             foreach (Client c in list_)
             {
-                c.Connect(reliableSession);
+                c.Connect(option);
             }
 
             while (waitForConnect())
