@@ -89,6 +89,8 @@ namespace Fun
             if (transport == null)
                 return;
 
+            transport.sendSessionIdOnlyOnce = option_.sendSessionIdOnlyOnce;
+
             Connect(protocol);
         }
 
@@ -979,7 +981,7 @@ namespace Fun
             if (transport == null)
                 return;
 
-            transport.SetEstablish(session_id_, option_.sendSessionIdOnlyOnce);
+            transport.SetEstablish(session_id_);
 
             onTransportEvent(transport.protocol, TransportEventType.kStarted);
 
@@ -1773,17 +1775,17 @@ namespace Fun
 
 
         // Message-type-related constants.
-        const string kIntMessageType = "_int#";
-        const string kMessageTypeField = "_msgtype";
-        const string kSessionIdField = "_sid";
-        const string kSeqNumberField = "_seq";
-        const string kAckNumberField = "_ack";
-        const string kSessionOpenedType = "_session_opened";
-        const string kSessionClosedType = "_session_closed";
-        const string kMaintenanceType = "_maintenance";
-        const string kMulticastMsgType = "_multicast";
-        const string kRedirectType = "_sc_redirect";
-        const string kRedirectConnectType = "_cs_redirect_connect";
+        static readonly string kIntMessageType = "_int#";
+        static readonly string kMessageTypeField = "_msgtype";
+        static readonly string kSessionIdField = "_sid";
+        static readonly string kSeqNumberField = "_seq";
+        static readonly string kAckNumberField = "_ack";
+        static readonly string kSessionOpenedType = "_session_opened";
+        static readonly string kSessionClosedType = "_session_closed";
+        static readonly string kMaintenanceType = "_maintenance";
+        static readonly string kMulticastMsgType = "_multicast";
+        static readonly string kRedirectType = "_sc_redirect";
+        static readonly string kRedirectConnectType = "_cs_redirect_connect";
 
         // Delegates
         public delegate void SessionEventHandler (SessionEventType type, string session_id);
