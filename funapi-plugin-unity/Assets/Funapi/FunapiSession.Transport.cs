@@ -170,12 +170,11 @@ namespace Fun
                     StoppedCallback(protocol_);
             }
 
-            public void SetEstablish (SessionId sid, bool sendSessionIdOnlyOnce)
+            public void SetEstablish (SessionId sid)
             {
                 state_ = State.kEstablished;
 
                 session_id_.SetId(sid);
-                send_session_id_only_once_ = sendSessionIdOnlyOnce;
 
                 if (enable_ping_)
                     startPingTimer();
@@ -195,14 +194,10 @@ namespace Fun
                     // Add session id
                     if (session_id_.IsValid && fun_msg.message != null)
                     {
-                        bool do_not_send = (protocol == TransportProtocol.kTcp || protocol == TransportProtocol.kUdp)
-                                           && send_session_id_only_once_ && session_id_has_been_sent;
-
-                        if (do_not_send == false)
+                        bool send_session_id = protocol_ == TransportProtocol.kHttp ||
+                                               !send_session_id_only_once_ || !session_id_has_been_sent;
+                        if (send_session_id)
                         {
-                            if (send_session_id_only_once_)
-                                session_id_has_been_sent = true;
-
                             if (encoding == FunEncoding.kJson)
                             {
                                 json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
@@ -301,6 +296,11 @@ namespace Fun
                 set { state_ = value; }
             }
 
+            public bool sendSessionIdOnlyOnce
+            {
+                set { send_session_id_only_once_ = value; }
+            }
+
             public abstract bool Started { get; }
 
             public bool Connecting
@@ -322,7 +322,7 @@ namespace Fun
                         return true;
 
                     // Waiting for unsent messages.
-                    if (protocol == TransportProtocol.kTcp)
+                    if (protocol_ == TransportProtocol.kTcp)
                     {
                         if (Started && HasUnsentMessages)
                             return true;
@@ -683,7 +683,7 @@ namespace Fun
             // Decoding a messages
             protected void tryToDecodeMessage ()
             {
-                if (protocol == TransportProtocol.kTcp)
+                if (protocol_ == TransportProtocol.kTcp)
                 {
                     // Try to decode as many messages as possible.
                     while (true)
@@ -895,7 +895,7 @@ namespace Fun
 
             void sendPublicKey (EncryptionType type)
             {
-                FunapiMessage fun_msg = new FunapiMessage(protocol, kEncryptionPublicKey, null, type);
+                FunapiMessage fun_msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
 
                 // Add a message to front of pending list...
                 lock (sending_lock_)
@@ -962,9 +962,16 @@ namespace Fun
                     }
                 }
 
-                // Checks ping messages
+                // Checks sent session id
+                if (send_session_id_only_once_ && !session_id_has_been_sent &&
+                    protocol_ != TransportProtocol.kHttp && msg_type != kSessionOpenedType)
+                {
+                    session_id_has_been_sent = true;
+                }
+
                 if (msg_type.Length > 0)
                 {
+                    // Checks ping messages
                     if (msg_type == kServerPingMessageType)
                     {
                         onServerPingMessage(message);
@@ -1179,7 +1186,6 @@ namespace Fun
             const string kServerPingMessageType = "_ping_s";
             const string kClientPingMessageType = "_ping_c";
             const string kPingTimestampField = "timestamp";
-            const string kAckNumberField = "_ack";
 
             // for speed-up.
             static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
