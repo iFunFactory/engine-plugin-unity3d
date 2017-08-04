@@ -974,6 +974,9 @@ namespace Fun
             DebugLog1("{0} Stopping transport.", transport.str_protocol);
 
             transport.Stop();
+
+            if (!isReliableTransport(transport.protocol))
+                transport.SetAbolish();
         }
 
         void setTransportStarted (Transport transport, bool send_unsent = true)
