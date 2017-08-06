@@ -191,50 +191,50 @@ namespace Fun
             {
                 try
                 {
-                    lock (buffer_lock_)
+                    // Add session id
+                    if (session_id_.IsValid && fun_msg.message != null)
                     {
-                        // Add session id
-                        if (session_id_.IsValid && fun_msg.message != null)
-                        {
-                            bool send_session_id = protocol_ == TransportProtocol.kHttp ||
-                                !send_session_id_only_once_ || !session_id_has_been_sent;
-                            if (send_session_id)
-                            {
-                                if (encoding == FunEncoding.kJson)
-                                {
-                                    json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
-                                }
-                                else if (encoding == FunEncoding.kProtobuf)
-                                {
-                                    FunMessage msg = fun_msg.message as FunMessage;
-                                    msg.sid = session_id_;
-                                }
-                            }
-                        }
-
-                        // Add message type
-                        if (fun_msg.msg_type != null && fun_msg.msg_type.Length > 0 &&
-                            fun_msg.message != null && fun_msg.msg_type != kAckNumberField)
+                        bool send_session_id = protocol_ == TransportProtocol.kHttp ||
+                                               !send_session_id_only_once_ || !session_id_has_been_sent;
+                        if (send_session_id)
                         {
                             if (encoding == FunEncoding.kJson)
                             {
-                                json_helper_.SetStringField(fun_msg.message, kMessageTypeField, fun_msg.msg_type);
+                                json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
                             }
                             else if (encoding == FunEncoding.kProtobuf)
                             {
                                 FunMessage msg = fun_msg.message as FunMessage;
-                                if (fun_msg.msg_type.Contains(kIntMessageType))
-                                {
-                                    msg.msgtype2 = Convert.ToInt32(fun_msg.msg_type.Substring(kIntMessageType.Length));
-                                }
-                                else
-                                {
-                                    msg.msgtype = fun_msg.msg_type;
-                                }
+                                msg.sid = session_id_;
                             }
                         }
+                    }
 
-                        // Sending...
+                    // Add message type
+                    if (fun_msg.msg_type != null && fun_msg.msg_type.Length > 0 &&
+                        fun_msg.message != null && fun_msg.msg_type != kAckNumberField)
+                    {
+                        if (encoding == FunEncoding.kJson)
+                        {
+                            json_helper_.SetStringField(fun_msg.message, kMessageTypeField, fun_msg.msg_type);
+                        }
+                        else if (encoding == FunEncoding.kProtobuf)
+                        {
+                            FunMessage msg = fun_msg.message as FunMessage;
+                            if (fun_msg.msg_type.Contains(kIntMessageType))
+                            {
+                                msg.msgtype2 = Convert.ToInt32(fun_msg.msg_type.Substring(kIntMessageType.Length));
+                            }
+                            else
+                            {
+                                msg.msgtype = fun_msg.msg_type;
+                            }
+                        }
+                    }
+
+                    // Sending...
+                    lock (sending_lock_)
+                    {
                         fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
                         pending_.Add(fun_msg);
 
@@ -335,7 +335,7 @@ namespace Fun
             // If the transport has unsent messages..
             public bool HasUnsentMessages
             {
-                get { lock (buffer_lock_) { return sending_.Count > 0 || pending_.Count > 0; } }
+                get { lock (sending_lock_) { return sending_.Count > 0 || pending_.Count > 0; } }
             }
 
             public bool SequenceValidation
@@ -395,7 +395,7 @@ namespace Fun
             {
                 get
                 {
-                    lock (buffer_lock_)
+                    lock (sending_lock_)
                     {
                         return !is_paused_ && sending_.Count == 0;
                     }
@@ -562,7 +562,7 @@ namespace Fun
             {
                 try
                 {
-                    lock (buffer_lock_)
+                    lock (sending_lock_)
                     {
                         if (sending_.Count > 0)
                         {
@@ -898,7 +898,7 @@ namespace Fun
                 FunapiMessage fun_msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
 
                 // Add a message to front of pending list...
-                lock (buffer_lock_)
+                lock (sending_lock_)
                 {
                     fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
                     pending_.Insert(0, fun_msg);
@@ -910,7 +910,7 @@ namespace Fun
             // Sends messages & Calls start callback
             void onHandshakeComplete ()
             {
-                lock (buffer_lock_)
+                lock (sending_lock_)
                 {
                     if (Started && isSendable)
                     {
@@ -1239,7 +1239,8 @@ namespace Fun
 
             protected int received_size_ = 0;
             protected int next_decoding_offset_ = 0;
-            protected object buffer_lock_ = new object();
+            protected object sending_lock_ = new object();
+            protected object receive_lock_ = new object();
             protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
             protected List<FunapiMessage> pending_ = new List<FunapiMessage>();
             protected List<FunapiMessage> sending_ = new List<FunapiMessage>();
@@ -1319,7 +1320,7 @@ namespace Fun
                 List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
                 int length = 0;
 
-                lock (buffer_lock_)
+                lock (sending_lock_)
                 {
                     foreach (FunapiMessage message in sending_)
                     {
@@ -1355,7 +1356,7 @@ namespace Fun
 
                     state_ = State.kHandshaking;
 
-                    lock (buffer_lock_)
+                    lock (receive_lock_)
                     {
                         // Wait for handshaking message.
                         ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
@@ -1388,7 +1389,7 @@ namespace Fun
 
                     DebugLog2("TCP sent {0} bytes.", nSent);
 
-                    lock (buffer_lock_)
+                    lock (sending_lock_)
                     {
                         // Removes any segment fully sent.
                         while (nSent > 0)
@@ -1460,7 +1461,7 @@ namespace Fun
                     if (sock_ == null)
                         return;
 
-                    lock (buffer_lock_)
+                    lock (receive_lock_)
                     {
                         int nRead = sock_.EndReceive(ar);
                         if (nRead > 0)
@@ -1582,7 +1583,7 @@ namespace Fun
                 else
                     sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
 
-                lock (buffer_lock_)
+                lock (receive_lock_)
                 {
                     sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
                                            ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
@@ -1605,7 +1606,7 @@ namespace Fun
             {
                 int offset = 0;
 
-                lock (buffer_lock_)
+                lock (sending_lock_)
                 {
                     FunDebug.Assert(sending_.Count >= 2);
 
@@ -1646,7 +1647,7 @@ namespace Fun
                     if (sock_ == null)
                         return;
 
-                    lock (buffer_lock_)
+                    lock (sending_lock_)
                     {
                         int nSent = sock_.EndSend(ar);
                         FunDebug.Assert(nSent > 0, "UDP failed to transfer messages.");
@@ -1691,7 +1692,7 @@ namespace Fun
                     if (sock_ == null)
                         return;
 
-                    lock (buffer_lock_)
+                    lock (receive_lock_)
                     {
                         int nRead = sock_.EndReceive(ar);
                         if (nRead > 0)
@@ -1839,7 +1840,7 @@ namespace Fun
 
             protected override void wireSend ()
             {
-                lock (buffer_lock_)
+                lock (sending_lock_)
                 {
                     FunDebug.Assert(sending_.Count >= 2);
                     DebugLog2("HTTP Host Url: {0}", host_url_);
@@ -1990,7 +1991,7 @@ namespace Fun
                         stream.Write(body.buffer.Array, 0, body.buffer.Count);
                     stream.Close();
 
-                    lock (buffer_lock_)
+                    lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count >= 2);
                         DebugLog2("HTTP sent a message - '{0}' ({1}bytes)",
@@ -2035,7 +2036,7 @@ namespace Fun
 
                     if (web_response_.StatusCode == HttpStatusCode.OK)
                     {
-                        lock (buffer_lock_)
+                        lock (receive_lock_)
                         {
                             byte[] header = web_response_.Headers.ToByteArray();
                             string str_header = System.Text.Encoding.ASCII.GetString(header, 0, header.Length);
@@ -2079,7 +2080,7 @@ namespace Fun
                     int nRead = read_stream_.EndRead(ar);
                     if (nRead > 0)
                     {
-                        lock (buffer_lock_)
+                        lock (receive_lock_)
                         {
                             received_size_ += nRead;
                             read_stream_.BeginRead(receive_buffer_, received_size_,
@@ -2099,7 +2100,7 @@ namespace Fun
 
                         DebugLog2("HTTP received {0} bytes.", received_size_);
 
-                        lock (buffer_lock_)
+                        lock (receive_lock_)
                         {
                             // Decoding a message
                             tryToDecodeMessage();
@@ -2146,7 +2147,7 @@ namespace Fun
 
                 try
                 {
-                    lock (buffer_lock_)
+                    lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count >= 2);
                         DebugLog2("HTTP sent a message - '{0}' ({1}bytes)",
@@ -2171,7 +2172,7 @@ namespace Fun
                     }
                     headers.Append(kHeaderDelimeter);
 
-                    lock (buffer_lock_)
+                    lock (receive_lock_)
                     {
                         onReceiveHeader(headers.ToString());
 
