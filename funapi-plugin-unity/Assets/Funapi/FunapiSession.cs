@@ -636,10 +636,12 @@ namespace Fun
                 }
                 else
                 {
-                    Log("Session id changed: {0} => {1}", (string)session_id_, SessionId.ToString(session_id));
-
-                    session_id_.SetId(session_id);
-                    onSessionEvent(SessionEventType.kChanged);
+                    LogWarning("Received a different session id. This is ignored.\ncurrent:{0} received:{1}",
+                               (string)session_id_, SessionId.ToString(session_id));
+                    return;
+                    //Log("Session id changed: {0} => {1}", (string)session_id_, SessionId.ToString(session_id));
+                    //session_id_.SetId(session_id);
+                    //onSessionEvent(SessionEventType.kChanged);
                 }
 
                 prev_session_id_.SetId(session_id);
