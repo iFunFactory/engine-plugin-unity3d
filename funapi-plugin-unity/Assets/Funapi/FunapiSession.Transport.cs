@@ -194,8 +194,13 @@ namespace Fun
                     // Add session id
                     if (session_id_.IsValid && fun_msg.message != null)
                     {
-                        bool send_session_id = protocol_ == TransportProtocol.kHttp ||
-                                               !send_session_id_only_once_ || !session_id_has_been_sent;
+                        bool send_session_id = false;
+                        lock (session_id_sent_lock_)
+                        {
+                            send_session_id = protocol_ == TransportProtocol.kHttp ||
+                                              !send_session_id_only_once_ || !session_id_has_been_sent;
+                        }
+
                         if (send_session_id)
                         {
                             if (encoding == FunEncoding.kJson)
@@ -963,10 +968,13 @@ namespace Fun
                 }
 
                 // Checks sent session id
-                if (send_session_id_only_once_ && !session_id_has_been_sent &&
-                    protocol_ != TransportProtocol.kHttp && msg_type != kSessionOpenedType)
+                lock (session_id_sent_lock_)
                 {
-                    session_id_has_been_sent = true;
+                    if (send_session_id_only_once_ && !session_id_has_been_sent &&
+                        protocol_ != TransportProtocol.kHttp && msg_type.Length > 0)
+                    {
+                        session_id_has_been_sent = true;
+                    }
                 }
 
                 if (msg_type.Length > 0)
@@ -1235,6 +1243,7 @@ namespace Fun
             bool header_decoded_ = false;
             bool send_session_id_only_once_ = false;
             bool session_id_has_been_sent = false;
+            object session_id_sent_lock_ = new object();
             Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
 
             protected int received_size_ = 0;
