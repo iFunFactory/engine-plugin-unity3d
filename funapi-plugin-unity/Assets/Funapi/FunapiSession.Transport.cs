@@ -1587,10 +1587,15 @@ namespace Fun
                 state_ = State.kConnected;
 
                 sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
+
+                int port = LocalPort.Next();
                 if (ip_af_ == AddressFamily.InterNetwork)
-                    sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    sock_.Bind(new IPEndPoint(IPAddress.Any, port));
                 else
-                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
+                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+
+                IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
+                DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
 
                 lock (receive_lock_)
                 {
@@ -1759,7 +1764,57 @@ namespace Fun
                 }
             }
 
+            // This class is to prevent UDP local ports from overlapping.
+            static class LocalPort
+            {
+                static LocalPort ()
+                {
+                    string path = FunapiUtils.GetLocalDataPath;
+                    if (path.Length > 0 && path[path.Length - 1] != '/')
+                        path += "/";
+                    save_path_ = path + kFileName;
 
+                    if (File.Exists(save_path_))
+                    {
+                        string text = File.ReadAllText(save_path_);
+                        if (!int.TryParse(text, out local_port_))
+                            local_port_ = kLocalPortMin;
+                    }
+                    else
+                    {
+                        local_port_ = kLocalPortMin;
+                        File.WriteAllText(save_path_, local_port_.ToString());
+                    }
+
+                    FunDebug.Log("The udp local port start value ({0}) has been loaded.", local_port_);
+                }
+
+                public static int Next ()
+                {
+                    lock (local_port_lock_)
+                    {
+                        ++local_port_;
+                        if (local_port_ > kLocalPortMax)
+                            local_port_ = kLocalPortMin;
+
+                        File.WriteAllText(save_path_, local_port_.ToString());
+
+                        return local_port_;
+                    }
+                }
+
+
+                static readonly string kFileName = "udp.localport";
+                static readonly int kLocalPortMin = 2048;
+                static readonly int kLocalPortMax = 48000;
+
+                static object local_port_lock_ = new object();
+                static int local_port_ = 0;
+                static string save_path_ = "";
+            }
+
+
+            // member variables
             Socket sock_;
             AddressFamily ip_af_;
             IPEndPoint send_ep_;
