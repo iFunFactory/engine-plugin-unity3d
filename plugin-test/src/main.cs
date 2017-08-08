@@ -16,7 +16,7 @@ namespace Tester
 {
     class TesterMain
     {
-        const int kClientMax = 10;
+        const int kClientMax = 100;
         const string kServerIp = "127.0.0.1";
 
         SessionOption option = new SessionOption();
@@ -34,7 +34,7 @@ namespace Tester
             writeTitle("START");
             FunDebug.Log("Client count is {0}.", kClientMax);
 
-            option.sessionReliability = true;
+            option.sessionReliability = false;
             option.sendSessionIdOnlyOnce = false;
 
             for (int i = 0; i < kClientMax; ++i)
@@ -46,12 +46,31 @@ namespace Tester
             Thread t = new Thread(new ThreadStart(onUpdate));
             t.Start();
 
-            testConnect();
-            testStartStop();
-            testSendReceive();
+            foreach (Client c in list_)
+            {
+                c.Connect(option);
+                Thread.Sleep(10);
+            }
+
+            while (waitForConnect())
+            {
+                Thread.Sleep(500);
+            }
+            writeTitle("All sessions are connected.");
+
+            foreach (Client c in list_)
+            {
+                c.SendMessage();
+                Thread.Sleep(10);
+            }
+
+            while (waitForStop())
+            {
+                Thread.Sleep(500);
+            }
 
             t.Abort();
-            writeTitle("FINISH");
+            writeTitle("FINISHED");
         }
 
         void onUpdate ()
@@ -64,38 +83,6 @@ namespace Tester
                 }
 
                 Thread.Sleep(33);
-            }
-        }
-
-        void connect ()
-        {
-            foreach (Client c in list_)
-            {
-                c.Connect(option);
-            }
-
-            while (waitForConnect())
-            {
-                Thread.Sleep(100);
-            }
-        }
-
-        void stop ()
-        {
-            while (waitForSend())
-            {
-                Thread.Sleep(100);
-            }
-            Thread.Sleep(100);
-
-            foreach (Client c in list_)
-            {
-                c.Stop();
-            }
-
-            while (waitForStop())
-            {
-                Thread.Sleep(100);
             }
         }
 
@@ -121,70 +108,13 @@ namespace Tester
             return false;
         }
 
-        bool waitForSend ()
-        {
-            foreach (Client c in list_)
-            {
-                if (c.HasUnsentMessages)
-                    return true;
-            }
-
-            return false;
-        }
-
-        void sendMessage ()
-        {
-            foreach (Client c in list_)
-            {
-                c.SendMessage(TransportProtocol.kTcp, "tcp message");
-                c.SendMessage(TransportProtocol.kUdp, "udp message");
-                c.SendMessage(TransportProtocol.kHttp, "http message");
-            }
-
-            Thread.Sleep(33);
-        }
-
-        void testConnect ()
-        {
-            writeTitle("CONNECT TEST");
-
-            for (int i = 0; i < 10; ++i)
-            {
-                connect();
-                stop();
-            }
-        }
-
-        void testStartStop ()
-        {
-            writeTitle("START / STOP TEST");
-
-            for (int i = 0; i < 10; ++i)
-            {
-                connect();
-                sendMessage();
-                stop();
-            }
-        }
-
-        void testSendReceive ()
-        {
-            writeTitle("SEND / RECEIVE TEST");
-
-            connect();
-
-            for (int i = 0; i < 10; ++i)
-                sendMessage();
-
-            stop();
-        }
-
         void writeTitle (string message)
         {
             Console.WriteLine("");
             Console.WriteLine("---------------------- "
                               + message
                               + " -----------------------");
+            Console.WriteLine("");
         }
     }
 }
