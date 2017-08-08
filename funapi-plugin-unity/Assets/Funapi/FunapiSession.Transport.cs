@@ -1588,11 +1588,18 @@ namespace Fun
 
                 sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
 
+#if FIXED_UDP_LOCAL_PORT
                 int port = LocalPort.Next();
                 if (ip_af_ == AddressFamily.InterNetwork)
                     sock_.Bind(new IPEndPoint(IPAddress.Any, port));
                 else
                     sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+#else
+                if (ip_af_ == AddressFamily.InterNetwork)
+                    sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
+                else
+                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
+#endif
 
                 IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
                 DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
@@ -1764,6 +1771,7 @@ namespace Fun
                 }
             }
 
+#if FIXED_UDP_LOCAL_PORT
             // This class is to prevent UDP local ports from overlapping.
             static class LocalPort
             {
@@ -1805,13 +1813,14 @@ namespace Fun
 
 
                 static readonly string kFileName = "udp.localport";
-                static readonly int kLocalPortMin = 2048;
-                static readonly int kLocalPortMax = 48000;
+                static readonly int kLocalPortMin = 49152;
+                static readonly int kLocalPortMax = 65534;
 
                 static object local_port_lock_ = new object();
                 static int local_port_ = 0;
                 static string save_path_ = "";
             }
+#endif
 
 
             // member variables
