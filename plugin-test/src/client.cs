@@ -43,9 +43,9 @@ namespace Tester
                     if (protocols[i] == TransportProtocol.kTcp)
                     {
                         TcpTransportOption tcp_option = new TcpTransportOption();
-                        tcp_option.EnablePing = true;
-                        tcp_option.PingIntervalSeconds = 1;
-                        tcp_option.PingTimeoutSeconds = 3;
+                        //tcp_option.EnablePing = true;
+                        tcp_option.PingIntervalSeconds = 3;
+                        tcp_option.PingTimeoutSeconds = 20;
                         option = tcp_option;
                     }
                     else if (protocols[i] == TransportProtocol.kHttp)
@@ -64,8 +64,9 @@ namespace Tester
                     //else
                     //    option.Encryption = EncryptionType.kIFunEngine2Encryption;
 
-                    ushort port = getPort(protocols[i], encodings[i]);
-                    session_.Connect(protocols[i], encodings[i], port, option);
+                    int enc = (int)protocols[i] - 1;
+                    ushort port = getPort(protocols[i], encodings[enc]);
+                    session_.Connect(protocols[i], encodings[enc], port, option);
                 }
             }
             else
@@ -85,12 +86,7 @@ namespace Tester
 
         public bool Connected
         {
-            get { return connected_; }
-        }
-
-        public bool HasUnsentMessages
-        {
-            get { return session_.HasUnsentMessages; }
+            get { return session_ != null && session_.Connected; }
         }
 
         public void Update ()
@@ -99,20 +95,34 @@ namespace Tester
                 session_.updateFrame();
         }
 
+        public void SendMessage ()
+        {
+            for (int i = 0; i < protocols.Count; ++i)
+            {
+                if (protocols[i] == TransportProtocol.kTcp)
+                    SendMessage(TransportProtocol.kTcp, "tcp message");
+                else if (protocols[i] == TransportProtocol.kUdp)
+                    SendMessage(TransportProtocol.kUdp, "udp message");
+                else if (protocols[i] == TransportProtocol.kHttp)
+                    SendMessage(TransportProtocol.kHttp, "http message");
+            }
+        }
+
         public void SendMessage (TransportProtocol protocol, string message)
         {
-            if (protocol == TransportProtocol.kTcp)
+            FunEncoding encoding = encodings[(int)protocol - 1];
+            if (encoding == FunEncoding.kJson)
+            {
+                Dictionary<string, object> echo = new Dictionary<string, object>();
+                echo["message"] = message;
+                session_.SendMessage("echo", echo, protocol);
+            }
+            else
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = message;
                 FunMessage fmsg = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
                 session_.SendMessage("pbuf_echo", fmsg, protocol);
-            }
-            else
-            {
-                Dictionary<string, object> echo = new Dictionary<string, object>();
-                echo["message"] = message;
-                session_.SendMessage("echo", echo, protocol);
             }
         }
 
@@ -132,18 +142,15 @@ namespace Tester
 
         void onSessionEvent (SessionEventType type, string session_id)
         {
-            if (type == SessionEventType.kStopped)
-            {
-                connected_ = false;
-            }
         }
 
         void onTransportEvent (TransportProtocol protocol, TransportEventType type)
         {
-            if (type == TransportEventType.kStarted)
+            if (type == TransportEventType.kConnectionFailed ||
+                type == TransportEventType.kConnectionTimedOut ||
+                type == TransportEventType.kDisconnected)
             {
-                if (!connected_)
-                    connected_ = true;
+                session_.Stop(protocol);
             }
         }
 
@@ -153,10 +160,12 @@ namespace Tester
 
         void onReceivedMessage (string type, object message)
         {
+            string echo_msg = "";
+
             if (type == "echo")
             {
                 Dictionary<string, object> json = message as Dictionary<string, object>;
-                string echo_msg = json["message"] as string;
+                echo_msg = json["message"] as string;
                 FunDebug.Log("[{0}:{2}] {1}", id_, echo_msg, ++message_number_);
             }
             else if (type == "pbuf_echo")
@@ -167,24 +176,38 @@ namespace Tester
                     return;
 
                 PbufEchoMessage echo = obj as PbufEchoMessage;
-                FunDebug.Log("[{0}:{2}] {1}", id_, echo.msg, ++message_number_);
+                echo_msg = echo.msg;
+                FunDebug.Log("[{0}:{2}] {1}", id_, echo_msg, ++message_number_);
+            }
+
+            if (message_number_ < 3)
+            {
+                if (echo_msg.StartsWith("tcp"))
+                    SendMessage(TransportProtocol.kTcp, echo_msg);
+                else if (echo_msg.StartsWith("udp"))
+                    SendMessage(TransportProtocol.kUdp, echo_msg);
+                else if (echo_msg.StartsWith("http"))
+                    SendMessage(TransportProtocol.kHttp, echo_msg);
+            }
+            else
+            {
+                Stop();
             }
         }
 
 
         // Protocol constants.
         static readonly List<TransportProtocol> protocols = new List<TransportProtocol>() {
-            TransportProtocol.kTcp, TransportProtocol.kUdp, TransportProtocol.kHttp };
+            TransportProtocol.kTcp, TransportProtocol.kHttp };
 
         // Encoding constants.
         static readonly List<FunEncoding> encodings = new List<FunEncoding>() {
-            FunEncoding.kProtobuf, FunEncoding.kJson, FunEncoding.kJson };
+            FunEncoding.kJson, FunEncoding.kJson, FunEncoding.kJson };
 
 
         // Member variables.
         int id_ = -1;
         string server_ip_;
-        bool connected_ = false;
         int message_number_ = 0;
 
         FunapiSession session_ = null;
