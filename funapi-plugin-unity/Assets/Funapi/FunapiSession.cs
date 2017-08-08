@@ -332,7 +332,7 @@ namespace Fun
                     else if (transport == null)
                         strlog.AppendFormat("There's no {0} transport.", convertString(protocol));
                     else if (transport.state != Transport.State.kEstablished)
-                        strlog.AppendFormat("Transport's state is '{0}'.", transport.state);
+                        strlog.AppendFormat("{0} transport's state is '{1}'.", transport.str_protocol, transport.state);
                     strlog.AppendFormat(" (session: {0})", state_);
 
                     LogWarning(strlog.ToString());
@@ -384,6 +384,11 @@ namespace Fun
             get { return default_protocol_; }
             set { default_protocol_ = value;
                   Log("The default protocol is '{0}'", convertString(value)); }
+        }
+
+        public string GetSessionId ()
+        {
+            return (string)session_id_;
         }
 
         public bool Started
