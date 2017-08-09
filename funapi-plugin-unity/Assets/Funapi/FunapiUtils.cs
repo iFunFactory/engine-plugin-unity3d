@@ -19,7 +19,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 227;
+        public static readonly int kPluginVersion = 228;
     }
 
 
@@ -66,16 +66,18 @@ namespace Fun
         protected void releaseUpdater ()
         {
 #if !NO_UNITY
-            lock (lock_)
-            {
-                if (game_object_ == null)
-                    return;
+            event_.Add(() => {
+                lock (lock_)
+                {
+                    if (game_object_ == null)
+                        return;
 
-                DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
-                GameObject.Destroy(game_object_);
-                game_object_ = null;
-                funapi_object_ = null;
-            }
+                    DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
+                    GameObject.Destroy(game_object_);
+                    game_object_ = null;
+                    funapi_object_ = null;
+                }
+            });
 #endif
         }
 
@@ -219,28 +221,16 @@ namespace Fun
             get { lock (lock_) { return list_.Count + pending_.Count; } }
         }
 
-        public void Clear (bool immediately = true)
+        public void Clear ()
         {
             lock (lock_)
             {
-                if (immediately)
-                {
-                    list_.Clear();
-                    pending_.Clear();
-                    expired_.Clear();
-                }
-                else
-                {
-                    all_clear_ = true;
-                }
+                all_clear_ = true;
             }
         }
 
         public void Update (float deltaTime)
         {
-            if (Count <= 0)
-                return;
-
             lock (lock_)
             {
                 if (all_clear_)
@@ -358,7 +348,7 @@ namespace Fun
 
 
         // Member variables
-        uint key_ = 0;
+        uint key_ = 100;
         bool all_clear_ = false;
         object lock_ = new object();
         Dictionary<uint, Item> list_ = new Dictionary<uint, Item>();
