@@ -28,13 +28,20 @@ namespace Fun
         public FunapiUpdater ()
         {
             setDebugObject(this);
+
+#if NO_UNITY
+            funapi_object_ = new FunapiObject();
+            funapi_object_.Updater = onUpdate;
+            funapi_object_.OnPause = onPaused;
+            funapi_object_.OnQuit = onQuit;
+#endif
         }
 
         protected void createUpdater ()
         {
+#if !NO_UNITY
             lock (lock_)
             {
-#if !NO_UNITY
                 if (game_object_ != null)
                     return;
 
@@ -45,39 +52,31 @@ namespace Fun
                     if (obj != null)
                     {
                         funapi_object_ = obj;
-                        obj.Updater = onUpdate;
-                        obj.OnPause = onPaused;
-                        obj.OnQuit = onQuit;
+                        funapi_object_.Updater = onUpdate;
+                        funapi_object_.OnPause = onPaused;
+                        funapi_object_.OnQuit = onQuit;
                     }
 
                     DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
                 }
-#else
-                if (funapi_object_ != null)
-                    return;
-
-                funapi_object_ = new FunapiObject();
-                funapi_object_.Updater = onUpdate;
-                funapi_object_.OnPause = onPaused;
-                funapi_object_.OnQuit = onQuit;
-#endif
             }
+#endif
         }
 
         protected void releaseUpdater ()
         {
+#if !NO_UNITY
             lock (lock_)
             {
-#if !NO_UNITY
                 if (game_object_ == null)
                     return;
 
                 DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
                 GameObject.Destroy(game_object_);
                 game_object_ = null;
-#endif
                 funapi_object_ = null;
             }
+#endif
         }
 
 #if NO_UNITY
@@ -220,11 +219,20 @@ namespace Fun
             get { lock (lock_) { return list_.Count + pending_.Count; } }
         }
 
-        public void Clear ()
+        public void Clear (bool immediately = true)
         {
             lock (lock_)
             {
-                all_clear_ = true;
+                if (immediately)
+                {
+                    list_.Clear();
+                    pending_.Clear();
+                    expired_.Clear();
+                }
+                else
+                {
+                    all_clear_ = true;
+                }
             }
         }
 
@@ -286,15 +294,6 @@ namespace Fun
         }
 
 
-        // Gets new key
-        uint getNewKey ()
-        {
-            while (ContainsKey(key_))
-                ++key_;
-
-            return key_;
-        }
-
         // Adds a action
         uint addItem (Action callback, float start_delay = 0f, bool repeat = false, float repeat_time = 0f)
         {
@@ -305,7 +304,11 @@ namespace Fun
 
             lock (lock_)
             {
-                uint key = getNewKey();
+                uint key = key_;
+                while (ContainsKey(key))
+                    ++key;
+                key_ = key + 1;
+
                 pending_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
                 return key;
             }
