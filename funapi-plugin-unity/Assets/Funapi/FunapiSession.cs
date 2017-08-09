@@ -1283,7 +1283,7 @@ namespace Fun
 
             DebugLog1("{0} sending a empty message for getting to session id.", transport.str_protocol);
 
-            transport.SendMessage(new FunapiMessage(transport.protocol, "_first"));
+            transport.SendMessage(new FunapiMessage(transport.protocol, "_first"), true);
         }
 
         void sendAck (Transport transport, UInt32 ack)
