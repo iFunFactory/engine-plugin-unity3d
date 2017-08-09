@@ -27,7 +27,7 @@ public class UILogs : MonoBehaviour
 #endif
     }
 
-    void OnOutput (string message)
+    void OnOutput (string type, string message)
     {
         content_.AddLog(message);
     }
