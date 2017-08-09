@@ -445,9 +445,6 @@ namespace Fun
             if (!base.onUpdate(deltaTime))
                 return false;
 
-            if (!Started)
-                return true;
-
             lock (transports_lock_)
             {
                 foreach (Transport transport in transports_.Values)
