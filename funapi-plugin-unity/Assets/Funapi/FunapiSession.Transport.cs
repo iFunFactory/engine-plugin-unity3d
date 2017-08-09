@@ -113,6 +113,7 @@ namespace Fun
                     received_size_ = 0;
                     next_decoding_offset_ = 0;
                     header_fields_.Clear();
+                    first_.Clear();
                     sending_.Clear();
                     resetEncryptors();
 
@@ -187,61 +188,17 @@ namespace Fun
             }
 
             // Sends a message
-            public void SendMessage (FunapiMessage fun_msg)
+            public void SendMessage (FunapiMessage fun_msg, bool sendingFirst = false)
             {
                 try
                 {
-                    // Add session id
-                    if (session_id_.IsValid && fun_msg.message != null)
-                    {
-                        bool send_session_id = false;
-                        lock (session_id_sent_lock_)
-                        {
-                            send_session_id = protocol_ == TransportProtocol.kHttp ||
-                                              !send_session_id_only_once_ || !session_id_has_been_sent;
-                        }
-
-                        if (send_session_id)
-                        {
-                            if (encoding == FunEncoding.kJson)
-                            {
-                                json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
-                            }
-                            else if (encoding == FunEncoding.kProtobuf)
-                            {
-                                FunMessage msg = fun_msg.message as FunMessage;
-                                msg.sid = session_id_;
-                            }
-                        }
-                    }
-
-                    // Add message type
-                    if (fun_msg.msg_type != null && fun_msg.msg_type.Length > 0 &&
-                        fun_msg.message != null && fun_msg.msg_type != kAckNumberField)
-                    {
-                        if (encoding == FunEncoding.kJson)
-                        {
-                            json_helper_.SetStringField(fun_msg.message, kMessageTypeField, fun_msg.msg_type);
-                        }
-                        else if (encoding == FunEncoding.kProtobuf)
-                        {
-                            FunMessage msg = fun_msg.message as FunMessage;
-                            if (fun_msg.msg_type.Contains(kIntMessageType))
-                            {
-                                msg.msgtype2 = Convert.ToInt32(fun_msg.msg_type.Substring(kIntMessageType.Length));
-                            }
-                            else
-                            {
-                                msg.msgtype = fun_msg.msg_type;
-                            }
-                        }
-                    }
-
                     // Sending...
                     lock (sending_lock_)
                     {
-                        fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
-                        pending_.Add(fun_msg);
+                        if (sendingFirst)
+                            first_.Add(fun_msg);
+                        else
+                            pending_.Add(fun_msg);
 
                         if (Started && isSendable)
                         {
@@ -340,7 +297,13 @@ namespace Fun
             // If the transport has unsent messages..
             public bool HasUnsentMessages
             {
-                get { lock (sending_lock_) { return sending_.Count > 0 || pending_.Count > 0; } }
+                get
+                {
+                    lock (sending_lock_)
+                    {
+                        return first_.Count > 0 || sending_.Count > 0 || pending_.Count > 0;
+                    }
+                }
             }
 
             public bool SequenceValidation
@@ -402,7 +365,13 @@ namespace Fun
                 {
                     lock (sending_lock_)
                     {
-                        return !is_paused_ && sending_.Count == 0;
+                        if (is_paused_)
+                            return false;
+
+                        if (sending_.Count > 0)
+                            return false;
+
+                        return true;
                     }
                 }
             }
@@ -575,12 +544,23 @@ namespace Fun
                             Log("{0} retrying unsent messages.", str_protocol_);
                             wireSend();
                         }
-                        else if (isSendable && pending_.Count > 0)
+                        else if (isSendable && (first_.Count > 0 || pending_.Count > 0))
                         {
                             // Otherwise, try to process pending messages.
                             List<FunapiMessage> tmp = sending_;
-                            sending_ = pending_;
-                            pending_ = tmp;
+                            if (first_.Count > 0)
+                            {
+                                sending_ = first_;
+                                first_ = tmp;
+                            }
+                            else
+                            {
+                                if (!session_id_.IsValid)
+                                    return;
+
+                                sending_ = pending_;
+                                pending_ = tmp;
+                            }
 
                             if (!buildingMessages())
                                 return;
@@ -602,17 +582,67 @@ namespace Fun
             {
                 for (int i = 0; i < sending_.Count; i += 2)
                 {
-                    FunapiMessage message = sending_[i];
+                    FunapiMessage fun_msg = sending_[i];
 
+                    // Add session id
+                    if (session_id_.IsValid && fun_msg.message != null)
+                    {
+                        bool send_session_id = false;
+                        lock (session_id_sent_lock_)
+                        {
+                            send_session_id = protocol_ == TransportProtocol.kHttp ||
+                                              !send_session_id_only_once_ || !session_id_has_been_sent;
+                        }
+
+                        if (send_session_id)
+                        {
+                            if (encoding == FunEncoding.kJson)
+                            {
+                                json_helper_.SetStringField(fun_msg.message, kSessionIdField, session_id_);
+                            }
+                            else if (encoding == FunEncoding.kProtobuf)
+                            {
+                                FunMessage msg = fun_msg.message as FunMessage;
+                                msg.sid = session_id_;
+                            }
+                        }
+                    }
+
+                    // Add message type
+                    if (fun_msg.msg_type != null && fun_msg.msg_type.Length > 0 &&
+                        fun_msg.message != null && fun_msg.msg_type != kAckNumberField)
+                    {
+                        if (encoding == FunEncoding.kJson)
+                        {
+                            json_helper_.SetStringField(fun_msg.message, kMessageTypeField, fun_msg.msg_type);
+                        }
+                        else if (encoding == FunEncoding.kProtobuf)
+                        {
+                            FunMessage msg = fun_msg.message as FunMessage;
+                            if (fun_msg.msg_type.Contains(kIntMessageType))
+                            {
+                                msg.msgtype2 = Convert.ToInt32(fun_msg.msg_type.Substring(kIntMessageType.Length));
+                            }
+                            else
+                            {
+                                msg.msgtype = fun_msg.msg_type;
+                            }
+                        }
+                    }
+
+                    // Serializes message
+                    fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
+
+                    // Encrypt message
                     string enc_header = "";
-                    EncryptionType type = getEncryption(message);
-                    if (message.msg_type == kEncryptionPublicKey)
+                    EncryptionType type = getEncryption(fun_msg);
+                    if (fun_msg.msg_type == kEncryptionPublicKey)
                     {
                         enc_header = generatePublicKey(type);
                     }
                     else if (type != EncryptionType.kNoneEncryption)
                     {
-                        if (!encryptMessage(message, type, ref enc_header))
+                        if (!encryptMessage(fun_msg, type, ref enc_header))
                         {
                             last_error_code_ = TransportError.Type.kEncryptionFailed;
                             last_error_message_ = string.Format("Encrypt message failed. type:{0}", (int)type);
@@ -631,7 +661,7 @@ namespace Fun
                         first_sending_ = false;
                     }
                     header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter,
-                                        message.buffer.Count, kHeaderDelimeter);
+                                        fun_msg.buffer.Count, kHeaderDelimeter);
                     if (type != EncryptionType.kNoneEncryption)
                     {
                         header.AppendFormat("{0}{1}{2}", kEncryptionHeaderField, kHeaderFieldDelimeter, Convert.ToInt32(type));
@@ -639,12 +669,12 @@ namespace Fun
                     }
                     header.Append(kHeaderDelimeter);
 
-                    FunapiMessage header_buffer = new FunapiMessage(protocol_, message.msg_type + " (header)", header);
+                    FunapiMessage header_buffer = new FunapiMessage(protocol_, fun_msg.msg_type + " (header)", header);
                     header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                     sending_.Insert(i, header_buffer);
 
                     DebugLog2("{0} built a message - '{1}' ({2}bytes + {3}bytes)", str_protocol_,
-                              message.msg_type, header_buffer.buffer.Count, message.buffer.Count);
+                              fun_msg.msg_type, header_buffer.buffer.Count, fun_msg.buffer.Count);
                 }
 
                 return true;
@@ -849,11 +879,11 @@ namespace Fun
                         DebugLog1("{0} handshaking is complete.", str_protocol_);
 
                         // Send public key (Do not change this order)
-                        if (hasEncryption(EncryptionType.kAes128Encryption))
-                            sendPublicKey(EncryptionType.kAes128Encryption);
-
                         if (hasEncryption(EncryptionType.kChaCha20Encryption))
                             sendPublicKey(EncryptionType.kChaCha20Encryption);
+
+                        if (hasEncryption(EncryptionType.kAes128Encryption))
+                            sendPublicKey(EncryptionType.kAes128Encryption);
 
                         event_.Add(onHandshakeComplete);
                     }
@@ -900,29 +930,24 @@ namespace Fun
 
             void sendPublicKey (EncryptionType type)
             {
-                FunapiMessage fun_msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
+                DebugLog1("{0} sending a {1}-pubkey message.", str_protocol_, (int)type);
 
-                // Add a message to front of pending list...
                 lock (sending_lock_)
                 {
-                    fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
-                    pending_.Insert(0, fun_msg);
+                    FunapiMessage fun_msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
+                    first_.Add(fun_msg);
                 }
-
-                DebugLog1("{0} sending a {1}-pubkey message.", str_protocol_, (int)type);
             }
 
             // Sends messages & Calls start callback
             void onHandshakeComplete ()
             {
-                lock (sending_lock_)
+                if (Started && isSendable)
                 {
-                    if (Started && isSendable)
-                    {
-                        sendPendingMessages();
-                        onStarted();
-                    }
+                    sendPendingMessages();
                 }
+
+                onStarted();
             }
 
             void onReceived (Dictionary<string, string> header, ArraySegment<byte> body)
@@ -1022,15 +1047,30 @@ namespace Fun
                 if (protocol_ != TransportProtocol.kTcp)
                     return;
 
-                timer_.Remove(ping_timer_id_);
-                ping_timer_id_ = 0;
-                ping_time_ = 0;
+                lock (sending_lock_)
+                {
+                    if (pending_.Count > 0)
+                        pending_.RemoveAll(msg => { return msg.msg_type == kClientPingMessageType; });
+                }
 
-                Log("{0} ping timer stopped.", str_protocol_);
+                if (ping_timer_id_ != 0)
+                {
+                    timer_.Remove(ping_timer_id_);
+                    ping_timer_id_ = 0;
+                    ping_time_ = 0;
+
+                    Log("{0} ping timer stopped.", str_protocol_);
+                }
             }
 
             void onPingTimerEvent ()
             {
+                if (!Started)
+                {
+                    stopPingTimer();
+                    return;
+                }
+
                 if (ping_wait_time_ > ping_timeout_)
                 {
                     LogWarning("Network seems disabled. Stopping the transport.");
@@ -1043,9 +1083,6 @@ namespace Fun
 
             void sendPingMessage ()
             {
-                if (!session_id_.IsValid)
-                    return;
-
                 long timestamp = DateTime.Now.Ticks;
 
                 if (encoding_ == FunEncoding.kJson)
@@ -1251,6 +1288,7 @@ namespace Fun
             protected object sending_lock_ = new object();
             protected object receive_lock_ = new object();
             protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
+            protected List<FunapiMessage> first_ = new List<FunapiMessage>();
             protected List<FunapiMessage> pending_ = new List<FunapiMessage>();
             protected List<FunapiMessage> sending_ = new List<FunapiMessage>();
 
