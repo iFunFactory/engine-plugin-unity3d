@@ -453,6 +453,9 @@ namespace Fun
                 }
             }
 
+            if (!Started)
+                return true;
+
             updateMessages();
             updateExpectedResponse(deltaTime);
 

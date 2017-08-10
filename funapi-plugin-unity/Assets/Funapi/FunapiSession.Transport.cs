@@ -1379,9 +1379,25 @@ namespace Fun
                     }
                 }
 
-                DebugLog2("TCP sending {0} bytes.", length);
+                try
+                {
+                    if (sock_ == null)
+                        return;
 
-                sock_.BeginSend(list, 0, new AsyncCallback(this.sendBytesCb), this);
+                    DebugLog2("TCP sending {0} bytes.", length);
+
+                    sock_.BeginSend(list, 0, new AsyncCallback(this.sendBytesCb), this);
+                }
+                catch (ObjectDisposedException)
+                {
+                    DebugLog1("TCP BeginSend operation has been cancelled.");
+                }
+                catch (Exception e)
+                {
+                    last_error_code_ = TransportError.Type.kSendingFailed;
+                    last_error_message_ = "TCP failure in wireSend: " + e.ToString();
+                    event_.Add(onFailure);
+                }
             }
 
             void startCb (IAsyncResult ar)
@@ -1491,7 +1507,7 @@ namespace Fun
                 }
                 catch (ObjectDisposedException)
                 {
-                    DebugLog1("TCP beginSend operation has been cancelled.");
+                    DebugLog1("TCP BeginSend operation has been cancelled.");
                 }
                 catch (Exception e)
                 {
