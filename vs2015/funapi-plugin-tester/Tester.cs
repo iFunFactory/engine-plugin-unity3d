@@ -28,6 +28,8 @@ namespace funapi_plugin_tester
         [TestMethod]
         public void TestSession ()
         {
+            FunapiEncryptor.public_key = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
+
             new Tester().start();
         }
 
