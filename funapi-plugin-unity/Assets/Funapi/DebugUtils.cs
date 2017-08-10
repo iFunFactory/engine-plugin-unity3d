@@ -159,67 +159,97 @@ namespace Fun
         {
             string log = string.Format("{0}[{1}] {2}", type, DateTime.Now.ToLongTimeString(), message);
 #if ENABLE_SAVE_LOG
-            if (log_buffer_.Length + log.Length >= kLogBufferMax)
-                SaveLogs();
+            lock (buffer_lock_)
+            {
+                if ((log_buffer_.Length + log.Length) >= kLogBufferMax)
+                    SaveLogs();
 
-            log_buffer_.Append(log);
-            log_buffer_.AppendLine();
+                log_buffer_.Append(log);
+                log_buffer_.AppendLine();
+            }
 #endif
             return log;
         }
 
 #if ENABLE_SAVE_LOG
+        static string getSavePath ()
+        {
+            string path = FunapiUtils.GetLocalDataPath;
+            if (path.Length > 0 && path[path.Length - 1] != '/')
+                path += "/";
+            path += kLogPath;
+
+            return path;
+        }
+
         public static void SaveLogs ()
         {
-            if (log_buffer_.Length <= 0)
-                return;
+            lock (buffer_lock_)
+            {
+                if (log_buffer_.Length <= 0)
+                    return;
 
-            string path = FunapiUtils.GetLocalDataPath + kLogPath;
-            if (!Directory.Exists(path))
-                Directory.CreateDirectory(path);
+                string path = getSavePath();
+                if (!Directory.Exists(path))
+                    Directory.CreateDirectory(path);
 
-            DateTime time = DateTime.Now;
-            path += string.Format("Log_{0}-{1:D2}-{2:D2}-{3:D2}-{4:D2}-{5:D2}.txt",
-                                  time.Year, time.Month, time.Day,
-                                  time.Hour, time.Minute, time.Second);
+                DateTime time = DateTime.Now;
+                path += string.Format("Log_{0}-{1:D2}-{2:D2}-{3:D2}-{4:D2}-{5:D2}.txt",
+                                      time.Year, time.Month, time.Day,
+                                      time.Hour, time.Minute, time.Second);
+#if NO_UNITY
+                Console.WriteLine(string.Format("Logs are saved. {0}", path));
+#else
+                UnityEngine.Debug.Log(string.Format("Logs are saved. {0}", path));
+#endif
 
-            FileStream file = File.Open(path, FileMode.Create);
-            StreamWriter stream = new StreamWriter(file);
-            stream.Write(log_buffer_.ToString().ToCharArray(), 0, log_buffer_.Length);
-            stream.Flush();
-            stream.Close();
+                FileStream file = File.Open(path, FileMode.Create);
+                StreamWriter stream = new StreamWriter(file);
+                stream.Write(log_buffer_.ToString().ToCharArray(), 0, log_buffer_.Length);
+                stream.Flush();
+                stream.Close();
 
-            Log("Logs are saved.\n{0}", path);
-
-            ClearLogBuffer();
+                ClearLogBuffer();
+            }
         }
 
         public static int GetLogLength ()
         {
-            return log_buffer_.Length;
+            lock (buffer_lock_)
+            {
+                return log_buffer_.Length;
+            }
         }
 
         public static string GetLogString ()
         {
-            return log_buffer_.ToString();
+            lock (buffer_lock_)
+            {
+                return log_buffer_.ToString();
+            }
         }
 
         public static void ClearLogBuffer ()
         {
             // Reset buffer
-            log_buffer_.Length = 0;
+            lock (buffer_lock_)
+            {
+                log_buffer_.Length = 0;
+            }
         }
 
         public static void RemoveAllLogFiles ()
         {
-            string path = FunapiUtils.GetLocalDataPath + kLogPath;
+            string path = getSavePath();
             if (Directory.Exists(path))
                 Directory.Delete(path, true);
         }
 
 
-        const string kLogPath = "/Logs/";
+        const string kLogPath = "Logs/";
         const int kLogBufferMax = 1024 * 1024;
+
+        static object buffer_lock_ = new object();
         static StringBuilder log_buffer_ = new StringBuilder(kLogBufferMax);
 #else
         public static void SaveLogs () {}
@@ -227,7 +257,6 @@ namespace Fun
         public static string GetLogString() { return ""; }
         public static void RemoveAllLogFiles () {}
 #endif
-
 
 #if ENABLE_OUTPUT
         public delegate void OutputListener (string type, string message);
