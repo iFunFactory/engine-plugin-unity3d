@@ -19,7 +19,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 229;
+        public static readonly int kPluginVersion = 230;
     }
 
 
@@ -192,14 +192,19 @@ namespace Fun
 
         public void Remove (uint key)
         {
-            if (key <= 0)
-                return;
-
             lock (lock_)
             {
-                if (list_.ContainsKey(key) && !expired_.Contains(key))
+                if (all_clear_)
                 {
-                    expired_.Add(key);
+                    if (pending2_.ContainsKey(key))
+                        pending2_.Remove(key);
+                    return;
+                }
+
+                if (list_.ContainsKey(key))
+                {
+                    if (!expired_.Contains(key))
+                        expired_.Add(key);
                 }
                 else if (pending_.ContainsKey(key))
                 {
@@ -216,11 +221,6 @@ namespace Fun
             }
         }
 
-        public int Count
-        {
-            get { lock (lock_) { return list_.Count + pending_.Count; } }
-        }
-
         public void Clear ()
         {
             lock (lock_)
@@ -233,16 +233,7 @@ namespace Fun
         {
             lock (lock_)
             {
-                if (all_clear_)
-                {
-                    list_.Clear();
-                    pending_.Clear();
-                    expired_.Clear();
-                    all_clear_ = false;
-                    return;
-                }
-
-                checkExpiredList();
+                checkStatus();
 
                 // Adds pending items
                 if (pending_.Count > 0)
@@ -255,31 +246,32 @@ namespace Fun
                     pending_.Clear();
                 }
 
-                if (list_.Count <= 0)
-                    return;
-
-                foreach (KeyValuePair<uint, Item> p in list_)
+                // Update routine
+                if (list_.Count > 0)
                 {
-                    if (expired_.Contains(p.Key))
-                        continue;
-
-                    Item item = p.Value;
-                    if (item.remaining_time > 0f)
+                    foreach (KeyValuePair<uint, Item> p in list_)
                     {
-                        item.remaining_time -= deltaTime;
-                        if (item.remaining_time > 0f)
+                        if (expired_.Contains(p.Key))
                             continue;
+
+                        Item item = p.Value;
+                        if (item.remaining_time > 0f)
+                        {
+                            item.remaining_time -= deltaTime;
+                            if (item.remaining_time > 0f)
+                                continue;
+                        }
+
+                        if (item.repeat)
+                            item.remaining_time = item.repeat_time;
+                        else
+                            expired_.Add(p.Key);
+
+                        item.callback();
                     }
-
-                    if (item.repeat)
-                        item.remaining_time = item.repeat_time;
-                    else
-                        expired_.Add(p.Key);
-
-                    item.callback();
                 }
 
-                checkExpiredList();
+                checkStatus();
             }
         }
 
@@ -299,32 +291,52 @@ namespace Fun
                     ++key;
                 key_ = key + 1;
 
-                pending_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
+                if (all_clear_)
+                    pending2_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
+                else
+                    pending_.Add(key, new Item(callback, start_delay, repeat, repeat_time));
+
                 return key;
             }
         }
 
-        // Removes items from the expired list
-        void checkExpiredList ()
+        void checkStatus ()
         {
             lock (lock_)
             {
-                if (expired_.Count <= 0)
-                    return;
-
-                foreach (uint key in expired_)
+                if (all_clear_)
                 {
-                    if (list_.ContainsKey(key))
+                    list_.Clear();
+                    pending_.Clear();
+                    expired_.Clear();
+                    all_clear_ = false;
+
+                    if (pending2_.Count > 0)
                     {
-                        list_.Remove(key);
+                        Dictionary<uint, Item> tmp = list_;
+                        list_ = pending2_;
+                        pending2_ = tmp;
                     }
-                    else if (pending_.ContainsKey(key))
-                    {
-                        pending_.Remove(key);
-                    }
+                    return;
                 }
 
-                expired_.Clear();
+                // Removes items from the expired list
+                if (expired_.Count > 0)
+                {
+                    foreach (uint key in expired_)
+                    {
+                        if (list_.ContainsKey(key))
+                        {
+                            list_.Remove(key);
+                        }
+                        else if (pending_.ContainsKey(key))
+                        {
+                            pending_.Remove(key);
+                        }
+                    }
+
+                    expired_.Clear();
+                }
             }
         }
 
@@ -353,6 +365,7 @@ namespace Fun
         object lock_ = new object();
         Dictionary<uint, Item> list_ = new Dictionary<uint, Item>();
         Dictionary<uint, Item> pending_ = new Dictionary<uint, Item>();
+        Dictionary<uint, Item> pending2_ = new Dictionary<uint, Item>();
         List<uint> expired_ = new List<uint>();
     }
 
