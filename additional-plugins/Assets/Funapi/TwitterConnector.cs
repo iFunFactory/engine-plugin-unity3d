@@ -1,70 +1,61 @@
-﻿// Copyright (C) 2014 iFunFactory Inc. All Rights Reserved.
+﻿// Copyright (C) 2013 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using MiniJSON;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
-
-using MiniJSON;
 
 
 namespace Fun
 {
     public class TwitterConnector : SocialNetwork
     {
-        public void Awake ()
+        public void Init (string consumer_key, string consumer_secret)
         {
-            // this array should be filled before you can use EncryptedPlayerPrefs :
-            EncryptedPlayerPrefs.keys=new string[5];
-            EncryptedPlayerPrefs.keys[0]="AFsT0m8Q";
-            EncryptedPlayerPrefs.keys[1]="WKvhyubv";
-            EncryptedPlayerPrefs.keys[2]="kOg6mN9l";
-            EncryptedPlayerPrefs.keys[3]="Ed3ri5U4";
-            EncryptedPlayerPrefs.keys[4]="GyVHft3j";
+            FunDebug.DebugLog1("TwitterConnector.Init called.");
 
-            OnEventCallback += new SocialNetwork.EventHandler(OnEventHandler);
-        }
+            OnEventCallback += new EventHandler(OnEventHandler);
+            oauth_handler_ = new OAuthHandler(consumer_key, consumer_secret);
 
-        #region public implementation
-        public override void Init(params object[] param)
-        {
-            Debug.Log("TwitterConnector Initialization.");
-            DebugUtils.Assert(param[0] is string);
-            DebugUtils.Assert(param[1] is string);
-
-            oauth_handler_ = new OAuthHandler(param[0] as string, param[1] as string);
-
-            string oauth_token = EncryptedPlayerPrefs.GetString("oauth_token");
-            string oauth_token_secret = EncryptedPlayerPrefs.GetString("oauth_token_secret");
+            string oauth_token = PlayerPrefs.GetString("oauth_token");
+            string oauth_token_secret = PlayerPrefs.GetString("oauth_token_secret");
             if (!string.IsNullOrEmpty(oauth_token) && !string.IsNullOrEmpty(oauth_token_secret))
             {
                 oauth_handler_.AddParameter("oauth_token", oauth_token);
                 oauth_handler_.AddParameter("oauth_token_secret", oauth_token_secret);
 
-                my_info_.id = EncryptedPlayerPrefs.GetString("user_id");
-                my_info_.name = EncryptedPlayerPrefs.GetString("screen_name");
+                my_info_.id = PlayerPrefs.GetString("user_id");
+                my_info_.name = PlayerPrefs.GetString("screen_name");
 
-                Debug.Log("Already logged in.");
+                FunDebug.Log("Logged in Twitter using saved token.");
                 OnEventNotify(SNResultCode.kLoggedIn);
+            }
+            else
+            {
+                OnEventNotify(SNResultCode.kInitialized);
             }
         }
 
-        public bool auto_request_picture
+        public bool IsLoggedIn
+        {
+            get { return logged_in_; }
+        }
+
+        public bool AutoDownloadPicture
         {
             set { auto_request_picture_ = value; }
         }
 
         public void Login()
         {
-            Debug.Log("Request token.");
+            FunDebug.DebugLog1("Request Twitter access token.");
             StartCoroutine(GetRequestToken());
         }
 
@@ -88,18 +79,17 @@ namespace Fun
 
         public override void Post (string message)
         {
-            Debug.Log("Post tweet. message: " + message);
+            FunDebug.DebugLog1("Post tweet. message: {0}", message);
             StartCoroutine(PostTweet(message));
         }
-        #endregion
 
 
-        #region internal implementation
-        private void OnEventHandler (SNResultCode result)
+        void OnEventHandler (SNResultCode result)
         {
             switch (result)
             {
             case SNResultCode.kLoggedIn:
+                logged_in_ = true;
                 StartCoroutine(RequestMyInfo());
                 break;
             }
@@ -125,7 +115,7 @@ namespace Fun
 
             if (!string.IsNullOrEmpty(web.error))
             {
-                Debug.Log(string.Format("GetRequestToken - failed. {0}, {1}", web.error, web.text));
+                FunDebug.LogError("Failure in GetRequestToken: {0}\n{1}", web.error, web.text);
                 OnEventNotify(SNResultCode.kLoginFailed);
             }
             else
@@ -135,8 +125,8 @@ namespace Fun
 
                 if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(secret))
                 {
-                    Debug.Log(string.Format("GetRequestToken - succeeded.\n  token: {0}\n  secret: {1}",
-                                            token, secret));
+                    FunDebug.Log("Succeeded in getting access token of Twitter.\n" +
+                                 "token: {0}\nsecret: {1}", token, secret);
 
                     request_token_ = token;
 
@@ -145,7 +135,7 @@ namespace Fun
                 }
                 else
                 {
-                    Debug.Log("GetRequestToken - failed. " + web.text);
+                    FunDebug.LogError("Failure in GetRequestToken: {0}", web.text);
                     OnEventNotify(SNResultCode.kLoginFailed);
                 }
             }
@@ -166,7 +156,7 @@ namespace Fun
 
             if (!string.IsNullOrEmpty(web.error))
             {
-                Debug.Log(string.Format("GetAccessToken - failed. {0}, {1}", web.error, web.text));
+                FunDebug.LogError("Failure in GetAccessToken: {0}\n{1}", web.error, web.text);
                 OnEventNotify(SNResultCode.kLoginFailed);
             }
             else
@@ -179,23 +169,23 @@ namespace Fun
                 if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(secret) &&
                     !string.IsNullOrEmpty(my_info_.id) && !string.IsNullOrEmpty(my_info_.name))
                 {
-                    Debug.Log("GetAccessToken - succeeded.");
-                    Debug.Log(string.Format("id: {0}\nname: {1}\ntoken: {2}\ntoken_secret: {3}",
-                                            my_info_.id, my_info_.name, token, secret));
+                    FunDebug.Log("Succeeded in getting my information of Twitter.\n" +
+                                 "id: {0}\nname: {1}\ntoken: {2}\ntoken_secret: {3}",
+                                 my_info_.id, my_info_.name, token, secret);
 
                     oauth_handler_.AddParameter("oauth_token", token);
                     oauth_handler_.AddParameter("oauth_token_secret", secret);
 
-                    EncryptedPlayerPrefs.SetString("user_id", my_info_.id);
-                    EncryptedPlayerPrefs.SetString("screen_name", my_info_.name);
-                    EncryptedPlayerPrefs.SetString("oauth_token", token);
-                    EncryptedPlayerPrefs.SetString("oauth_token_secret", secret);
+                    PlayerPrefs.SetString("user_id", my_info_.id);
+                    PlayerPrefs.SetString("screen_name", my_info_.name);
+                    PlayerPrefs.SetString("oauth_token", token);
+                    PlayerPrefs.SetString("oauth_token_secret", secret);
 
                     OnEventNotify(SNResultCode.kLoggedIn);
                 }
                 else
                 {
-                    Debug.Log("GetAccessToken - failed. " + web.text);
+                    FunDebug.LogError("Failure in GetAccessToken: {0}", web.text);
                     OnEventNotify(SNResultCode.kLoginFailed);
                 }
             }
@@ -204,18 +194,18 @@ namespace Fun
         IEnumerator RequestMyInfo ()
         {
             oauth_handler_.Clear();
-            oauth_handler_.AddParameter("user_id", my_id);
+            oauth_handler_.AddParameter("user_id", MyId);
 
             var headers = new Dictionary<string, string>();
             headers["Authorization"] = oauth_handler_.GenerateHeader(kShowUrl, "GET");
 
-            string url = string.Format("{0}?user_id={1}", kShowUrl, my_id);
+            string url = string.Format("{0}?user_id={1}", kShowUrl, MyId);
             WWW web = new WWW(url.ToString(), null, headers);
             yield return web;
 
             if (!string.IsNullOrEmpty(web.error))
             {
-                Debug.Log(string.Format("RequestMyInfo - failed. {0}", web.error));
+                FunDebug.LogError("Failure in RequestMyInfo: {0}", web.error);
                 OnEventNotify(SNResultCode.kError);
             }
             else
@@ -241,7 +231,7 @@ namespace Fun
 
             if (!string.IsNullOrEmpty(web.error))
             {
-                Debug.Log(string.Format("RequestFriendIds - failed. {0}", web.error));
+                FunDebug.LogError("Failure in RequestFriendIds: {0}", web.error);
                 OnEventNotify(SNResultCode.kError);
             }
             else
@@ -277,7 +267,7 @@ namespace Fun
 
             if (!string.IsNullOrEmpty(web.error))
             {
-                Debug.Log(string.Format("RequestUserInfo - failed. {0}", web.error));
+                FunDebug.LogError("Failure in RequestUserInfo: {0}", web.error);
                 OnEventNotify(SNResultCode.kError);
             }
             else
@@ -285,28 +275,37 @@ namespace Fun
                 List<object> list = Json.Deserialize(web.text) as List<object>;
                 if (list.Count <= 0)
                 {
-                    DebugUtils.Log("RequestUserInfo - Invalid list data. List size is 0.");
+                    FunDebug.LogError("RequestUserInfo - Invalid list data. List size is 0.");
                     yield break;
                 }
                 else
                 {
-                    foreach (Dictionary<string, object> node in list)
+                    lock (friend_list_)
                     {
-                        UserInfo user = new UserInfo();
-                        user.id = node["id"] as string;
-                        user.name = node["screen_name"] as string;
+                        friend_list_.Clear();
 
-                        url = node["profile_image_url"] as string;
-                        user.url = url.Replace("_normal", "_bigger");
+                        foreach (Dictionary<string, object> node in list)
+                        {
+                            UserInfo user = new UserInfo();
+                            user.id = node["id_str"] as string;
+                            user.name = node["screen_name"] as string;
 
-                        friends_.Add(user);
+                            url = node["profile_image_url"] as string;
+                            user.url = url.Replace("_normal", "_bigger");
+
+                            friend_list_.Add(user);
+                            FunDebug.DebugLog1("> id:{0} name:{1} image:{2}", user.id, user.name, user.url);
+                        }
                     }
 
-                    DebugUtils.Log("Succeeded in getting the friend list. count:{0}", friends_.Count);
+                    FunDebug.Log("Succeeded in getting the friend list. count:{0}", friend_list_.Count);
                     OnEventNotify(SNResultCode.kFriendList);
 
-                    if (auto_request_picture_ && friends_.Count > 0)
-                        StartCoroutine(RequestPictureList(friends_));
+                    lock (friend_list_)
+                    {
+                        if (auto_request_picture_ && friend_list_.Count > 0)
+                            StartCoroutine(RequestPictures(GetFriendList()));
+                    }
                 }
             }
         }
@@ -315,7 +314,7 @@ namespace Fun
         {
             if (string.IsNullOrEmpty(message) || message.Length > 140)
             {
-                Debug.Log("PostTweet - message is empty or too long. message: " + message);
+                FunDebug.LogError("PostTweet - message is empty or too long.\nmessage: {0}", message);
                 OnEventNotify(SNResultCode.kPostFailed);
             }
             else
@@ -337,7 +336,7 @@ namespace Fun
 
                 if (!string.IsNullOrEmpty(web.error))
                 {
-                    Debug.Log(string.Format("PostTweet - failed. {0}, {1}", web.error, web.text));
+                    FunDebug.LogError("Failure in PostTweet: {0}\n{1}", web.error, web.text);
                     OnEventNotify(SNResultCode.kPostFailed);
                 }
                 else
@@ -345,36 +344,34 @@ namespace Fun
                     string error = Regex.Match(web.text, @"<error>([^&]+)</error>").Groups[1].Value;
                     if (!string.IsNullOrEmpty(error))
                     {
-                        Debug.Log("PostTweet - failed." + error);
+                        FunDebug.LogError("Failure in PostTweet(Regex.Match): {0}", error);
                         OnEventNotify(SNResultCode.kPostFailed);
                     }
                     else
                     {
-                        Debug.Log("PostTweet - succeeeded.");
+                        FunDebug.Log("Post tweet succeeeded.");
                         OnEventNotify(SNResultCode.kPosted);
                     }
                 }
             }
         }
-        #endregion
 
 
-        #region member variables
         // Twitter APIs for OAuth process
-        private readonly string kRequestUrl = "https://api.twitter.com/oauth/request_token";
-        private readonly string kOAuthUrl = "https://api.twitter.com/oauth/authenticate?oauth_token={0}";
-        private readonly string kAccessUrl = "https://api.twitter.com/oauth/access_token";
-        private readonly string kShowUrl = "https://api.twitter.com/1.1/users/show.json";
-        private readonly string kFriendsIdsUrl = "https://api.twitter.com/1.1/friends/ids.json";
-        private readonly string kLookupUrl = "https://api.twitter.com/1.1/users/lookup.json";
-        private readonly string kPostUrl = "https://api.twitter.com/1.1/statuses/update.json";
+        static readonly string kRequestUrl = "https://api.twitter.com/oauth/request_token";
+        static readonly string kOAuthUrl = "https://api.twitter.com/oauth/authenticate?oauth_token={0}";
+        static readonly string kAccessUrl = "https://api.twitter.com/oauth/access_token";
+        static readonly string kShowUrl = "https://api.twitter.com/1.1/users/show.json";
+        static readonly string kFriendsIdsUrl = "https://api.twitter.com/1.1/friends/ids.json";
+        static readonly string kLookupUrl = "https://api.twitter.com/1.1/users/lookup.json";
+        static readonly string kPostUrl = "https://api.twitter.com/1.1/statuses/update.json";
 
-        private readonly int kFriendLimitMax = 100;
+        static readonly int kFriendLimitMax = 100;
 
         // Member variables.
-        private OAuthHandler oauth_handler_;
-        private string request_token_ = "";
-        private bool auto_request_picture_ = true;
-        #endregion
+        OAuthHandler oauth_handler_;
+        string request_token_ = "";
+        bool auto_request_picture_ = true;
+        bool logged_in_ = false;
     }
 }
