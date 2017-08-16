@@ -1,30 +1,33 @@
-﻿// Copyright (C) 2013-2015 iFunFactory Inc. All Rights Reserved.
+﻿// Copyright (C) 2013 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using Facebook.Unity;
+using MiniJSON;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
-using Facebook.Unity;
-using MiniJSON;
 
 namespace Fun
 {
     public class FacebookConnector : SocialNetwork
     {
-        #region public implementation
-        public override void Init (params object[] param)
+        public void Init ()
         {
-            DebugUtils.DebugLog("FacebookConnector.Init called.");
-            if (!FB.IsInitialized) {
+            FunDebug.DebugLog1("FacebookConnector.Init called.");
+
+            if (!FB.IsInitialized)
+            {
                 // Initialize the Facebook SDK
                 FB.Init(OnInitCb, OnHideCb);
-            } else {
+            }
+            else
+            {
                 // Already initialized, signal an app activation App Event
                 if (Application.isMobilePlatform)
                     FB.ActivateApp();
@@ -33,17 +36,17 @@ namespace Fun
 
         public void LogInWithRead (List<string> perms)
         {
-            DebugUtils.DebugLog("Request facebook login with read.");
+            FunDebug.Log("Request facebook login with read.");
             FB.LogInWithReadPermissions(perms, OnLoginCb);
         }
 
         public void LogInWithPublish (List<string> perms)
         {
-            DebugUtils.DebugLog("Request facebook login with publish.");
+            FunDebug.Log("Request facebook login with publish.");
             FB.LogInWithPublishPermissions(perms, OnLoginCb);
         }
 
-        public void Logout()
+        public void Logout ()
         {
             FB.LogOut();
         }
@@ -58,15 +61,21 @@ namespace Fun
             StartCoroutine(PostWithScreenshotEnumerator(message));
         }
 
-        public bool auto_request_picture
+        public bool IsLoggedIn
+        {
+            get { return FB.IsLoggedIn; }
+        }
+
+        public bool AutoDownloadPicture
         {
             set { auto_request_picture_ = value; }
         }
 
         public void RequestFriendList (int limit)
         {
-            string query = string.Format("me?fields=friends.limit({0}).fields(id,name,picture.width(128).height(128))", limit);
-            DebugUtils.Log("Facebook request: {0}", query);
+            string query = string.Format("me?fields=friends.limit({0})" +
+                                         ".fields(id,name,picture.width(128).height(128))", limit);
+            FunDebug.Log("Facebook request: {0}", query);
 
             // Reqests friend list
             FB.API(query, HttpMethod.GET, OnFriendListCb);
@@ -74,59 +83,14 @@ namespace Fun
 
         public void RequestInviteList (int limit)
         {
-            string query = string.Format("me?fields=invitable_friends.limit({0}).fields(id,name,picture.width(128).height(128))", limit);
-            DebugUtils.Log("Facebook request: {0}", query);
+            string query = string.Format("me?fields=invitable_friends.limit({0})" +
+                                         ".fields(id,name,picture.width(128).height(128))", limit);
+            FunDebug.Log("Facebook request: {0}", query);
 
             // Reqests friend list
             FB.API(query, HttpMethod.GET, OnInviteListCb);
         }
 
-        // start: index at which the range starts.
-        public void RequestFriendPictures (int start, int count)
-        {
-            if (friends_.Count <= 0) {
-                DebugUtils.LogWarning("There's no friend list. You should call 'RequestFriendList' first.");
-                return;
-            }
-
-            List<UserInfo> list = GetRangeOfList(friends_, start, count);
-            if (list == null) {
-                DebugUtils.LogWarning("Invalid range of friend list. list:{0} start:{1} count:{2}",
-                                      friends_.Count, start, count);
-                return;
-            }
-
-            StartCoroutine(RequestPictureList(list));
-        }
-
-        // start: index at which the range starts.
-        public void RequestInvitePictures (int start, int count)
-        {
-            if (invite_friends_.Count <= 0) {
-                DebugUtils.LogWarning("There's no friend list. You should call 'RequestInviteList' first.");
-                return;
-            }
-
-            List<UserInfo> list = GetRangeOfList(invite_friends_, start, count);
-            if (list == null) {
-                DebugUtils.LogWarning("Invalid range of invite list. list:{0} start:{1} count:{2}",
-                                      invite_friends_.Count, start, count);
-                return;
-            }
-
-            StartCoroutine(RequestPictureList(list));
-        }
-        #endregion
-
-        #region internal implementation
-        private List<UserInfo> GetRangeOfList (List<UserInfo> list, int start, int count)
-        {
-            if (start < 0 || start >= list.Count ||
-                count <= 0 || start + count > list.Count)
-                return null;
-
-            return list.GetRange(start, count);
-        }
 
         // Callback-related functions
         void OnInitCb ()
@@ -137,11 +101,13 @@ namespace Fun
                 if (Application.isMobilePlatform)
                     FB.ActivateApp();
 
-                if (FB.IsLoggedIn) {
-                    DebugUtils.DebugLog("Already logged in.");
+                if (FB.IsLoggedIn)
+                {
+                    FunDebug.Log("Already logged in.");
                     OnEventNotify(SNResultCode.kLoggedIn);
                 }
-                else {
+                else
+                {
                     OnEventNotify(SNResultCode.kInitialized);
                 }
             }
@@ -153,24 +119,24 @@ namespace Fun
 
         void OnHideCb (bool isGameShown)
         {
-            DebugUtils.DebugLog("isGameShown: {0}", isGameShown);
+            FunDebug.DebugLog1("isGameShown: {0}", isGameShown);
         }
 
         void OnLoginCb (ILoginResult result)
         {
             if (result.Error != null)
             {
-                DebugUtils.DebugLogError(result.Error);
+                FunDebug.LogError(result.Error);
                 OnEventNotify(SNResultCode.kLoginFailed);
             }
             else if (!FB.IsLoggedIn)
             {
-                DebugUtils.DebugLog("User cancelled login.");
+                FunDebug.Log("User cancelled login.");
                 OnEventNotify(SNResultCode.kLoginFailed);
             }
             else
             {
-                DebugUtils.DebugLog("Login successful!");
+                FunDebug.Log("Facebook login succeeded!");
 
                 // AccessToken class will have session details
                 var aToken = Facebook.Unity.AccessToken.CurrentAccessToken;
@@ -180,7 +146,7 @@ namespace Fun
                 perms.Append("Permissions: ");
                 foreach (string perm in aToken.Permissions)
                     perms.AppendFormat("\"{0}\", ", perm);
-                DebugUtils.Log(perms.ToString());
+                FunDebug.Log(perms.ToString());
 
                 // Reqests my info and profile picture
                 FB.API("me?fields=id,name,picture.width(128).height(128)", HttpMethod.GET, OnMyProfileCb);
@@ -191,10 +157,10 @@ namespace Fun
 
         void OnMyProfileCb (IGraphResult result)
         {
-            DebugUtils.DebugLog("OnMyProfileCb called.");
+            FunDebug.DebugLog1("FacebookConnector.OnMyProfileCb called.");
             if (result.Error != null)
             {
-                DebugUtils.DebugLogError(result.Error);
+                FunDebug.LogError(result.Error);
                 OnEventNotify(SNResultCode.kError);
                 return;
             }
@@ -204,7 +170,7 @@ namespace Fun
                 Dictionary<string, object> json = Json.Deserialize(result.RawResult) as Dictionary<string, object>;
                 if (json == null)
                 {
-                    DebugUtils.DebugLogError("OnMyProfileCb - json is null.");
+                    FunDebug.LogError("OnMyProfileCb - json is null.");
                     OnEventNotify(SNResultCode.kError);
                     return;
                 }
@@ -212,7 +178,7 @@ namespace Fun
                 // my profile
                 my_info_.id = json["id"] as string;
                 my_info_.name = json["name"] as string;
-                DebugUtils.Log("Facebook id: {0}, name: {1}.", my_info_.id, my_info_.name);
+                FunDebug.Log("Facebook id: {0}, name: {1}.", my_info_.id, my_info_.name);
 
                 // my picture
                 var picture = json["picture"] as Dictionary<string, object>;
@@ -224,7 +190,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                DebugUtils.DebugLogError("Failure in OnMyProfileCb: " + e.ToString());
+                FunDebug.LogError("Failure in OnMyProfileCb: {0}", e.ToString());
             }
         }
 
@@ -235,7 +201,7 @@ namespace Fun
                 Dictionary<string, object> json = Json.Deserialize(result.RawResult) as Dictionary<string, object>;
                 if (json == null)
                 {
-                    DebugUtils.DebugLogError("OnFriendListCb - json is null.");
+                    FunDebug.LogError("OnFriendListCb - json is null.");
                     OnEventNotify(SNResultCode.kError);
                     return;
                 }
@@ -243,38 +209,45 @@ namespace Fun
                 // friend list
                 object friend_list = null;
                 json.TryGetValue("friends", out friend_list);
-                if (friend_list == null) {
-                    DebugUtils.DebugLogError("OnInviteListCb - friend_list is null.");
+                if (friend_list == null)
+                {
+                    FunDebug.LogError("OnInviteListCb - friend_list is null.");
                     OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
-                friends_.Clear();
-
-                List<object> list = ((Dictionary<string, object>)friend_list)["data"] as List<object>;
-                foreach (object item in list)
+                lock (friend_list_)
                 {
-                    Dictionary<string, object> info = item as Dictionary<string, object>;
-                    Dictionary<string, object> picture = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
+                    friend_list_.Clear();
 
-                    UserInfo user = new UserInfo();
-                    user.id = info["id"] as string;
-                    user.name = info["name"] as string;
-                    user.url = picture["url"] as string;
+                    List<object> list = ((Dictionary<string, object>)friend_list)["data"] as List<object>;
+                    foreach (object item in list)
+                    {
+                        Dictionary<string, object> info = item as Dictionary<string, object>;
+                        Dictionary<string, object> picture = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
 
-                    friends_.Add(user);
-                    DebugUtils.DebugLog("> id:{0} name:{1} url:{2}", user.id, user.name, user.url);
+                        UserInfo user = new UserInfo();
+                        user.id = info["id"] as string;
+                        user.name = info["name"] as string;
+                        user.url = picture["url"] as string;
+
+                        friend_list_.Add(user);
+                        FunDebug.DebugLog1("> id:{0} name:{1} image:{2}", user.id, user.name, user.url);
+                    }
                 }
 
-                DebugUtils.Log("Succeeded in getting the friend list. count:{0}", friends_.Count);
+                FunDebug.Log("Succeeded in getting the friend list. count:{0}", friend_list_.Count);
                 OnEventNotify(SNResultCode.kFriendList);
 
-                if (auto_request_picture_ && friends_.Count > 0)
-                    StartCoroutine(RequestPictureList(friends_));
+                lock (friend_list_)
+                {
+                    if (auto_request_picture_ && friend_list_.Count > 0)
+                        StartCoroutine(RequestPictures(GetFriendList()));
+                }
             }
             catch (Exception e)
             {
-                DebugUtils.DebugLogError("Failure in OnFriendListCb: " + e.ToString());
+                FunDebug.LogError("Failure in OnFriendListCb: {0}", e.ToString());
             }
         }
 
@@ -283,47 +256,55 @@ namespace Fun
             try
             {
                 Dictionary<string, object> json = Json.Deserialize(result.RawResult) as Dictionary<string, object>;
-                if (json == null) {
-                    DebugUtils.DebugLogError("OnInviteListCb - json is null.");
+                if (json == null)
+                {
+                    FunDebug.LogError("OnInviteListCb - json is null.");
                     OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
                 object invitable_friends = null;
                 json.TryGetValue("invitable_friends", out invitable_friends);
-                if (invitable_friends == null) {
-                    DebugUtils.DebugLogError("OnInviteListCb - invitable_friends is null.");
+                if (invitable_friends == null)
+                {
+                    FunDebug.LogError("OnInviteListCb - invitable_friends is null.");
                     OnEventNotify(SNResultCode.kError);
                     return;
                 }
 
-                invite_friends_.Clear();
-
-                List<object> list = ((Dictionary<string, object>)invitable_friends)["data"] as List<object>;
-                foreach (object item in list)
+                lock (invite_list_)
                 {
-                    Dictionary<string, object> info = item as Dictionary<string, object>;
-                    Dictionary<string, object> picture = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
+                    invite_list_.Clear();
 
-                    string url = picture["url"] as string;
-                    UserInfo user = new UserInfo();
-                    user.id = info["id"] as string;
-                    user.name = info["name"] as string;
-                    user.url = url;
+                    List<object> list = ((Dictionary<string, object>)invitable_friends)["data"] as List<object>;
+                    foreach (object item in list)
+                    {
+                        Dictionary<string, object> info = item as Dictionary<string, object>;
+                        Dictionary<string, object> picture = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
 
-                    invite_friends_.Add(user);
-                    DebugUtils.DebugLog(">> id:{0} name:{1} url:{2}", user.id, user.name, user.url);
+                        string url = picture["url"] as string;
+                        UserInfo user = new UserInfo();
+                        user.id = info["id"] as string;
+                        user.name = info["name"] as string;
+                        user.url = url;
+
+                        invite_list_.Add(user);
+                        FunDebug.DebugLog1(">> id:{0} name:{1} image:{2}", user.id, user.name, user.url);
+                    }
                 }
 
-                DebugUtils.Log("Succeeded in getting the invite list.");
+                FunDebug.Log("Succeeded in getting the invite friend list.");
                 OnEventNotify(SNResultCode.kInviteList);
 
-                if (auto_request_picture_ && invite_friends_.Count > 0)
-                    StartCoroutine(RequestPictureList(invite_friends_));
+                lock (invite_list_)
+                {
+                    if (auto_request_picture_ && invite_list_.Count > 0)
+                        StartCoroutine(RequestPictures(GetInviteList()));
+                }
             }
             catch (Exception e)
             {
-                DebugUtils.DebugLogError("Failure in OnInviteListCb: " + e.ToString());
+                FunDebug.LogError("Failure in OnInviteListCb: {0}", e.ToString());
             }
         }
 
@@ -360,21 +341,20 @@ namespace Fun
 
         void PostCallback (IGraphResult result)
         {
-            DebugUtils.DebugLog("PostCallback called.");
+            FunDebug.DebugLog1("FacebookConnector.PostCallback called.");
             if (result.Error != null)
             {
-                DebugUtils.DebugLogError(result.Error);
+                FunDebug.LogError(result.Error);
                 OnEventNotify(SNResultCode.kPostFailed);
                 return;
             }
 
-            DebugUtils.Log("Post successful!");
+            FunDebug.Log("Facebook post succeeded!");
             OnEventNotify(SNResultCode.kPosted);
         }
-        #endregion
 
 
         // member variables.
-        private bool auto_request_picture_ = true;
+        bool auto_request_picture_ = true;
     }
 }
