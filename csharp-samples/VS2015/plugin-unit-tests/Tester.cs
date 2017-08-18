@@ -13,7 +13,7 @@ using System.Collections.Generic;
 using System.Threading;
 
 
-namespace funapi_plugin_tester
+namespace plugin_unit_tests
 {
     [TestClass]
     public class Tester
