@@ -3,8 +3,6 @@ Library
 Temp
 *.userprefs
 *.unityproj
-*.csproj
-*.sln
 *.pidb
 *.apk
 *.exe
@@ -13,11 +11,11 @@ Temp
 *.prefab
 *.prefab.meta
 *.unitypackage
-plugin-test/*.dll
-funapi-plugin-unity/Data/
-funapi-plugin-unity/obj/
-vs2015/funapi-plugin/bin/
-vs2015/funapi-plugin/obj/
-vs2015/funapi-plugin-tester/bin/
-vs2015/funapi-plugin-tester/obj/
 funapi-plugin-unity/Assets/UnityVS/
+funapi-plugin-unity/Data/
+funapi-plugin-unity/output/
+funapi-plugin-unity/*.sln
+funapi-plugin-unity/*.csproj
+csharp-samples/Linux/*.dll
+obj/
+bin/

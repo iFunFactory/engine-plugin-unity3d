@@ -1,30 +1,26 @@
-﻿// vim: fileencoding=utf-8 expandtab tabstop=4 softtabstop=4 shiftwidth=4
-//
-// Copyright (C) 2013-2016 iFunFactory Inc. All Rights Reserved.
-//
-// This work is confidential and proprietary to iFunFactory Inc and
-// must not be used, disclosed, copied, or distributed without the prior
-// consent of iFunFactory Inc.
-
-using Fun;
+﻿using Fun;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 // protobuf
 using plugin_messages;
 using funapi.network.fun_message;
 
 
-namespace funapi_plugin_tester
+namespace test_winform
 {
     class Client
     {
-        public Client (int id, string server_ip)
+        public Client(int id, string server_ip)
         {
             id_ = id;
             server_ip_ = server_ip;
         }
 
-        public void Connect (SessionOption session_option)
+        public void Connect(SessionOption session_option)
         {
             message_number_ = 0;
 
@@ -56,7 +52,7 @@ namespace funapi_plugin_tester
                         option = new TransportOption();
                     }
 
-                    option.ConnectionTimeout = 3f;
+                    option.ConnectionTimeout = 5f;
 
                     //if (protocols[i] == TransportProtocol.kTcp)
                     //    option.Encryption = EncryptionType.kIFunEngine1Encryption;
@@ -77,7 +73,7 @@ namespace funapi_plugin_tester
             }
         }
 
-        public void Stop ()
+        public void Stop()
         {
             if (session_ != null && session_.Connected)
                 session_.Stop();
@@ -88,13 +84,13 @@ namespace funapi_plugin_tester
             get { return session_ != null && session_.Connected; }
         }
 
-        public void Update ()
+        public void Update()
         {
             if (session_ != null)
                 session_.updateFrame();
         }
 
-        public void SendMessage ()
+        public void SendMessage()
         {
             for (int i = 0; i < protocols.Count; ++i)
             {
@@ -107,7 +103,7 @@ namespace funapi_plugin_tester
             }
         }
 
-        public void SendMessage (TransportProtocol protocol, string message)
+        public void SendMessage(TransportProtocol protocol, string message)
         {
             FunEncoding encoding = encodings[(int)protocol - 1];
             if (encoding == FunEncoding.kJson)
@@ -126,7 +122,7 @@ namespace funapi_plugin_tester
         }
 
 
-        ushort getPort (TransportProtocol protocol, FunEncoding encoding)
+        ushort getPort(TransportProtocol protocol, FunEncoding encoding)
         {
             ushort port = 0;
             if (protocol == TransportProtocol.kTcp)
@@ -135,15 +131,16 @@ namespace funapi_plugin_tester
                 port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
             else if (protocol == TransportProtocol.kHttp)
                 port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
+            port += 200;
 
             return port;
         }
 
-        void onSessionEvent (SessionEventType type, string session_id)
+        void onSessionEvent(SessionEventType type, string session_id)
         {
         }
 
-        void onTransportEvent (TransportProtocol protocol, TransportEventType type)
+        void onTransportEvent(TransportProtocol protocol, TransportEventType type)
         {
             if (type == TransportEventType.kConnectionFailed ||
                 type == TransportEventType.kConnectionTimedOut ||
@@ -153,11 +150,11 @@ namespace funapi_plugin_tester
             }
         }
 
-        void onTransportError (TransportProtocol protocol, TransportError error)
+        void onTransportError(TransportProtocol protocol, TransportError error)
         {
         }
 
-        void onReceivedMessage (string type, object message)
+        void onReceivedMessage(string type, object message)
         {
             string echo_msg = "";
 
@@ -179,7 +176,7 @@ namespace funapi_plugin_tester
                 FunDebug.Log("[{0}:{2}] {1}", id_, echo_msg, ++message_number_);
             }
 
-            if (message_number_ < 3)
+            if (message_number_ < 9)
             {
                 if (echo_msg.StartsWith("tcp"))
                     SendMessage(TransportProtocol.kTcp, echo_msg);

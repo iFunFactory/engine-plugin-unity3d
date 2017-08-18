@@ -4,7 +4,7 @@
 # must not be used, disclosed, copied, or distributed without the prior
 # consent of iFunFactory Inc.
 
-PLUGIN_ROOT=../funapi-plugin-unity/Assets
+PLUGIN_ROOT=../../funapi-plugin-unity/Assets
 SRC_ROOT=src
 
 tester.exe: ${SRC_ROOT}/main.cs \
