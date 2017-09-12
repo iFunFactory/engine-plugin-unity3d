@@ -665,6 +665,8 @@ namespace Fun
 
             first_receiving_ = true;
 
+            onSessionEvent(SessionEventType.kOpened);
+
             lock (transports_lock_)
             {
                 foreach (Transport transport in transports_.Values)
@@ -677,8 +679,6 @@ namespace Fun
             }
 
             sendUnsentMessages();
-
-            onSessionEvent(SessionEventType.kOpened);
         }
 
         void onSessionClosed ()
@@ -1043,7 +1043,7 @@ namespace Fun
 
             if (all_stopped)
             {
-                event_list.Add(() => onStopped());
+                onStopped();
             }
         }
 
@@ -1194,10 +1194,14 @@ namespace Fun
                 {
                     state_ = State.kConnected;
 
-                    if (isReliableTransport(protocol) && seq_recvd_ != 0)
+                    if (isReliableTransport(protocol))
                     {
                         transport.state = Transport.State.kWaitForAck;
-                        sendAck(transport, seq_recvd_ + 1);
+
+                        if (seq_recvd_ != 0)
+                            sendAck(transport, seq_recvd_ + 1);
+                        else
+                            sendEmptyMessage(transport);
                     }
                     else
                     {
@@ -1236,9 +1240,9 @@ namespace Fun
                 return;
 
             DebugLog1("{0} transport stopped.", transport.str_protocol);
+            onTransportEvent(protocol, TransportEventType.kStopped);
 
             checkTransportStatus(protocol);
-            onTransportEvent(protocol, TransportEventType.kStopped);
         }
 
         void onTransportError (TransportProtocol protocol)
@@ -1253,9 +1257,9 @@ namespace Fun
         void onConnectionFailed (TransportProtocol protocol)
         {
             LogWarning("{0} transport connection failed.", convertString(protocol));
+            onTransportEvent(protocol, TransportEventType.kConnectionFailed);
 
             checkTransportStatus(protocol);
-            onTransportEvent(protocol, TransportEventType.kConnectionFailed);
         }
 
         void onConnectionTimedOut (TransportProtocol protocol)
@@ -1270,9 +1274,9 @@ namespace Fun
         void onDisconnected (TransportProtocol protocol)
         {
             LogWarning("{0} transport disconnected.", convertString(protocol));
+            onTransportEvent(protocol, TransportEventType.kDisconnected);
 
             checkTransportStatus(protocol);
-            onTransportEvent(protocol, TransportEventType.kDisconnected);
         }
 
 
@@ -1289,6 +1293,25 @@ namespace Fun
             DebugLog1("{0} sending a empty message for getting to session id.", transport.str_protocol);
 
             transport.SendMessage(new FunapiMessage(transport.protocol, "_first"), true);
+        }
+
+        void sendEmptyMessage (Transport transport)
+        {
+            if (transport == null)
+                return;
+
+            DebugLog1("{0} sending a empty message for reliability sync.", transport.str_protocol);
+
+            if (transport.encoding == FunEncoding.kJson)
+            {
+                object msg = FunapiMessage.Deserialize("{}");
+                transport.SendMessage(new FunapiMessage(transport.protocol, "", msg), true);
+            }
+            else if (transport.encoding == FunEncoding.kProtobuf)
+            {
+                FunMessage msg = new FunMessage();
+                transport.SendMessage(new FunapiMessage(transport.protocol, "", msg), true);
+            }
         }
 
         void sendAck (Transport transport, UInt32 ack)
@@ -1656,6 +1679,9 @@ namespace Fun
             lock (sending_lock_)
             {
                 UInt32 seq = 0;
+
+                if (send_queue_.Count > 0)
+                    DebugLog1("The send queue has {0} messages.", send_queue_.Count);
 
                 while (send_queue_.Count > 0)
                 {
