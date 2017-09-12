@@ -1206,8 +1206,10 @@ namespace Fun
                 }
                 else if (state_ == State.kStarted || state_ == State.kStopped)
                 {
-                    // If there are other protocols, UDP dose not send the first session message.
-                    if (protocol == TransportProtocol.kUdp && transportCount > 1)
+                    // If there is TCP protocol, then TCP send the first session message.
+                    // Priority order : TCP > HTTP > UDP
+                    if ((protocol == TransportProtocol.kUdp && transportCount > 1) ||
+                        (protocol == TransportProtocol.kHttp && HasTransport(TransportProtocol.kTcp)))
                     {
                         transport.state = Transport.State.kWaitForSessionId;
                     }
