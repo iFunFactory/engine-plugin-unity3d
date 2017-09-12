@@ -1000,7 +1000,7 @@ namespace Fun
 
             if (send_unsent)
             {
-                sendUnsentMessages();
+                sendUnsentMessages(transport.protocol);
             }
         }
 
@@ -1335,7 +1335,7 @@ namespace Fun
             }
         }
 
-        void sendUnsentMessages ()
+        void sendUnsentMessages (TransportProtocol protocol = TransportProtocol.kDefault)
         {
             lock (sending_lock_)
             {
@@ -1348,6 +1348,15 @@ namespace Fun
 
                 foreach (FunapiMessage msg in unsent_queue_)
                 {
+                    if (protocol != TransportProtocol.kDefault && protocol != msg.protocol)
+                    {
+                        if (remained_queue == null)
+                            remained_queue = new Queue<FunapiMessage>();
+
+                        remained_queue.Enqueue(msg);
+                        continue;
+                    }
+
                     Transport transport = GetTransport(msg.protocol);
                     if (transport == null || transport.state != Transport.State.kEstablished)
                     {
