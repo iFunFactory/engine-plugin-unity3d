@@ -125,9 +125,12 @@ namespace Fun
                 return;
             }
 
-            DebugLog1("Session.Connect({0}) called. {1} trys to connect.", str_protocol, str_protocol);
+            DebugLog1("Session.Connect({0}) called. Ready to connect {1} transport.", str_protocol, str_protocol);
 
-            event_list.Add(() => startTransport(protocol));
+            lock (connect_lock_)
+            {
+                connect_queue_.Enqueue(protocol);
+            }
         }
 
         public void Reconnect ()
@@ -320,7 +323,7 @@ namespace Fun
 
                     unsent_queue_.Enqueue(fun_msg);
 
-                    DebugLog1("{0} - '{1}' message queued. (seq : {2})\nsession: {3}, transport: {4}",
+                    DebugLog1("{0} - '{1}' message queued. seq:{2} (session:{3}, transport:{4})",
                               transport.str_protocol, msg_type, seq, state_, transport.state);
                 }
                 else
@@ -332,8 +335,8 @@ namespace Fun
                     else if (transport == null)
                         strlog.AppendFormat("There's no {0} transport.", convertString(protocol));
                     else if (transport.state != Transport.State.kEstablished)
-                        strlog.AppendFormat("{0} transport's state is '{1}'.", transport.str_protocol, transport.state);
-                    strlog.AppendFormat(" (session: {0})", state_);
+                        strlog.AppendFormat(" {0}:{1}", transport.str_protocol, transport.state);
+                    strlog.AppendFormat(" session:{0}", state_);
 
                     LogWarning(strlog.ToString());
 
@@ -448,6 +451,8 @@ namespace Fun
             if (!base.onUpdate(deltaTime))
                 return false;
 
+            connectTransports();
+
             lock (transports_lock_)
             {
                 foreach (Transport transport in transports_.Values)
@@ -461,6 +466,8 @@ namespace Fun
 
             updateMessages();
             updateExpectedResponse(deltaTime);
+
+            disconnectTransports();
 
             return true;
         }
@@ -487,8 +494,42 @@ namespace Fun
 
 
         //
-        // Update-close-related functions
+        // Update-related functions
         //
+        void connectTransports ()
+        {
+            lock (connect_lock_)
+            {
+                if (connect_queue_.Count <= 0)
+                    return;
+
+                Queue<TransportProtocol> list = new Queue<TransportProtocol>(connect_queue_);
+                connect_queue_.Clear();
+
+                foreach (TransportProtocol protocol in list)
+                {
+                    startTransport(protocol);
+                }
+            }
+        }
+
+        void disconnectTransports ()
+        {
+            lock (connect_lock_)
+            {
+                if (disconnect_queue_.Count <= 0)
+                    return;
+
+                Queue<TransportProtocol> list = new Queue<TransportProtocol>(disconnect_queue_);
+                disconnect_queue_.Clear();
+
+                foreach (TransportProtocol protocol in list)
+                {
+                    stopTransport(GetTransport(protocol));
+                }
+            }
+        }
+
         void updateMessages ()
         {
             lock (message_buffer_)
@@ -775,7 +816,7 @@ namespace Fun
                 Connect(info.protocol, info.encoding, info.port, info.option);
             }
 
-            // Convers seconds to ticks.
+            // Converts seconds to ticks.
             long redirect_timeout = DateTime.UtcNow.Ticks + (option_.redirectTimeout * 1000 * 10000);
 
             // Wait for connect.
@@ -1094,11 +1135,31 @@ namespace Fun
                 return;
 #endif
 
+            lock (connect_lock_)
+            {
+                if (disconnect_queue_.Contains(transport.protocol))
+#if !NO_UNITY
+                    yield break;
+#else
+                    return;
+#endif
+            }
+
+            // Converts seconds to ticks.
+            long wait_timeout = DateTime.UtcNow.Ticks + (kWaitForStopTimeout * 1000 * 10000);
+
             // Checks transport's state.
             while (transport.InProcess)
             {
                 DebugLog1("Waiting for process before {0} transport to stop... ({1})",
                           transport.str_protocol, transport.HasUnsentMessages ? "sending" : "0");
+
+                if (DateTime.UtcNow.Ticks > wait_timeout)
+                {
+                    LogWarning("Timed out to stop the {0} transport. state:{1} unsent:{2}",
+                               transport.str_protocol, transport.state, transport.HasUnsentMessages);
+                    break;
+                }
 
 #if !NO_UNITY
                 yield return new WaitForSeconds(0.1f);
@@ -1107,7 +1168,10 @@ namespace Fun
 #endif
             }
 
-            stopTransport(transport);
+            lock (connect_lock_)
+            {
+                disconnect_queue_.Enqueue(transport.protocol);
+            }
         }
 
         void onTransportEvent (TransportProtocol protocol, TransportEventType type)
@@ -1824,6 +1888,9 @@ namespace Fun
         }
 
 
+        // constants
+        static readonly int kWaitForStopTimeout = 3;
+
         // Message-type-related constants.
         static readonly string kIntMessageType = "_int#";
         static readonly string kMessageTypeField = "_msgtype";
@@ -1918,8 +1985,11 @@ namespace Fun
         bool first_receiving_ = false;
 
         // Transport-related variables.
+        object connect_lock_ = new object();
         object transports_lock_ = new object();
         TransportProtocol default_protocol_ = TransportProtocol.kDefault;
+        Queue<TransportProtocol> connect_queue_ = new Queue<TransportProtocol>();
+        Queue<TransportProtocol> disconnect_queue_ = new Queue<TransportProtocol>();
         Dictionary<TransportProtocol, Transport> transports_ = new Dictionary<TransportProtocol, Transport>();
 
         // Message-related variables.

@@ -14,9 +14,8 @@ Funapi plugin unity
 
 ## 서버 버전
 
-플러그인 버전 212 이상은 **서버 버전 2118-experimental 이상이 필요** 하며 Protobuf DLL을
-새로 빌드해야 합니다. FunMulticastMessage를 확장하여 사용하는 경우 필드 번호를 16부터 사용하도록
-수정이 필요합니다.
+* 플러그인 버전 228 이상은 **서버 버전 2256 이상이 필요** 합니다.
+* FunMulticastMessage를 확장하여 사용하는 경우 **필드 번호를 16부터 사용** 하도록 수정이 필요합니다.
 
 
 ## 사용방법
@@ -27,12 +26,12 @@ Funapi plugin unity
 
 ```text
 |- additional-plugins      # 페이스북, 트위터 플러그인
-|- funapi-plugin-unity     # 플러그인 프로젝트
-|- plugin-test             # 봇테스트 샘플
+|- csharp-samples          # C# Runtime 샘플 코드
+|- funapi-plugin-unity     # 플러그인 코드
 ```
 
 클라이언트 플러그인 코드는 ``funapi-plugin-unity`` 폴더에 있습니다.
-``additional-plugins``와 ``plugin-test`` 폴더는 필요할 경우 사용하면 됩니다.
+``additional-plugins``와 ``csharp-samples`` 폴더는 필요할 경우 사용하시면 됩니다.
 
 ### 테스트 프로젝트
 유니티를 실행해서 ``funapi-plugin-unity`` 폴더의 프로젝트를 열면 프로젝트 폴더 중에 ``Tester``
@@ -89,6 +88,15 @@ Protobuf를 사용할 경우 서버 프로젝트에서 메시지를 정의하고
 ## 버전별 주요 이슈
 
 아래 설명의 버전보다 낮은 버전의 플러그인을 사용하고 있다면 플러그인 업데이트시 아래 내용을 참고해 주세요.
+
+### v226
+하나의 머신에서 테스트를 위해 클라이언트를 여러 개 실행할 경우 UDP Transport 를 사용한다면
+UDP 소켓의 로컬 포트가 겹치는 문제가 발생할 수 있습니다. (로컬 포트가 같을 경우 서버에서 하나의
+클라이언트로 인식) 가장 좋은 해결책은 서버에서 연결 종료 후 세션을 명시적으로 Close 하는 것입니다.
+(기본적으로 서버는 Close가 호출되지 않으면 세션 타임아웃이 발생할 때까지 세션을 닫지 않습니다)
+서버에서 세션을 닫는 것이 어려울 경우 Define Symbols에 FIXED_UDP_LOCAL_PORT 를 추가하면
+클라이언트에서 로컬 포트를 순차적으로 할당하게 할 수 있습니다. 이 방법은 테스트 용도로만 사용하는 것을
+권장하며 기본적으로 하나의 머신에서 하나의 클라이언트만 실행된다면 발생하지 않는 문제입니다.
 
 ### v213
 Protobuf의 Message Type을 Integer로 쓸 수 있는 기능이 추가되면서 기존의
