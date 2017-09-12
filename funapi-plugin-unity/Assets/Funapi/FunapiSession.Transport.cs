@@ -1340,7 +1340,7 @@ namespace Fun
                 connect_ep_ = new IPEndPoint(ip, addr.port);
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
-                Log("TCP connect - {0}:{1}\n {2}, {3}, Sequence:{4}, Timeout:{5}, Reconnect:{6}, Nagle:{7}, Ping:{8}",
+                Log("TCP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}, Reconnect:{6}, Nagle:{7}, Ping:{8}",
                     ip, addr.port, convertString(encoding_), convertString(tcp_option.Encryption),
                     tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
                     tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
@@ -1636,7 +1636,7 @@ namespace Fun
                 else
                     receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr.port);
 
-                Log("UDP connect - {0}:{1}\n {2}, {3}, Sequence:{4}, Timeout:{5}",
+                Log("UDP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}",
                     ip, addr.port, convertString(encoding_), convertString(option_.Encryption),
                     option_.SequenceValidation, option_.ConnectionTimeout);
             }
@@ -1715,8 +1715,15 @@ namespace Fun
 
                 if (offset > 0)
                 {
-                    sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
-                                      send_ep_, new AsyncCallback(this.sendBytesCb), this);
+                    try
+                    {
+                        sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
+                                          send_ep_, new AsyncCallback(this.sendBytesCb), this);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        DebugLog1("UDP BeginSendTo operation has been cancelled.");
+                    }
                 }
             }
 
@@ -1933,7 +1940,7 @@ namespace Fun
                                           FunapiVersion.kProtocolVersion);
 
                 HttpTransportOption http_option = (HttpTransportOption)option_;
-                Log("HTTP connect - {0}\n {1}, {2}, Sequence:{3}, Timeout:{4}, WWW:{5}",
+                Log("HTTP connect - {0}\n    {1}, {2}, Sequence:{3}, Timeout:{4}, WWW:{5}",
                     host_url_, convertString(encoding_), convertString(http_option.Encryption),
                     http_option.SequenceValidation, http_option.ConnectionTimeout, http_option.UseWWW);
             }
