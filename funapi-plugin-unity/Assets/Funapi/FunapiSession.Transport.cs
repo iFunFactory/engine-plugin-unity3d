@@ -157,7 +157,9 @@ namespace Fun
 
                 timer_.Clear();
                 connect_timer_id_ = 0;
-                session_id_has_been_sent = false;
+
+                lock (session_id_sent_lock_)
+                    session_id_has_been_sent = false;
 
                 if (enable_ping_)
                     stopPingTimer();
@@ -995,10 +997,13 @@ namespace Fun
                 // Checks sent session id
                 lock (session_id_sent_lock_)
                 {
-                    if (send_session_id_only_once_ && !session_id_has_been_sent &&
-                        protocol_ != TransportProtocol.kHttp && msg_type.Length > 0)
+                    if (send_session_id_only_once_ && !session_id_has_been_sent)
                     {
-                        session_id_has_been_sent = true;
+                        if (protocol_ != TransportProtocol.kHttp &&
+                            state_ == State.kEstablished && msg_type.Length > 0)
+                        {
+                            session_id_has_been_sent = true;
+                        }
                     }
                 }
 
