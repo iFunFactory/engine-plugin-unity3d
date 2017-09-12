@@ -336,6 +336,9 @@ namespace Fun
                     strlog.AppendFormat(" (session: {0})", state_);
 
                     LogWarning(strlog.ToString());
+
+                    if (DroppedMessageCallback != null)
+                        DroppedMessageCallback(msg_type, message);
                 }
             }
         }
@@ -1804,6 +1807,7 @@ namespace Fun
         public delegate void TransportErrorHandler (TransportProtocol protocol, TransportError type);
         public delegate void MaintenanceHandler (FunEncoding encoding, object message);
         public delegate void ReceivedMessageHandler (string msg_type, object message);
+        public delegate void DroppedMessageHandler (string msg_type, object message);
         public delegate void ResponseTimeoutHandler (string msg_type);
 
         // Funapi message-related events.
@@ -1813,6 +1817,7 @@ namespace Fun
         public event TransportErrorHandler TransportErrorCallback;
         public event ReceivedMessageHandler ReceivedMessageCallback;
         public event ReceivedMessageHandler MulticastMessageCallback;
+        public event DroppedMessageHandler DroppedMessageCallback;
         public event ResponseTimeoutHandler ResponseTimeoutCallback;
         public event MaintenanceHandler MaintenanceCallback;
 
