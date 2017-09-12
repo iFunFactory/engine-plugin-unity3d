@@ -1966,11 +1966,8 @@ namespace Fun
                 {
                     if (is_paused_)
                         return false;
-#if !NO_UNITY
-                    if (cur_www_ != null)
-                        return false;
-#endif
-                    if (web_request_ != null || web_response_ != null)
+
+                    if (cur_request_ != null)
                         return false;
 
                     return true;
@@ -2025,8 +2022,6 @@ namespace Fun
 #if !NO_UNITY
             void sendWWWRequest (Dictionary<string, string> headers, FunapiMessage body)
             {
-                cancel_www_ = false;
-
                 if (body.buffer.Count > 0)
                 {
                     mono.StartCoroutine(wwwPost(new WWW(host_url_, body.buffer.Array, headers)));
@@ -2041,20 +2036,24 @@ namespace Fun
             void sendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage body)
             {
                 // Request
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
-                request.ConnectionGroupName = session_id_;
-                request.Method = "POST";
-                request.ContentType = "application/octet-stream";
-                request.ContentLength = body.buffer.Count;
+                HttpWebRequest web_request = (HttpWebRequest)WebRequest.Create(host_url_);
+                web_request.ConnectionGroupName = session_id_;
+                web_request.Method = "POST";
+                web_request.ContentType = "application/octet-stream";
+                web_request.ContentLength = body.buffer.Count;
 
                 foreach (KeyValuePair<string, string> item in headers) {
-                    request.Headers[item.Key] = item.Value;
+                    web_request.Headers[item.Key] = item.Value;
                 }
 
-                web_request_ = request;
-                was_aborted_ = false;
+                Request request = new Request();
+                request.message = body;
+                request.web_request = web_request;
 
-                web_request_.BeginGetRequestStream(new AsyncCallback(requestStreamCb), body);
+                FunDebug.Assert(cur_request_ == null);
+                cur_request_ = request;
+
+                web_request.BeginGetRequestStream(new AsyncCallback(requestStreamCb), request);
             }
 
             void onReceiveHeader (string headers)
@@ -2123,9 +2122,10 @@ namespace Fun
             {
                 try
                 {
-                    FunapiMessage body = (FunapiMessage)ar.AsyncState;
+                    Request request = (Request)ar.AsyncState;
+                    Stream stream = request.web_request.EndGetRequestStream(ar);
 
-                    Stream stream = web_request_.EndGetRequestStream(ar);
+                    FunapiMessage body = request.message;
                     if (body.buffer.Count > 0)
                         stream.Write(body.buffer.Array, 0, body.buffer.Count);
                     stream.Close();
@@ -2141,7 +2141,7 @@ namespace Fun
                         sending_.RemoveAt(0);
                     }
 
-                    web_request_.BeginGetResponse(new AsyncCallback(responseCb), null);
+                    request.web_request.BeginGetResponse(new AsyncCallback(responseCb), request);
                 }
                 catch (Exception e)
                 {
@@ -2164,34 +2164,35 @@ namespace Fun
             {
                 try
                 {
-                    if (was_aborted_)
+                    Request request = (Request)ar.AsyncState;
+                    if (request.was_aborted)
                     {
-                        Log("HTTP responseCb - request aborted.");
+                        Log("HTTP responseCb - request aborted. ({0})", request.message.msg_type);
                         return;
                     }
 
-                    web_response_ = (HttpWebResponse)web_request_.EndGetResponse(ar);
-                    web_request_ = null;
+                    request.web_response = (HttpWebResponse)request.web_request.EndGetResponse(ar);
+                    request.web_request = null;
 
-                    if (web_response_.StatusCode == HttpStatusCode.OK)
+                    if (request.web_response.StatusCode == HttpStatusCode.OK)
                     {
                         lock (receive_lock_)
                         {
-                            byte[] header = web_response_.Headers.ToByteArray();
+                            byte[] header = request.web_response.Headers.ToByteArray();
                             string str_header = System.Text.Encoding.ASCII.GetString(header, 0, header.Length);
                             onReceiveHeader(str_header);
 
-                            read_stream_ = web_response_.GetResponseStream();
-                            read_stream_.BeginRead(receive_buffer_, received_size_,
-                                                   receive_buffer_.Length - received_size_,
-                                                   new AsyncCallback(readCb), null);
+                            request.read_stream = request.web_response.GetResponseStream();
+                            request.read_stream.BeginRead(receive_buffer_, received_size_,
+                                                          receive_buffer_.Length - received_size_,
+                                                          new AsyncCallback(readCb), request);
                         }
                     }
                     else
                     {
                         last_error_code_ = TransportError.Type.kReceivingFailed;
                         last_error_message_ = string.Format("Failed response. status:{0}",
-                                                            web_response_.StatusDescription);
+                                                            request.web_response.StatusDescription);
                         event_.Add(onFailure);
                     }
                 }
@@ -2216,20 +2217,21 @@ namespace Fun
             {
                 try
                 {
-                    int nRead = read_stream_.EndRead(ar);
+                    Request request = (Request)ar.AsyncState;
+                    int nRead = request.read_stream.EndRead(ar);
                     if (nRead > 0)
                     {
                         lock (receive_lock_)
                         {
                             received_size_ += nRead;
-                            read_stream_.BeginRead(receive_buffer_, received_size_,
-                                                   receive_buffer_.Length - received_size_,
-                                                   new AsyncCallback(readCb), null);
+                            request.read_stream.BeginRead(receive_buffer_, received_size_,
+                                                          receive_buffer_.Length - received_size_,
+                                                          new AsyncCallback(readCb), request);
                         }
                     }
                     else
                     {
-                        if (web_response_ == null)
+                        if (request.web_response == null)
                         {
                             last_error_code_ = TransportError.Type.kReceivingFailed;
                             last_error_message_ = "Response instance is null.";
@@ -2245,10 +2247,10 @@ namespace Fun
                             tryToDecodeMessage();
                         }
 
-                        read_stream_.Close();
-                        web_response_.Close();
+                        request.read_stream.Close();
+                        request.web_response.Close();
 
-                        clearRequest();
+                        cur_request_ = null;
 
                         // Sends unsent messages
                         sendPendingMessages();
@@ -2271,16 +2273,20 @@ namespace Fun
 #if !NO_UNITY
             IEnumerator wwwPost (WWW www)
             {
-                cur_www_ = www;
+                Request request = new Request();
+                request.www = www;
 
-                while (!www.isDone && !cancel_www_)
+                FunDebug.Assert(cur_request_ == null);
+                cur_request_ = request;
+
+                while (!www.isDone && !request.cancel)
                 {
                     yield return null;
                 }
 
-                if (cancel_www_)
+                if (request.cancel)
                 {
-                    cur_www_ = null;
+                    cur_request_ = null;
                     yield break;
                 }
 
@@ -2324,7 +2330,7 @@ namespace Fun
                         tryToDecodeMessage();
                     }
 
-                    clearRequest();
+                    cur_request_ = null;
 
                     // Sends unsent messages
                     sendPendingMessages();
@@ -2340,39 +2346,51 @@ namespace Fun
 
             void cancelRequest ()
             {
-#if !NO_UNITY
-                if (cur_www_ != null)
-                    cancel_www_ = true;
-#endif
-                if (web_request_ != null)
+                if (cur_request_ != null)
                 {
-                    was_aborted_ = true;
-                    web_request_.Abort();
-                }
+                    if (cur_request_.web_request != null)
+                    {
+                        cur_request_.was_aborted = true;
+                        cur_request_.web_request.Abort();
+                    }
 
-                if (web_response_ != null)
-                    web_response_.Close();
+                    if (cur_request_.web_response != null)
+                        cur_request_.web_response.Close();
 
-                if (read_stream_ != null)
-                    read_stream_.Close();
+                    if (cur_request_.read_stream != null)
+                        cur_request_.read_stream.Close();
 
-                clearRequest();
-            }
-
-            void clearRequest ()
-            {
 #if !NO_UNITY
-                cur_www_ = null;
+                    if (cur_request_.www != null)
+                        cur_request_.cancel = true;
 #endif
-                web_request_ = null;
-                web_response_ = null;
-                read_stream_ = null;
+                    cur_request_ = null;
+                }
             }
 
             protected override void onFailure ()
             {
                 cancelRequest();
                 base.onFailure();
+            }
+
+
+            // Request variables collection class
+            class Request
+            {
+                public FunapiMessage message = null;
+
+                // WebRequest-related
+                public HttpWebRequest web_request = null;
+                public HttpWebResponse web_response = null;
+                public Stream read_stream = null;
+                public bool was_aborted = false;
+
+                // WWW-related
+#if !NO_UNITY
+                public WWW www = null;
+                public bool cancel = false;
+#endif
             }
 
 
@@ -2385,19 +2403,10 @@ namespace Fun
             // member variables.
             string host_url_;
             string str_cookie_;
-
-            // WebRequest-related member variables.
-            HttpWebRequest web_request_ = null;
-            HttpWebResponse web_response_ = null;
-            Stream read_stream_ = null;
-            bool was_aborted_ = false;
-
-            // WWW-related member variables.
 #if !NO_UNITY
             bool using_www_ = false;
-            bool cancel_www_ = false;
-            WWW cur_www_ = null;
 #endif
+            Request cur_request_ = null;
         }
 
 
