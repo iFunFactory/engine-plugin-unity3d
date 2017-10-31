@@ -1,0 +1,39 @@
+{
+  "data": [
+    {
+      "path": "Images/Aim Arrow.png",
+      "size": 18271,
+      "md5": "ae2d290fc1a3b9b11a822604e7fdaa97"
+    },
+    {
+      "path": "Images/BirdHeroSprite.png",
+      "size": 40533,
+      "md5": "3ff1f5492a64266543aac159ec5bbccd"
+    },
+    {
+      "path": "Images/CoinSprite.png",
+      "size": 26425,
+      "md5": "52af2ba283e72167aaf61dfffc99b271"
+    },
+    {
+      "path": "Images/BirdEnemyIdleSprite.png",
+      "size": 29754,
+      "md5": "0ffe11f56cd89cdc30d34a4f3f556dde"
+    },
+    {
+      "path": "Images/BombSprite.png",
+      "size": 25759,
+      "md5": "c464c360993cc0b5b7784902b6923bb3"
+    },
+    {
+      "path": "Images/Health Wheel.png",
+      "size": 27985,
+      "md5": "db0b3dde76da154352f7a0eb5a7b6e88"
+    },
+    {
+      "path": "Images/AsteroidSprite.png",
+      "size": 75404,
+      "md5": "03414629e026c81f7462a706ca999f9d"
+    }
+  ]
+}
