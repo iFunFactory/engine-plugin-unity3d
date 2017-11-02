@@ -43,7 +43,10 @@ public class FunapiManager : MonoBehaviour
 
         if (FunapiDedicatedServer.isServer)
         {
-            StartCoroutine(StartServer());
+            FunapiDedicatedServer.UserDataCallback += onReceivedUserData;
+            FunapiDedicatedServer.MatchDataCallback += onReceivedMatchData;
+
+            StartCoroutine(startServer());
         }
         else
         {
@@ -51,7 +54,7 @@ public class FunapiManager : MonoBehaviour
         }
     }
 
-    IEnumerator StartServer ()
+    IEnumerator startServer ()
     {
         while (LobbyManager.s_Singleton == null)
             yield return new WaitForSeconds(0.1f);
@@ -67,9 +70,9 @@ public class FunapiManager : MonoBehaviour
     public void StartClient ()
     {
         session_ = FunapiSession.Create(kServerAddr);
-        session_.SessionEventCallback += OnSessionEvent;
-        session_.TransportEventCallback += OnTransportEvent;
-        session_.ReceivedMessageCallback += OnReceived;
+        session_.SessionEventCallback += onSessionEvent;
+        session_.TransportEventCallback += onTransportEvent;
+        session_.ReceivedMessageCallback += onReceived;
 
         TcpTransportOption option = new TcpTransportOption();
         option.ConnectionTimeout = 10f;
@@ -91,7 +94,7 @@ public class FunapiManager : MonoBehaviour
         token = token_;
     }
 
-    void OnSessionEvent (SessionEventType type, string session__id)
+    void onSessionEvent (SessionEventType type, string session__id)
     {
         if (type == SessionEventType.kOpened)
         {
@@ -99,7 +102,7 @@ public class FunapiManager : MonoBehaviour
         }
     }
 
-    void OnTransportEvent (TransportProtocol protocol, TransportEventType type)
+    void onTransportEvent (TransportProtocol protocol, TransportEventType type)
     {
         if (type == TransportEventType.kStarted)
         {
@@ -109,7 +112,7 @@ public class FunapiManager : MonoBehaviour
         }
     }
 
-    void OnReceived (string msg_type, object body)
+    void onReceived (string msg_type, object body)
     {
         Dictionary<string, object> message = body as Dictionary<string, object>;
 
@@ -131,6 +134,15 @@ public class FunapiManager : MonoBehaviour
                     mainMenu.OnClickJoin();
             }
         }
+    }
+
+    void onReceivedUserData (string uid, string json_string)
+    {
+    }
+
+    void onReceivedMatchData (string json_string)
+    {
+        FunapiDedicatedServer.Ready();
     }
 
 
