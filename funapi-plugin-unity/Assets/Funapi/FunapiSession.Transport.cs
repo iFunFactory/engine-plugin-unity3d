@@ -1319,7 +1319,11 @@ namespace Fun
 
             public override bool Started
             {
-                get { return sock_ != null && sock_.Connected && state_ >= State.kConnected; }
+                get
+                {
+                    lock (sock_lock_)
+                        return sock_ != null && sock_.Connected && state_ >= State.kConnected;
+                }
             }
 
             protected override void setAddress (HostAddr addr)
@@ -1349,21 +1353,28 @@ namespace Fun
             protected override void onStart ()
             {
                 state_ = State.kConnecting;
-                sock_ = new Socket(ip_af_, SocketType.Stream, ProtocolType.Tcp);
 
-                bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
-                if (disable_nagle)
-                    sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+                lock (sock_lock_)
+                {
+                    sock_ = new Socket(ip_af_, SocketType.Stream, ProtocolType.Tcp);
 
-                sock_.BeginConnect(connect_ep_, new AsyncCallback(this.startCb), this);
+                    bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
+                    if (disable_nagle)
+                        sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+
+                    sock_.BeginConnect(connect_ep_, new AsyncCallback(this.startCb), this);
+                }
             }
 
             protected override void onClose ()
             {
-                if (sock_ != null)
+                lock (sock_lock_)
                 {
-                    sock_.Close();
-                    sock_ = null;
+                    if (sock_ != null)
+                    {
+                        sock_.Close();
+                        sock_ = null;
+                    }
                 }
             }
 
@@ -1386,12 +1397,13 @@ namespace Fun
 
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
 
-                    DebugLog2("TCP sending {0} bytes.", length);
-
-                    sock_.BeginSend(list, 0, new AsyncCallback(this.sendBytesCb), this);
+                        sock_.BeginSend(list, 0, new AsyncCallback(this.sendBytesCb), this);
+                    }
                 }
                 catch (ObjectDisposedException)
                 {
@@ -1409,28 +1421,31 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
-
-                    sock_.EndConnect(ar);
-                    if (sock_.Connected == false)
+                    lock (sock_lock_)
                     {
-                        last_error_code_ = TransportError.Type.kConnectingFailed;
-                        last_error_message_ = string.Format("TCP connection failed.");
-                        event_.Add(onFailure);
-                        return;
-                    }
-                    DebugLog1("TCP transport connected. Starts handshaking..");
+                        if (sock_ == null)
+                            return;
 
-                    state_ = State.kHandshaking;
+                        sock_.EndConnect(ar);
+                        if (sock_.Connected == false)
+                        {
+                            last_error_code_ = TransportError.Type.kConnectingFailed;
+                            last_error_message_ = string.Format("TCP connection failed.");
+                            event_.Add(onFailure);
+                            return;
+                        }
+                        DebugLog1("TCP transport connected. Starts handshaking..");
 
-                    lock (receive_lock_)
-                    {
-                        // Wait for handshaking message.
-                        ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
-                        List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                        buffer.Add(wrapped);
-                        sock_.BeginReceive(buffer, 0, new AsyncCallback(this.receiveBytesCb), this);
+                        state_ = State.kHandshaking;
+
+                        lock (receive_lock_)
+                        {
+                            // Wait for handshaking message.
+                            ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
+                            List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                            buffer.Add(wrapped);
+                            sock_.BeginReceive(buffer, 0, new AsyncCallback(this.receiveBytesCb), this);
+                        }
                     }
                 }
                 catch (ObjectDisposedException)
@@ -1449,10 +1464,15 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nSent = 0;
 
-                    int nSent = sock_.EndSend(ar);
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nSent = sock_.EndSend(ar);
+                    }
                     FunDebug.Assert(nSent > 0, "TCP failed to transfer messages.");
 
                     DebugLog2("TCP sent {0} bytes.", nSent);
@@ -1526,24 +1546,27 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nRead = 0;
+
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nRead = sock_.EndReceive(ar);
+                    }
 
                     lock (receive_lock_)
                     {
-                        int nRead = sock_.EndReceive(ar);
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
                             DebugLog2("TCP received {0} bytes. Buffer has {1} bytes.",
                                       nRead, received_size_ - next_decoding_offset_);
-                        }
 
-                        // Decoding a messages
-                        tryToDecodeMessage();
+                            // Decoding a messages
+                            tryToDecodeMessage();
 
-                        if (nRead > 0)
-                        {
                             // Checks buffer space
                             checkReceiveBuffer();
 
@@ -1554,9 +1577,12 @@ namespace Fun
                             List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                             buffer.Add(residual);
 
-                            sock_.BeginReceive(buffer, 0, new AsyncCallback(this.receiveBytesCb), this);
-                            DebugLog2("TCP ready to receive more. We can receive upto {0} more bytes.",
-                                      receive_buffer_.Length - received_size_);
+                            lock (sock_lock_)
+                            {
+                                sock_.BeginReceive(buffer, 0, new AsyncCallback(this.receiveBytesCb), this);
+                                DebugLog2("TCP ready to receive more. We can receive upto {0} more bytes.",
+                                          receive_buffer_.Length - received_size_);
+                            }
                         }
                         else
                         {
@@ -1593,6 +1619,7 @@ namespace Fun
             Socket sock_;
             AddressFamily ip_af_;
             IPEndPoint connect_ep_;
+            object sock_lock_ = new object();
         }
 
 
@@ -1612,7 +1639,11 @@ namespace Fun
 
             public override bool Started
             {
-                get { return sock_ != null && state_ >= State.kConnected; }
+                get
+                {
+                    lock (sock_lock_)
+                        return sock_ != null && state_ >= State.kConnected;
+                }
             }
 
             protected override void setAddress (HostAddr addr)
@@ -1645,28 +1676,31 @@ namespace Fun
             {
                 state_ = State.kConnected;
 
-                sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
+                lock (sock_lock_)
+                {
+                    sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
 
 #if FIXED_UDP_LOCAL_PORT
-                int port = LocalPort.Next();
-                if (ip_af_ == AddressFamily.InterNetwork)
-                    sock_.Bind(new IPEndPoint(IPAddress.Any, port));
-                else
-                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+                    int port = LocalPort.Next();
+                    if (ip_af_ == AddressFamily.InterNetwork)
+                        sock_.Bind(new IPEndPoint(IPAddress.Any, port));
+                    else
+                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
 #else
-                if (ip_af_ == AddressFamily.InterNetwork)
-                    sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
-                else
-                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
+                    if (ip_af_ == AddressFamily.InterNetwork)
+                        sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    else
+                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
 #endif
 
-                IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
-                DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
+                    IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
+                    DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
 
-                lock (receive_lock_)
-                {
-                    sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
-                                           ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
+                    lock (receive_lock_)
+                    {
+                        sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
+                                               ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
+                    }
                 }
 
                 onStarted();
@@ -1674,10 +1708,13 @@ namespace Fun
 
             protected override void onClose ()
             {
-                if (sock_ != null)
+                lock (sock_lock_)
                 {
-                    sock_.Close();
-                    sock_ = null;
+                    if (sock_ != null)
+                    {
+                        sock_.Close();
+                        sock_ = null;
+                    }
                 }
             }
 
@@ -1717,8 +1754,11 @@ namespace Fun
                 {
                     try
                     {
-                        sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
-                                          send_ep_, new AsyncCallback(this.sendBytesCb), this);
+                        lock (sock_lock_)
+                        {
+                            sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
+                                              send_ep_, new AsyncCallback(this.sendBytesCb), this);
+                        }
                     }
                     catch (ObjectDisposedException)
                     {
@@ -1731,14 +1771,19 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nSent = 0;
+
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nSent = sock_.EndSend(ar);
+                        FunDebug.Assert(nSent > 0, "UDP failed to transfer messages.");
+                    }
 
                     lock (sending_lock_)
                     {
-                        int nSent = sock_.EndSend(ar);
-                        FunDebug.Assert(nSent > 0, "UDP failed to transfer messages.");
-
                         FunDebug.Assert(sending_.Count >= 2);
                         DebugLog2("UDP sent a message - '{0}' ({1}bytes)", sending_[1].msg_type, nSent);
 
@@ -1776,12 +1821,18 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nRead = 0;
+
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nRead = sock_.EndReceive(ar);
+                    }
 
                     lock (receive_lock_)
                     {
-                        int nRead = sock_.EndReceive(ar);
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
@@ -1798,14 +1849,17 @@ namespace Fun
                             received_size_ = 0;
                             next_decoding_offset_ = 0;
 
-                            // Starts another async receive
-                            sock_.BeginReceiveFrom(receive_buffer_, received_size_,
-                                                   receive_buffer_.Length - received_size_,
-                                                   SocketFlags.None, ref receive_ep_,
-                                                   new AsyncCallback(this.receiveBytesCb), this);
+                            lock (sock_lock_)
+                            {
+                                // Starts another async receive
+                                sock_.BeginReceiveFrom(receive_buffer_, received_size_,
+                                                       receive_buffer_.Length - received_size_,
+                                                       SocketFlags.None, ref receive_ep_,
+                                                       new AsyncCallback(this.receiveBytesCb), this);
 
-                            DebugLog2("UDP ready to receive more. We can receive upto {0} more bytes",
-                                      receive_buffer_.Length);
+                                DebugLog2("UDP ready to receive more. We can receive upto {0} more bytes",
+                                          receive_buffer_.Length);
+                            }
                         }
                         else
                         {
@@ -1894,6 +1948,7 @@ namespace Fun
             AddressFamily ip_af_;
             IPEndPoint send_ep_;
             EndPoint receive_ep_;
+            object sock_lock_ = new object();
 
             // This length is 64KB minus 8 bytes UDP header and 48 bytes IP header.
             // (IP header size is based on IPV6. IPV4 uses 20 bytes.)
