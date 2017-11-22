@@ -629,8 +629,6 @@ namespace Fun
                 releaseUpdater();
             }
 
-            updateMessages();
-
             lock (expected_responses_)
             {
                 expected_responses_.Clear();
@@ -788,6 +786,10 @@ namespace Fun
         void tryToRedirect (string host, List<RedirectInfo> list)
 #endif
         {
+#if !NO_UNITY
+            yield return null;
+#endif
+
             // Wait for stop.
             while (Started)
             {
@@ -800,11 +802,6 @@ namespace Fun
 
             onSessionClosed();
 
-            // Removes transports.
-            lock (transports_lock_)
-            {
-                transports_.Clear();
-            }
             default_protocol_ = TransportProtocol.kDefault;
 
             // Adds transports.
@@ -912,7 +909,7 @@ namespace Fun
         Transport createTransport (TransportProtocol protocol, FunEncoding encoding,
                                    UInt16 port, TransportOption option = null)
         {
-            Transport transport = GetTransport(protocol);
+            Transport transport = getTransport(protocol, encoding, port, option);
             if (transport != null)
                 return transport;
 
@@ -977,6 +974,22 @@ namespace Fun
                 DefaultProtocol = protocol;
 
             DebugLog1("{0} transport was created.", transport.str_protocol);
+            return transport;
+        }
+
+        public Transport getTransport (TransportProtocol protocol, FunEncoding encoding,
+                                       UInt16 port, TransportOption option)
+        {
+            Transport transport = GetTransport(protocol);
+            if (transport == null)
+                return null;
+
+            if (transport.encoding != encoding || transport.address.port != port)
+                return null;
+
+            if (!transport.option.Equals(option))
+                return null;
+
             return transport;
         }
 
@@ -1128,7 +1141,11 @@ namespace Fun
         void tryToStopTransport (Transport transport)
 #endif
         {
-            if (transport == null)
+#if !NO_UNITY
+            yield return null;
+#endif
+
+            if (transport == null || !transport.Started)
 #if !NO_UNITY
                 yield break;
 #else

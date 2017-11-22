@@ -57,6 +57,23 @@ namespace Fun
         public EncryptionType Encryption = EncryptionType.kDefaultEncryption;
         public bool SequenceValidation = false;
         public float ConnectionTimeout = 0f;
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !(obj is TransportOption))
+                return false;
+
+            TransportOption option = obj as TransportOption;
+
+            return Encryption == option.Encryption &&
+                   ConnectionTimeout == option.ConnectionTimeout &&
+                   SequenceValidation == option.SequenceValidation;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
     }
 
     public class TcpTransportOption : TransportOption
@@ -75,12 +92,47 @@ namespace Fun
             PingIntervalSeconds = interval;
             PingTimeoutSeconds = timeout;
         }
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !base.Equals(obj) || !(obj is TcpTransportOption))
+                return false;
+
+            TcpTransportOption option = obj as TcpTransportOption;
+
+            return AutoReconnect == option.AutoReconnect &&
+                   DisableNagle == option.DisableNagle &&
+                   EnablePing == option.EnablePing &&
+                   EnablePingLog == option.EnablePingLog &&
+                   PingIntervalSeconds == option.PingIntervalSeconds &&
+                   PingTimeoutSeconds == option.PingTimeoutSeconds;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
     }
 
     public class HttpTransportOption : TransportOption
     {
         public bool HTTPS = false;
         public bool UseWWW = false;
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !base.Equals(obj) || !(obj is HttpTransportOption))
+                return false;
+
+            HttpTransportOption option = obj as HttpTransportOption;
+
+            return HTTPS == option.HTTPS && UseWWW == option.UseWWW;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
     }
 
 
@@ -1596,7 +1648,7 @@ namespace Fun
 
                             last_error_code_ = TransportError.Type.kDisconnected;
                             last_error_message_ = "TCP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected);
+                            event_.Add(onDisconnected, 1f);
                         }
                     }
                 }
