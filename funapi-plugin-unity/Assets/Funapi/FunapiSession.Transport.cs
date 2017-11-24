@@ -1731,6 +1731,7 @@ namespace Fun
                 lock (sock_lock_)
                 {
                     sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
+                    sock_.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
 #if FIXED_UDP_LOCAL_PORT
                     int port = LocalPort.Next();
