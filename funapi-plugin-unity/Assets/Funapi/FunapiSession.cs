@@ -759,8 +759,11 @@ namespace Fun
 
             Log("EVENT: Session ({0}).", type);
 
-            if (SessionEventCallback != null)
-                SessionEventCallback(type, session_id_);
+            event_list.Add (delegate
+            {
+                if (SessionEventCallback != null)
+                    SessionEventCallback(type, session_id_);
+            });
         }
 
 
@@ -1214,8 +1217,11 @@ namespace Fun
 
             Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
 
-            if (TransportEventCallback != null)
-                TransportEventCallback(protocol, type);
+            event_list.Add (delegate
+            {
+                if (TransportEventCallback != null)
+                    TransportEventCallback(protocol, type);
+            });
         }
 
         void onTransportError (TransportProtocol protocol, TransportError.Type type, string message)
@@ -1229,14 +1235,17 @@ namespace Fun
 
             LogWarning("ERROR: {0} transport ({1})\n{2}.", convertString(protocol), type, message);
 
-            if (TransportErrorCallback != null)
+            event_list.Add (delegate
             {
-                TransportError error = new TransportError();
-                error.type = type;
-                error.message = message;
+                if (TransportErrorCallback != null)
+                {
+                    TransportError error = new TransportError();
+                    error.type = type;
+                    error.message = message;
 
-                TransportErrorCallback(protocol, error);
-            }
+                    TransportErrorCallback(protocol, error);
+                }
+            });
         }
 
         bool isReliableTransport (TransportProtocol protocol)
