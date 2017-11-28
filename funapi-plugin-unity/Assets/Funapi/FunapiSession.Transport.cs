@@ -365,6 +365,15 @@ namespace Fun
                 get { return option_.SequenceValidation; }
             }
 
+            public bool SendSessionId
+            {
+                set
+                {
+                    lock (session_id_sent_lock_)
+                        session_id_has_been_sent = !value;
+                }
+            }
+
             // ping time in milliseconds
             public int PingTime
             {

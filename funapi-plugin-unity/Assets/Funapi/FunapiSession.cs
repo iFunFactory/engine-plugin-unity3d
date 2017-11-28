@@ -660,12 +660,12 @@ namespace Fun
             http_seq_ = (UInt32)rnd_.Next() + (UInt32)rnd_.Next();
         }
 
-        void setSessionId (object session_id)
+        bool setSessionId (Transport transport, object session_id)
         {
             if (!session_id_.IsValid)
             {
                 if (prev_session_id_.Equals(session_id))
-                    return;
+                    return false;
 
                 session_id_.SetId(session_id);
                 prev_session_id_.SetId(session_id);
@@ -676,23 +676,29 @@ namespace Fun
             }
             else if (session_id_ != session_id)
             {
+                if (option_.sendSessionIdOnlyOnce && transport.protocol == TransportProtocol.kUdp)
+                {
+                    transport.SendSessionId = true;
+                    LogWarning("UDP received a wrong session id. Sends the previous session id again. current:{0} received:{1}",
+                               (string)session_id_, SessionId.ToString(session_id));
+                    return false;
+                }
+
                 if (session_id is byte[] && session_id_.IsStringArray &&
                     (session_id as byte[]).Length == SessionId.kArrayLength)
                 {
                     session_id_.SetId(session_id);
+                    prev_session_id_.SetId(session_id);
                 }
                 else
                 {
-                    LogWarning("Received a different session id. This is ignored.\ncurrent:{0} received:{1}",
+                    LogWarning("Received a wrong session id. This message is ignored. current:{0} received:{1}",
                                (string)session_id_, SessionId.ToString(session_id));
-                    return;
-                    //Log("Session id changed: {0} => {1}", (string)session_id_, SessionId.ToString(session_id));
-                    //session_id_.SetId(session_id);
-                    //onSessionEvent(SessionEventType.kChanged);
+                    return false;
                 }
-
-                prev_session_id_.SetId(session_id);
             }
+
+            return true;
         }
 
         void onSessionOpened ()
@@ -798,6 +804,12 @@ namespace Fun
 #else
                 Thread.Sleep(100);
 #endif
+            }
+
+            lock (transports_lock_)
+            {
+                transports_.Clear();
+                Log("Redirect: Removes all transports.");
             }
 
             onSessionClosed();
@@ -984,10 +996,10 @@ namespace Fun
             if (transport == null)
                 return null;
 
-            if (transport.encoding != encoding || transport.address.port != port)
+            if (transport.address.host != server_address_ || transport.address.port != port)
                 return null;
 
-            if (!transport.option.Equals(option))
+            if (transport.encoding != encoding || !transport.option.Equals(option))
                 return null;
 
             return transport;
@@ -1509,7 +1521,9 @@ namespace Fun
                     {
                         string session_id = json_helper_.GetStringField(msg.message, kSessionIdField);
                         json_helper_.RemoveField(msg.message, kSessionIdField);
-                        setSessionId(session_id);
+
+                        if (!setSessionId(transport, session_id))
+                            return;
                     }
 
                     if (isReliableTransport(msg.protocol))
@@ -1536,7 +1550,10 @@ namespace Fun
                     FunMessage funmsg = msg.message as FunMessage;
 
                     if (funmsg.sidSpecified)
-                        setSessionId(funmsg.sid);
+                    {
+                        if (!setSessionId(transport, funmsg.sid))
+                            return;
+                    }
 
                     if (isReliableTransport(msg.protocol))
                     {
