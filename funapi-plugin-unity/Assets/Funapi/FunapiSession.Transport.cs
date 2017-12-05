@@ -736,7 +736,7 @@ namespace Fun
                     header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                     sending_.Insert(i, header_buffer);
 
-                    DebugLog2("{0} built a message - '{1}' ({2}bytes + {3}bytes)", str_protocol_,
+                    DebugLog3("{0} built a message - '{1}' ({2}bytes + {3}bytes)", str_protocol_,
                               fun_msg.msg_type, header_buffer.buffer.Count, fun_msg.buffer.Count);
                 }
 
@@ -762,7 +762,7 @@ namespace Fun
                 if (next_decoding_offset_ > 0)
                 {
                     // fit in the receive buffer boundary.
-                    DebugLog2("{0} compacting the receive buffer to save {1} bytes.",
+                    DebugLog3("{0} compacting the receive buffer to save {1} bytes.",
                               str_protocol_, next_decoding_offset_);
                     Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0,
                                      received_size_ - next_decoding_offset_);
@@ -772,7 +772,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugLog2("{0} increasing the receive buffer to {1} bytes.", str_protocol_, new_length);
+                    DebugLog3("{0} increasing the receive buffer to {1} bytes.", str_protocol_, new_length);
                     Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
                     receive_buffer_ = new_buffer;
                 }
@@ -818,7 +818,7 @@ namespace Fun
 
             bool tryToDecodeHeader ()
             {
-                DebugLog2("{0} trying to decode header fields.", str_protocol_);
+                DebugLog3("{0} trying to decode header fields.", str_protocol_);
                 int length = 0;
 
                 for (; next_decoding_offset_ < received_size_; )
@@ -829,7 +829,7 @@ namespace Fun
                     if (offset < 0)
                     {
                         // Not enough bytes. Wait for more bytes to come.
-                        DebugLog2("{0} need more bytes for a header field. Waiting.", str_protocol_);
+                        DebugLog3("{0} need more bytes for a header field. Waiting.", str_protocol_);
                         return false;
                     }
 
@@ -842,7 +842,7 @@ namespace Fun
                     {
                         // End of header.
                         header_decoded_ = true;
-                        DebugLog2("{0} read {1} bytes for header.", str_protocol_, length);
+                        DebugLog3("{0} read {1} bytes for header.", str_protocol_, length);
                         return true;
                     }
 
@@ -851,7 +851,7 @@ namespace Fun
                     {
                         tuple[0] = tuple[0].ToUpper();
                         header_fields_[tuple[0]] = tuple[1];
-                        DebugLog2("  > {0} header '{1} : {2}'", str_protocol_, tuple[0], tuple[1]);
+                        DebugLog3("  > {0} header '{1} : {2}'", str_protocol_, tuple[0], tuple[1]);
                     }
                     else
                     {
@@ -910,19 +910,19 @@ namespace Fun
                 int body_length = Convert.ToInt32(header_fields_[kLengthHeaderField]);
                 if (body_length > 0)
                 {
-                    DebugLog2("{0} message body is {1} bytes. Buffer has {2} bytes.",
+                    DebugLog3("{0} message body is {1} bytes. Buffer has {2} bytes.",
                               str_protocol_, body_length, received_size_ - next_decoding_offset_);
                 }
                 else
                 {
-                    DebugLog2("{0} {1} bytes left in buffer.",
+                    DebugLog3("{0} {1} bytes left in buffer.",
                               str_protocol_, received_size_ - next_decoding_offset_);
                 }
 
                 if (received_size_ - next_decoding_offset_ < body_length)
                 {
                     // Need more bytes.
-                    DebugLog2("{0} need more bytes for a message body. Waiting.", str_protocol_);
+                    DebugLog3("{0} need more bytes for a message body. Waiting.", str_protocol_);
                     return false;
                 }
 
@@ -1553,13 +1553,13 @@ namespace Fun
                             if (sending_[0].buffer.Count > nSent)
                             {
                                 // partial data
-                                DebugLog2("TCP partially sent. Will resume. (buffer:{0}, nSent:{1})",
+                                DebugLog3("TCP partially sent. Will resume. (buffer:{0}, nSent:{1})",
                                           sending_[0].buffer.Count, nSent);
                                 break;
                             }
                             else
                             {
-                                DebugLog2("TCP remove buffer - '{0}' ({1}bytes)",
+                                DebugLog3("TCP remove buffer - '{0}' ({1}bytes)",
                                           sending_[0].msg_type, sending_[0].buffer.Count);
 
                                 // fully sent.
@@ -1570,7 +1570,7 @@ namespace Fun
                             // for empty body.
                             if (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
                             {
-                                DebugLog2("TCP remove buffer - '{0}' (0bytes)", sending_[0].msg_type);
+                                DebugLog3("TCP remove buffer - '{0}' (0bytes)", sending_[0].msg_type);
                                 sending_.RemoveAt(0);
                             }
                         }
@@ -1585,7 +1585,7 @@ namespace Fun
                             ArraySegment<byte> adjusted = new ArraySegment<byte>(
                                 original.Array, original.Offset + nSent, original.Count - nSent);
                             sending_[0].buffer = adjusted;
-                            DebugLog2("TCP partially sending {0} bytes. {1} bytes already sent.", adjusted.Count, nSent);
+                            DebugLog3("TCP partially sending {0} bytes. {1} bytes already sent.", adjusted.Count, nSent);
                         }
 
                         sendPendingMessages();
@@ -1622,7 +1622,7 @@ namespace Fun
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            DebugLog2("TCP received {0} bytes. Buffer has {1} bytes.",
+                            DebugLog3("TCP received {0} bytes. Buffer has {1} bytes.",
                                       nRead, received_size_ - next_decoding_offset_);
 
                             // Decoding a messages
@@ -1641,7 +1641,7 @@ namespace Fun
                             lock (sock_lock_)
                             {
                                 sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
-                                DebugLog2("TCP ready to receive more. We can receive upto {0} more bytes.",
+                                DebugLog3("TCP ready to receive more. We can receive upto {0} more bytes.",
                                           receive_buffer_.Length - received_size_);
                             }
                         }
@@ -1898,7 +1898,7 @@ namespace Fun
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            DebugLog2("UDP received {0} bytes. Buffer has {1} bytes.",
+                            DebugLog3("UDP received {0} bytes. Buffer has {1} bytes.",
                                       nRead, received_size_ - next_decoding_offset_);
                         }
 
@@ -1919,7 +1919,7 @@ namespace Fun
                                                        SocketFlags.None, ref receive_ep_,
                                                        new AsyncCallback(this.receiveBytesCb), this);
 
-                                DebugLog2("UDP ready to receive more. We can receive upto {0} more bytes",
+                                DebugLog3("UDP ready to receive more. We can receive upto {0} more bytes",
                                           receive_buffer_.Length);
                             }
                         }
@@ -2355,7 +2355,7 @@ namespace Fun
                             return;
                         }
 
-                        DebugLog2("HTTP received {0} bytes.", received_size_);
+                        DebugLog3("HTTP received {0} bytes.", received_size_);
 
                         lock (receive_lock_)
                         {
@@ -2440,7 +2440,7 @@ namespace Fun
                         Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
                         received_size_ += www.bytes.Length;
 
-                        DebugLog2("HTTP received {0} bytes.", received_size_);
+                        DebugLog3("HTTP received {0} bytes.", received_size_);
 
                         // Decoding a message
                         tryToDecodeMessage();
