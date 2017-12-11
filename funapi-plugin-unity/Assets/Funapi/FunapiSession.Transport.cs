@@ -1087,6 +1087,15 @@ namespace Fun
                     ReceivedCallback(new FunapiMessage(protocol_, msg_type, message));
             }
 
+            protected void onFailedSending ()
+            {
+                lock (sending_lock_)
+                    sending_.Clear();
+
+                LogWarning("{0} sending failed. Clears the sending buffer.", str_protocol_);
+            }
+
+
             //---------------------------------------------------------------------
             // Ping-related functions
             //---------------------------------------------------------------------
@@ -1873,6 +1882,8 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
+                    onFailedSending();
+
                     last_error_code_ = TransportError.Type.kSendingFailed;
                     last_error_message_ = "UDP failure in sendBytesCb: " + e.ToString();
                     event_.Add(onFailure);
