@@ -205,7 +205,13 @@ namespace Fun
         public EncryptionType enc_type;
         public string msg_type;
         public object message;
-        public ArraySegment<byte> buffer;
+
+        public bool ready = false;
+        public ArraySegment<byte> header;
+        public ArraySegment<byte> body;
+        public string enc_header = "";
+        public UInt32 seq = 0;
+
         public object reply = null;
 
         // json-related members.

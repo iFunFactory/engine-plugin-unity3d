@@ -9,6 +9,7 @@
 
 #if UNITY_EDITOR || NO_UNITY
 #define ENABLE_LOG
+// LOG_LEVEL_1 ~ LOG_LEVEL_4
 #define LOG_LEVEL_1
 #endif
 

@@ -244,8 +244,10 @@ public partial class Tester : MonoBehaviour
             option = http_option;
         }
 
+        if (protocol != TransportProtocol.kUdp)
+            option.SequenceValidation = option_.sequenceValidation;
+
         option.ConnectionTimeout = 10f;
-        option.SequenceValidation = option_.sequenceValidation;
 
         return option;
     }
