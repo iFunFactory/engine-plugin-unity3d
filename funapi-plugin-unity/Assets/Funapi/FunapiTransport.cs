@@ -869,7 +869,7 @@ namespace Fun
             {
                 lock (sending_lock_)
                 {
-                    fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
+                    fun_msg.body = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
                     pending_.Add(fun_msg);
 
                     if (Started && IsSendable)
@@ -896,15 +896,14 @@ namespace Fun
             {
                 FunapiMessage message = sending_[i];
 
-                string enc_header = "";
                 EncryptionType type = getEncryption(message);
                 if (message.msg_type == kEncryptionPublicKey)
                 {
-                    enc_header = generatePublicKey(type);
+                    message.enc_header = generatePublicKey(type);
                 }
                 else if (type != EncryptionType.kNoneEncryption)
                 {
-                    if (!encryptMessage(message, type, ref enc_header))
+                    if (!encryptMessage(message, type))
                     {
                         last_error_code_ = ErrorCode.kEncryptionFailed;
                         last_error_message_ = string.Format("Encrypt message failed. type:{0}", (int)type);
@@ -921,16 +920,16 @@ namespace Fun
                     header.AppendFormat("{0}{1}{2}{3}", kPluginVersionHeaderField, kHeaderFieldDelimeter, FunapiVersion.kPluginVersion, kHeaderDelimeter);
                     first_sending_ = false;
                 }
-                header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, message.buffer.Count, kHeaderDelimeter);
+                header.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField, kHeaderFieldDelimeter, message.body.Count, kHeaderDelimeter);
                 if (type != EncryptionType.kNoneEncryption)
                 {
                     header.AppendFormat("{0}{1}{2}", kEncryptionHeaderField, kHeaderFieldDelimeter, Convert.ToInt32(type));
-                    header.AppendFormat("-{0}{1}", enc_header, kHeaderDelimeter);
+                    header.AppendFormat("-{0}{1}", message.enc_header, kHeaderDelimeter);
                 }
                 header.Append(kHeaderDelimeter);
 
                 FunapiMessage header_buffer = new FunapiMessage(protocol_, message.msg_type, header);
-                header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
+                header_buffer.body = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                 sending_.Insert(i, header_buffer);
 
                 DebugLog2("Header to send: {0}", header.ToString());
@@ -1174,7 +1173,7 @@ namespace Fun
             // Add a message to front of pending list...
             lock (sending_lock_)
             {
-                fun_msg.buffer = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
+                fun_msg.body = new ArraySegment<byte>(fun_msg.GetBytes(encoding_));
                 pending_.Insert(0, fun_msg);
             }
 
@@ -1356,7 +1355,7 @@ namespace Fun
             {
                 foreach (FunapiMessage message in sending_)
                 {
-                    list.Add(message.buffer);
+                    list.Add(message.body);
                 }
             }
 
@@ -1437,25 +1436,25 @@ namespace Fun
                     {
                         FunDebug.Assert(sending_.Count > 0);
 
-                        if (sending_[0].buffer.Count > nSent)
+                        if (sending_[0].body.Count > nSent)
                         {
                             // partial data
                             DebugLog2("Partially sent. Will resume. (buffer:{0}, nSent:{1})",
-                                      sending_[0].buffer.Count, nSent);
+                                      sending_[0].body.Count, nSent);
                             break;
                         }
                         else
                         {
                             DebugLog2("Discarding a fully sent message. ({0}bytes)",
-                                      sending_[0].buffer.Count);
+                                      sending_[0].body.Count);
 
                             // fully sent.
-                            nSent -= sending_[0].buffer.Count;
+                            nSent -= sending_[0].body.Count;
                             sending_.RemoveAt(0);
                         }
                     }
 
-                    while (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
+                    while (sending_.Count > 0 && sending_[0].body.Count <= 0)
                     {
                         DebugLog2("Remove empty buffer.");
                         sending_.RemoveAt(0);
@@ -1465,11 +1464,11 @@ namespace Fun
                     if (nSent > 0)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-                        ArraySegment<byte> original = sending_[0].buffer;
+                        ArraySegment<byte> original = sending_[0].body;
 
-                        FunDebug.Assert(nSent <= sending_[0].buffer.Count);
+                        FunDebug.Assert(nSent <= sending_[0].body.Count);
                         ArraySegment<byte> adjusted = new ArraySegment<byte>(original.Array, original.Offset + nSent, original.Count - nSent);
-                        sending_[0].buffer = adjusted;
+                        sending_[0].body = adjusted;
                     }
 
                     last_error_code_ = ErrorCode.kNone;
@@ -1668,7 +1667,7 @@ namespace Fun
             {
                 FunDebug.Assert(sending_.Count >= 2);
 
-                int length = sending_[0].buffer.Count + sending_[1].buffer.Count;
+                int length = sending_[0].body.Count + sending_[1].body.Count;
                 if (length > send_buffer_.Length)
                 {
                     send_buffer_ = new byte[length];
@@ -1677,7 +1676,7 @@ namespace Fun
                 // one header + one body
                 for (int i = 0; i < 2; ++i)
                 {
-                    ArraySegment<byte> item = sending_[i].buffer;
+                    ArraySegment<byte> item = sending_[i].body;
                     Buffer.BlockCopy(item.Array, 0, send_buffer_, offset, item.Count);
                     offset += item.Count;
                 }
@@ -1722,7 +1721,7 @@ namespace Fun
                     int nToSend = 0;
                     for (int i = 0; i < 2; ++i)
                     {
-                        nToSend += sending_[0].buffer.Count;
+                        nToSend += sending_[0].body.Count;
                         sending_.RemoveAt(0);
                     }
 
@@ -1985,13 +1984,13 @@ namespace Fun
         }
 
 #if !NO_UNITY
-        void SendWWWRequest (Dictionary<string, string> headers, FunapiMessage body)
+        void SendWWWRequest (Dictionary<string, string> headers, FunapiMessage msg)
         {
             cancel_www_ = false;
 
-            if (body.buffer.Count > 0)
+            if (msg.body.Count > 0)
             {
-                mono.StartCoroutine(WWWPost(new WWW(host_url_, body.buffer.Array, headers)));
+                mono.StartCoroutine(WWWPost(new WWW(host_url_, msg.body.Array, headers)));
             }
             else
             {
@@ -2000,14 +1999,14 @@ namespace Fun
         }
 #endif
 
-        void SendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage body)
+        void SendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage msg)
         {
             // Request
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(host_url_);
             request.ConnectionGroupName = session_id_;
             request.Method = "POST";
             request.ContentType = "application/octet-stream";
-            request.ContentLength = body.buffer.Count;
+            request.ContentLength = msg.body.Count;
 
             foreach (KeyValuePair<string, string> item in headers) {
                 request.Headers[item.Key] = item.Value;
@@ -2016,7 +2015,7 @@ namespace Fun
             web_request_ = request;
             was_aborted_ = false;
 
-            web_request_.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), body);
+            web_request_.BeginGetRequestStream(new AsyncCallback(RequestStreamCb), msg);
         }
 
         void OnReceiveHeader (string headers)
@@ -2082,12 +2081,12 @@ namespace Fun
 
             try
             {
-                FunapiMessage body = (FunapiMessage)ar.AsyncState;
+                FunapiMessage msg = (FunapiMessage)ar.AsyncState;
 
                 Stream stream = web_request_.EndGetRequestStream(ar);
-                stream.Write(body.buffer.Array, 0, body.buffer.Count);
+                stream.Write(msg.body.Array, 0, msg.body.Count);
                 stream.Close();
-                DebugLog2("Sent {0}bytes.", body.buffer.Count);
+                DebugLog2("Sent {0}bytes.", msg.body.Count);
 
                 lock (sending_lock_)
                 {

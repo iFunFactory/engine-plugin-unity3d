@@ -579,7 +579,7 @@ namespace Fun
             return handshake_complete;
         }
 
-        protected bool encryptMessage (FunapiMessage message, EncryptionType type, ref string header)
+        protected bool encryptMessage (FunapiMessage message, EncryptionType type)
         {
             if (type == EncryptionType.kDummyEncryption)
                 return true;
@@ -599,16 +599,19 @@ namespace Fun
                 return false;
             }
 
-            if (message.buffer.Count > 0)
+            if (message.body.Count > 0)
             {
-                Int64 nSize = encryptor.Encrypt(message.buffer, message.buffer, ref header);
+                string header = "";
+                Int64 nSize = encryptor.Encrypt(message.body, message.body, ref header);
                 if (nSize <= 0)
                 {
                     LogWarning("Encryptor.encryptMessage - Failed to encrypt.");
                     return false;
                 }
 
-                FunDebug.Assert(nSize == message.buffer.Count);
+                FunDebug.Assert(nSize == message.body.Count);
+
+                message.enc_header = header;
             }
 
             return true;
