@@ -461,12 +461,21 @@ namespace Fun
             protected void initAddress (string hostname, UInt16 port)
             {
                 ip_list_.Add(hostname, port);
-                setNextAddress();
             }
 
             protected void initAddress (string hostname, UInt16 port, bool https)
             {
                 ip_list_.Add(hostname, port, https);
+                setNextAddress();
+            }
+
+            protected void refreshAddress ()
+            {
+                HostAddr addr = address;
+
+                ip_list_.Clear();
+                ip_list_.Add(addr.host, addr.port);
+
                 setNextAddress();
             }
 
@@ -1398,21 +1407,12 @@ namespace Fun
 
             protected override void setAddress (HostAddr addr)
             {
-                IPAddress ip = null;
-                if (addr is HostIP)
-                {
-                    ip = ((HostIP)addr).ip;
-                }
-                else
-                {
-                    IPHostEntry host_info = Dns.GetHostEntry(addr.host);
-                    FunDebug.Assert(host_info.AddressList.Length > 0);
-                    ip = host_info.AddressList[0];
-                }
+                FunDebug.Assert(addr is HostIP);
+                addr_ = (HostIP)addr;
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
                 Log("TCP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}, Reconnect:{6}, Nagle:{7}, Ping:{8}",
-                    ip, addr.port, convertString(encoding_), convertString(tcp_option.Encryption),
+                    addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
                     tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
                     tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
             }
@@ -1421,18 +1421,18 @@ namespace Fun
             {
                 state_ = State.kConnecting;
 
+                refreshAddress();
+
                 lock (sock_lock_)
                 {
-                    IPHostEntry list = Dns.GetHostEntry(address.host);
-                    IPAddress ip = list.AddressList[0];
-
-                    sock_ = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                    sock_ = new Socket(addr_.ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
                     bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
                     if (disable_nagle)
                         sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
-                    sock_.BeginConnect(list.AddressList, address.port, new AsyncCallback(this.startCb), this);
+                    IPAddress[] list = Dns.GetHostAddresses(addr_.host);
+                    sock_.BeginConnect(list, address.port, new AsyncCallback(this.startCb), this);
                 }
             }
 
@@ -1687,6 +1687,7 @@ namespace Fun
 
 
             Socket sock_;
+            HostIP addr_;
             object sock_lock_ = new object();
         }
 
@@ -1716,20 +1717,11 @@ namespace Fun
 
             protected override void setAddress (HostAddr addr)
             {
-                IPAddress ip;
-                if (addr is HostIP)
-                {
-                    ip = ((HostIP)addr).ip;
-                }
-                else
-                {
-                    IPHostEntry host_info = Dns.GetHostEntry(addr.host);
-                    FunDebug.Assert(host_info.AddressList.Length > 0);
-                    ip = host_info.AddressList[0];
-                }
+                FunDebug.Assert(addr is HostIP);
+                addr_ = (HostIP)addr;
 
                 Log("UDP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}",
-                    ip, addr.port, convertString(encoding_), convertString(option_.Encryption),
+                    addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
                     option_.SequenceValidation, option_.ConnectionTimeout);
             }
 
@@ -1737,22 +1729,21 @@ namespace Fun
             {
                 state_ = State.kConnected;
 
+                refreshAddress();
+
                 lock (sock_lock_)
                 {
-                    IPHostEntry list = Dns.GetHostEntry(address.host);
-                    IPAddress ip = list.AddressList[0];
-
-                    sock_ = new Socket(ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                    sock_ = new Socket(addr_.ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
                     sock_.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
 #if FIXED_UDP_LOCAL_PORT
                     int port = LocalPort.Next();
-                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
                         sock_.Bind(new IPEndPoint(IPAddress.Any, port));
                     else
                         sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
 #else
-                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
                         sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
                     else
                         sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
@@ -1761,11 +1752,11 @@ namespace Fun
                     IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
                     DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
 
-                    send_ep_ = new IPEndPoint(ip, address.port);
-                    if (ip.AddressFamily == AddressFamily.InterNetwork)
-                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, address.port);
+                    send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
+                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
+                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr_.port);
                     else
-                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, address.port);
+                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr_.port);
 
                     lock (receive_lock_)
                     {
@@ -2018,6 +2009,7 @@ namespace Fun
 
             // member variables
             Socket sock_;
+            HostIP addr_;
             IPEndPoint send_ep_;
             EndPoint receive_ep_;
             object sock_lock_ = new object();

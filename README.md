@@ -12,9 +12,9 @@ Funapi plugin unity
 * 페이스북, 트위터의 글쓰기, 친구 정보 요청 등의 기능 지원
 
 
-## 서버 버전
+## 서버
 
-* 플러그인 버전 228 이상은 **서버 버전 2256 이상이 필요** 합니다.
+* 서버 버전 2543 이상은 플러그인 버전 239 이상이 필요합니다.
 * FunMulticastMessage를 확장하여 사용하는 경우 **필드 번호를 16부터 사용** 하도록 수정이 필요합니다.
 
 
@@ -27,19 +27,22 @@ Funapi plugin unity
 ```text
 |- additional-plugins      # 페이스북, 트위터 플러그인
 |- csharp-samples          # C# Runtime 샘플 코드
+|- dedi-server-example     # Dedicated Server 샘플 코드
 |- funapi-plugin-unity     # 플러그인 코드
 ```
 
 클라이언트 플러그인 코드는 ``funapi-plugin-unity`` 폴더에 있습니다.
-``additional-plugins``와 ``csharp-samples`` 폴더는 필요할 경우 사용하시면 됩니다.
+``dedi-server-example`` 은 유니티의 Dedicated Server 와 통신하는 방법을 확인해 볼 수 있는
+샘플 프로젝트입니다. ``additional-plugins`` 에는 페이스북과 트위터용 플러그인이 있으며
+ ``csharp-samples`` 폴더에는 MacOS/Linux 와 Windows 용 C# Runtime 샘플 코드가 있습니다.
 
 ### 테스트 프로젝트
 유니티를 실행해서 ``funapi-plugin-unity`` 폴더의 프로젝트를 열면 프로젝트 폴더 중에 ``Tester``
 폴더가 있습니다. 여기에 테스트용 Scene과 샘플 코드들이 있습니다.
 
-**Tester** Scene을 열어 보면 오른쪽 상단에 **OPTION** 버튼이 있는데 옵션창을 통해 테스트에 필요한
-값들을 수정할 수 있습니다. 서버 주소가 로컬로 되어 있으니 서버가 로컬에 있지 않다면 **Server** 항목을
-수정해 주세요.
+**Tester** Scene을 열어 보면 화면 오른쪽 상단에 **OPTION** 버튼이 있는데 옵션창을 통해 테스트에
+필요한 값들을 수정할 수 있습니다. 서버 주소가 로컬로 되어 있으니 서버가 로컬에 있지 않다면 **Server**
+항목을 수정해 주세요.
 
 서버를 띄우고 실행을 하면 여러가지 기능들을 테스트해 볼 수 있습니다.
 서버를 설치하고 아무것도 변경하지 않았다면 기본적으로 TCP, HTTP의 JSON 포트만 열려 있습니다.
