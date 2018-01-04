@@ -15,8 +15,15 @@ public class FunapiManager : MonoBehaviour
     public bool manualTest = false;
 
 
+    public static void StartPlay ()
+    {
+        UnityEditor.EditorApplication.isPlaying = true;
+    }
+
     void Awake ()
     {
+        FunapiDedicatedServer.version = "{ \"version\": \"1.0.0.1\" }";
+
         if (instance_ == null)
         {
             instance_ = this;
@@ -37,7 +44,12 @@ public class FunapiManager : MonoBehaviour
 
         if (!FunapiDedicatedServer.Init())
         {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.Exit(0);
+            //UnityEditor.EditorApplication.isPlaying = false;
+#else
             Application.Quit();
+#endif
             return;
         }
 

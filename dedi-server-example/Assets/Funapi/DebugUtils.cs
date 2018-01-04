@@ -4,9 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
-#define ENABLE_LOG
-#define LOG_LEVEL_2
-#define ENABLE_SAVE_LOG
+//#define ENABLE_SAVE_LOG
 //#define ENABLE_OUTPUT
 
 #if UNITY_EDITOR || NO_UNITY
@@ -58,7 +56,7 @@ namespace Fun
 #if !NO_UNITY
         public static void Log (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG
             string text = getTimeLog("I", string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
@@ -71,7 +69,7 @@ namespace Fun
 
         public static void LogWarning (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG
             string text = getTimeLog("W", string.Format(message, args));
             UnityEngine.Debug.LogWarning(text);
 
@@ -84,7 +82,7 @@ namespace Fun
 
         public static void LogError (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG
             string text = getTimeLog("E", string.Format(message, args));
             UnityEngine.Debug.LogError(text);
 
@@ -97,7 +95,7 @@ namespace Fun
 
         public static void DebugLog1 (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3 || LOG_LEVEL_4)
             string text = getTimeLog("D", string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
@@ -110,7 +108,20 @@ namespace Fun
 
         public static void DebugLog2 (string message, params object[] args)
         {
-#if ENABLE_LOG && LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
+            string text = getTimeLog("D", string.Format(message, args));
+            UnityEngine.Debug.Log(text);
+
+#if ENABLE_OUTPUT
+            if (OutputCallback != null)
+                OutputCallback("D", text);
+#endif
+#endif
+        }
+
+        public static void DebugLog3 (string message, params object[] args)
+        {
+#if ENABLE_LOG && LOG_LEVEL_4
             string text = getTimeLog("D", string.Format(message, args));
             UnityEngine.Debug.Log(text);
 
@@ -123,35 +134,42 @@ namespace Fun
 #else
         public static void Log (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG
             Console.WriteLine(getTimeLog("I", string.Format(message, args)));
 #endif
         }
 
         public static void LogWarning (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG
             Console.WriteLine(getTimeLog("W", string.Format(message, args)));
 #endif
         }
 
         public static void LogError (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG
             Console.WriteLine(getTimeLog("E", string.Format(message, args)));
 #endif
         }
 
         public static void DebugLog1 (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
+#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3 || LOG_LEVEL_4)
             Console.WriteLine(getTimeLog("D", string.Format(message, args)));
 #endif
         }
 
         public static void DebugLog2 (string message, params object[] args)
         {
-#if ENABLE_LOG && LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
+            Console.WriteLine(getTimeLog("D", string.Format(message, args)));
+#endif
+        }
+
+        public static void DebugLog3 (string message, params object[] args)
+        {
+#if ENABLE_LOG && LOG_LEVEL_4
             Console.WriteLine(getTimeLog("D", string.Format(message, args)));
 #endif
         }
@@ -271,7 +289,7 @@ namespace Fun
     {
         protected void setDebugObject (object obj)
         {
-#if ENABLE_LOG && LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
             string str = string.Format("{0:X}", obj.GetHashCode());
             hash_ = str.Length < 6 ? str : str.Substring(0, 6);
 #endif
@@ -279,8 +297,8 @@ namespace Fun
 
         protected void Log (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-#if LOG_LEVEL_3
+#if ENABLE_LOG
+#if LOG_LEVEL_3 || LOG_LEVEL_4
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
             FunDebug.Log(message, args);
@@ -289,8 +307,8 @@ namespace Fun
 
         protected void LogWarning (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-#if LOG_LEVEL_3
+#if ENABLE_LOG
+#if LOG_LEVEL_3 || LOG_LEVEL_4
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
             FunDebug.LogWarning(message, args);
@@ -299,8 +317,8 @@ namespace Fun
 
         protected void LogError (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_1 || LOG_LEVEL_2 || LOG_LEVEL_3)
-#if LOG_LEVEL_3
+#if ENABLE_LOG
+#if LOG_LEVEL_3 || LOG_LEVEL_4
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
             FunDebug.LogError(message, args);
@@ -309,8 +327,8 @@ namespace Fun
 
         protected void DebugLog1 (string message, params object[] args)
         {
-#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3)
-#if LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3 || LOG_LEVEL_4)
+#if LOG_LEVEL_3 || LOG_LEVEL_4
             message = string.Format("[{0}] {1}", hash_, message);
 #endif
             FunDebug.DebugLog1(message, args);
@@ -319,14 +337,22 @@ namespace Fun
 
         protected void DebugLog2 (string message, params object[] args)
         {
-#if ENABLE_LOG && LOG_LEVEL_3
+#if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
             message = string.Format("[{0}] {1}", hash_, message);
             FunDebug.DebugLog2(message, args);
 #endif
         }
 
+        protected void DebugLog3 (string message, params object[] args)
+        {
+#if ENABLE_LOG && LOG_LEVEL_4
+            message = string.Format("[{0}] {1}", hash_, message);
+            FunDebug.DebugLog3(message, args);
+#endif
+        }
 
-#if ENABLE_LOG && LOG_LEVEL_3
+
+#if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
         string hash_ = "";
 #endif
     }
