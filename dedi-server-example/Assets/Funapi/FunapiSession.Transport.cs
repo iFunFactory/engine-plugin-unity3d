@@ -57,6 +57,23 @@ namespace Fun
         public EncryptionType Encryption = EncryptionType.kDefaultEncryption;
         public bool SequenceValidation = false;
         public float ConnectionTimeout = 0f;
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !(obj is TransportOption))
+                return false;
+
+            TransportOption option = obj as TransportOption;
+
+            return Encryption == option.Encryption &&
+                   ConnectionTimeout == option.ConnectionTimeout &&
+                   SequenceValidation == option.SequenceValidation;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
     }
 
     public class TcpTransportOption : TransportOption
@@ -75,12 +92,47 @@ namespace Fun
             PingIntervalSeconds = interval;
             PingTimeoutSeconds = timeout;
         }
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !base.Equals(obj) || !(obj is TcpTransportOption))
+                return false;
+
+            TcpTransportOption option = obj as TcpTransportOption;
+
+            return AutoReconnect == option.AutoReconnect &&
+                   DisableNagle == option.DisableNagle &&
+                   EnablePing == option.EnablePing &&
+                   EnablePingLog == option.EnablePingLog &&
+                   PingIntervalSeconds == option.PingIntervalSeconds &&
+                   PingTimeoutSeconds == option.PingTimeoutSeconds;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
     }
 
     public class HttpTransportOption : TransportOption
     {
         public bool HTTPS = false;
         public bool UseWWW = false;
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !base.Equals(obj) || !(obj is HttpTransportOption))
+                return false;
+
+            HttpTransportOption option = obj as HttpTransportOption;
+
+            return HTTPS == option.HTTPS && UseWWW == option.UseWWW;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
     }
 
 
@@ -313,6 +365,15 @@ namespace Fun
                 get { return option_.SequenceValidation; }
             }
 
+            public bool SendSessionId
+            {
+                set
+                {
+                    lock (session_id_sent_lock_)
+                        session_id_has_been_sent = !value;
+                }
+            }
+
             // ping time in milliseconds
             public int PingTime
             {
@@ -400,12 +461,21 @@ namespace Fun
             protected void initAddress (string hostname, UInt16 port)
             {
                 ip_list_.Add(hostname, port);
-                setNextAddress();
             }
 
             protected void initAddress (string hostname, UInt16 port, bool https)
             {
                 ip_list_.Add(hostname, port, https);
+                setNextAddress();
+            }
+
+            protected void refreshAddress ()
+            {
+                HostAddr addr = address;
+
+                ip_list_.Clear();
+                ip_list_.Add(addr.host, addr.port);
+
                 setNextAddress();
             }
 
@@ -675,7 +745,7 @@ namespace Fun
                     header_buffer.buffer = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(header.ToString()));
                     sending_.Insert(i, header_buffer);
 
-                    DebugLog2("{0} built a message - '{1}' ({2}bytes + {3}bytes)", str_protocol_,
+                    DebugLog3("{0} built a message - '{1}' ({2}bytes + {3}bytes)", str_protocol_,
                               fun_msg.msg_type, header_buffer.buffer.Count, fun_msg.buffer.Count);
                 }
 
@@ -701,7 +771,7 @@ namespace Fun
                 if (next_decoding_offset_ > 0)
                 {
                     // fit in the receive buffer boundary.
-                    DebugLog2("{0} compacting the receive buffer to save {1} bytes.",
+                    DebugLog3("{0} compacting the receive buffer to save {1} bytes.",
                               str_protocol_, next_decoding_offset_);
                     Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0,
                                      received_size_ - next_decoding_offset_);
@@ -711,7 +781,7 @@ namespace Fun
                 }
                 else
                 {
-                    DebugLog2("{0} increasing the receive buffer to {1} bytes.", str_protocol_, new_length);
+                    DebugLog3("{0} increasing the receive buffer to {1} bytes.", str_protocol_, new_length);
                     Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
                     receive_buffer_ = new_buffer;
                 }
@@ -757,7 +827,7 @@ namespace Fun
 
             bool tryToDecodeHeader ()
             {
-                DebugLog2("{0} trying to decode header fields.", str_protocol_);
+                DebugLog3("{0} trying to decode header fields.", str_protocol_);
                 int length = 0;
 
                 for (; next_decoding_offset_ < received_size_; )
@@ -768,7 +838,7 @@ namespace Fun
                     if (offset < 0)
                     {
                         // Not enough bytes. Wait for more bytes to come.
-                        DebugLog2("{0} need more bytes for a header field. Waiting.", str_protocol_);
+                        DebugLog3("{0} need more bytes for a header field. Waiting.", str_protocol_);
                         return false;
                     }
 
@@ -781,7 +851,7 @@ namespace Fun
                     {
                         // End of header.
                         header_decoded_ = true;
-                        DebugLog2("{0} read {1} bytes for header.", str_protocol_, length);
+                        DebugLog3("{0} read {1} bytes for header.", str_protocol_, length);
                         return true;
                     }
 
@@ -790,7 +860,7 @@ namespace Fun
                     {
                         tuple[0] = tuple[0].ToUpper();
                         header_fields_[tuple[0]] = tuple[1];
-                        DebugLog2("  > {0} header '{1} : {2}'", str_protocol_, tuple[0], tuple[1]);
+                        DebugLog3("  > {0} header '{1} : {2}'", str_protocol_, tuple[0], tuple[1]);
                     }
                     else
                     {
@@ -849,19 +919,19 @@ namespace Fun
                 int body_length = Convert.ToInt32(header_fields_[kLengthHeaderField]);
                 if (body_length > 0)
                 {
-                    DebugLog2("{0} message body is {1} bytes. Buffer has {2} bytes.",
+                    DebugLog3("{0} message body is {1} bytes. Buffer has {2} bytes.",
                               str_protocol_, body_length, received_size_ - next_decoding_offset_);
                 }
                 else
                 {
-                    DebugLog2("{0} {1} bytes left in buffer.",
+                    DebugLog3("{0} {1} bytes left in buffer.",
                               str_protocol_, received_size_ - next_decoding_offset_);
                 }
 
                 if (received_size_ - next_decoding_offset_ < body_length)
                 {
                     // Need more bytes.
-                    DebugLog2("{0} need more bytes for a message body. Waiting.", str_protocol_);
+                    DebugLog3("{0} need more bytes for a message body. Waiting.", str_protocol_);
                     return false;
                 }
 
@@ -1025,6 +1095,15 @@ namespace Fun
                 if (ReceivedCallback != null)
                     ReceivedCallback(new FunapiMessage(protocol_, msg_type, message));
             }
+
+            protected void onFailedSending ()
+            {
+                lock (sending_lock_)
+                    sending_.Clear();
+
+                LogWarning("{0} sending failed. Clears the sending buffer.", str_protocol_);
+            }
+
 
             //---------------------------------------------------------------------
             // Ping-related functions
@@ -1319,29 +1398,21 @@ namespace Fun
 
             public override bool Started
             {
-                get { return sock_ != null && sock_.Connected && state_ >= State.kConnected; }
+                get
+                {
+                    lock (sock_lock_)
+                        return sock_ != null && sock_.Connected && state_ >= State.kConnected;
+                }
             }
 
             protected override void setAddress (HostAddr addr)
             {
-                IPAddress ip = null;
-                if (addr is HostIP)
-                {
-                    ip = ((HostIP)addr).ip;
-                }
-                else
-                {
-                    IPHostEntry host_info = Dns.GetHostEntry(addr.host);
-                    FunDebug.Assert(host_info.AddressList.Length > 0);
-                    ip = host_info.AddressList[0];
-                }
-
-                ip_af_ = ip.AddressFamily;
-                connect_ep_ = new IPEndPoint(ip, addr.port);
+                FunDebug.Assert(addr is HostIP);
+                addr_ = (HostIP)addr;
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
                 Log("TCP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}, Reconnect:{6}, Nagle:{7}, Ping:{8}",
-                    ip, addr.port, convertString(encoding_), convertString(tcp_option.Encryption),
+                    addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
                     tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
                     tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
             }
@@ -1349,21 +1420,31 @@ namespace Fun
             protected override void onStart ()
             {
                 state_ = State.kConnecting;
-                sock_ = new Socket(ip_af_, SocketType.Stream, ProtocolType.Tcp);
 
-                bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
-                if (disable_nagle)
-                    sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+                refreshAddress();
 
-                sock_.BeginConnect(connect_ep_, new AsyncCallback(this.startCb), this);
+                lock (sock_lock_)
+                {
+                    sock_ = new Socket(addr_.ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+
+                    bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
+                    if (disable_nagle)
+                        sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+
+                    IPAddress[] list = Dns.GetHostAddresses(addr_.host);
+                    sock_.BeginConnect(list, address.port, new AsyncCallback(this.startCb), this);
+                }
             }
 
             protected override void onClose ()
             {
-                if (sock_ != null)
+                lock (sock_lock_)
                 {
-                    sock_.Close();
-                    sock_ = null;
+                    if (sock_ != null)
+                    {
+                        sock_.Close();
+                        sock_ = null;
+                    }
                 }
             }
 
@@ -1386,12 +1467,13 @@ namespace Fun
 
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
 
-                    DebugLog2("TCP sending {0} bytes.", length);
-
-                    sock_.BeginSend(list, 0, new AsyncCallback(this.sendBytesCb), this);
+                        sock_.BeginSend(list, SocketFlags.None, new AsyncCallback(this.sendBytesCb), this);
+                    }
                 }
                 catch (ObjectDisposedException)
                 {
@@ -1409,28 +1491,31 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
-
-                    sock_.EndConnect(ar);
-                    if (sock_.Connected == false)
+                    lock (sock_lock_)
                     {
-                        last_error_code_ = TransportError.Type.kConnectingFailed;
-                        last_error_message_ = string.Format("TCP connection failed.");
-                        event_.Add(onFailure);
-                        return;
-                    }
-                    DebugLog1("TCP transport connected. Starts handshaking..");
+                        if (sock_ == null)
+                            return;
 
-                    state_ = State.kHandshaking;
+                        sock_.EndConnect(ar);
+                        if (sock_.Connected == false)
+                        {
+                            last_error_code_ = TransportError.Type.kConnectingFailed;
+                            last_error_message_ = string.Format("TCP connection failed.");
+                            event_.Add(onFailure);
+                            return;
+                        }
+                        DebugLog1("TCP transport connected. Starts handshaking..");
 
-                    lock (receive_lock_)
-                    {
-                        // Wait for handshaking message.
-                        ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
-                        List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                        buffer.Add(wrapped);
-                        sock_.BeginReceive(buffer, 0, new AsyncCallback(this.receiveBytesCb), this);
+                        state_ = State.kHandshaking;
+
+                        lock (receive_lock_)
+                        {
+                            // Wait for handshaking message.
+                            ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
+                            List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                            buffer.Add(wrapped);
+                            sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                        }
                     }
                 }
                 catch (ObjectDisposedException)
@@ -1449,10 +1534,15 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nSent = 0;
 
-                    int nSent = sock_.EndSend(ar);
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nSent = sock_.EndSend(ar);
+                    }
                     FunDebug.Assert(nSent > 0, "TCP failed to transfer messages.");
 
                     DebugLog2("TCP sent {0} bytes.", nSent);
@@ -1472,13 +1562,13 @@ namespace Fun
                             if (sending_[0].buffer.Count > nSent)
                             {
                                 // partial data
-                                DebugLog2("TCP partially sent. Will resume. (buffer:{0}, nSent:{1})",
+                                DebugLog3("TCP partially sent. Will resume. (buffer:{0}, nSent:{1})",
                                           sending_[0].buffer.Count, nSent);
                                 break;
                             }
                             else
                             {
-                                DebugLog2("TCP remove buffer - '{0}' ({1}bytes)",
+                                DebugLog3("TCP remove buffer - '{0}' ({1}bytes)",
                                           sending_[0].msg_type, sending_[0].buffer.Count);
 
                                 // fully sent.
@@ -1489,7 +1579,7 @@ namespace Fun
                             // for empty body.
                             if (sending_.Count > 0 && sending_[0].buffer.Count <= 0)
                             {
-                                DebugLog2("TCP remove buffer - '{0}' (0bytes)", sending_[0].msg_type);
+                                DebugLog3("TCP remove buffer - '{0}' (0bytes)", sending_[0].msg_type);
                                 sending_.RemoveAt(0);
                             }
                         }
@@ -1504,7 +1594,7 @@ namespace Fun
                             ArraySegment<byte> adjusted = new ArraySegment<byte>(
                                 original.Array, original.Offset + nSent, original.Count - nSent);
                             sending_[0].buffer = adjusted;
-                            DebugLog2("TCP partially sending {0} bytes. {1} bytes already sent.", adjusted.Count, nSent);
+                            DebugLog3("TCP partially sending {0} bytes. {1} bytes already sent.", adjusted.Count, nSent);
                         }
 
                         sendPendingMessages();
@@ -1526,24 +1616,27 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nRead = 0;
+
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nRead = sock_.EndReceive(ar);
+                    }
 
                     lock (receive_lock_)
                     {
-                        int nRead = sock_.EndReceive(ar);
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            DebugLog2("TCP received {0} bytes. Buffer has {1} bytes.",
+                            DebugLog3("TCP received {0} bytes. Buffer has {1} bytes.",
                                       nRead, received_size_ - next_decoding_offset_);
-                        }
 
-                        // Decoding a messages
-                        tryToDecodeMessage();
+                            // Decoding a messages
+                            tryToDecodeMessage();
 
-                        if (nRead > 0)
-                        {
                             // Checks buffer space
                             checkReceiveBuffer();
 
@@ -1554,9 +1647,12 @@ namespace Fun
                             List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
                             buffer.Add(residual);
 
-                            sock_.BeginReceive(buffer, 0, new AsyncCallback(this.receiveBytesCb), this);
-                            DebugLog2("TCP ready to receive more. We can receive upto {0} more bytes.",
-                                      receive_buffer_.Length - received_size_);
+                            lock (sock_lock_)
+                            {
+                                sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                                DebugLog3("TCP ready to receive more. We can receive upto {0} more bytes.",
+                                          receive_buffer_.Length - received_size_);
+                            }
                         }
                         else
                         {
@@ -1570,7 +1666,7 @@ namespace Fun
 
                             last_error_code_ = TransportError.Type.kDisconnected;
                             last_error_message_ = "TCP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected);
+                            event_.Add(onDisconnected, 1f);
                         }
                     }
                 }
@@ -1591,8 +1687,8 @@ namespace Fun
 
 
             Socket sock_;
-            AddressFamily ip_af_;
-            IPEndPoint connect_ep_;
+            HostIP addr_;
+            object sock_lock_ = new object();
         }
 
 
@@ -1612,32 +1708,20 @@ namespace Fun
 
             public override bool Started
             {
-                get { return sock_ != null && state_ >= State.kConnected; }
+                get
+                {
+                    lock (sock_lock_)
+                        return sock_ != null && state_ >= State.kConnected;
+                }
             }
 
             protected override void setAddress (HostAddr addr)
             {
-                IPAddress ip = null;
-                if (addr is HostIP)
-                {
-                    ip = ((HostIP)addr).ip;
-                }
-                else
-                {
-                    IPHostEntry host_info = Dns.GetHostEntry(addr.host);
-                    FunDebug.Assert(host_info.AddressList.Length > 0);
-                    ip = host_info.AddressList[0];
-                }
-
-                ip_af_ = ip.AddressFamily;
-                send_ep_ = new IPEndPoint(ip, addr.port);
-                if (ip_af_ == AddressFamily.InterNetwork)
-                    receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr.port);
-                else
-                    receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr.port);
+                FunDebug.Assert(addr is HostIP);
+                addr_ = (HostIP)addr;
 
                 Log("UDP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}",
-                    ip, addr.port, convertString(encoding_), convertString(option_.Encryption),
+                    addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
                     option_.SequenceValidation, option_.ConnectionTimeout);
             }
 
@@ -1645,28 +1729,40 @@ namespace Fun
             {
                 state_ = State.kConnected;
 
-                sock_ = new Socket(ip_af_, SocketType.Dgram, ProtocolType.Udp);
+                refreshAddress();
+
+                lock (sock_lock_)
+                {
+                    sock_ = new Socket(addr_.ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                    sock_.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
 #if FIXED_UDP_LOCAL_PORT
-                int port = LocalPort.Next();
-                if (ip_af_ == AddressFamily.InterNetwork)
-                    sock_.Bind(new IPEndPoint(IPAddress.Any, port));
-                else
-                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+                    int port = LocalPort.Next();
+                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
+                        sock_.Bind(new IPEndPoint(IPAddress.Any, port));
+                    else
+                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
 #else
-                if (ip_af_ == AddressFamily.InterNetwork)
-                    sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
-                else
-                    sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
+                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
+                        sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    else
+                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
 #endif
 
-                IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
-                DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
+                    IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
+                    DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
 
-                lock (receive_lock_)
-                {
-                    sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
-                                           ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
+                    send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
+                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
+                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr_.port);
+                    else
+                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr_.port);
+
+                    lock (receive_lock_)
+                    {
+                        sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
+                                               ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
+                    }
                 }
 
                 onStarted();
@@ -1674,10 +1770,13 @@ namespace Fun
 
             protected override void onClose ()
             {
-                if (sock_ != null)
+                lock (sock_lock_)
                 {
-                    sock_.Close();
-                    sock_ = null;
+                    if (sock_ != null)
+                    {
+                        sock_.Close();
+                        sock_ = null;
+                    }
                 }
             }
 
@@ -1717,8 +1816,11 @@ namespace Fun
                 {
                     try
                     {
-                        sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
-                                          send_ep_, new AsyncCallback(this.sendBytesCb), this);
+                        lock (sock_lock_)
+                        {
+                            sock_.BeginSendTo(send_buffer_, 0, offset, SocketFlags.None,
+                                              send_ep_, new AsyncCallback(this.sendBytesCb), this);
+                        }
                     }
                     catch (ObjectDisposedException)
                     {
@@ -1731,14 +1833,19 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nSent = 0;
+
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nSent = sock_.EndSend(ar);
+                        FunDebug.Assert(nSent > 0, "UDP failed to transfer messages.");
+                    }
 
                     lock (sending_lock_)
                     {
-                        int nSent = sock_.EndSend(ar);
-                        FunDebug.Assert(nSent > 0, "UDP failed to transfer messages.");
-
                         FunDebug.Assert(sending_.Count >= 2);
                         DebugLog2("UDP sent a message - '{0}' ({1}bytes)", sending_[1].msg_type, nSent);
 
@@ -1766,6 +1873,8 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
+                    onFailedSending();
+
                     last_error_code_ = TransportError.Type.kSendingFailed;
                     last_error_message_ = "UDP failure in sendBytesCb: " + e.ToString();
                     event_.Add(onFailure);
@@ -1776,16 +1885,22 @@ namespace Fun
             {
                 try
                 {
-                    if (sock_ == null)
-                        return;
+                    int nRead = 0;
+
+                    lock (sock_lock_)
+                    {
+                        if (sock_ == null)
+                            return;
+
+                        nRead = sock_.EndReceive(ar);
+                    }
 
                     lock (receive_lock_)
                     {
-                        int nRead = sock_.EndReceive(ar);
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            DebugLog2("UDP received {0} bytes. Buffer has {1} bytes.",
+                            DebugLog3("UDP received {0} bytes. Buffer has {1} bytes.",
                                       nRead, received_size_ - next_decoding_offset_);
                         }
 
@@ -1798,14 +1913,17 @@ namespace Fun
                             received_size_ = 0;
                             next_decoding_offset_ = 0;
 
-                            // Starts another async receive
-                            sock_.BeginReceiveFrom(receive_buffer_, received_size_,
-                                                   receive_buffer_.Length - received_size_,
-                                                   SocketFlags.None, ref receive_ep_,
-                                                   new AsyncCallback(this.receiveBytesCb), this);
+                            lock (sock_lock_)
+                            {
+                                // Starts another async receive
+                                sock_.BeginReceiveFrom(receive_buffer_, received_size_,
+                                                       receive_buffer_.Length - received_size_,
+                                                       SocketFlags.None, ref receive_ep_,
+                                                       new AsyncCallback(this.receiveBytesCb), this);
 
-                            DebugLog2("UDP ready to receive more. We can receive upto {0} more bytes",
-                                      receive_buffer_.Length);
+                                DebugLog3("UDP ready to receive more. We can receive upto {0} more bytes",
+                                          receive_buffer_.Length);
+                            }
                         }
                         else
                         {
@@ -1891,9 +2009,10 @@ namespace Fun
 
             // member variables
             Socket sock_;
-            AddressFamily ip_af_;
+            HostIP addr_;
             IPEndPoint send_ep_;
             EndPoint receive_ep_;
+            object sock_lock_ = new object();
 
             // This length is 64KB minus 8 bytes UDP header and 48 bytes IP header.
             // (IP header size is based on IPV6. IPV4 uses 20 bytes.)
@@ -2239,7 +2358,7 @@ namespace Fun
                             return;
                         }
 
-                        DebugLog2("HTTP received {0} bytes.", received_size_);
+                        DebugLog3("HTTP received {0} bytes.", received_size_);
 
                         lock (receive_lock_)
                         {
@@ -2324,7 +2443,7 @@ namespace Fun
                         Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
                         received_size_ += www.bytes.Length;
 
-                        DebugLog2("HTTP received {0} bytes.", received_size_);
+                        DebugLog3("HTTP received {0} bytes.", received_size_);
 
                         // Decoding a message
                         tryToDecodeMessage();

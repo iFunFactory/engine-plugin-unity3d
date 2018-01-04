@@ -18,6 +18,8 @@ namespace Fun
     {
         private FunapiDedicatedServer () {}
 
+        public static string version { private get; set; }
+
         public static bool isServer { get; private set; }
 
         public static bool isActive { get; private set; }
@@ -28,7 +30,7 @@ namespace Fun
         public static bool Init ()
         {
             string commandLine = System.Environment.CommandLine;
-            if (!commandLine.Contains("-batchmode"))
+            if (!commandLine.Contains("-RunDedicatedServer"))
                 return true;
 
             return instance.readCommandLineArgs();
@@ -57,11 +59,6 @@ namespace Fun
         public static string GetUserDataJsonString (string uid)
         {
             return instance.getUserData(uid);
-        }
-
-        public static string GetMatchDataJsonString()
-        {
-            return instance.match_data_;
         }
 
         public static bool AuthUser (string uid, string token)
@@ -118,6 +115,7 @@ namespace Fun
 
             Dictionary<string, string> arg_list = new Dictionary<string, string>();
             string [] args = System.Environment.GetCommandLineArgs();
+            bool sendVersion = false;
 
             foreach (string n in args)
             {
@@ -129,16 +127,37 @@ namespace Fun
                     arg_list.Add(key, value);
                     FunDebug.DebugLog1("command argument - key:{0} value:{1}", key, value);
                 }
+                else if (n.Contains(kServerVersion))
+                {
+                    sendVersion = true;
+                }
             }
 
             if (arg_list.ContainsKey(kManagerServer))
             {
-                server_url_ = string.Format("http://{0}/match/{1}/",
-                                            arg_list[kManagerServer], arg_list[kMatchId]);
+                server_url_ = string.Format("http://{0}/", arg_list[kManagerServer]);
+                server_url_with_match_id_ = string.Format("{0}match/{1}/", server_url_, arg_list[kMatchId]);
             }
             else
             {
                 FunDebug.LogError("'{0}' parameter is required.", kManagerServer);
+                return false;
+            }
+
+            if (sendVersion)
+            {
+                if (string.IsNullOrEmpty(version))
+                {
+                    FunDebug.LogWarning("Need to set the dedicated server version.");
+                }
+                else
+                {
+                    instance.httpPost(CmdVersion, version, delegate (object obj)
+                    {
+                        FunDebug.Log("Sent the dedicated server version. ({0})", version);
+                    });
+                }
+
                 return false;
             }
 
@@ -248,9 +267,8 @@ namespace Fun
                 else
                     json_string = FunapiMessage.JsonHelper.Serialize(data["match_data"]);
 
-                if (match_data_ != json_string)
+                if (json_string.Length > 0)
                 {
-                    match_data_ = json_string;
                     if (MatchDataCallback != null)
                         MatchDataCallback(json_string);
                 }
@@ -307,6 +325,11 @@ namespace Fun
         }
 
 
+        bool needMatchId (string command)
+        {
+            return command != CmdVersion;
+        }
+
         void httpGet (string command, Action<object> callback = null)
         {
             webRequest("GET", command, "", callback);
@@ -324,10 +347,10 @@ namespace Fun
 
         void webRequest (string method, string command, string data, Action<object> callback)
         {
-            if (!isActive)
+            if (!isActive && needMatchId(command))
                 return;
 
-            string url = server_url_ + command;
+            string url = (needMatchId(command) ? server_url_with_match_id_ : server_url_) + command;
             FunDebug.DebugLog1("FunapiDedicatedServer.webRequest called.\n  {0} {1}", method, url);
 
             // Request
@@ -502,10 +525,12 @@ namespace Fun
         public static event MatchDataHandler MatchDataCallback;
 
         static readonly string kInstanceName = "Fun.DedicatedServer";
+        static readonly string kServerVersion = "FunapiVersion";
         static readonly string kManagerServer = "FunapiManagerServer";
         static readonly string kMatchId = "FunapiMatchID";
         static readonly string kHeartbeat = "FunapiHeartbeat";
         static readonly string kPort = "port";
+        static readonly string CmdVersion = "server/version";
 
         static readonly string[] kHeaderSeparator = { ":", "\n" };
 
@@ -514,9 +539,9 @@ namespace Fun
         object lock_user_data_ = new object();
         Dictionary<string, string> users_ = new Dictionary<string, string>();
         Dictionary<string, string> user_data_ = new Dictionary<string, string>();
-        string match_data_;
 
         string server_url_ = "";
+        string server_url_with_match_id_ = "";
         float heartbeat_seconds_ = 0f;
         float update_pending_seconds_ = 5f;
     }

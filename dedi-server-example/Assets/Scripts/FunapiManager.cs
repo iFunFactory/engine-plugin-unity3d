@@ -15,8 +15,15 @@ public class FunapiManager : MonoBehaviour
     public bool manualTest = false;
 
 
+    public static void StartPlay ()
+    {
+        UnityEditor.EditorApplication.isPlaying = true;
+    }
+
     void Awake ()
     {
+        FunapiDedicatedServer.version = "{ \"version\": \"1.0.0.1\" }";
+
         if (instance_ == null)
         {
             instance_ = this;
@@ -37,7 +44,12 @@ public class FunapiManager : MonoBehaviour
 
         if (!FunapiDedicatedServer.Init())
         {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.Exit(0);
+            //UnityEditor.EditorApplication.isPlaying = false;
+#else
             Application.Quit();
+#endif
             return;
         }
 
@@ -131,7 +143,7 @@ public class FunapiManager : MonoBehaviour
             {
                 LobbyMainMenu mainMenu = panel.GetComponent<LobbyMainMenu>();
                 if (mainMenu != null)
-                    mainMenu.OnClickJoin();
+                    mainMenu.StartJoin();
             }
         }
     }
@@ -142,6 +154,10 @@ public class FunapiManager : MonoBehaviour
 
     void onReceivedMatchData (string json_string)
     {
+        if (send_ready_)
+            return;
+
+        send_ready_ = true;
         FunapiDedicatedServer.Ready();
     }
 
@@ -151,6 +167,7 @@ public class FunapiManager : MonoBehaviour
 
     FunapiSession session_ = null;
     bool started_ = false;
+    bool send_ready_ = false;
 
     static string uid_ = "";
     static string token_ = "";
