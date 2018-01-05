@@ -1,0 +1,1 @@
+"C:\Program Files\Unity\Editor\Unity.exe" -projectPath C:\work\funapi-plugin-unity5_64\dedi-server-example -executeMethod FunapiManager.StartPlay %*

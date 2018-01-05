@@ -33,9 +33,15 @@ namespace Prototype.NetworkLobby
 
         public void OnClickJoin()
         {
+            lobbyManager.networkAddress = ipInput.text;
+
+            StartJoin();
+        }
+
+        public void StartJoin()
+        {
             lobbyManager.ChangeTo(lobbyPanel);
 
-            lobbyManager.networkAddress = ipInput.text;
             lobbyManager.StartClient();
 
             lobbyManager.backDelegate = lobbyManager.StopClientClbk;

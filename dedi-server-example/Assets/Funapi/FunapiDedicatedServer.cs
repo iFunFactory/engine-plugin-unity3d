@@ -4,6 +4,10 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+#if !FUNAPI_DEDICATED_SERVER
+#pragma warning disable 67
+#endif
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -16,6 +20,31 @@ namespace Fun
 {
     public class FunapiDedicatedServer : MonoBehaviour
     {
+        static readonly string kInstanceName = "Fun.DedicatedServer";
+        static FunapiDedicatedServer instance_ = null;
+
+        static FunapiDedicatedServer instance
+        {
+            get
+            {
+                if (instance_ == null)
+                {
+                    GameObject obj = GameObject.Find(kInstanceName);
+                    if (obj == null)
+                    {
+                        obj = new GameObject(kInstanceName);
+                        obj.AddComponent<FunapiDedicatedServer>();
+
+                        DontDestroyOnLoad(obj);
+                    }
+
+                    instance_ = obj.GetComponent<FunapiDedicatedServer>();
+                }
+
+                return instance_;
+            }
+        }
+
         private FunapiDedicatedServer () {}
 
         public static string version { private get; set; }
@@ -27,7 +56,8 @@ namespace Fun
         public static int serverPort { get; private set; }
 
 
-        public static bool Init ()
+#if FUNAPI_DEDICATED_SERVER
+        public static bool Init()
         {
             string commandLine = System.Environment.CommandLine;
             if (!commandLine.Contains("-RunDedicatedServer"))
@@ -86,28 +116,6 @@ namespace Fun
             instance.httpPost("result", json_string);
         }
 
-
-        static FunapiDedicatedServer instance
-        {
-            get
-            {
-                if (instance_ == null)
-                {
-                    GameObject obj = GameObject.Find(kInstanceName);
-                    if (obj == null)
-                    {
-                        obj = new GameObject(kInstanceName);
-                        obj.AddComponent<FunapiDedicatedServer>();
-
-                        DontDestroyOnLoad(obj);
-                    }
-
-                    instance_ = obj.GetComponent<FunapiDedicatedServer>();
-                }
-
-                return instance_;
-            }
-        }
 
         bool readCommandLineArgs ()
         {
@@ -518,13 +526,6 @@ namespace Fun
             public Action<object> callback = null;
         }
 
-        public delegate void UserDataHandler (string uid, string json_string);
-        public delegate void MatchDataHandler (string json_string);
-
-        public static event UserDataHandler UserDataCallback;
-        public static event MatchDataHandler MatchDataCallback;
-
-        static readonly string kInstanceName = "Fun.DedicatedServer";
         static readonly string kServerVersion = "FunapiVersion";
         static readonly string kManagerServer = "FunapiManagerServer";
         static readonly string kMatchId = "FunapiMatchID";
@@ -534,8 +535,6 @@ namespace Fun
 
         static readonly string[] kHeaderSeparator = { ":", "\n" };
 
-        static FunapiDedicatedServer instance_ = null;
-
         object lock_user_data_ = new object();
         Dictionary<string, string> users_ = new Dictionary<string, string>();
         Dictionary<string, string> user_data_ = new Dictionary<string, string>();
@@ -544,5 +543,32 @@ namespace Fun
         string server_url_with_match_id_ = "";
         float heartbeat_seconds_ = 0f;
         float update_pending_seconds_ = 5f;
+#else
+        public static bool Init() { return false; }
+
+        public static void Start() { }
+
+        public static void Ready() { }
+
+        public static void Stop() { }
+
+        public static void SendJoined(string uid) { }
+
+        public static void SendLeft(string uid) { }
+
+        public static void SendCustomCallback(string json_string) { }
+
+        public static void SendResult(string json_string) { }
+
+        public static string GetUserDataJsonString(string uid) { return ""; }
+
+        public static bool AuthUser(string uid, string token) { return false; }
+#endif
+
+        public delegate void UserDataHandler(string uid, string json_string);
+        public delegate void MatchDataHandler(string json_string);
+
+        public static event UserDataHandler UserDataCallback;
+        public static event MatchDataHandler MatchDataCallback;
     }
 }
