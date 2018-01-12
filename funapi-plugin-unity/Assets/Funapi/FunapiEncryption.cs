@@ -581,6 +581,9 @@ namespace Fun
 
         protected bool encryptMessage (FunapiMessage message, EncryptionType type, ref string header)
         {
+            if (type == EncryptionType.kDummyEncryption)
+                return true;
+
             if (!encryptors_.ContainsKey(type))
             {
                 LogWarning("Encryptor.encryptMessage - Unavailable type: {0}", type);
@@ -614,6 +617,9 @@ namespace Fun
         protected bool decryptMessage (ArraySegment<byte> buffer, string encryption_type, string encryption_header)
         {
             EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
+            if (type == EncryptionType.kDummyEncryption)
+                return true;
+
             if (!encryptors_.ContainsKey(type))
             {
                 LogWarning("Encryptor.decryptMessage - Unavailable type: {0}", type);
