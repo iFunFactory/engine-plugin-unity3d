@@ -410,6 +410,13 @@ namespace Fun
                 }
             }
 
+            public void ForcedDisconnect()
+            {
+                LogWarning("{0} forcibly closed the connection for testing.", str_protocol_);
+                onClose();
+                event_.Add(onDisconnected);
+            }
+
             protected abstract void setAddress (HostAddr addr);
 
             // Creates a socket.
