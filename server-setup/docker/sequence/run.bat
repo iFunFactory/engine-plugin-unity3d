@@ -1,0 +1,1 @@
+docker run -t --name plugin-sequence -p 8041:8041 -p 8042:8042/udp -p 8043:8043 -p 8047:8047 -p 8048:8048/udp -p 8049:8049 plugin:sequence

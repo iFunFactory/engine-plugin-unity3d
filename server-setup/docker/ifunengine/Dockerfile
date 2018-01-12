@@ -1,5 +1,5 @@
 FROM ubuntu:16.04
-MAINTAINER Eunhee Lee <arin@ifunfactory.com>
+LABEL MAINTAINER "arin@ifunfactory.com"
 
 RUN apt-get update && \
     apt-get install -y wget lsb apt-transport-https

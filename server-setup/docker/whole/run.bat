@@ -1,1 +1,1 @@
-docker run -t --name plugin-whole -p 8032:8032 -p 8033:8033/udp -p 8038:8038 -p 8042:8042 -p 8043:8043/udp -p 8048:8048 plugin:whole
+docker run -t --name plugin-whole -p 8021:8021 -p 8022:8022/udp -p 8023:8023 -p 8027:8027 -p 8028:8028/udp -p 8029:8029 plugin:whole

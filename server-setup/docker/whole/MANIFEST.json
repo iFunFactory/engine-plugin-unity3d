@@ -36,19 +36,23 @@
             "internal_threads_size": 4
           },
           "SessionService": {
-            "tcp_json_port": 8032,
-            "udp_json_port": 8033,
-            "http_json_port": 8038,
-            "tcp_protobuf_port": 8042,
-            "udp_protobuf_port": 8043,
-            "http_protobuf_port": 8048,
+            "tcp_json_port": 8021,
+            "udp_json_port": 8022,
+            "http_json_port": 8023,
+            "websocket_json_port": 0,
+            "tcp_protobuf_port": 8027,
+            "udp_protobuf_port": 8028,
+            "http_protobuf_port": 8029,
+            "websocket_protobuf_port": 0,
             "session_timeout_in_second" : 300,
             "use_session_reliability": true,
+            "delayed_ack_interval_in_ms": 0,
             "use_sequence_number_validation": false,
-            "use_encryption": true,
-            "tcp_encryptions": ["ife1", "ife2", "chacha20", "aes128"],
-            "udp_encryptions": ["ife2"],
-            "http_encryptions": ["ife2"],
+            "use_encryption": false,
+            "tcp_encryptions": ["ife1", "ife2", "chacha20", "aes128", "dummy"],
+            "udp_encryptions": ["ife2", "dummy"],
+            "http_encryptions": ["ife2", "dummy"],
+            "websocket_encryptions":[],
             "encryption_ecdh_key": "02d87cf9965f27cec9dd399b00cde2fb1c39af4711df5a1cb96a79f597c2e1b8",
             "disable_tcp_nagle": true,
             "enable_http_message_list": true,
@@ -61,7 +65,15 @@
             "close_transport_when_session_close": true,
             "send_session_id_as_string": false,
             "send_session_id_only_once": true,
-            "network_io_threads_size": 4
+            "network_io_threads_size": 4,
+            "use_ssl_on_tcp_json": false,
+            "use_ssl_on_tcp_protobuf": false,
+            "use_ssl_on_http_json": false,
+            "use_ssl_on_http_protobuf": false,
+            "ssl_certification_path": "",
+            "ssl_passphrase": "",
+            "ssl_private_key_path": "",
+            "ssl_ciphers": "ECDH+AESGCM:ECDH+AES256:ECDH+AES128:RSA+AESGCM:!aNULL:!eNULL:!3DES:!MD5:!EXP:!PSK:!SRP:!DSS:!RC4:!SEED"
           },
           "Timer": {},
           "Object": {
@@ -81,6 +93,7 @@
             "db_character_set": "utf8",
             "use_db_select_transaction_isolation_level_read_uncommitted": true,
             "use_db_stored_procedure": true,
+            "use_db_stored_procedure_full_name": true,
             "export_db_schema": false,
             "use_db_char_type_for_object_id": false,
             "enable_assert_no_rollback" : true,
@@ -92,28 +105,31 @@
             "redirection_strict_check_server_id": true,
             // Secret hexdecimal string used to protect redirection-procedure
             // from tampering.
-            "redirection_secret": "403f217b685f437df905541b5e3286f1725153f7a95e63d1c0158731d52c0d5f"
+            "redirection_secret": "403f217b685f437df905541b5e3286f1725153f7a95e63d1c0158731d52c0d5f",
+            // If you prefer to use a hostname over a IP address, set
+            // redirection_prefer_hostname to "true".
+            "redirection_prefer_hostname": true
           },
           "CounterService": {
             "counter_flush_interval_in_sec": 0,
             "counter_monitoring_interval_in_sec": 30,
             "warning_threshold_event_queue_length": 3000,
             "warning_threshold_outstanding_fetch_query": 5000,
-            "warning_threshold_outstanding_update_query": 5000
+            "warning_threshold_outstanding_update_query": 5000,
+            "warning_threshold_slow_query_in_sec": 1,
+            "warning_threshold_slow_distribution_in_sec": 3
           },
           "RuntimeConfiguration": {
             "enable_runtime_configuration": true,
             "additional_configurations": []
           },
           "ApiService": {
-            "api_service_port": 8044,
+            "api_service_port": 8014,
             "api_service_event_tags_size": 1,
             "api_service_logging_level": 2
           },
-          "AuthenticationClient": {
-            "use_authenticator" : false,
-            "remote_authenticator_ip_address" : "127.0.0.1",
-            "remote_authenticator_port" : 12800
+          "AuthenticationService": {
+            "use_authentication_service": false
           },
           "BillingClient": {
             "use_biller" : false,
@@ -133,8 +149,8 @@
             }
           },
           "ClientResourceService": {
-            "use_client_resource_service" : true,
-            "client_resource_service_port" : 8020,
+            "use_client_resource_service" : false,
+            "client_resource_service_port" : 0,
             "client_resource_dir" : "client_data",
             "client_resource_url_base": "",
             "client_resource_list_url": "",
@@ -165,6 +181,7 @@
             "redis_servers": {
               "": {
                 "address": "127.0.0.1:6379",
+                "database": 0,
                 "auth_pass": ""
               }
             },
@@ -172,6 +189,7 @@
               "": {
                 "master_name": "mymaster",
                 "addresses": ["127.0.0.1:26379"],
+                "database": 0,
                 "auth_pass": ""
               }
             },
@@ -181,10 +199,19 @@
             "under_maintenance": false,
             "maintenance_data_path": ""
           },
+          "DedicatedServerRpcService": {
+            "dedicated_server_rpc_enabled": false,
+            "dedicated_server_rpc_threads_size": 4,
+            "dedicated_server_rpc_port": 8016,
+            "dedicated_server_rpc_nic_name" : "",
+            "dedicated_server_rpc_use_public_address": false,
+            "dedicated_server_rpc_message_logging_level": 0,
+            "dedicated_server_rpc_disable_tcp_nagle": true
+          },
           "RpcService": {
             "rpc_enabled": false,
             "rpc_threads_size": 4,
-            "rpc_port": 8045,
+            "rpc_port": 8015,
             "rpc_nic_name": "",  // if not specified, uses first NIC appeared in predictable network interface names.
             "rpc_tags": [],
             "rpc_message_logging_level": 0,
@@ -205,6 +232,28 @@
           "CrossServerStorage": {
             "enable_cross_server_storage": false,
             "redis_tag_for_cross_server_storage": ""
+          },
+          "WorldManager": {
+            "world_index_block_length": 500,
+            "tag_rpc_with_world_name": true,
+            "worlds": {
+              // "earth": {
+              //   "channel": 0,
+              //   "local": false,
+              //   "zones": [
+              //     {"name": "KennedySpaceCenter",
+              //      "type": "portal",
+              //      "sphere": {"x": 1000, "y": 1000, "z": 10, "r": 30},
+              //      "arguments": {
+              //        "destination_world": "moon",
+              //        "coordinates": { "x": 0, "y": 0, "z": 0 }
+              //      }
+              //     }
+              //   ]
+              // },
+              // "moon": {
+              // }
+            }
           }
       },
       "library": "libplugin.so"
