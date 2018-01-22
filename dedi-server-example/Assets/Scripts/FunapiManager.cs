@@ -17,7 +17,9 @@ public class FunapiManager : MonoBehaviour
 
     public static void StartPlay ()
     {
+#if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = true;
+#endif
     }
 
     void Awake ()
