@@ -245,22 +245,6 @@ namespace Fun
             Connect();
         }
 
-        public void Redirect (HostAddr addr)
-        {
-            Log("'{0}' Try to redirect to server. {1}:{2}", str_protocol, addr.host, addr.port);
-
-            if (Started) {
-                Stop();
-            }
-
-            event_.Add(
-                delegate {
-                    cstate_ = ConnectState.kRedirecting;
-                    Connect(addr);
-                }
-            );
-        }
-
         // Checks connection list
         protected void CheckConnectList ()
         {
