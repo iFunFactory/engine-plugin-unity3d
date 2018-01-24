@@ -23,6 +23,23 @@ using funapi.network.ping_message;
 
 namespace Fun
 {
+    // Funapi transport protocol
+    public enum TransportProtocol
+    {
+        kDefault = 0,
+        kTcp,
+        kUdp,
+        kHttp
+    };
+
+    // Message encoding type
+    public enum FunEncoding
+    {
+        kNone,
+        kJson,
+        kProtobuf
+    }
+
     public enum TransportEventType
     {
         kStarted,
