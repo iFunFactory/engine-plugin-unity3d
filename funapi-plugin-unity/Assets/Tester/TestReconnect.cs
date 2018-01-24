@@ -45,10 +45,7 @@ public class TestReconnect
                 }
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);

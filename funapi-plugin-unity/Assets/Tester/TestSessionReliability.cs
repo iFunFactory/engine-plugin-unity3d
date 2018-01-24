@@ -50,10 +50,7 @@ public class TestSessionReliability
                 }
             };
 
-            setTimeoutCallbackWithFail (7f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(7f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);

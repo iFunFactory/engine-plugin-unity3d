@@ -80,10 +80,7 @@ public class TestMulticast
                 }
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
         }
 
         void joinMulticastChannel ()

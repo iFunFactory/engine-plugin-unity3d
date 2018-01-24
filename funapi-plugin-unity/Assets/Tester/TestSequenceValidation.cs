@@ -70,10 +70,7 @@ public class TestSequenceValidation
                     session.Stop();
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
 
             ushort port = getPort("sequence", protocol, encoding);
             TransportOption option = newTransportOption(protocol);

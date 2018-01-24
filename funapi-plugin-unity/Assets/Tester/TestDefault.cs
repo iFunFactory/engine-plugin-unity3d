@@ -53,10 +53,7 @@ public class TestDefault
                     session.Stop();
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
 
             ushort port = getPort("default", TransportProtocol.kTcp, encoding);
             session.Connect(TransportProtocol.kTcp, encoding, port);

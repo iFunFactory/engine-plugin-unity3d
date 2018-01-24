@@ -42,10 +42,7 @@ public class TestPing
                     isFinished = true;
             };
 
-            setTimeoutCallback (5f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallback(5f);
 
             ushort port = getPort("default", protocol, encoding);
             session.Connect(protocol, encoding, port, option);
