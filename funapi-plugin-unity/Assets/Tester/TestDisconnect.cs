@@ -82,10 +82,7 @@ public class TestDisconnect
                 }
             };
 
-            setTimeoutCallbackWithFail (5f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(5f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);

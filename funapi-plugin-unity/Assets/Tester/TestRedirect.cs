@@ -58,10 +58,7 @@ public class TestRedirect
                     sendEchoMessage(protocol);
             };
 
-            setTimeoutCallbackWithFail (5f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(5f);
 
             ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kJson);
             session.Connect(TransportProtocol.kTcp, FunEncoding.kJson, port);

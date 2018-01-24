@@ -32,8 +32,7 @@ public class TestTransportOptions
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (TransportProtocol protocol, FunEncoding encoding,
-                         TransportOption option, int count)
+        public TestImpl (TransportProtocol protocol, FunEncoding encoding, TransportOption option, int count)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
@@ -60,10 +59,7 @@ public class TestTransportOptions
                     session.Stop();
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
 
             ushort port = getPort("default", protocol, encoding);
             session.Connect(protocol, encoding, port, option);

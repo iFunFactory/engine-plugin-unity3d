@@ -45,12 +45,12 @@ class TestBase : CustomYieldInstruction
         updater.StartCoroutine(func);
     }
 
-    protected void setTimeoutCallback (float seconds, Action callback)
+    protected void setTimeoutCallback (float seconds, Action callback = null)
     {
         updater.StartCoroutine(onTimedOut(seconds, callback));
     }
 
-    protected void setTimeoutCallbackWithFail (float seconds, Action callback)
+    protected void setTimeoutCallbackWithFail (float seconds, Action callback = null)
     {
         updater.StartCoroutine(onTimedOut(seconds, callback, true));
     }
@@ -59,7 +59,8 @@ class TestBase : CustomYieldInstruction
     {
         yield return new WaitForSeconds(seconds);
 
-        callback();
+        if (callback != null)
+            callback();
 
         if (with_fail)
             Assert.Fail("'{0}' Test has timed out.", GetType().ToString());

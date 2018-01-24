@@ -150,10 +150,7 @@ public class TestEncryption
                     session.Stop();
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
 
             ushort port = getPort("encryption", protocol, encoding);
             TransportOption option = newTransportOption(protocol);

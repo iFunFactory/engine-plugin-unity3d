@@ -47,10 +47,7 @@ public class TestDelayedAck
                 }
             };
 
-            setTimeoutCallbackWithFail (3f, delegate ()
-            {
-                session.Stop();
-            });
+            setTimeoutCallbackWithFail(3f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);
@@ -61,7 +58,6 @@ public class TestDelayedAck
             keepSendingEchoMessages(protocol, 0.1f);
             yield return new WaitForSeconds(1f);
 
-            session.Stop();
             isFinished = true;
         }
     }
