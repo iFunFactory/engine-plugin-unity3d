@@ -129,24 +129,6 @@ namespace Fun
             return true;
         }
 
-        public bool Redirect (TransportProtocol protocol, HostAddr addr, bool keep_session_id = false)
-        {
-            FunapiTransport transport = GetTransport(protocol);
-            if (transport == null)
-            {
-                LogWarning("Redirect - Can't find a {0} transport.", protocol);
-                return false;
-            }
-
-            if (!keep_session_id)
-            {
-                InitSession();
-            }
-
-            transport.Redirect(addr);
-            return true;
-        }
-
         // Starts FunapiNetwork
         public void Start ()
         {

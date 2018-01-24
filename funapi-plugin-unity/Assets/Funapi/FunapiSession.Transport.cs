@@ -190,18 +190,6 @@ namespace Fun
                 }
             }
 
-            public void Redirect (string host, ushort port)
-            {
-                ip_list_.Replace(host, port);
-                setNextAddress();
-
-                Log("'{0}' Try to redirect to server.", str_protocol_);
-                exponential_time_ = 1f;
-                reconnect_count_ = 0;
-
-                Start();
-            }
-
             // Stops transport
             public void Stop ()
             {
