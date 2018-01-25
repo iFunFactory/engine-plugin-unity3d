@@ -1833,6 +1833,9 @@ namespace Fun
 
             seq_recvd_ = seq;
 
+            if (option_.delayedAckInterval <= 0f)
+                sendAck(transport, seq_recvd_ + 1);
+
             return true;
         }
 
