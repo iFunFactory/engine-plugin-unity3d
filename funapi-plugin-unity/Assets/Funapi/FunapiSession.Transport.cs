@@ -44,9 +44,7 @@ namespace Fun
     {
         kStarted,
         kStopped,
-        kConnectionFailed,
-        kConnectionTimedOut,
-        kDisconnected
+        kReconnecting
     };
 
     public class TransportError
@@ -55,8 +53,7 @@ namespace Fun
         {
             kNone,
             kStartingFailed,
-            kConnectingFailed,
-            kInvalidSequence,
+            kConnectionTimeout,
             kEncryptionFailed,
             kSendingFailed,
             kReceivingFailed,
@@ -202,24 +199,7 @@ namespace Fun
                     }
 
                     DebugLog1("{0} starting transport.", str_protocol_);
-
-                    // Resets states.
-                    first_message_ = true;
-                    header_decoded_ = false;
-                    received_size_ = 0;
-                    next_decoding_offset_ = 0;
-                    header_fields_.Clear();
-                    first_.Clear();
-                    sending_.Clear();
-                    resetEncryptors();
-
-                    if (option_.ConnectionTimeout > 0f)
-                    {
-                        timer_.Remove(connect_timer_id_);
-                        connect_timer_id_ = timer_.Add(onConnectionTimedout, option_.ConnectionTimeout);
-                        DebugLog1("{0} sets connection timeout - id:{1} timeout:{2}.",
-                                  str_protocol_, connect_timer_id_, option_.ConnectionTimeout);
-                    }
+                    setConnectionTimeout();
 
                     onStart();
                 }
@@ -237,23 +217,17 @@ namespace Fun
                 if (state_ == State.kUnknown)
                     return;
 
-                DebugLog1("{0} stopping transport.", str_protocol_);
+                DebugLog1("{0} stopping transport. (state:{1})", str_protocol_, state_);
 
                 state_ = State.kUnknown;
+                cstate_ = ConnectState.kUnknown;
 
                 timer_.Clear();
+                event_.Clear();
                 connect_timer_id_ = 0;
+                exponential_time_ = 0f;
 
-                if (enable_ping_)
-                    stopPingTimer();
-
-                if (IsReliable && delayed_ack_timer_id_ != 0)
-                {
-                    timer_.Remove(delayed_ack_timer_id_);
-                    delayed_ack_timer_id_ = 0;
-
-                    Log("{0} removes delayed ack timer.", str_protocol_);
-                }
+                stopPingTimer();
 
                 onClose();
 
@@ -266,11 +240,9 @@ namespace Fun
                 lock (session_id_sent_lock_)
                     session_id_has_been_sent = false;
 
-                if (Reconnecting)
-                    event_.Add(onReconnecting);
+                resetEncryptors();
 
-                if (StoppedCallback != null)
-                    StoppedCallback(protocol_);
+                onTransportEventCallback(TransportEventType.kStopped);
             }
 
             public void SetEstablish (SessionId sid)
@@ -301,7 +273,7 @@ namespace Fun
 
                 if (IsReliable && delayed_ack_interval_ > 0f)
                 {
-                    delayed_ack_timer_id_ = timer_.Add(onDelayedAckEvent, true, delayed_ack_interval_);
+                    timer_.Add(onDelayedAckEvent, true, delayed_ack_interval_);
                     Log("{0} sets delayed ack timer - interval: {1}s", str_protocol_, delayed_ack_interval_);
                 }
 
@@ -356,10 +328,7 @@ namespace Fun
             //
             // Properties
             //
-            public HostAddr address
-            {
-                get { return ip_list_.GetCurAddress(); }
-            }
+            public abstract HostAddr address { get; }
 
             public TransportProtocol protocol
             {
@@ -418,10 +387,7 @@ namespace Fun
                 set { delayed_ack_interval_ = value; }
             }
 
-            public abstract bool Connected
-            {
-                get;
-            }
+            public abstract bool Connected { get; }
 
             public bool Connecting
             {
@@ -511,15 +477,35 @@ namespace Fun
 
             public void ForcedDisconnect()
             {
-                LogWarning("{0} forcibly closed the connection for testing.", str_protocol_);
                 onClose();
+
+                last_error_code_ = TransportError.Type.kDisconnected;
+                last_error_message_ = string.Format("{0} forcibly closed the connection for testing.", str_protocol_);
                 event_.Add(onDisconnected);
             }
 
-            protected abstract void setAddress (HostAddr addr);
-
             // Creates a socket.
-            protected abstract void onStart ();
+            protected virtual void onStart ()
+            {
+                // Resets buffer.
+                lock (sending_lock_)
+                {
+                    first_.Clear();
+                    sending_.Clear();
+                }
+
+                lock (receive_lock_)
+                {
+                    first_message_ = true;
+                    header_decoded_ = false;
+                    received_size_ = 0;
+                    next_decoding_offset_ = 0;
+                    header_fields_.Clear();
+                }
+
+                last_error_code_ = TransportError.Type.kNone;
+                last_error_message_ = "";
+            }
 
             // Closes a socket
             protected abstract void onClose ();
@@ -564,43 +550,31 @@ namespace Fun
                 }
             }
 
-            protected void initAddress (string hostname, UInt16 port)
+            void setConnectionTimeout ()
             {
-                ip_list_.Add(hostname, port);
+                if (option_.ConnectionTimeout <= 0f)
+                    return;
+
+                timer_.Remove(connect_timer_id_);
+                connect_timer_id_ = timer_.Add(onConnectionTimedout, option_.ConnectionTimeout);
+
+                DebugLog1("{0} sets connection timeout - id:{1} timeout:{2}.",
+                          str_protocol_, connect_timer_id_, option_.ConnectionTimeout);
             }
 
-            protected void initAddress (string hostname, UInt16 port, bool https)
+            void resetConnectionTimeout ()
             {
-                ip_list_.Add(hostname, port, https);
-                setNextAddress();
+                if (option_.ConnectionTimeout <= 0f)
+                    return;
+
+                timer_.Remove(connect_timer_id_);
+                connect_timer_id_ = 0;
             }
 
-            protected void refreshAddress ()
-            {
-                HostAddr addr = address;
 
-                ip_list_.Clear();
-                ip_list_.Add(addr.host, addr.port);
-
-                setNextAddress();
-            }
-
-            bool setNextAddress ()
-            {
-                HostAddr addr = ip_list_.GetNextAddress();
-                if (addr != null)
-                {
-                    setAddress(addr);
-                }
-                else
-                {
-                    Log("{0} setNextAddress - There's no available address.", str_protocol_);
-                    return false;
-                }
-
-                return true;
-            }
-
+            //---------------------------------------------------------------------
+            // Transport event
+            //---------------------------------------------------------------------
             protected void onStarted ()
             {
                 if (session_id_.IsValid && IsReliable)
@@ -623,17 +597,7 @@ namespace Fun
                 state_ = State.kStandby;
 
                 sendPendingMessages();
-
-                if (StartedCallback != null)
-                    StartedCallback(protocol_);
-            }
-
-            protected void onDisconnected ()
-            {
-                Stop();
-
-                if (DisconnectedCallback != null)
-                    DisconnectedCallback(protocol_);
+                onTransportEventCallback(TransportEventType.kStarted);
             }
 
             void onConnectionTimedout ()
@@ -641,90 +605,107 @@ namespace Fun
                 if (state_ == State.kUnknown || state_ == State.kEstablished)
                     return;
 
-                Log("{0} Connection waiting time has been exceeded.", str_protocol_);
+                last_error_code_ = TransportError.Type.kConnectionTimeout;
+                last_error_message_ = string.Format("{0} Connection waiting time has been exceeded.", str_protocol_);
+                LogWarning(last_error_message_);
 
-                checkReconnect();
-
-                if (ConnectionTimeoutCallback != null)
-                    ConnectionTimeoutCallback(protocol_);
+                Stop();
             }
 
-            void onConnectionFailed ()
+            protected void onDisconnected ()
             {
-                ip_list_.SetFirst();
+                LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
+                           str_protocol_, state_, last_error_code_, last_error_message_);
 
-                if (ConnectionFailedCallback != null)
-                    ConnectionFailedCallback(protocol_);
+                if (checkAutoReconnect())
+                    return;
+
+                Stop();
+            }
+
+            protected virtual void onFailure ()
+            {
+                if (state_ != State.kEstablished)
+                {
+                    if (checkAutoReconnect())
+                    {
+                        Log("{0} connection failed. will try to connect again. (state: {1}, error: {2})\n{3}\n",
+                            str_protocol_, state_, last_error_code_, last_error_message_);
+                        return;
+                    }
+                }
+
+                LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
+                           str_protocol_, state_, last_error_code_, last_error_message_);
+
+                if (state_ != State.kEstablished)
+                {
+                    Stop();
+                }
+                else
+                {
+                    onTransportErrorCallback(last_error_code_, last_error_message_);
+                }
+            }
+
+            void onTransportEventCallback (TransportEventType type)
+            {
+                if (EventCallback != null)
+                    EventCallback(protocol_, type);
+            }
+
+            void onTransportErrorCallback (TransportError.Type type, string message)
+            {
+                if (ErrorCallback != null)
+                {
+                    TransportError error = new TransportError();
+                    error.type = type;
+                    error.message = message;
+
+                    ErrorCallback(protocol_, error);
+                }
             }
 
 
             //---------------------------------------------------------------------
             // auto-reconnect-related functions
             //---------------------------------------------------------------------
-            void checkReconnect ()
+            bool checkAutoReconnect ()
             {
-                if (!auto_reconnect_ || Reconnecting)
-                    return;
-
-                cstate_ = ConnectState.kReconnecting;
-                exponential_time_ = 1f;
-            }
-
-            bool startReconnect ()
-            {
-                if (reconnect_count_ >= 0)
-                {
-                    if (tryToReconnect())
-                        return true;
-                }
-
-                if (!ip_list_.IsNextAvailable)
+                if (!auto_reconnect_)
                     return false;
 
-                event_.Add (delegate
+                if (cstate_ != ConnectState.kReconnecting)
                 {
-                    Log("'{0}' Try to connect to server.", str_protocol_);
+                    cstate_ = ConnectState.kReconnecting;
                     exponential_time_ = 1f;
-                    reconnect_count_ = 0;
-                    setNextAddress();
-                    Start();
-                });
 
+                    if (state_ == State.kEstablished)
+                        setConnectionTimeout();
+
+                    onTransportEventCallback(TransportEventType.kReconnecting);
+                }
+
+                event_.Add(onReconnecting);
                 return true;
             }
 
-            bool tryToReconnect ()
+            void onReconnecting ()
             {
-                ++reconnect_count_;
-                if (reconnect_count_ > kReconnectCountMax)
-                    return false;
-
+                // 1, 2, 4, 8, 8, 8,...
                 float delay_time = exponential_time_;
-                exponential_time_ *= 2f;
+                if (exponential_time_ < 8f)
+                    exponential_time_ *= 2f;
 
                 Log("Wait {0} seconds for reconnect to {1} transport.", delay_time, str_protocol_);
 
                 event_.Add (delegate
                     {
                         Log("'{0}' Try to reconnect to server.", str_protocol_);
-                        Start();
+                        onStart();
                     },
                     delay_time
                 );
-
-                return true;
-            }
-
-            void onReconnecting ()
-            {
-                if (!startReconnect())
-                {
-                    cstate_ = ConnectState.kUnknown;
-                    exponential_time_ = 1f;
-                    reconnect_count_ = 0;
-
-                    onConnectionFailed();
-                }
             }
 
 
@@ -1084,7 +1065,7 @@ namespace Fun
                     if (!encryptMessage(msg, enc_type))
                     {
                         last_error_code_ = TransportError.Type.kEncryptionFailed;
-                        last_error_message_ = string.Format("Encrypt message failed. type:{0}", (int)enc_type);
+                        last_error_message_ = string.Format("Message encryption failed. type:{0}", (int)enc_type);
                         event_.Add(onFailure);
                         return false;
                     }
@@ -1126,7 +1107,7 @@ namespace Fun
                     if (!encryptMessage(msg, enc_type))
                     {
                         last_error_code_ = TransportError.Type.kEncryptionFailed;
-                        last_error_message_ = string.Format("Encrypt message failed. type:{0}", (int)enc_type);
+                        last_error_message_ = string.Format("Message encryption failed. type:{0}", (int)enc_type);
                         event_.Add(onFailure);
                         return false;
                     }
@@ -1464,8 +1445,7 @@ namespace Fun
                         first_message_ = false;
                         cstate_ = ConnectState.kConnected;
 
-                        timer_.Remove(connect_timer_id_);
-                        connect_timer_id_ = 0;
+                        resetConnectionTimeout();
                     }
 
                     onReceived(header_fields_, body);
@@ -1605,7 +1585,7 @@ namespace Fun
                 }
 
                 if (ReceivedCallback != null)
-                    ReceivedCallback(protocol_, msg_type, message);
+                    ReceivedCallback(protocol_, encoding_, msg_type, message);
             }
 
             protected void onFailedSending ()
@@ -1622,7 +1602,7 @@ namespace Fun
             //---------------------------------------------------------------------
             void startPingTimer ()
             {
-                if (protocol_ != TransportProtocol.kTcp)
+                if (!enable_ping_ || protocol_ != TransportProtocol.kTcp)
                     return;
 
                 if (ping_interval_ <= 0)
@@ -1640,7 +1620,7 @@ namespace Fun
 
             void stopPingTimer ()
             {
-                if (protocol_ != TransportProtocol.kTcp)
+                if (!enable_ping_ || protocol_ != TransportProtocol.kTcp)
                     return;
 
                 lock (sending_lock_)
@@ -1669,7 +1649,8 @@ namespace Fun
 
                 if (ping_wait_time_ > ping_timeout_)
                 {
-                    LogWarning("Network seems disabled. Stopping the transport.");
+                    last_error_code_ = TransportError.Type.kDisconnected;
+                    last_error_message_ = string.Format("{0} has not received a ping message for a long time.", str_protocol_);
                     onDisconnected();
                     return;
                 }
@@ -1762,32 +1743,6 @@ namespace Fun
             }
 
 
-            //---------------------------------------------------------------------
-            // Transport error
-            //---------------------------------------------------------------------
-            protected virtual void onFailure ()
-            {
-                LogError("{0} : onFailure - state: {1}, error: {2}\n{3}\n",
-                         str_protocol_, state_, last_error_code_, last_error_message_);
-
-                if (state_ != State.kEstablished)
-                {
-                    checkReconnect();
-                    Stop();
-
-                    if (auto_reconnect_ && Reconnecting)
-                        return;
-
-                    onConnectionFailed();
-                }
-                else
-                {
-                    if (TransportErrorCallback != null)
-                        TransportErrorCallback(protocol_);
-                }
-            }
-
-
             public enum State
             {
                 kUnknown = 0,
@@ -1835,14 +1790,9 @@ namespace Fun
 
             // Event handlers
             public event CreateCompressorHandler CreateCompressorCallback;
-            public event EventNotifyHandler StartedCallback;
-            public event EventNotifyHandler StoppedCallback;
+            public event TransportEventHandler EventCallback;
+            public event TransportErrorHandler ErrorCallback;
             public event MessageNotifyHandler ReceivedCallback;
-            public event EventNotifyHandler TransportErrorCallback;
-
-            public event EventNotifyHandler ConnectionFailedCallback;
-            public event EventNotifyHandler ConnectionTimeoutCallback;
-            public event EventNotifyHandler DisconnectedCallback;
 
             // member variables.
             protected State state_;
@@ -1857,11 +1807,9 @@ namespace Fun
 
             // Connect-related member variables.
             ConnectState cstate_ = ConnectState.kUnknown;
-            ConnectList ip_list_ = new ConnectList();
             bool auto_reconnect_ = false;
             uint connect_timer_id_ = 0;
             float exponential_time_ = 0f;
-            int reconnect_count_ = 0;
 
             // Ping-related variables.
             bool enable_ping_ = false;
@@ -1900,7 +1848,6 @@ namespace Fun
             UInt32 sent_ack_ = 0;
             bool first_seq_ = true;
             float delayed_ack_interval_ = 0f;
-            uint delayed_ack_timer_id_ = 0;
             Queue<FunapiMessage> sent_queue_ = new Queue<FunapiMessage>();
             Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
 
@@ -1921,7 +1868,12 @@ namespace Fun
                 encoding_ = type;
                 option = tcp_option;
 
-                initAddress(hostname_or_ip, port);
+                setAddress(hostname_or_ip, port);
+            }
+
+            public override HostAddr address
+            {
+                get { return addr_; }
             }
 
             public override bool Connected
@@ -1933,13 +1885,12 @@ namespace Fun
                 }
             }
 
-            protected override void setAddress (HostAddr addr)
+            void setAddress (string host, UInt16 port)
             {
-                FunDebug.Assert(addr is HostIP);
-                addr_ = (HostIP)addr;
+                addr_ = new HostIP(host, port);
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
-                Log("TCP connect - {0}:{1}\n    {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}, Reconnect:{7}, Nagle:{8}, Ping:{9}",
+                Log("TCP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}, Reconnect:{7}, Nagle:{8}, Ping:{9}",
                     addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
                     tcp_option.CompressionType, tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
                     tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
@@ -1947,20 +1898,21 @@ namespace Fun
 
             protected override void onStart ()
             {
+                base.onStart();
+
                 state_ = State.kConnecting;
 
-                refreshAddress();
+                addr_.refresh();
 
                 lock (sock_lock_)
                 {
-                    sock_ = new Socket(addr_.ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                    sock_ = new Socket(addr_.inet, SocketType.Stream, ProtocolType.Tcp);
 
                     bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
                     if (disable_nagle)
                         sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
-                    IPAddress[] list = Dns.GetHostAddresses(addr_.host);
-                    sock_.BeginConnect(list, address.port, new AsyncCallback(this.startCb), this);
+                    sock_.BeginConnect(addr_.list, addr_.port, new AsyncCallback(this.startCb), this);
                 }
             }
 
@@ -2038,7 +1990,7 @@ namespace Fun
                         sock_.EndConnect(ar);
                         if (sock_.Connected == false)
                         {
-                            last_error_code_ = TransportError.Type.kConnectingFailed;
+                            last_error_code_ = TransportError.Type.kStartingFailed;
                             last_error_message_ = string.Format("TCP connection failed.");
                             event_.Add(onFailure);
                             return;
@@ -2063,7 +2015,7 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kConnectingFailed;
+                    last_error_code_ = TransportError.Type.kStartingFailed;
                     last_error_message_ = "TCP failure in startCb: " + e.ToString();
                     event_.Add(onFailure);
                 }
@@ -2171,7 +2123,7 @@ namespace Fun
                             if (received_size_ - next_decoding_offset_ > 0)
                             {
                                 LogWarning("TCP buffer has {0} bytes but they failed to decode. Discarding.",
-                                           receive_buffer_.Length - received_size_);
+                                           received_size_ - next_decoding_offset_);
                             }
 
                             last_error_code_ = TransportError.Type.kDisconnected;
@@ -2213,7 +2165,12 @@ namespace Fun
                 encoding_ = type;
                 option = udp_option;
 
-                initAddress(hostname_or_ip, port);
+                setAddress(hostname_or_ip, port);
+            }
+
+            public override HostAddr address
+            {
+                get { return addr_; }
             }
 
             public override bool Connected
@@ -2225,48 +2182,43 @@ namespace Fun
                 }
             }
 
-            protected override void setAddress (HostAddr addr)
+            protected void setAddress (string host, UInt16 port)
             {
-                FunDebug.Assert(addr is HostIP);
-                addr_ = (HostIP)addr;
+                addr_ = new HostIP(host, port);
 
-                Log("UDP connect - {0}:{1}\n    {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}",
+                Log("UDP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}",
                     addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
                     option_.CompressionType, option_.SequenceValidation, option_.ConnectionTimeout);
             }
 
             protected override void onStart ()
             {
-                state_ = State.kConnected;
+                base.onStart();
 
-                refreshAddress();
+                state_ = State.kConnected;
 
                 lock (sock_lock_)
                 {
-                    sock_ = new Socket(addr_.ip.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+                    sock_ = new Socket(addr_.inet, SocketType.Dgram, ProtocolType.Udp);
                     sock_.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
+                    int port = 0;
 #if FIXED_UDP_LOCAL_PORT
-                    int port = LocalPort.Next();
-                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
-                        sock_.Bind(new IPEndPoint(IPAddress.Any, port));
-                    else
-                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
-#else
-                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
-                        sock_.Bind(new IPEndPoint(IPAddress.Any, 0));
-                    else
-                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, 0));
+                    port = LocalPort.Next();
 #endif
+                    if (addr_.inet == AddressFamily.InterNetworkV6)
+                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+                    else
+                        sock_.Bind(new IPEndPoint(IPAddress.Any, port));
 
                     IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
                     DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
 
                     send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
-                    if (addr_.ip.AddressFamily == AddressFamily.InterNetwork)
-                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr_.port);
-                    else
+                    if (addr_.inet == AddressFamily.InterNetworkV6)
                         receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr_.port);
+                    else
+                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr_.port);
 
                     lock (receive_lock_)
                     {
@@ -2444,7 +2396,7 @@ namespace Fun
                             if (received_size_ - next_decoding_offset_ > 0)
                             {
                                 LogWarning("UDP buffer has {0} bytes but they failed to decode. Discarding.",
-                                           receive_buffer_.Length - received_size_);
+                                           received_size_ - next_decoding_offset_);
                             }
 
                             last_error_code_ = TransportError.Type.kDisconnected;
@@ -2547,7 +2499,7 @@ namespace Fun
                 encoding_ = type;
                 option = http_option;
 
-                initAddress(hostname_or_ip, port, https);
+                setAddress(hostname_or_ip, port, https);
 
                 if (https)
                     MozRoots.LoadRootCertificates();
@@ -2555,23 +2507,27 @@ namespace Fun
 
             public MonoBehaviour mono { private get; set; }
 
+            public override HostAddr address
+            {
+                get { return addr_; }
+            }
+
             public override bool Connected
             {
                 get { return state_ >= State.kConnected; }
             }
 
-            protected override void setAddress (HostAddr addr)
+            protected void setAddress (string host, UInt16 port, bool https)
             {
-                FunDebug.Assert(addr is HostHttp);
-                HostHttp http = addr as HostHttp;
+                addr_ = new HostHttp(host, port, https);
 
                 // Sets host url
                 host_url_ = string.Format("{0}://{1}:{2}/v{3}/",
-                                          (http.https ? "https" : "http"), http.host, http.port,
+                                          (https ? "https" : "http"), host, port,
                                           FunapiVersion.kProtocolVersion);
 
                 HttpTransportOption http_option = (HttpTransportOption)option_;
-                Log("HTTP connect - {0}\n    {1}, {2}, Compression:{3}, Sequence:{4}, Timeout:{5}, WWW:{6}",
+                Log("HTTP connect - {0}, {1}, {2}, Compression:{3}, Sequence:{4}, Timeout:{5}, WWW:{6}",
                     host_url_, convertString(encoding_), convertString(http_option.Encryption),
                     http_option.CompressionType, http_option.SequenceValidation,
                     http_option.ConnectionTimeout, http_option.UseWWW);
@@ -2579,6 +2535,8 @@ namespace Fun
 
             protected override void onStart ()
             {
+                base.onStart();
+
                 state_ = State.kConnected;
                 str_cookie_ = "";
 #if !NO_UNITY
@@ -3034,6 +2992,7 @@ namespace Fun
             static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
 
             // member variables.
+            HostHttp addr_;
             string host_url_;
             string str_cookie_;
 #if !NO_UNITY
@@ -3045,8 +3004,10 @@ namespace Fun
 
         // Event handler delegate
         public delegate FunapiCompressor CreateCompressorHandler (TransportProtocol protocol);
-        public delegate void EventNotifyHandler (TransportProtocol protocol);
-        public delegate void MessageNotifyHandler (TransportProtocol protocol, string msg_type, object message);
+        public delegate void TransportEventHandler (TransportProtocol protocol, TransportEventType type);
+        public delegate void TransportErrorHandler (TransportProtocol protocol, TransportError type);
+        public delegate void MessageNotifyHandler (TransportProtocol protocol, FunEncoding encoding,
+                                                   string msg_type, object message);
     }
 
 }  // namespace Fun
