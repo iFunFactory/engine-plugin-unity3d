@@ -58,7 +58,7 @@ public class TestRedirect
                     sendEchoMessage(protocol);
             };
 
-            setTimeoutCallbackWithFail(5f);
+            setTimeoutCallbackWithFail(10f);
 
             ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kJson);
             session.Connect(TransportProtocol.kTcp, FunEncoding.kJson, port);
@@ -79,7 +79,7 @@ public class TestRedirect
             else if (type == SessionEventType.kRedirectSucceeded)
             {
                 ++test_step;
-                if (test_step >= kStepCountMax)
+                if (test_step > kStepCountMax)
                     isFinished = true;
                 else
                     requestRedirect(TransportProtocol.kTcp);

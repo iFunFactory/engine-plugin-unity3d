@@ -140,8 +140,7 @@ namespace Fun
                 return;
             }
 
-            DebugLog1("Session.Connect({0}) called. Ready to connect {1} transport.",
-                      str_protocol, str_protocol);
+            DebugLog1("Session.Connect({0}) called.", str_protocol);
 
             lock (connect_lock_)
             {
@@ -447,7 +446,6 @@ namespace Fun
         protected override void onQuit ()
         {
             stopAllTransports(true);
-            onSessionEvent(SessionEventType.kStopped);
         }
 
 
@@ -710,7 +708,7 @@ namespace Fun
             server_address_ = host;
 
             // Stopping all transports.
-            stopAllTransports();
+            stopAllTransports(true);
 
 #if !NO_UNITY
             mono.StartCoroutine(tryToRedirect(host, list));
@@ -908,14 +906,9 @@ namespace Fun
 
             // Callback functions
             transport.CreateCompressorCallback += onCreateCompressor;
-            transport.StartedCallback += onTransportStarted;
-            transport.StoppedCallback += onTransportStopped;
+            transport.EventCallback += onTransportEvent;
+            transport.ErrorCallback += onTransportError;
             transport.ReceivedCallback += onTransportReceived;
-            transport.TransportErrorCallback += onTransportError;
-
-            transport.ConnectionFailedCallback += onConnectionFailed;
-            transport.ConnectionTimeoutCallback += onConnectionTimedOut;
-            transport.DisconnectedCallback += onDisconnected;
 
             lock (transports_lock_)
             {
@@ -983,7 +976,7 @@ namespace Fun
 
             transport.SetEstablish(session_id_);
 
-            onTransportEvent(transport.protocol, TransportEventType.kStarted);
+            onTransportEventCallback(transport.protocol, TransportEventType.kStarted);
         }
 
         void stopAllTransports (bool force_stop = false)
@@ -997,10 +990,9 @@ namespace Fun
                 {
                     lock (transports_lock_)
                     {
-                        foreach (TransportProtocol protocol in transports_.Keys)
+                        foreach (Transport transport in transports_.Values)
                         {
-                            if (!disconnect_queue_.Contains(protocol))
-                                disconnect_queue_.Enqueue(protocol);
+                            transport.Stop();
                         }
                     }
                 }
@@ -1022,6 +1014,8 @@ namespace Fun
                     }
                 }
             }
+
+            checkAllTransportStopped();
         }
 
 #if !NO_UNITY
@@ -1034,7 +1028,7 @@ namespace Fun
             yield return null;
 #endif
 
-            if (transport == null || !transport.Connected)
+            if (transport == null)
 #if !NO_UNITY
                 yield break;
 #else
@@ -1054,27 +1048,30 @@ namespace Fun
                 }
             }
 
-            // Converts seconds to ticks.
-            long wait_timeout = DateTime.UtcNow.Ticks + (kWaitForStopTimeout * 1000 * 10000);
-
-            // Checks transport's state.
-            while (transport.InProcess)
+            if (transport.Connected)
             {
-                DebugLog1("Waiting for process before {0} transport to stop... ({1})",
-                          transport.str_protocol, transport.HasUnsentMessages ? "sending" : "0");
+                // Converts seconds to ticks.
+                long wait_timeout = DateTime.UtcNow.Ticks + (kWaitForStopTimeout * 1000 * 10000);
 
-                if (DateTime.UtcNow.Ticks > wait_timeout)
+                // Checks transport's state.
+                while (transport.InProcess)
                 {
-                    LogWarning("Timed out to stop the {0} transport. state:{1} unsent:{2}",
-                               transport.str_protocol, transport.state, transport.HasUnsentMessages);
-                    break;
-                }
+                    DebugLog1("Waiting for process before {0} transport to stop... ({1})",
+                            transport.str_protocol, transport.HasUnsentMessages ? "sending" : "0");
+
+                    if (DateTime.UtcNow.Ticks > wait_timeout)
+                    {
+                        LogWarning("Timed out to stop the {0} transport. state:{1} unsent:{2}",
+                                transport.str_protocol, transport.state, transport.HasUnsentMessages);
+                        break;
+                    }
 
 #if !NO_UNITY
-                yield return new WaitForSeconds(0.1f);
+                    yield return new WaitForSeconds(0.1f);
 #else
-                Thread.Sleep(100);
+                    Thread.Sleep(100);
 #endif
+                }
             }
 
             lock (connect_lock_)
@@ -1083,50 +1080,32 @@ namespace Fun
             }
         }
 
-        void onTransportEvent (TransportProtocol protocol, TransportEventType type)
-        {
-            if (wait_redirect_)
-            {
-                Log("Redirect: {0} transport ({1}).\nThis event callback is skipped.",
-                    convertString(protocol), type);
-                return;
-            }
-
-            Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
-
-            event_list.Add (delegate
-            {
-                if (TransportEventCallback != null)
-                    TransportEventCallback(protocol, type);
-            });
-        }
-
-        void onTransportError (TransportProtocol protocol, TransportError.Type type, string message)
-        {
-            if (wait_redirect_)
-            {
-                LogWarning("Redirect: {0} error ({1})\nThis event callback is skipped.\n{2}.",
-                           convertString(protocol), type, message);
-                return;
-            }
-
-            event_list.Add (delegate
-            {
-                if (TransportErrorCallback != null)
-                {
-                    TransportError error = new TransportError();
-                    error.type = type;
-                    error.message = message;
-
-                    TransportErrorCallback(protocol, error);
-                }
-            });
-        }
-
 
         //
         // Transport-related callback functions
         //
+        void onTransportEvent (TransportProtocol protocol, TransportEventType type)
+        {
+            switch (type)
+            {
+            case TransportEventType.kStarted:
+                onTransportStarted(protocol);
+                break;
+
+            case TransportEventType.kStopped:
+                onTransportStopped(protocol);
+                break;
+
+            case TransportEventType.kReconnecting:
+                onTransportEventCallback(protocol, type);
+                break;
+
+            default:
+                FunDebug.LogWarning("onTransportEvent - may need to handle this type '{0}'", type);
+                break;
+            }
+        }
+
         void onTransportStarted (TransportProtocol protocol)
         {
             Transport transport = GetTransport(protocol);
@@ -1165,54 +1144,50 @@ namespace Fun
             if (transport == null)
                 return;
 
-            DebugLog1("{0} transport stopped.", transport.str_protocol);
-            onTransportEvent(protocol, TransportEventType.kStopped);
-
-            checkAllTransportStopped();
-        }
-
-        void onTransportError (TransportProtocol protocol)
-        {
-            Transport transport = GetTransport(protocol);
-            if (transport == null)
-                return;
-
-            onTransportError(protocol, transport.LastErrorCode, transport.LastErrorMessage);
-        }
-
-        void onConnectionFailed (TransportProtocol protocol)
-        {
-            LogWarning("{0} transport connection failed.", convertString(protocol));
-            onTransportEvent(protocol, TransportEventType.kConnectionFailed);
-
-            checkAllTransportStopped();
-        }
-
-        void onConnectionTimedOut (TransportProtocol protocol)
-        {
-            LogWarning("{0} transport connection timed out.", convertString(protocol));
-
-            lock (connect_lock_)
+            if (transport.LastErrorCode != TransportError.Type.kNone)
             {
-                if (disconnect_queue_.Contains(protocol))
-                {
-                    LogWarning("{0} is already waiting to be stopped.", convertString(protocol));
-                    return;
-                }
-
-                disconnect_queue_.Enqueue(protocol);
+                Log("{0} transport stopped. (error:{1})\n{2}",
+                    transport.str_protocol, transport.LastErrorCode, transport.LastErrorMessage);
             }
 
-            onTransportEvent(protocol, TransportEventType.kConnectionTimedOut);
-        }
-
-        void onDisconnected (TransportProtocol protocol)
-        {
-            LogWarning("{0} transport disconnected.", convertString(protocol));
-            onTransportEvent(protocol, TransportEventType.kDisconnected);
-
+            onTransportEventCallback(protocol, TransportEventType.kStopped);
             checkAllTransportStopped();
         }
+
+        void onTransportEventCallback (TransportProtocol protocol, TransportEventType type)
+        {
+            if (wait_redirect_)
+            {
+                Log("Redirect: {0} transport ({1}).\nThis event callback is skipped.",
+                    convertString(protocol), type);
+                return;
+            }
+
+            Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
+
+            event_list.Add (delegate
+            {
+                if (TransportEventCallback != null)
+                    TransportEventCallback(protocol, type);
+            });
+        }
+
+        void onTransportError (TransportProtocol protocol, TransportError error)
+        {
+            if (wait_redirect_)
+            {
+                LogWarning("Redirect: {0} error ({1})\nThis event callback is skipped.\n{2}.",
+                           convertString(protocol), error.type, error.message);
+                return;
+            }
+
+            event_list.Add (delegate
+            {
+                if (TransportErrorCallback != null)
+                    TransportErrorCallback(protocol, error);
+            });
+        }
+
 
         void checkAllTransportConnected ()
         {
@@ -1259,11 +1234,12 @@ namespace Fun
         //
         // Receiving-related functions
         //
-        void onTransportReceived (TransportProtocol protocol, string msg_type, object message)
+        void onTransportReceived (TransportProtocol protocol, FunEncoding encoding,
+                                  string msg_type, object message)
         {
             lock (message_buffer_)
             {
-                message_buffer_.Add(new ReceivedMessage(protocol, msg_type, message));
+                message_buffer_.Add(new ReceivedMessage(protocol, encoding, msg_type, message));
             }
         }
 
@@ -1272,7 +1248,7 @@ namespace Fun
             // Checks session id
             try
             {
-                if (transport.encoding == FunEncoding.kJson)
+                if (msg.encoding == FunEncoding.kJson)
                 {
                     if (json_helper_.HasField(msg.message, kSessionIdField))
                     {
@@ -1281,7 +1257,7 @@ namespace Fun
                             return;
                     }
                 }
-                else if (transport.encoding == FunEncoding.kProtobuf)
+                else if (msg.encoding == FunEncoding.kProtobuf)
                 {
                     FunMessage funmsg = msg.message as FunMessage;
                     if (funmsg.sidSpecified)
@@ -1318,11 +1294,11 @@ namespace Fun
                     break;
 
                 case kRedirectType:
-                    onRedirectMessage(transport, msg.message);
+                    onRedirectMessage(msg.encoding, msg.message);
                     return;
 
                 case kRedirectConnectType:
-                    onRedirectResultMessage(transport, msg.message);
+                    onRedirectResultMessage(msg.encoding, msg.message);
                     return;
 
                 case kMaintenanceType:
@@ -1347,14 +1323,14 @@ namespace Fun
             }
         }
 
-        void onRedirectMessage (Transport transport, object message)
+        void onRedirectMessage (FunEncoding encoding, object message)
         {
             string host = "";
             string token = "";
             string flavor = "";
             List<RedirectInfo> info_list = new List<RedirectInfo>();
 
-            if (transport.encoding == FunEncoding.kJson)
+            if (encoding == FunEncoding.kJson)
             {
                 host = json_helper_.GetStringField(message, "host");
                 token = json_helper_.GetStringField(message, "token");
@@ -1373,7 +1349,7 @@ namespace Fun
                     info_list.Add(info);
                 }
             }
-            else if (transport.encoding == FunEncoding.kProtobuf)
+            else if (encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
                 FunRedirectMessage redirect = FunapiMessage.GetMessage<FunRedirectMessage>(msg, MessageType._sc_redirect);
@@ -1413,11 +1389,11 @@ namespace Fun
             startRedirect(host, info_list);
         }
 
-        void onRedirectResultMessage (Transport transport, object message)
+        void onRedirectResultMessage (FunEncoding encoding, object message)
         {
             wait_redirect_ = false;
 
-            if (transport.encoding == FunEncoding.kJson)
+            if (encoding == FunEncoding.kJson)
             {
                 RedirectResult result = (RedirectResult)json_helper_.GetIntegerField(message, "result");
                 if (result == RedirectResult.kSucceeded)
@@ -1430,7 +1406,7 @@ namespace Fun
                     onRedirectFailed();
                 }
             }
-            else if (transport.encoding == FunEncoding.kProtobuf)
+            else if (encoding == FunEncoding.kProtobuf)
             {
                 FunMessage msg = message as FunMessage;
                 FunRedirectConnectMessage redirect = FunapiMessage.GetMessage<FunRedirectConnectMessage>(msg, MessageType._cs_redirect_connect);
@@ -1508,13 +1484,11 @@ namespace Fun
 
         // Delegates
         public delegate void SessionEventHandler (SessionEventType type, string session_id);
-        public delegate TransportOption TransportOptionHandler (string flavor, TransportProtocol protocol);
-        public delegate void TransportEventHandler (TransportProtocol protocol, TransportEventType type);
-        public delegate void TransportErrorHandler (TransportProtocol protocol, TransportError type);
-        public delegate void MaintenanceHandler (FunEncoding encoding, object message);
         public delegate void ReceivedMessageHandler (string msg_type, object message);
         public delegate void DroppedMessageHandler (string msg_type, object message);
         public delegate void ResponseTimeoutHandler (string msg_type);
+        public delegate void MaintenanceHandler (FunEncoding encoding, object message);
+        public delegate TransportOption TransportOptionHandler (string flavor, TransportProtocol protocol);
 
         // Funapi message-related events.
         public event SessionEventHandler SessionEventCallback;
@@ -1531,12 +1505,15 @@ namespace Fun
         class ReceivedMessage
         {
             public TransportProtocol protocol;
+            public FunEncoding encoding;
             public string msg_type;
             public object message;
 
-            public ReceivedMessage (TransportProtocol protocol, string msg_type, object message)
+            public ReceivedMessage (TransportProtocol protocol, FunEncoding encoding,
+                                    string msg_type, object message)
             {
                 this.protocol = protocol;
+                this.encoding = encoding;
                 this.msg_type = msg_type;
                 this.message = message;
             }
