@@ -76,6 +76,8 @@ namespace Fun
         public bool SequenceValidation = false;
         public float ConnectionTimeout = 0f;
 
+        // TODO(jinuk): Compression option 지정할 수 있게 수정
+
         public override bool Equals (object obj)
         {
             if (obj == null || !(obj is TransportOption))
@@ -906,7 +908,7 @@ namespace Fun
             //---------------------------------------------------------------------
             // Message-related functions
             //---------------------------------------------------------------------
-            void makeHeader (FunapiMessage msg)
+            void makeHeader (FunapiMessage msg, int uncompressed_size)
             {
                 EncryptionType enc_type = getEncryption(msg);
 
@@ -926,6 +928,10 @@ namespace Fun
                 {
                     header.AppendFormat("{0}{1}{2}-{3}{4}", kEncryptionHeaderField, kHeaderFieldDelimeter,
                                         Convert.ToInt32(enc_type), msg.enc_header, kHeaderDelimeter);
+                }
+                if (uncompressed_size > 0) {
+                    header.AppendFormat("{0}{1}{2}{3}", kUncompressedLengthHeaderField, kHeaderFieldDelimeter,
+                                        uncompressed_size, kHeaderDelimeter);
                 }
                 header.Append(kHeaderDelimeter);
 
@@ -1024,6 +1030,11 @@ namespace Fun
 
                 // Serializes message
                 msg.body = new ArraySegment<byte>(msg.GetBytes(encoding_));
+                int uncompressed_size = 0;
+                ArraySegment<byte> compressed = compressMessage(msg.body, out uncompressed_size);
+                if (uncompressed_size > 0) {
+                    msg.body = compressed;
+                }                
 
                 // Encrypt message
                 EncryptionType enc_type = getEncryption(msg);
@@ -1042,7 +1053,7 @@ namespace Fun
                     }
                 }
 
-                makeHeader(msg);
+                makeHeader(msg, uncompressed_size);
 
                 msg.ready = true;
 
@@ -1064,6 +1075,11 @@ namespace Fun
                 {
                     // Serializes message
                     msg.body = new ArraySegment<byte>(msg.GetBytes(encoding_));
+                    int uncompressed_size = 0;
+                    ArraySegment<byte> compressed = compressMessage(msg.body, out uncompressed_size);
+                    if (uncompressed_size > 0) {
+                        msg.body = compressed;
+                    }
 
                     if (!encryptMessage(msg, enc_type))
                     {
@@ -1073,7 +1089,7 @@ namespace Fun
                         return false;
                     }
 
-                    makeHeader(msg);
+                    makeHeader(msg, uncompressed_size);
 
                     StringBuilder strlog = new StringBuilder();
                     strlog.AppendFormat("{0} rebuilt a message - '{1}' ({2} + {3} bytes)",
@@ -1083,6 +1099,18 @@ namespace Fun
                 }
 
                 return true;
+            }
+
+            ArraySegment<byte> compressMessage(ArraySegment<byte> buffer, out int uncompressed_size) {
+                uncompressed_size = 0;
+                if (buffer.Count > 0 && compressor_ != null) {
+                    ArraySegment<byte> compressed = compressor_.Compress(buffer);
+                    if (compressed.Count > 0) {
+                        uncompressed_size = buffer.Count;
+                        return compressed;
+                    }
+                }
+                return new ArraySegment<byte>();
             }
 
             void sendPendingMessages ()
@@ -1334,8 +1362,14 @@ namespace Fun
                 // Encryption
                 string encryption_type = "";
                 string encryption_header = "";
+                string compression_header = "";
+                int uncompressed_size = 0;
                 if (header_fields_.TryGetValue(kEncryptionHeaderField, out encryption_header))
                     parseEncryptionHeader(ref encryption_type, ref encryption_header);
+
+                if (header_fields_.TryGetValue(kUncompressedLengthHeaderField, out compression_header)) {
+                    uncompressed_size = Convert.ToInt32(compression_header);
+                }
 
                 if (state_ == State.kHandshaking)
                 {
@@ -1372,6 +1406,22 @@ namespace Fun
                     {
                         if (!decryptMessage(body, encryption_type, encryption_header))
                             return false;
+                    }
+
+                    if (uncompressed_size > 0)
+                    {
+                        if (compressor_ == null) {
+                            LogError("Received a compressed message. But the transport is not configured with compression.");
+                            return false;
+                        }
+
+                        ArraySegment<byte> decompressed = compressor_.Decompress(body, uncompressed_size);
+                        if (decompressed.Count == 0) {
+                            LogError("Failed to decompress the mssage.");
+                            return false;
+                        }
+
+                        body = decompressed;
                     }
 
                     if (first_message_)
@@ -1736,6 +1786,7 @@ namespace Fun
             protected const string kPluginVersionHeaderField = "PVER";
             protected const string kLengthHeaderField = "LEN";
             protected const string kEncryptionHeaderField = "ENC";
+            protected const string kUncompressedLengthHeaderField = "C";
 
             // message-related constants.
             const string kEncryptionPublicKey = "_pub_key";
@@ -1816,6 +1867,10 @@ namespace Fun
             // Error-related member variables.
             protected TransportError.Type last_error_code_ = TransportError.Type.kNone;
             protected string last_error_message_ = "";
+
+            // Compression releated variables.
+            // TODO(jinuk): 옵션에 따라 생성하게 수정
+            protected FunapiCompressor compressor_ = null;  //new FunapiCompressor();
         }
 
 
