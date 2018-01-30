@@ -37,6 +37,7 @@ public partial class Tester : MonoBehaviour
     void Awake ()
     {
         FunapiEncryptor.public_key = encryptionPublicKey;
+        //FunapiCompression.PerformanceTest();
 
         option_ = optionPopup.GetComponent<UIOption>();
         option_.Init();
