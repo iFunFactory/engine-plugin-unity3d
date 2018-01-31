@@ -11,41 +11,84 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Fun {
 
-public class FunapiCompressor {
-    private UIntPtr cdict_ = (UIntPtr)0, ddict_ = (UIntPtr)0;
+namespace Fun
+{
+public enum FunCompressionType
+{
+    kNone,
+    kZstd,      // Zstandard
+    kDeflate    // DEFLATE
+}
 
-    public void Create(string dict_base64) {
-        if (!string.IsNullOrEmpty(dict_base64)) {
-            byte[] dict_buf = Convert.FromBase64String(dict_base64);
+
+public abstract class FunapiCompressor
+{
+    public abstract ArraySegment<byte> Compress (ArraySegment<byte> src);
+    public abstract ArraySegment<byte> Decompress (ArraySegment<byte> src, int expected_size);
+
+    public int compression_threshold { get; set; }
+}
+
+
+public class FunapiZstdCompressor : FunapiCompressor
+{
+    public void Create (byte[] dict_buf)
+    {
+        if (dict_buf != null && dict_buf.Length > 0)
+        {
             cdict_ = FunapiCompression.LoadCompressionDictionary(dict_buf, 1);
             ddict_ = FunapiCompression.LoadDecompressionDictionary(dict_buf);
         }
     }
 
-    public void Destroy() {
-        if (cdict_ != (UIntPtr)0) {
+    public void Destroy ()
+    {
+        if (cdict_ != (UIntPtr)0)
+        {
             FunapiCompression.UnloadCompressionDictionary(cdict_);
             cdict_ = (UIntPtr)0;
         }
 
-        if (ddict_ != (UIntPtr)0) {
+        if (ddict_ != (UIntPtr)0)
+        {
             FunapiCompression.UnloadDecompressionDictionary(ddict_);
             ddict_ = (UIntPtr)0;
         }
     }
 
-    public ArraySegment<byte> Compress(ArraySegment<byte> src) {
+    public override ArraySegment<byte> Compress (ArraySegment<byte> src)
+    {
         return FunapiCompression.Compress(src, cdict_);
     }
 
-    public ArraySegment<byte> Decompress(ArraySegment<byte> src, int expected_size) {
+    public override ArraySegment<byte> Decompress (ArraySegment<byte> src, int expected_size)
+    {
         return FunapiCompression.Decompress(src, expected_size, ddict_);
+    }
+
+
+    UIntPtr cdict_ = (UIntPtr)0;
+    UIntPtr ddict_ = (UIntPtr)0;
+}
+
+
+public class FunapiDeflateCompressor : FunapiCompressor
+{
+    public override ArraySegment<byte> Compress (ArraySegment<byte> src)
+    {
+        return new ArraySegment<byte>();
+    }
+
+    public override ArraySegment<byte> Decompress (ArraySegment<byte> src, int expected_size)
+    {
+        return new ArraySegment<byte>();
     }
 }
 
-public class FunapiCompression {
+
+public class FunapiCompression
+{
 #region native wrappers
 
 #if UNITY_IOS && !UNITY_EDITOR
@@ -166,7 +209,8 @@ public class FunapiCompression {
 
 #endregion
 
-    public static void PerformanceTest() {
+    public static void PerformanceTest()
+    {
         string dict_str = ("N6Qw7OaV4zEcENhIgAAAAAAA2pAu8cEmbIanlFJKKU0jSZMxINMBAABCIJRW"
         + "+QIAAARAzIeVRcZN0YNRQRiFKgAAAIAAAAAAAAAAAAAAAAAAACRs5KZSRDquS4oAAAAAAAAAAAAAAA"
         + "EAAAAEAAAACAAAADksIl9tc2d0NTI1ODc4OSwiX21zZ196IjotOTAuOTAwMDAxLTIuNSwibG9va196"
@@ -219,7 +263,7 @@ public class FunapiCompression {
         ZSTD_freeCDict(cdict);
         ZSTD_freeDDict(ddict);
 
-        var comp = new FunapiCompressor();
+        var comp = new FunapiZstdCompressor();
         ArraySegment<byte> intermediate = comp.Compress(new ArraySegment<byte>(src_buf));
         ArraySegment<byte> comp_result = comp.Decompress(intermediate, src_buf.Length);
 

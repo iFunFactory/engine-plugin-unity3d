@@ -72,11 +72,10 @@ namespace Fun
     public class TransportOption
     {
         public EncryptionType Encryption = EncryptionType.kDefaultEncryption;
+        public FunCompressionType CompressionType = FunCompressionType.kNone;
         public bool ReliableTransport = false;
         public bool SequenceValidation = false;
         public float ConnectionTimeout = 0f;
-
-        // TODO(jinuk): Compression option 지정할 수 있게 수정
 
         public override bool Equals (object obj)
         {
@@ -86,6 +85,7 @@ namespace Fun
             TransportOption option = obj as TransportOption;
 
             return Encryption == option.Encryption &&
+                   CompressionType == option.CompressionType &&
                    ConnectionTimeout == option.ConnectionTimeout &&
                    SequenceValidation == option.SequenceValidation;
         }
@@ -165,6 +165,28 @@ namespace Fun
             public Transport ()
             {
                 state_ = State.kUnknown;
+            }
+
+            public void Init ()
+            {
+                if (option_ == null)
+                    return;
+
+                if (option_.CompressionType != FunCompressionType.kNone)
+                {
+                    compression_type_ = option_.CompressionType;
+
+                    if (this.CreateCompressorCallback != null)
+                        compressor_ = this.CreateCompressorCallback(protocol_);
+
+                    if (compressor_ == null)
+                    {
+                        if (compression_type_ == FunCompressionType.kZstd)
+                            compressor_ = new FunapiZstdCompressor();
+                        else if (compression_type_ == FunCompressionType.kDeflate)
+                            compressor_ = new FunapiDeflateCompressor();
+                    }
+                }
             }
 
             // Starts transport
@@ -929,7 +951,8 @@ namespace Fun
                     header.AppendFormat("{0}{1}{2}-{3}{4}", kEncryptionHeaderField, kHeaderFieldDelimeter,
                                         Convert.ToInt32(enc_type), msg.enc_header, kHeaderDelimeter);
                 }
-                if (uncompressed_size > 0) {
+                if (uncompressed_size > 0)
+                {
                     header.AppendFormat("{0}{1}{2}{3}", kUncompressedLengthHeaderField, kHeaderFieldDelimeter,
                                         uncompressed_size, kHeaderDelimeter);
                 }
@@ -1030,10 +1053,20 @@ namespace Fun
 
                 // Serializes message
                 msg.body = new ArraySegment<byte>(msg.GetBytes(encoding_));
+
+                // Compress the message
                 int uncompressed_size = 0;
-                ArraySegment<byte> compressed = compressMessage(msg.body, out uncompressed_size);
-                if (uncompressed_size > 0) {
-                    msg.body = compressed;
+                if (compressor_ != null && msg.body.Count >= compressor_.compression_threshold)
+                {
+                    ArraySegment<byte> compressed = compressor_.Compress(msg.body);
+                    if (compressed.Count > 0)
+                    {
+                        DebugLog3("{0} compression successed: {1}bytes -> {2}bytes",
+                                  str_protocol_, msg.body.Count, compressed.Count);
+
+                        uncompressed_size = msg.body.Count;
+                        msg.body = compressed;
+                    }
                 }
 
                 // Encrypt message
@@ -1080,9 +1113,14 @@ namespace Fun
                     // Serializes message
                     msg.body = new ArraySegment<byte>(msg.GetBytes(encoding_));
                     int uncompressed_size = 0;
-                    ArraySegment<byte> compressed = compressMessage(msg.body, out uncompressed_size);
-                    if (uncompressed_size > 0) {
-                        msg.body = compressed;
+                    if (compressor_ != null && msg.body.Count >= compressor_.compression_threshold)
+                    {
+                        ArraySegment<byte> compressed = compressor_.Compress(msg.body);
+                        if (compressed.Count > 0)
+                        {
+                            uncompressed_size = msg.body.Count;
+                            msg.body = compressed;
+                        }
                     }
 
                     if (!encryptMessage(msg, enc_type))
@@ -1103,18 +1141,6 @@ namespace Fun
                 }
 
                 return true;
-            }
-
-            ArraySegment<byte> compressMessage(ArraySegment<byte> buffer, out int uncompressed_size) {
-                uncompressed_size = 0;
-                if (buffer.Count > 0 && compressor_ != null) {
-                    ArraySegment<byte> compressed = compressor_.Compress(buffer);
-                    if (compressed.Count > 0) {
-                        uncompressed_size = buffer.Count;
-                        return compressed;
-                    }
-                }
-                return new ArraySegment<byte>();
             }
 
             void sendPendingMessages ()
@@ -1368,12 +1394,12 @@ namespace Fun
                 string encryption_header = "";
                 string compression_header = "";
                 int uncompressed_size = 0;
+
                 if (header_fields_.TryGetValue(kEncryptionHeaderField, out encryption_header))
                     parseEncryptionHeader(ref encryption_type, ref encryption_header);
 
-                if (header_fields_.TryGetValue(kUncompressedLengthHeaderField, out compression_header)) {
+                if (header_fields_.TryGetValue(kUncompressedLengthHeaderField, out compression_header))
                     uncompressed_size = Convert.ToInt32(compression_header);
-                }
 
                 if (state_ == State.kHandshaking)
                 {
@@ -1414,16 +1440,21 @@ namespace Fun
 
                     if (uncompressed_size > 0)
                     {
-                        if (compressor_ == null) {
+                        if (compressor_ == null)
+                        {
                             LogError("Received a compressed message. But the transport is not configured with compression.");
                             return false;
                         }
 
                         ArraySegment<byte> decompressed = compressor_.Decompress(body, uncompressed_size);
-                        if (decompressed.Count == 0) {
+                        if (decompressed.Count == 0)
+                        {
                             LogError("Failed to decompress the mssage.");
                             return false;
                         }
+
+                        DebugLog3("{0} decompression successed: {1}bytes -> {2}bytes",
+                                  str_protocol_, body.Count, decompressed.Count);
 
                         body = decompressed;
                     }
@@ -1803,6 +1834,7 @@ namespace Fun
             static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
             // Event handlers
+            public event CreateCompressorHandler CreateCompressorCallback;
             public event EventNotifyHandler StartedCallback;
             public event EventNotifyHandler StoppedCallback;
             public event MessageNotifyHandler ReceivedCallback;
@@ -1858,6 +1890,10 @@ namespace Fun
             protected List<FunapiMessage> pending_ = new List<FunapiMessage>();
             protected List<FunapiMessage> sending_ = new List<FunapiMessage>();
 
+            // Compression releated variables.
+            FunCompressionType compression_type_ = FunCompressionType.kNone;
+            FunapiCompressor compressor_ = null;
+
             // Reliability-related variables.
             UInt32 seq_ = 0;
             UInt32 last_seq_ = 0;
@@ -1871,10 +1907,6 @@ namespace Fun
             // Error-related member variables.
             protected TransportError.Type last_error_code_ = TransportError.Type.kNone;
             protected string last_error_message_ = "";
-
-            // Compression releated variables.
-            // TODO(jinuk): 옵션에 따라 생성하게 수정
-            protected FunapiCompressor compressor_ = null;  //new FunapiCompressor();
         }
 
 
@@ -1907,9 +1939,9 @@ namespace Fun
                 addr_ = (HostIP)addr;
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
-                Log("TCP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}, Reconnect:{6}, Nagle:{7}, Ping:{8}",
+                Log("TCP connect - {0}:{1}\n    {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}, Reconnect:{7}, Nagle:{8}, Ping:{9}",
                     addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
-                    tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
+                    tcp_option.CompressionType, tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
                     tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
             }
 
@@ -2198,9 +2230,9 @@ namespace Fun
                 FunDebug.Assert(addr is HostIP);
                 addr_ = (HostIP)addr;
 
-                Log("UDP connect - {0}:{1}\n    {2}, {3}, Sequence:{4}, Timeout:{5}",
+                Log("UDP connect - {0}:{1}\n    {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}",
                     addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
-                    option_.SequenceValidation, option_.ConnectionTimeout);
+                    option_.CompressionType, option_.SequenceValidation, option_.ConnectionTimeout);
             }
 
             protected override void onStart ()
@@ -2539,9 +2571,10 @@ namespace Fun
                                           FunapiVersion.kProtocolVersion);
 
                 HttpTransportOption http_option = (HttpTransportOption)option_;
-                Log("HTTP connect - {0}\n    {1}, {2}, Sequence:{3}, Timeout:{4}, WWW:{5}",
+                Log("HTTP connect - {0}\n    {1}, {2}, Compression:{3}, Sequence:{4}, Timeout:{5}, WWW:{6}",
                     host_url_, convertString(encoding_), convertString(http_option.Encryption),
-                    http_option.SequenceValidation, http_option.ConnectionTimeout, http_option.UseWWW);
+                    http_option.CompressionType, http_option.SequenceValidation,
+                    http_option.ConnectionTimeout, http_option.UseWWW);
             }
 
             protected override void onStart ()
@@ -2594,6 +2627,8 @@ namespace Fun
 
                         if (list[i] == kEncryptionHeaderField)
                             headers.Add(kEncryptionHttpHeaderField, list[i+1]);
+                        else if (list[i] == kUncompressedLengthHeaderField)
+                            headers.Add(kUncompressedLengthHttpHeaderField, list[i+1]);
                         else
                             headers.Add(list[i], list[i+1]);
                     }
@@ -2689,6 +2724,10 @@ namespace Fun
                             break;
                         case "x-ifun-enc":
                             buffer.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField,
+                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
+                            break;
+                        case "x-ifun-c":
+                            buffer.AppendFormat("{0}{1}{2}{3}", kUncompressedLengthHeaderField,
                                                 kHeaderFieldDelimeter, value, kHeaderDelimeter);
                             break;
                         default:
@@ -2989,6 +3028,7 @@ namespace Fun
 
             // Funapi header-related constants.
             const string kEncryptionHttpHeaderField = "X-iFun-Enc";
+            const string kUncompressedLengthHttpHeaderField = "X-iFun-C";
             const string kCookieHeaderField = "Cookie";
 
             static readonly string[] kHeaderSeparator = { kHeaderFieldDelimeter, kHeaderDelimeter };
@@ -3004,6 +3044,7 @@ namespace Fun
 
 
         // Event handler delegate
+        public delegate FunapiCompressor CreateCompressorHandler (TransportProtocol protocol);
         public delegate void EventNotifyHandler (TransportProtocol protocol);
         public delegate void MessageNotifyHandler (TransportProtocol protocol, string msg_type, object message);
     }

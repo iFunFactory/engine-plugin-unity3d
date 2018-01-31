@@ -49,7 +49,7 @@ public class TestDefault
             {
                 onReceivedEchoMessage(type, message);
 
-                if (IsReceivedAllMessages)
+                if (isReceivedAllMessages)
                     session.Stop();
             };
 
