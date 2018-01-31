@@ -479,15 +479,16 @@ namespace Fun
         {
             if (pub_key_ == null)
             {
-                LogError("Encryptor.generatePublicKey - Failed to generate {0} public key.\n" +
-                         "You should set 'FunapiEncryptor.public_key' value first.", type);
-                return "";
+                LogError("Please set the value of 'FunapiEncryptor.public_key' first before connecting.\n" +
+                         "  The encryption public key can be found in the MANIFEST file on the server.\n" +
+                         "  You must copy the public key from the [encryption_ecdh_key]'s comment in the MANIFEST file.\n");
+                return null;
             }
 
             if (!encryptors_.ContainsKey(type))
             {
                 LogWarning("Encryptor.generatePublicKey - Unavailable type: {0}", type);
-                return "";
+                return null;
             }
 
             return encryptors_[type].generatePublicKey(pub_key_);
