@@ -1034,13 +1034,17 @@ namespace Fun
                 ArraySegment<byte> compressed = compressMessage(msg.body, out uncompressed_size);
                 if (uncompressed_size > 0) {
                     msg.body = compressed;
-                }                
+                }
 
                 // Encrypt message
                 EncryptionType enc_type = getEncryption(msg);
                 if (msg.msg_type == kEncryptionPublicKey)
                 {
-                    msg.enc_header = generatePublicKey(enc_type);
+                    string enc_key = generatePublicKey(enc_type);
+                    if (enc_key == null)
+                        return false;
+
+                    msg.enc_header = enc_key;
                 }
                 else if (enc_type != EncryptionType.kNoneEncryption)
                 {
