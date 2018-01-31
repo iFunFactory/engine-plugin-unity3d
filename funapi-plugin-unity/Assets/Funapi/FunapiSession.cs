@@ -907,6 +907,7 @@ namespace Fun
             }
 
             // Callback functions
+            transport.CreateCompressorCallback += onCreateCompressor;
             transport.StartedCallback += onTransportStarted;
             transport.StoppedCallback += onTransportStopped;
             transport.ReceivedCallback += onTransportReceived;
@@ -924,12 +925,22 @@ namespace Fun
             if (default_protocol_ == TransportProtocol.kDefault)
                 DefaultProtocol = protocol;
 
+            transport.Init();
+
             DebugLog1("{0} transport was created.", transport.str_protocol);
             return transport;
         }
 
-        public Transport getTransport (TransportProtocol protocol, FunEncoding encoding,
-                                       UInt16 port, TransportOption option)
+        FunapiCompressor onCreateCompressor (TransportProtocol protocol)
+        {
+            if (CreateCompressorCallback != null)
+                return CreateCompressorCallback(protocol);
+
+            return null;
+        }
+
+        Transport getTransport (TransportProtocol protocol, FunEncoding encoding,
+                                UInt16 port, TransportOption option)
         {
             Transport transport = GetTransport(protocol);
             if (transport == null)
@@ -1509,6 +1520,7 @@ namespace Fun
         // Funapi message-related events.
         public event SessionEventHandler SessionEventCallback;
         public event TransportOptionHandler TransportOptionCallback;
+        public event CreateCompressorHandler CreateCompressorCallback;
         public event TransportEventHandler TransportEventCallback;
         public event TransportErrorHandler TransportErrorCallback;
         public event ReceivedMessageHandler ReceivedMessageCallback;

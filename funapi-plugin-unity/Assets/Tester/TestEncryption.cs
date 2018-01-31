@@ -146,7 +146,7 @@ public class TestEncryption
             {
                 onReceivedEchoMessage(type, message);
 
-                if (IsReceivedAllMessages)
+                if (isReceivedAllMessages)
                     session.Stop();
             };
 

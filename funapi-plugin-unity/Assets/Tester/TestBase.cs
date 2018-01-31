@@ -94,13 +94,13 @@ class TestSessionBase : TestBase
         if (transport.encoding == FunEncoding.kJson)
         {
             Dictionary<string, object> message = new Dictionary<string, object>();
-            message["message"] = string.Format("[{0}] hello json", transport.str_protocol);
+            message["message"] = string.Format("[{0}] {1}", transport.str_protocol, echo_message);
             session.SendMessage("echo", message, protocol, enc_type);
         }
         else if (transport.encoding == FunEncoding.kProtobuf)
         {
             PbufEchoMessage echo = new PbufEchoMessage();
-            echo.msg = string.Format("[{0}] hello proto", transport.str_protocol);
+            echo.msg = string.Format("[{0}] {1}", transport.str_protocol, echo_message);
             FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
             session.SendMessage("pbuf_echo", message, protocol, enc_type);
         }
@@ -131,8 +131,13 @@ class TestSessionBase : TestBase
         --sending_count;
     }
 
+    protected void setEchoMessage (string new_message)
+    {
+        echo_message = new_message;
+    }
+
     // Did it received all the messages?
-    protected bool IsReceivedAllMessages
+    protected bool isReceivedAllMessages
     {
         get { return sending_count <= 0; }
     }
@@ -195,6 +200,10 @@ class TestSessionBase : TestBase
             port += 40;  // 8051~
         else if (flavor == "redirect")
             port += 50;  // 8061~
+        else if (flavor == "compression")
+            port += 60;  // 8071~
+        else if (flavor == "compression-enc")
+            port += 70;  // 8081~
 
         return port;
     }
@@ -202,5 +211,6 @@ class TestSessionBase : TestBase
 
     protected FunapiSession session;
 
+    string echo_message = "hello";
     int sending_count = 0;
 }

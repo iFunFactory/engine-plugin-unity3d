@@ -66,7 +66,7 @@ public class TestSequenceValidation
             {
                 onReceivedEchoMessage(type, message);
 
-                if (IsReceivedAllMessages)
+                if (isReceivedAllMessages)
                     session.Stop();
             };
 

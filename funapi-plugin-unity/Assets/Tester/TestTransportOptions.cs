@@ -55,7 +55,7 @@ public class TestTransportOptions
             {
                 onReceivedEchoMessage(type, message);
 
-                if (IsReceivedAllMessages)
+                if (isReceivedAllMessages)
                     session.Stop();
             };
 
