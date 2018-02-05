@@ -460,8 +460,8 @@ namespace Fun
                 if (connect_queue_.Count <= 0)
                     return;
 
-                Queue<TransportProtocol> list = new Queue<TransportProtocol>(connect_queue_);
-                connect_queue_.Clear();
+                Queue<TransportProtocol> list = connect_queue_;
+                connect_queue_ = new Queue<TransportProtocol>();
 
                 foreach (TransportProtocol protocol in list)
                 {
@@ -486,8 +486,8 @@ namespace Fun
                 if (disconnect_queue_.Count <= 0)
                     return;
 
-                Queue<TransportProtocol> list = new Queue<TransportProtocol>(disconnect_queue_);
-                disconnect_queue_.Clear();
+                Queue<TransportProtocol> list = disconnect_queue_;
+                disconnect_queue_ = new Queue<TransportProtocol>();
 
                 foreach (TransportProtocol protocol in list)
                 {
