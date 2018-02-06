@@ -1,14 +1,11 @@
-FROM ifunengine:latest
+FROM engine:exp
 LABEL MAINTAINER "arin@ifunfactory.com"
 
-ENV TARGET plugin-default
+RUN funapi_initiator plugin
+ADD MANIFEST.json /home/test/plugin-source/src/
 
-WORKDIR /home/test-server
-RUN funapi_initiator plugin && mv plugin-source $TARGET
+RUN plugin-source/setup_build_environment --type=makefile
+WORKDIR /home/test/plugin-build/debug
+RUN make
 
-WORKDIR /home/test-server/$TARGET/build
-RUN cmake .. && make
-
-ADD MANIFEST.json /home/test-server/$TARGET/src/
-
-CMD /home/test-server/$TARGET/build/plugin-local -session_message_logging_level=2
+CMD /home/test/plugin-build/debug/plugin-local -session_message_logging_level=2

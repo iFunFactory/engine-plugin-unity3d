@@ -1,0 +1,1 @@
+docker run -t --name plugin-compress -p 8071:8071 -p 8072:8072/udp -p 8073:8073 -p 8077:8077 -p 8078:8078/udp -p 8079:8079 -p 8081:8081 -p 8082:8082/udp -p 8083:8083 -p 8087:8087 -p 8088:8088/udp -p 8089:8089 plugin:compress
