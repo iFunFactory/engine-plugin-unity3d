@@ -60,15 +60,6 @@ namespace Fun
             return new FunapiSession(hostname_or_ip, option);
         }
 
-        [System.Obsolete("This will be deprecated October 2017. Please use 'FunapiSession.Create(string, SessionOption)' instead.")]
-        public static FunapiSession Create (string hostname_or_ip, bool session_reliability)
-        {
-            SessionOption option = new SessionOption();
-            option.sessionReliability = session_reliability;
-
-            return new FunapiSession(hostname_or_ip, option);
-        }
-
         private FunapiSession (string hostname_or_ip, SessionOption option)
         {
             FunDebug.Assert(option != null);
