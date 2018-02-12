@@ -59,12 +59,12 @@ public class FunapiZstdCompressor : FunapiCompressor
 
     public override ArraySegment<byte> Compress (ArraySegment<byte> src)
     {
-        return FunapiCompression.Compress(src, cdict_);
+        return FunapiCompression.CompressZstd(src, cdict_);
     }
 
     public override ArraySegment<byte> Decompress (ArraySegment<byte> src, int expected_size)
     {
-        return FunapiCompression.Decompress(src, expected_size, ddict_);
+        return FunapiCompression.DecompressZstd(src, expected_size, ddict_);
     }
 
 
@@ -77,12 +77,12 @@ public class FunapiDeflateCompressor : FunapiCompressor
 {
     public override ArraySegment<byte> Compress (ArraySegment<byte> src)
     {
-        return new ArraySegment<byte>();
+        return FunapiCompression.CompressDeflate(src);
     }
 
     public override ArraySegment<byte> Decompress (ArraySegment<byte> src, int expected_size)
     {
-        return new ArraySegment<byte>();
+        return FunapiCompression.DecompressDeflate(src, expected_size);
     }
 }
 
@@ -176,6 +176,26 @@ public class FunapiCompression
 #endif
     private static extern UIntPtr ZSTD_freeDDict(UIntPtr dict);
 
+#if UNITY_IOS && !UNITY_EDITOR
+    [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("z64", CallingConvention = CallingConvention.Cdecl)]
+#else
+    [DllImport("z", CallingConvention = CallingConvention.Cdecl)]
+#endif
+    private static extern UIntPtr ZlibCompressForFunapi(byte [] dst, UIntPtr dst_offset, UIntPtr dst_len,
+        byte[] src, UIntPtr src_offset, UIntPtr src_len);
+
+#if UNITY_IOS && !UNITY_EDITOR
+    [DllImport("__Internal")]
+#elif (UNITY_64 || UNITY_EDITOR_64) && (UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN)
+    [DllImport("z64", CallingConvention = CallingConvention.Cdecl)]
+#else
+    [DllImport("z", CallingConvention = CallingConvention.Cdecl)]
+#endif
+    private static extern UIntPtr ZlibDecompressForFunapi(byte [] dst, UIntPtr dst_offset, UIntPtr dst_len,
+        byte[] src, UIntPtr src_offset, UIntPtr src_len);
+
     internal static UIntPtr LoadCompressionDictionary(byte[] buf, int compressionLevel) {
         return ZSTD_createCDict(buf, (UIntPtr)buf.Length, compressionLevel);
     }
@@ -192,19 +212,34 @@ public class FunapiCompression
         ZSTD_freeDDict(dict);
     }
 
-    internal static ArraySegment<byte> Compress(ArraySegment<byte> buffer, UIntPtr dict) {
+    internal static ArraySegment<byte> CompressZstd(ArraySegment<byte> buffer, UIntPtr dict) {
         byte[] dst_buf = new byte[(int)ZSTD_compressBound((UIntPtr)buffer.Count)];
         int count = (int)CompressForFunapi(dst_buf, (UIntPtr)dst_buf.Length, (IntPtr)0,
                 buffer.Array, (UIntPtr)buffer.Count, (IntPtr)buffer.Offset, dict);
         return new ArraySegment<byte>(dst_buf, 0, count);
     }
 
-    internal static ArraySegment<byte> Decompress(
+    internal static ArraySegment<byte> DecompressZstd(
             ArraySegment<byte> buffer, int expected_size, UIntPtr dict) {
         byte[] dst_buf = new byte[expected_size];
         int count = (int)DecompressForFunapi(dst_buf, (UIntPtr)expected_size, (IntPtr)0,
                 buffer.Array, (UIntPtr)buffer.Count, (IntPtr)buffer.Offset, dict);
         return new ArraySegment<byte>(dst_buf, 0, count);
+    }
+
+    internal static ArraySegment<byte> CompressDeflate(ArraySegment<byte> src) {
+        int dst_length = 18 + src.Count + 5 * (src.Count / 16383 + 1);
+        byte[] dst = new byte[dst_length];
+        int count = (int)ZlibCompressForFunapi(dst, (UIntPtr)0, (UIntPtr)dst_length,
+                src.Array, (UIntPtr)src.Offset, (UIntPtr)src.Count);
+        return new ArraySegment<byte>(dst, 0, count);
+    }
+
+    internal static ArraySegment<byte> DecompressDeflate(ArraySegment<byte> src, int expected_size) {
+        byte[] dst = new byte[expected_size];
+        int count = (int)ZlibDecompressForFunapi(dst, (UIntPtr)0, (UIntPtr)expected_size,
+                src.Array, (UIntPtr)src.Offset, (UIntPtr)src.Count);
+        return new ArraySegment<byte>(dst, 0, count);
     }
 
 #endregion
@@ -263,11 +298,32 @@ public class FunapiCompression
         ZSTD_freeCDict(cdict);
         ZSTD_freeDDict(ddict);
 
-        var comp = new FunapiZstdCompressor();
+        size = 0;
+        size2 = 0;
+        dst_buf = new byte[2 * src_buf.Length];
+        start = DateTime.Now.Ticks / 10000;
+        for (int i = 0; i < N; ++i) {
+            size += (ulong)ZlibCompressForFunapi(dst_buf, (UIntPtr)0, (UIntPtr)dst_buf.Length,
+                                      src_buf, (UIntPtr)0, (UIntPtr)src_buf.Length);
+            size2 += (ulong)ZlibDecompressForFunapi(src_buf, (UIntPtr)0, (UIntPtr)src_buf.Length,
+                    dst_buf, (UIntPtr)0, (UIntPtr)dst_buf.Length);
+        }
+        end = DateTime.Now.Ticks / 10000;
+        FunDebug.Log("Deflate {0} ms, {1} ms/(enc+dec)", end - start, (end - start) * 1.0 / N);
+        FunDebug.Log("String length={0}, compressed={1}", src_buf.Length, size / N);
+
+        FunapiCompressor comp = new FunapiZstdCompressor();
         ArraySegment<byte> intermediate = comp.Compress(new ArraySegment<byte>(src_buf));
         ArraySegment<byte> comp_result = comp.Decompress(intermediate, src_buf.Length);
 
         var test_target = Encoding.UTF8.GetString(comp_result.Array);
+        FunDebug.Assert(test_target == src);
+
+        comp = new FunapiDeflateCompressor();
+        intermediate = comp.Compress(new ArraySegment<byte>(src_buf));
+        comp_result = comp.Decompress(intermediate, src_buf.Length);
+
+        test_target = Encoding.UTF8.GetString(comp_result.Array);
         FunDebug.Assert(test_target == src);
     }
 }
