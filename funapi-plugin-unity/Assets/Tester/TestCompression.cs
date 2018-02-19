@@ -30,43 +30,45 @@ public class TestCompression
     [UnityTest]
     public IEnumerator Zstd_Json ()
     {
-        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kZstd, false);
+        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kZstd);
     }
 
     [UnityTest]
     public IEnumerator Zstd_Protobuf ()
     {
-        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kZstd, false);
+        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kZstd);
     }
 
     [UnityTest]
+    [Ignore("Waiting for jinuk to make a tool for dictionary.")]
     public IEnumerator Zstd_Json_Dic ()
     {
         yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kZstd, true);
     }
 
     [UnityTest]
+    [Ignore("Waiting for jinuk to make a tool for dictionary.")]
     public IEnumerator Zstd_Protobuf_Dic ()
     {
         yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kZstd, true);
     }
 
     [UnityTest]
-    public IEnumerator Zstd_Json_Enc ()
+    public IEnumerator Deflate_Json ()
     {
-        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kZstd, false, true);
+        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kDeflate);
     }
 
     [UnityTest]
-    public IEnumerator Zstd_Protobuf_Enc ()
+    public IEnumerator Deflate_Protobuf ()
     {
-        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kZstd, false, true);
+        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kDeflate);
     }
 
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (FunEncoding encoding, FunCompressionType comp_type, bool with_dic, bool with_enc = false)
+        public TestImpl (FunEncoding encoding, FunCompressionType comp_type, bool with_dic = false)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
@@ -119,7 +121,7 @@ public class TestCompression
 
                 if (type == TransportEventType.kStarted)
                 {
-                    if (with_enc)
+                    if (hasEncryption(protocol, comp_type))
                     {
                         sendEchoMessage(protocol, EncryptionType.kDummyEncryption);
                         sendEchoMessage(protocol, EncryptionType.kIFunEngine2Encryption);
@@ -149,18 +151,17 @@ public class TestCompression
             setEchoMessage(dummyText);
             setTimeoutCallbackWithFail(3f);
 
-            startConnect(TransportProtocol.kTcp, encoding, comp_type, with_enc);
-            startConnect(TransportProtocol.kUdp, encoding, comp_type, with_enc);
-            startConnect(TransportProtocol.kHttp, encoding, comp_type, with_enc);
+            startConnect(TransportProtocol.kTcp, encoding, comp_type);
+            startConnect(TransportProtocol.kUdp, encoding, comp_type);
+            startConnect(TransportProtocol.kHttp, encoding, comp_type);
         }
 
-        void startConnect (TransportProtocol protocol, FunEncoding encoding,
-                           FunCompressionType comp_type, bool with_enc = false)
+        void startConnect (TransportProtocol protocol, FunEncoding encoding, FunCompressionType comp_type)
         {
             TransportOption option = newTransportOption(protocol);
             option.CompressionType = comp_type;
 
-            if (with_enc)
+            if (hasEncryption(protocol, comp_type))
             {
                 if (protocol == TransportProtocol.kTcp)
                     option.Encryption = EncryptionType.kIFunEngine1Encryption;
@@ -175,6 +176,13 @@ public class TestCompression
                 ushort port = getPort("compression", protocol, encoding);
                 session.Connect(protocol, encoding, port, option);
             }
+        }
+
+        bool hasEncryption (TransportProtocol protocol, FunCompressionType comp_type)
+        {
+            return (protocol == TransportProtocol.kTcp && comp_type == FunCompressionType.kZstd) ||
+                   (protocol == TransportProtocol.kUdp && comp_type == FunCompressionType.kZstd) ||
+                   (protocol == TransportProtocol.kHttp && comp_type == FunCompressionType.kDeflate);
         }
 
 
