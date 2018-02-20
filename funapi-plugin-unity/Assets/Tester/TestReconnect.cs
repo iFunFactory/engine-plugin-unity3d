@@ -13,7 +13,7 @@ using UnityEngine.TestTools;
 public class TestReconnect
 {
     [UnityTest]
-    public IEnumerator WithSessionReliability ()
+    public IEnumerator WithReliability ()
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson);
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf);
@@ -68,6 +68,7 @@ public class TestReconnect
         {
             if (test_step >= kStepCountMax)
             {
+                FunapiSession.Destroy(session);
                 isFinished = true;
                 yield break;
             }

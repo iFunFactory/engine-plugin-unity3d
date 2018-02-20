@@ -6,24 +6,27 @@
 
 using Fun;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 
 namespace Fun
 {
-    public class FunapiMono : MonoBehaviour
+#if !NO_UNITY
+    public partial class FunapiMono : MonoBehaviour
     {
-        private static FunapiMono instance_ = null;
-
-        private FunapiMono() {}
-
-        public static FunapiMono Instance
+        static FunapiMono instance
         {
             get
             {
                 if (instance_ == null)
                 {
+                    if (is_expired_)
+                        return null;
+
                     instance_ =  FindObjectOfType(typeof(FunapiMono)) as FunapiMono;
                     if (instance_ == null)
                     {
@@ -42,10 +45,33 @@ namespace Fun
             DontDestroyOnLoad(this);
         }
 
+        void OnApplicationPause (bool isPaused)
+        {
+            listener_.ForEach(delegate (Listener listener) {
+                listener.OnPause(isPaused);
+            });
+        }
+
         void OnApplicationQuit()
         {
+            listener_.ForEach(delegate (Listener listener) {
+                listener.OnQuit();
+            });
+
             instance_ = null;
+            is_expired_ = true;
         }
+
+
+        static FunapiMono instance_ = null;
+        static bool is_expired_ = false;
+    }
+#endif
+
+
+    public partial class FunapiMono
+    {
+        private FunapiMono() {}
 
         void Update ()
         {
@@ -54,82 +80,73 @@ namespace Fun
             float delta_time = (now - prev_ticks_) / 10000000f;
             prev_ticks_ = now;
 
-            updateTimer(delta_time);
+            listener_.Update(delta_time);
         }
 
 
-        // Timer-related functions.
-        public static string AddTimer (FunapiTimer timer)
+        public abstract class Listener : IConcurrentItem
         {
-            return Instance.addTimer(timer);
-        }
-
-        public static void RemoveTimer (string name)
-        {
-            Instance.removeTimer(name);
-        }
-
-        string addTimer (FunapiTimer timer)
-        {
-            if (timer == null)
-                throw new ArgumentNullException("timer");
-
-            lock (timer_lock_)
+            // MonoBehaviour-related functions.
+            protected void setMonoListener ()
             {
-                pending_list_.Add(timer);
-                FunDebug.DebugLog3("[Timer] Adds {0}", timer.ToString());
+                instance.listener_.Add(this);
+                is_active_ = true;
             }
 
-            return timer.Name;
-        }
-
-        void removeTimer (string name)
-        {
-            lock (timer_lock_)
+            protected void releaseMonoListener ()
             {
-                FunapiTimer timer = primary_list_.Find(t => { return t.Name == name; });
-                if (timer != null)
+                instance.listener_.Remove(this);
+                is_active_ = false;
+            }
+
+            public void StartCoroutine (IEnumerator func)
+            {
+                if (!is_active_)
+                    return;
+
+                routines_.Insert(0, func);
+            }
+
+            public void Update (float deltaTime)
+            {
+                if (!is_active_)
                 {
-                    timer.Kill();
-                    FunDebug.DebugLog3("[Timer] Removes '{0}' timer.", name);
+                    if (routines_.Count > 0)
+                        routines_.Clear();
                     return;
                 }
 
-                int count = pending_list_.RemoveAll(t => { return t.Name == name; });
-                if (count > 0)
-                    FunDebug.DebugLog3("[Timer] Removes '{0}' timer. ({1})", name, count);
-            }
-        }
-
-        void updateTimer (float delta_time)
-        {
-            lock (timer_lock_)
-            {
-                // adds from pending list
-                if (pending_list_.Count > 0)
+                // Updates coroutines
+                for (int i = routines_.Count-1; i >= 0; --i)
                 {
-                    primary_list_.AddRange(pending_list_);
-                    pending_list_.Clear();
+                    if (!routines_[i].MoveNext())
+                        routines_.RemoveAt(i);
                 }
 
-                // updates timer
-                if (primary_list_.Count > 0)
-                {
-                    primary_list_.RemoveAll(t => { return t.IsDone; });
-
-                    foreach (FunapiTimer timer in primary_list_)
-                    {
-                        timer.Update(delta_time);
-                    }
-                }
+                OnUpdate(deltaTime);
             }
+
+            public abstract void OnUpdate (float deltaTime);
+
+            public virtual void OnPause (bool isPaused) {}
+
+            public virtual void OnQuit () {}
+
+            public abstract string name { get; }
+
+            public bool isDone { get; set; }
+
+
+            // Member variables.
+            bool is_active_ = false;
+
+            // list of coroutine
+            List<IEnumerator> routines_ = new List<IEnumerator>();
         }
 
 
-        // Timer-related variables.
+        // Member variables.
         long prev_ticks_ = DateTime.UtcNow.Ticks;
-        object timer_lock_ = new object();
-        List<FunapiTimer> primary_list_ = new List<FunapiTimer>();
-        List<FunapiTimer> pending_list_ = new List<FunapiTimer>();
+        ConcurrentList<Listener> listener_ = new ConcurrentList<Listener>();
     }
 }

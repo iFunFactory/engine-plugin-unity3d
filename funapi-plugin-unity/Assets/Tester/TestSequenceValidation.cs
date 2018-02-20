@@ -56,9 +56,14 @@ public class TestSequenceValidation
                 {
                     ++count;
                     if (count >= 3)
+                    {
+                        FunapiSession.Destroy(session);
                         isFinished = true;
+                    }
                     else
+                    {
                         session.Connect(protocol);
+                    }
                 }
             };
 

@@ -10,8 +10,6 @@ using System.Collections.Generic;
 using System.Text;
 #if !NO_UNITY
 using UnityEngine;
-#else
-using System.Threading;
 #endif
 
 // protobuf
@@ -47,7 +45,7 @@ namespace Fun
     }
 
 
-    public partial class FunapiSession : FunapiUpdater
+    public partial class FunapiSession : FunapiMono.Listener
     {
         //
         // Create an instance of FunapiSession.
@@ -60,6 +58,11 @@ namespace Fun
             return new FunapiSession(hostname_or_ip, option);
         }
 
+        public static void Destroy (FunapiSession session)
+        {
+            session.OnDestroy();
+        }
+
         private FunapiSession (string hostname_or_ip, SessionOption option)
         {
             FunDebug.Assert(option != null);
@@ -69,10 +72,19 @@ namespace Fun
             server_address_ = hostname_or_ip;
             option_ = option;
 
+            setMonoListener();
+
             debug.Log("Plugin:{0} Protocol:{1} Reliability:{2}, SessionIdOnce:{3}",
                       FunapiVersion.kPluginVersion, FunapiVersion.kProtocolVersion,
                       option.sessionReliability, option.sendSessionIdOnlyOnce);
         }
+
+        void OnDestroy ()
+        {
+            debug.Log("Destroy a session module.");
+            releaseMonoListener();
+        }
+
 
         //
         // Public functions.
@@ -100,8 +112,6 @@ namespace Fun
                 {
                     state_ = State.kStarted;
                 }
-
-                createUpdater();
             }
 
             string str_protocol = convertString(protocol);
@@ -187,11 +197,7 @@ namespace Fun
                 return;
             }
 
-#if !NO_UNITY
-            mono.StartCoroutine(tryToStopTransport(transport));
-#else
-            mono.StartCoroutine(() => tryToStopTransport(transport));
-#endif
+            StartCoroutine(tryToStopTransport(transport));
         }
 
 
@@ -329,6 +335,8 @@ namespace Fun
         //
         // Properties
         //
+        public override string name { get { return "FunapiSession"; } }
+
         public bool ReliableSession
         {
             get { return option_.sessionReliability; }
@@ -393,12 +401,11 @@ namespace Fun
 
 
         //
-        // Derived function from FunapiUpdater
+        // FunapiMono.Listener-related functions
         //
-        protected override bool onUpdate (float deltaTime)
+        public override void OnUpdate (float deltaTime)
         {
-            if (!base.onUpdate(deltaTime))
-                return false;
+            event_.Update(deltaTime);
 
             checkConnectionRequest();
 
@@ -410,35 +417,37 @@ namespace Fun
                 }
             }
 
-            if (!Started)
-                return true;
-
             updateMessages();
             updateExpectedResponse(deltaTime);
 
             checkDisconnectionRequest();
-
-            return true;
         }
 
-        protected override void onPaused (bool paused)
+        public override void OnPause (bool isPaused)
         {
-            debug.Log("Session {0}. (state:{1})", (paused ? "paused" : "resumed"), state_);
+            if (!Started)
+                return;
+
+            debug.Log("Session {0}. (state:{1})", (isPaused ? "paused" : "resumed"), state_);
 
             lock (transports_lock_)
             {
                 foreach (Transport transport in transports_.Values)
                 {
-                    transport.OnPaused(paused);
+                    transport.OnPaused(isPaused);
                 }
             }
         }
 
-        protected override void onQuit ()
+        public override void OnQuit ()
         {
-            stopAllTransports(true);
-        }
+            if (Started)
+            {
+                stopAllTransports(true);
+            }
 
+            OnDestroy();
+        }
 
 
         //
@@ -458,14 +467,7 @@ namespace Fun
                 {
                     Transport transport = GetTransport(protocol);
                     if (transport != null)
-                    {
-                        if (transport.protocol == TransportProtocol.kHttp)
-                        {
-                            ((HttpTransport)transport).mono = mono;
-                        }
-
                         transport.Start();
-                    }
                 }
             }
         }
@@ -577,11 +579,6 @@ namespace Fun
                     state_ = State.kUnknown;
             }
 
-            if (!wait_redirect_)
-            {
-                releaseUpdater();
-            }
-
             lock (expected_responses_)
             {
                 expected_responses_.Clear();
@@ -679,7 +676,7 @@ namespace Fun
 
             debug.Log("EVENT: Session ({0}).", type);
 
-            event_list.Add (delegate
+            event_.Add (delegate
             {
                 if (SessionEventCallback != null)
                     SessionEventCallback(type, session_id_);
@@ -701,32 +698,18 @@ namespace Fun
             // Stopping all transports.
             stopAllTransports(true);
 
-#if !NO_UNITY
-            mono.StartCoroutine(tryToRedirect(host, list));
-#else
-            mono.StartCoroutine(() => tryToRedirect(host, list));
-#endif
+            StartCoroutine(tryToRedirect(host, list));
             return true;
         }
 
-#if !NO_UNITY
         IEnumerator tryToRedirect (string host, List<RedirectInfo> list)
-#else
-        void tryToRedirect (string host, List<RedirectInfo> list)
-#endif
         {
-#if !NO_UNITY
             yield return null;
-#endif
 
             // Wait for stop.
             while (Started)
             {
-#if !NO_UNITY
                 yield return new WaitForSeconds(0.1f);
-#else
-                Thread.Sleep(100);
-#endif
             }
 
             lock (transports_lock_)
@@ -777,11 +760,7 @@ namespace Fun
                     break;
                 }
 
-#if !NO_UNITY
                 yield return new WaitForSeconds(0.2f);
-#else
-                Thread.Sleep(200);
-#endif
             }
 
             // Check success.
@@ -895,6 +874,8 @@ namespace Fun
                 return null;
             }
 
+            transport.mono = this;
+
             // Callback functions
             transport.CreateCompressorCallback += onCreateCompressor;
             transport.EventCallback += onTransportEvent;
@@ -990,18 +971,11 @@ namespace Fun
             }
             else
             {
-                if (mono == null)
-                    return;
-
                 lock (transports_lock_)
                 {
                     foreach (Transport transport in transports_.Values)
                     {
-#if !NO_UNITY
-                        mono.StartCoroutine(tryToStopTransport(transport));
-#else
-                        mono.StartCoroutine(() => tryToStopTransport(transport));
-#endif
+                        StartCoroutine(tryToStopTransport(transport));
                     }
                 }
             }
@@ -1009,33 +983,19 @@ namespace Fun
             checkAllTransportStopped();
         }
 
-#if !NO_UNITY
         IEnumerator tryToStopTransport (Transport transport)
-#else
-        void tryToStopTransport (Transport transport)
-#endif
         {
-#if !NO_UNITY
             yield return null;
-#endif
 
             if (transport == null)
-#if !NO_UNITY
                 yield break;
-#else
-                return;
-#endif
 
             lock (connect_lock_)
             {
                 if (disconnect_queue_.Contains(transport.protocol))
                 {
                     debug.LogWarning("{0} is already waiting to be stopped.", transport.str_protocol);
-#if !NO_UNITY
                     yield break;
-#else
-                    return;
-#endif
                 }
             }
 
@@ -1057,11 +1017,7 @@ namespace Fun
                         break;
                     }
 
-#if !NO_UNITY
                     yield return new WaitForSeconds(0.1f);
-#else
-                    Thread.Sleep(100);
-#endif
                 }
             }
 
@@ -1156,7 +1112,7 @@ namespace Fun
 
             debug.Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
 
-            event_list.Add (delegate
+            event_.Add (delegate
             {
                 if (TransportEventCallback != null)
                     TransportEventCallback(protocol, type);
@@ -1172,7 +1128,7 @@ namespace Fun
                 return;
             }
 
-            event_list.Add (delegate
+            event_.Add (delegate
             {
                 if (TransportErrorCallback != null)
                     TransportErrorCallback(protocol, error);
@@ -1552,6 +1508,7 @@ namespace Fun
         State state_;
         string server_address_ = "";
         object state_lock_ = new object();
+        ThreadSafeEventList event_ = new ThreadSafeEventList();
 
         // Session-related variables.
         SessionId session_id_ = new SessionId();

@@ -67,6 +67,7 @@ public class TestDisconnect
                     ++test_step;
                     if (test_step >= kStepCountMax)
                     {
+                        FunapiSession.Destroy(session);
                         isFinished = true;
                     }
                     else

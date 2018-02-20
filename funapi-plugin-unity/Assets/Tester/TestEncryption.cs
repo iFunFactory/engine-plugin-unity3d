@@ -113,7 +113,10 @@ public class TestEncryption
             session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
                 if (type == SessionEventType.kStopped)
+                {
+                    FunapiSession.Destroy(session);
                     isFinished = true;
+                }
             };
 
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)

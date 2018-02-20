@@ -91,6 +91,7 @@ public class TestSessionIdOnlyOnce
             }
             else if (test_step >= kStepCountMax)
             {
+                FunapiSession.Destroy(session);
                 isFinished = true;
                 yield break;
             }

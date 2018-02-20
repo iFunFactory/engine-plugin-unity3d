@@ -321,6 +321,8 @@ namespace Fun
             //
             // Properties
             //
+            public FunapiMono.Listener mono { protected get; set; }
+
             public abstract HostAddr address { get; }
 
             public TransportProtocol protocol
@@ -452,6 +454,9 @@ namespace Fun
             public void OnPaused (bool paused)
             {
                 is_paused_ = paused;
+
+                if (state_ != State.kEstablished)
+                    return;
 
                 if (paused)
                 {
