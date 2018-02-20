@@ -90,6 +90,8 @@ public class TestCompression
             {
                 if (type == SessionEventType.kStopped)
                 {
+                    FunapiSession.Destroy(session);
+
                     if (compressor_ != null)
                         compressor_.Destroy();
 

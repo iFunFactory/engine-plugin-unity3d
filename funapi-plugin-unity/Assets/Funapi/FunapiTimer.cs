@@ -5,13 +5,46 @@
 // consent of iFunFactory Inc.
 
 using System;
-using System.Collections.Generic;
-using UnityEngine;
 
 
 namespace Fun
 {
-    public class FunapiTimer
+    public class FunapiTimerList
+    {
+        public void Add (FunapiTimer timer)
+        {
+            if (timer == null)
+                return;
+
+            if (list_.Exists(timer.name))
+                list_.Remove(timer.name);
+
+            list_.Add(timer);
+            FunDebug.DebugLog1("[Timer] {0}", timer.ToString());
+        }
+
+        public void Remove (string name)
+        {
+            if (list_.Remove(name))
+                FunDebug.DebugLog1("[Timer] '{0}' timer deleted.", name);
+        }
+
+        public void Clear ()
+        {
+            list_.Clear();
+        }
+
+        public void Update (float deltaTime)
+        {
+            list_.Update(deltaTime);
+        }
+
+
+        ConcurrentList<FunapiTimer> list_ = new ConcurrentList<FunapiTimer>();
+    }
+
+
+    public class FunapiTimer : IConcurrentItem
     {
         public FunapiTimer (string name, Action callback)
             : this(name, 0f, callback)
@@ -31,42 +64,36 @@ namespace Fun
             wait_time_ = start_delay;
         }
 
-        public virtual void Update (float delta_time)
+        public virtual void Update (float deltaTime)
         {
-            if (is_done_)
+            if (isDone)
                 return;
 
             if (wait_time_ > 0f)
             {
-                wait_time_ -= delta_time;
+                wait_time_ -= deltaTime;
                 if (wait_time_ > 0f)
                     return;
             }
 
-            is_done_ = true;
-
             callback_();
+
+            isDone = true;
         }
 
-        public void Kill ()
-        {
-            is_done_ = true;
-        }
+        public string name { get { return name_; } }
+
+        public bool isDone { get; set; }
 
         public override string ToString ()
         {
             return string.Format("'{0}' timer. delay:{1}", name_, wait_time_);
         }
 
-        public string Name { get { return name_; } }
-
-        public bool IsDone { get { return is_done_; } }
-
 
         // Member variables.
         protected string name_;
         protected float wait_time_ = 0f;
-        protected bool is_done_ = false;
         protected Action callback_ = null;
     }
 
@@ -84,14 +111,14 @@ namespace Fun
             interval_ = interval;
         }
 
-        public override void Update (float delta_time)
+        public override void Update (float deltaTime)
         {
-            if (is_done_)
+            if (isDone)
                 return;
 
             if (wait_time_ > 0f)
             {
-                wait_time_ -= delta_time;
+                wait_time_ -= deltaTime;
                 if (wait_time_ > 0f)
                     return;
             }
@@ -121,14 +148,14 @@ namespace Fun
             limit_ = limit;
         }
 
-        public override void Update (float delta_time)
+        public override void Update (float deltaTime)
         {
-            if (is_done_)
+            if (isDone)
                 return;
 
             if (wait_time_ > 0f)
             {
-                wait_time_ -= delta_time;
+                wait_time_ -= deltaTime;
                 if (wait_time_ > 0f)
                     return;
             }

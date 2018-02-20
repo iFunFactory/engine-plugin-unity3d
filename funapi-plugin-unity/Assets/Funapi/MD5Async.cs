@@ -9,8 +9,6 @@ using System.IO;
 using System.Security.Cryptography;
 #if !NO_UNITY
 using UnityEngine;
-#else
-using System.Threading;
 #endif
 
 
@@ -18,7 +16,7 @@ namespace Fun
 {
     public class MD5Async
     {
-        public static void Compute (MonoBehaviour mono, ref string path, ref DownloadFileInfo file, OnResult on_result)
+        public static IEnumerator Compute (string path, DownloadFileInfo file, OnResult on_result)
         {
             if (!File.Exists(path))
             {
@@ -27,24 +25,9 @@ namespace Fun
                 if (on_result != null)
                     on_result(path, file, false);
 
-                return;
+                yield break;
             }
 
-#if !NO_UNITY
-            mono.StartCoroutine(asyncCompute(path, file, on_result));
-#else
-            string path_ = path;
-            DownloadFileInfo file_ = file;
-            mono.StartCoroutine(delegate { asyncCompute(path_, file_, on_result); });
-#endif
-        }
-
-#if !NO_UNITY
-        static IEnumerator asyncCompute (string path, DownloadFileInfo file, OnResult on_result)
-#else
-        static void asyncCompute (string path, DownloadFileInfo file, OnResult on_result)
-#endif
-        {
             MD5 md5 = MD5.Create();
             int length, read_bytes;
             byte[] buffer = new byte[kBlockSize];
@@ -67,20 +50,14 @@ namespace Fun
                         if (on_result != null)
                             on_result(path, file, md5hash == file.hash_front && md5hash == file.hash);
 
-#if !NO_UNITY
                         yield break;
-#else
-                        return;
-#endif
                     }
 
                     md5.Clear();
                     md5 = MD5.Create();
                     stream.Position = 0;
 
-#if !NO_UNITY
                     yield return new WaitForEndOfFrame();
-#endif
                 }
 
                 int sleep_count = 0;
@@ -106,11 +83,7 @@ namespace Fun
                     if (sleep_count >= kSleepCountMax)
                     {
                         sleep_count = 0;
-#if !NO_UNITY
                         yield return new WaitForEndOfFrame();
-#else
-                        Thread.Sleep(30);
-#endif
                     }
                 }
             }

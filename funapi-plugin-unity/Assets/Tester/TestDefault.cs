@@ -33,7 +33,10 @@ public class TestDefault
             session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
                 if (type == SessionEventType.kStopped)
+                {
+                    FunapiSession.Destroy(session);
                     isFinished = true;
+                }
             };
 
             session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)

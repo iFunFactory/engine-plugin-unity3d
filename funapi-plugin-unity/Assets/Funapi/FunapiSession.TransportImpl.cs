@@ -11,7 +11,9 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+#if !NO_UNITY
 using UnityEngine;
+#endif
 
 
 namespace Fun
@@ -197,7 +199,7 @@ namespace Fun
                     }
                     FunDebug.Assert(nSent > 0, "TCP failed to transfer messages.");
 
-                    debug.DebugLog2("TCP sent {0} bytes.", nSent);
+                    debug.DebugLog3("TCP sent {0} bytes.", nSent);
 
                     lock (sending_lock_)
                     {
@@ -289,7 +291,7 @@ namespace Fun
 
                             last_error_code_ = TransportError.Type.kDisconnected;
                             last_error_message_ = "TCP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected, 1f);
+                            event_.Add(onDisconnected);
                         }
                     }
                 }
@@ -665,8 +667,6 @@ namespace Fun
                 if (https)
                     MozRoots.LoadRootCertificates();
             }
-
-            public MonoBehaviour mono { private get; set; }
 
             public override HostAddr address
             {
@@ -1136,9 +1136,8 @@ namespace Fun
                 public HttpWebResponse web_response = null;
                 public Stream read_stream = null;
                 public bool was_aborted = false;
-
-                // WWW-related
 #if !NO_UNITY
+                // WWW-related
                 public WWW www = null;
                 public bool cancel = false;
 #endif

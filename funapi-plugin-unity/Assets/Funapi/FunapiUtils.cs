@@ -6,11 +6,10 @@
 
 using System;
 using System.Collections.Generic;
-#if NO_UNITY
-using System.Threading;
-#else
+#if !NO_UNITY
 using UnityEngine;
 #endif
+
 
 // Utility classes
 namespace Fun
@@ -19,155 +18,7 @@ namespace Fun
     public class FunapiVersion
     {
         public static readonly int kProtocolVersion = 1;
-        public static readonly int kPluginVersion = 246;
-    }
-
-
-    public class FunapiUpdater
-    {
-        public FunapiUpdater ()
-        {
-#if NO_UNITY
-            funapi_object_ = new FunapiObject();
-            funapi_object_.Updater = onUpdate;
-            funapi_object_.OnPause = onPaused;
-            funapi_object_.OnQuit = onQuit;
-#endif
-        }
-
-        protected void createUpdater ()
-        {
-#if !NO_UNITY
-            lock (lock_)
-            {
-                if (game_object_ != null)
-                    return;
-
-                game_object_ = new GameObject(GetType().ToString());
-                if (game_object_ != null)
-                {
-                    FunapiObject obj = game_object_.AddComponent(typeof(FunapiObject)) as FunapiObject;
-                    if (obj != null)
-                    {
-                        funapi_object_ = obj;
-                        funapi_object_.Updater = onUpdate;
-                        funapi_object_.OnPause = onPaused;
-                        funapi_object_.OnQuit = onQuit;
-                    }
-
-                    FunDebug.DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
-                }
-            }
-#endif
-        }
-
-        protected void releaseUpdater ()
-        {
-#if !NO_UNITY
-            event_.Add(() => {
-                lock (lock_)
-                {
-                    if (game_object_ == null)
-                        return;
-
-                    FunDebug.DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
-                    GameObject.Destroy(game_object_);
-                    game_object_ = null;
-                    funapi_object_ = null;
-                }
-            });
-#endif
-        }
-
-#if NO_UNITY
-        public void updateFrame ()
-        {
-            lock (lock_)
-            {
-                if (funapi_object_ != null)
-                    funapi_object_.Update();
-            }
-        }
-#endif
-
-        protected virtual bool onUpdate (float deltaTime)
-        {
-            event_.Update(deltaTime);
-            return true;
-        }
-
-        protected virtual void onPaused (bool paused) {}
-
-        protected virtual void onQuit () {}
-
-
-        // Properties
-        protected MonoBehaviour mono
-        {
-            get { lock (lock_) { return funapi_object_; } }
-        }
-
-        protected ThreadSafeEventList event_list
-        {
-            get { return event_; }
-        }
-
-
-        // For use a MonoBehaviour
-        class FunapiObject : MonoBehaviour
-        {
-#if !NO_UNITY
-            void Awake ()
-            {
-                prev_ticks_ = DateTime.UtcNow.Ticks;
-                deltaTime_ = 0.03f;
-
-                DontDestroyOnLoad(gameObject);
-            }
-
-            void OnApplicationPause (bool isPaused)
-            {
-                OnPause(isPaused);
-            }
-
-            void OnApplicationQuit ()
-            {
-                OnQuit();
-            }
-#endif
-
-            public void Update ()
-            {
-                long now = DateTime.UtcNow.Ticks;
-                int milliseconds = (int)((now - prev_ticks_) / 10000);
-                deltaTime_ = Math.Min((float)milliseconds / 1000f, kDeltaTimeMax);
-                prev_ticks_ = now;
-
-                Updater(deltaTime_);
-            }
-
-            public Func<float, bool> Updater { private get; set; }
-
-            public Action<bool> OnPause { private get; set; }
-
-            public Action OnQuit { private get; set; }
-
-
-            // Member variables
-            static readonly float kDeltaTimeMax = 0.3f;
-
-            long prev_ticks_ = 0;
-            float deltaTime_ = 0f;
-        }
-
-
-        // Member variables
-        object lock_ = new object();
-#if !NO_UNITY
-        GameObject game_object_ = null;
-#endif
-        FunapiObject funapi_object_ = null;
-        ThreadSafeEventList event_ = new ThreadSafeEventList();
+        public static readonly int kPluginVersion = 247;
     }
 
 
@@ -256,16 +107,4 @@ namespace Fun
 
         static string path_ = null;
     }
-
-
-#if NO_UNITY
-    public class MonoBehaviour
-    {
-        public void StartCoroutine (Action func)
-        {
-            Thread t = new Thread(new ThreadStart(func));
-            t.Start();
-        }
-    }
-#endif
 }
