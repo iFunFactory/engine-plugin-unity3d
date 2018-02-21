@@ -224,7 +224,7 @@
             "zookeeper_session_timeout_in_second": 60
           },
           "HardwareInfo": {
-            "external_ip_resolvers": "aws,nic:eth0,nat:192.0.2.113:tcp+pbuf=8012:http+json=8018"
+            "external_ip_resolvers": "nat:10.10.100.19:tcp+json=8061:udp+json=8062:http+pbuf=8069"
           },
           "Curl": {
             "curl_threads_size": 1

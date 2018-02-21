@@ -1,4 +1,4 @@
-FROM engine:exp
+FROM engine:experimental
 LABEL MAINTAINER "arin@ifunfactory.com"
 
 RUN apt-get update && \
