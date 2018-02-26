@@ -286,9 +286,9 @@ namespace Fun
     }
 
 
-    public class FunDebugLog
+    public sealed class FunDebugLog
     {
-        protected void setDebugObject (object obj)
+        public void SetDebugObject (object obj)
         {
 #if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
             string str = string.Format("{0:X}", obj.GetHashCode());
@@ -296,7 +296,7 @@ namespace Fun
 #endif
         }
 
-        protected void Log (string message, params object[] args)
+        public void Log (string message, params object[] args)
         {
 #if ENABLE_LOG
 #if LOG_LEVEL_3 || LOG_LEVEL_4
@@ -306,7 +306,7 @@ namespace Fun
 #endif
         }
 
-        protected void LogWarning (string message, params object[] args)
+        public void LogWarning (string message, params object[] args)
         {
 #if ENABLE_LOG
 #if LOG_LEVEL_3 || LOG_LEVEL_4
@@ -316,7 +316,7 @@ namespace Fun
 #endif
         }
 
-        protected void LogError (string message, params object[] args)
+        public void LogError (string message, params object[] args)
         {
 #if ENABLE_LOG
 #if LOG_LEVEL_3 || LOG_LEVEL_4
@@ -326,7 +326,7 @@ namespace Fun
 #endif
         }
 
-        protected void DebugLog1 (string message, params object[] args)
+        public void DebugLog1 (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_2 || LOG_LEVEL_3 || LOG_LEVEL_4)
 #if LOG_LEVEL_3 || LOG_LEVEL_4
@@ -336,7 +336,7 @@ namespace Fun
 #endif
         }
 
-        protected void DebugLog2 (string message, params object[] args)
+        public void DebugLog2 (string message, params object[] args)
         {
 #if ENABLE_LOG && (LOG_LEVEL_3 || LOG_LEVEL_4)
             message = string.Format("[{0}] {1}", hash_, message);
@@ -344,7 +344,7 @@ namespace Fun
 #endif
         }
 
-        protected void DebugLog3 (string message, params object[] args)
+        public void DebugLog3 (string message, params object[] args)
         {
 #if ENABLE_LOG && LOG_LEVEL_4
             message = string.Format("[{0}] {1}", hash_, message);

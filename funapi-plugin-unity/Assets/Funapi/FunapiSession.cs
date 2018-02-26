@@ -63,16 +63,16 @@ namespace Fun
         private FunapiSession (string hostname_or_ip, SessionOption option)
         {
             FunDebug.Assert(option != null);
+            debug.SetDebugObject(this);
 
             state_ = State.kUnknown;
             server_address_ = hostname_or_ip;
             option_ = option;
 
-            Log("Plugin:{0} Protocol:{1} Reliability: {2}, SessionIdOnce: {3}",
-                FunapiVersion.kPluginVersion, FunapiVersion.kProtocolVersion,
-                option.sessionReliability, option.sendSessionIdOnlyOnce);
+            debug.Log("Plugin:{0} Protocol:{1} Reliability:{2}, SessionIdOnce:{3}",
+                      FunapiVersion.kPluginVersion, FunapiVersion.kProtocolVersion,
+                      option.sessionReliability, option.sendSessionIdOnlyOnce);
         }
-
 
         //
         // Public functions.
@@ -94,7 +94,7 @@ namespace Fun
         {
             if (!Started)
             {
-                DebugLog1("Starting a session module.");
+                debug.DebugLog1("Starting a session module.");
 
                 lock (state_lock_)
                 {
@@ -110,7 +110,7 @@ namespace Fun
             {
                 if (connect_queue_.Contains(protocol))
                 {
-                    LogWarning("{0} is already waiting for a connection.", str_protocol);
+                    debug.LogWarning("{0} is already waiting for a connection.", str_protocol);
                     return;
                 }
             }
@@ -118,20 +118,20 @@ namespace Fun
             Transport transport = GetTransport(protocol);
             if (transport == null)
             {
-                LogWarning("Session.Connect({0}) - There's no {1} transport. " +
-                           "You should call FunapiSession.Connect(protocol, encoding, ...) function.",
-                           str_protocol, str_protocol);
+                debug.LogWarning("Session.Connect({0}) - There's no {1} transport. " +
+                                 "You should call FunapiSession.Connect(protocol, encoding, ...) function.",
+                                 str_protocol, str_protocol);
                 return;
             }
 
             if (transport.Connected)
             {
-                LogWarning("Session.Connect({0}) - {1} has been already connected.",
-                           str_protocol, str_protocol);
+                debug.LogWarning("Session.Connect({0}) - {1} has been already connected.",
+                                 str_protocol, str_protocol);
                 return;
             }
 
-            DebugLog1("Session.Connect({0}) called.", str_protocol);
+            debug.DebugLog1("Session.Connect({0}) called.", str_protocol);
 
             lock (connect_lock_)
             {
@@ -152,11 +152,11 @@ namespace Fun
 
         public void Stop ()
         {
-            DebugLog1("Session.Stop() called. (state:{0})", state_);
+            debug.DebugLog1("Session.Stop() called. (state:{0})", state_);
 
             if (!Started)
             {
-                LogWarning("Session.Stop() - The session is not connected.");
+                debug.LogWarning("Session.Stop() - The session is not connected.");
                 return;
             }
 
@@ -166,24 +166,24 @@ namespace Fun
         public void Stop (TransportProtocol protocol)
         {
             string str_protocol = convertString(protocol);
-            DebugLog1("Session.Stop({0}) called. (state:{1})", str_protocol, state_);
+            debug.DebugLog1("Session.Stop({0}) called. (state:{1})", str_protocol, state_);
 
             if (!Started)
             {
-                LogWarning("Session.Stop({0}) - The session is not connected.", str_protocol);
+                debug.LogWarning("Session.Stop({0}) - The session is not connected.", str_protocol);
                 return;
             }
 
             Transport transport = GetTransport(protocol);
             if (transport == null)
             {
-                LogWarning("Session.Stop({0}) - Can't find the {1} transport.", str_protocol, str_protocol);
+                debug.LogWarning("Session.Stop({0}) - Can't find the {1} transport.", str_protocol, str_protocol);
                 return;
             }
 
             if (transport.state == Transport.State.kUnknown)
             {
-                LogWarning("Session.Stop({0}) - {1} has been already stopped.", str_protocol, str_protocol);
+                debug.LogWarning("Session.Stop({0}) - {1} has been already stopped.", str_protocol, str_protocol);
                 return;
             }
 
@@ -288,7 +288,7 @@ namespace Fun
                     strlog.AppendFormat(" {0}:{1}", transport.str_protocol, transport.state);
                 strlog.AppendFormat(" session:{0}", state_);
 
-                LogWarning(strlog.ToString());
+                debug.LogWarning(strlog.ToString());
 
                 if (DroppedMessageCallback != null)
                     DroppedMessageCallback(msg_type, message);
@@ -304,12 +304,12 @@ namespace Fun
             {
                 if (expected_responses_.ContainsKey(msg_type))
                 {
-                    LogWarning("'{0}' expected response type is already added. Ignored.");
+                    debug.LogWarning("'{0}' expected response type is already added. Ignored.");
                     return;
                 }
 
                 expected_responses_[msg_type] = new ExpectedResponse(msg_type, waiting_time);
-                DebugLog1("Expected response message added - '{0}' ({1}s)", msg_type, waiting_time);
+                debug.DebugLog1("Expected response message added - '{0}' ({1}s)", msg_type, waiting_time);
             }
         }
 
@@ -320,7 +320,7 @@ namespace Fun
                 if (expected_responses_.ContainsKey(msg_type))
                 {
                     expected_responses_.Remove(msg_type);
-                    DebugLog1("Expected response message removed - {0}", msg_type);
+                    debug.DebugLog1("Expected response message removed - {0}", msg_type);
                 }
             }
         }
@@ -338,7 +338,7 @@ namespace Fun
         {
             get { return default_protocol_; }
             set { default_protocol_ = value;
-                  Log("The default protocol is '{0}'", convertString(value)); }
+                  debug.Log("The default protocol is '{0}'", convertString(value)); }
         }
 
         public string GetSessionId ()
@@ -423,7 +423,7 @@ namespace Fun
 
         protected override void onPaused (bool paused)
         {
-            Log("Session {0}.", paused ? "paused" : "resumed");
+            debug.Log("Session {0}. (state:{1})", (paused ? "paused" : "resumed"), state_);
 
             lock (transports_lock_)
             {
@@ -497,7 +497,7 @@ namespace Fun
             {
                 if (message_buffer_.Count > 0)
                 {
-                    DebugLog1("Update messages. count: {0}", message_buffer_.Count);
+                    debug.DebugLog1("Update messages. count: {0}", message_buffer_.Count);
 
                     foreach (ReceivedMessage msg in message_buffer_)
                     {
@@ -505,7 +505,7 @@ namespace Fun
                         if (transport != null)
                         {
                             if (!string.IsNullOrEmpty(msg.msg_type))
-                                DebugLog2("{0} received message - '{1}'", transport.str_protocol, msg.msg_type);
+                                debug.DebugLog2("{0} received message - '{1}'", transport.str_protocol, msg.msg_type);
 
                             onProcessMessage(transport, msg);
                         }
@@ -531,7 +531,7 @@ namespace Fun
                         er.wait_time -= deltaTime;
                         if (er.wait_time <= 0f)
                         {
-                            LogWarning("'{0}' message waiting time has been exceeded.", er.type);
+                            debug.LogWarning("'{0}' message waiting time has been exceeded.", er.type);
                             remove_list.Add(er.type);
 
                             if (ResponseTimeoutCallback != null)
@@ -604,7 +604,7 @@ namespace Fun
                 session_id_.SetId(new_id);
                 prev_session_id_.SetId(new_id);
 
-                Log("New session id: {0}", (string)session_id_);
+                debug.Log("New session id: {0}", (string)session_id_);
 
                 onSessionOpened();
             }
@@ -613,8 +613,8 @@ namespace Fun
                 if (option_.sendSessionIdOnlyOnce && transport.protocol == TransportProtocol.kUdp)
                 {
                     transport.SendSessionId = true;
-                    LogWarning("UDP received a wrong session id. Sends the previous session id again. current:{0} received:{1}",
-                               (string)session_id_, SessionId.ToString(new_id));
+                    debug.LogWarning("UDP received a wrong session id. Sends the previous session id again. current:{0} received:{1}",
+                                     (string)session_id_, SessionId.ToString(new_id));
                     return false;
                 }
 
@@ -623,12 +623,12 @@ namespace Fun
                 {
                     session_id_.SetId(new_id);
                     prev_session_id_.SetId(new_id);
-                    Log("Change the session id string to bytes: {0}", (string)session_id_);
+                    debug.Log("Change the session id string to bytes: {0}", (string)session_id_);
                 }
                 else
                 {
-                    LogWarning("Received a wrong session id. This message is ignored.\ncurrent:{0} received:{1}",
-                               (string)session_id_, SessionId.ToString(new_id));
+                    debug.LogWarning("Received a wrong session id. This message is ignored.\ncurrent:{0} received:{1}",
+                                     (string)session_id_, SessionId.ToString(new_id));
                     return false;
                 }
             }
@@ -673,11 +673,11 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                Log("Redirect: Session event ({0}).\nThis event callback is skipped.", type);
+                debug.Log("Redirect: Session event ({0}).\nThis event callback is skipped.", type);
                 return;
             }
 
-            Log("EVENT: Session ({0}).", type);
+            debug.Log("EVENT: Session ({0}).", type);
 
             event_list.Add (delegate
             {
@@ -732,7 +732,7 @@ namespace Fun
             lock (transports_lock_)
             {
                 transports_.Clear();
-                Log("Redirect: Removes all transports.");
+                debug.Log("Redirect: Removes all transports.");
             }
 
             onSessionClosed();
@@ -742,8 +742,8 @@ namespace Fun
             // Adds transports.
             foreach (RedirectInfo info in list)
             {
-                Log("Redirect: {0} - {1}:{2}, {3}", convertString(info.protocol),
-                    server_address_, info.port, convertString(info.encoding));
+                debug.Log("Redirect: {0} - {1}:{2}, {3}", convertString(info.protocol),
+                          server_address_, info.port, convertString(info.encoding));
 
                 Connect(info.protocol, info.encoding, info.port, info.option);
             }
@@ -772,8 +772,8 @@ namespace Fun
 
                 if (DateTime.UtcNow.Ticks > redirect_timeout)
                 {
-                    LogWarning("Redirect: Connection timed out. " +
-                               "Stops redirecting to another server. ({0})", host);
+                    debug.LogWarning("Redirect: Connection timed out. " +
+                                     "Stops redirecting to another server. ({0})", host);
                     break;
                 }
 
@@ -859,13 +859,13 @@ namespace Fun
 
                 if (wait_redirect_)
                 {
-                    Log("createTransport - {0} transport use the 'default option'.\n" +
-                        "If you want to use your option, please set FunapiSession.TransportOptionCallback function.",
-                        convertString(protocol));
+                    debug.Log("createTransport - {0} transport use the 'default option'.\n" +
+                              "If you want to use your option, please set FunapiSession.TransportOptionCallback function.",
+                              convertString(protocol));
                 }
                 else
                 {
-                    Log("createTransport - {0} transport use the 'default option'.", convertString(protocol));
+                    debug.Log("createTransport - {0} transport use the 'default option'.", convertString(protocol));
                 }
             }
 
@@ -891,7 +891,7 @@ namespace Fun
             }
             else
             {
-                LogError("createTransport - {0} is invalid protocol type.", convertString(protocol));
+                debug.LogError("createTransport - {0} is invalid protocol type.", convertString(protocol));
                 return null;
             }
 
@@ -911,7 +911,7 @@ namespace Fun
 
             transport.Init();
 
-            DebugLog1("{0} transport was created.", transport.str_protocol);
+            debug.DebugLog1("{0} transport was created.", transport.str_protocol);
             return transport;
         }
 
@@ -972,7 +972,7 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
-            DebugLog1("Stopping a session module.");
+            debug.DebugLog1("Stopping a session module.");
 
             if (force_stop)
             {
@@ -1030,7 +1030,7 @@ namespace Fun
             {
                 if (disconnect_queue_.Contains(transport.protocol))
                 {
-                    LogWarning("{0} is already waiting to be stopped.", transport.str_protocol);
+                    debug.LogWarning("{0} is already waiting to be stopped.", transport.str_protocol);
 #if !NO_UNITY
                     yield break;
 #else
@@ -1047,13 +1047,13 @@ namespace Fun
                 // Checks transport's state.
                 while (transport.InProcess)
                 {
-                    DebugLog1("Waiting for process before {0} transport to stop... ({1})",
-                            transport.str_protocol, transport.HasUnsentMessages ? "sending" : "0");
+                    debug.DebugLog1("Waiting for process before {0} transport to stop... ({1})",
+                                    transport.str_protocol, transport.HasUnsentMessages ? "sending" : "0");
 
                     if (DateTime.UtcNow.Ticks > wait_timeout)
                     {
-                        LogWarning("Timed out to stop the {0} transport. state:{1} unsent:{2}",
-                                transport.str_protocol, transport.state, transport.HasUnsentMessages);
+                        debug.LogWarning("Timed out to stop the {0} transport. state:{1} unsent:{2}",
+                                         transport.str_protocol, transport.state, transport.HasUnsentMessages);
                         break;
                     }
 
@@ -1092,7 +1092,7 @@ namespace Fun
                 break;
 
             default:
-                FunDebug.LogWarning("onTransportEvent - may need to handle this type '{0}'", type);
+                debug.LogWarning("onTransportEvent - may need to handle this type '{0}'", type);
                 break;
             }
         }
@@ -1137,8 +1137,8 @@ namespace Fun
 
             if (transport.LastErrorCode != TransportError.Type.kNone)
             {
-                Log("{0} transport stopped. (error:{1})\n{2}",
-                    transport.str_protocol, transport.LastErrorCode, transport.LastErrorMessage);
+                debug.Log("{0} transport stopped. (error:{1})\n{2}",
+                          transport.str_protocol, transport.LastErrorCode, transport.LastErrorMessage);
             }
 
             onTransportEventCallback(protocol, TransportEventType.kStopped);
@@ -1149,12 +1149,12 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                Log("Redirect: {0} transport ({1}).\nThis event callback is skipped.",
-                    convertString(protocol), type);
+                debug.Log("Redirect: {0} transport ({1}).\nThis event callback is skipped.",
+                          convertString(protocol), type);
                 return;
             }
 
-            Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
+            debug.Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
 
             event_list.Add (delegate
             {
@@ -1167,8 +1167,8 @@ namespace Fun
         {
             if (wait_redirect_)
             {
-                LogWarning("Redirect: {0} error ({1})\nThis event callback is skipped.\n{2}.",
-                           convertString(protocol), error.type, error.message);
+                debug.LogWarning("Redirect: {0} error ({1})\nThis event callback is skipped.\n{2}.",
+                                 convertString(protocol), error.type, error.message);
                 return;
             }
 
@@ -1260,7 +1260,7 @@ namespace Fun
             }
             catch (Exception e)
             {
-                LogError("Failure in Session.onProcessMessage: {0}", e.ToString());
+                debug.LogError("Failure in Session.onProcessMessage: {0}", e.ToString());
                 return;
             }
 
@@ -1274,7 +1274,7 @@ namespace Fun
 
                 case kSessionClosedType:
                     {
-                        Log("Session has been closed by server.");
+                        debug.Log("Session has been closed by server.");
 
                         if (wait_redirect_)
                             return;
@@ -1364,14 +1364,14 @@ namespace Fun
 
             if (host.Length <= 0 || token.Length <= 0)
             {
-                LogWarning("onRedirectMessage - Invalid host or token.\nhost:{0}, token:{1}",
-                           host, token);
+                debug.LogWarning("onRedirectMessage - Invalid host or token.\nhost:{0}, token:{1}",
+                                 host, token);
                 return;
             }
 
             if (info_list.Count <= 0)
             {
-                LogWarning("onRedirectMessage - Server port list is empty.");
+                debug.LogWarning("onRedirectMessage - Server port list is empty.");
                 return;
             }
 
@@ -1393,7 +1393,7 @@ namespace Fun
                 }
                 else
                 {
-                    LogWarning("Redirect failed. error code: {0}", result);
+                    debug.LogWarning("Redirect failed. error code: {0}", result);
                     onRedirectFailed();
                 }
             }
@@ -1410,7 +1410,7 @@ namespace Fun
                 }
                 else
                 {
-                    LogWarning("Redirect failed. error code: {0}", redirect.result);
+                    debug.LogWarning("Redirect failed. error code: {0}", redirect.result);
                     onRedirectFailed();
                 }
             }
@@ -1573,5 +1573,8 @@ namespace Fun
         static JsonAccessor json_helper_ = FunapiMessage.JsonHelper;
         List<ReceivedMessage> message_buffer_ = new List<ReceivedMessage>();
         Dictionary<string, ExpectedResponse> expected_responses_ = new Dictionary<string, ExpectedResponse>();
+
+        // For debugging
+        FunDebugLog debug = new FunDebugLog();
     }
 }

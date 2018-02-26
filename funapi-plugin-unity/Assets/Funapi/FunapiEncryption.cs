@@ -255,11 +255,11 @@ namespace Fun
     }
 
 
-    public class FunapiEncryptor : FunDebugLog
+    public class FunapiEncryptor
     {
         public FunapiEncryptor ()
         {
-            setDebugObject(this);
+            debug.SetDebugObject(this);
         }
 
         bool createEncryptor (EncryptionType type)
@@ -270,7 +270,7 @@ namespace Fun
             Encryptor encryptor = Encryptor.Create(type);
             if (encryptor == null)
             {
-                LogWarning("Encryptor - Failed to create '{0}' encryptor", type);
+                debug.LogWarning("Encryptor - Failed to create '{0}' encryptor", type);
                 return false;
             }
 
@@ -302,7 +302,7 @@ namespace Fun
         {
             if (type == EncryptionType.kIFunEngine1Encryption || type == EncryptionType.kIFunEngine2Encryption)
             {
-                LogWarning("This plugin is not support '{0}' encryption.", type);
+                debug.LogWarning("This plugin is not support '{0}' encryption.", type);
                 return;
             }
 
@@ -377,23 +377,23 @@ namespace Fun
                 EncryptionType type = (EncryptionType)Convert.ToInt32(encryption_type);
                 if (!encryptors_.ContainsKey(type))
                 {
-                    LogWarning("Encryptor.doHandshaking - Unavailable type: {0}", type);
+                    debug.LogWarning("Encryptor.doHandshaking - Unavailable type: {0}", type);
                     return false;
                 }
 
                 Encryptor encryptor = encryptors_[type];
                 if (encryptor.state != Encryptor.State.kHandshaking)
                 {
-                    LogWarning("Encryptor.doHandshaking - Encryptor state is not handshaking. " +
-                               "state: {0}", encryptor.state);
+                    debug.LogWarning("Encryptor.doHandshaking - Encryptor state is not handshaking. " +
+                                     "state: {0}", encryptor.state);
                     return false;
                 }
 
                 string out_header = "";
                 if (!encryptor.Handshake(encryption_header, ref out_header))
                 {
-                    LogWarning("Encryptor.doHandshaking - Failure in '{0}' Handshake.",
-                               encryptor.name);
+                    debug.LogWarning("Encryptor.doHandshaking - Failure in '{0}' Handshake.",
+                                     encryptor.name);
                     return false;
                 }
 
@@ -420,16 +420,16 @@ namespace Fun
 
             if (!encryptors_.ContainsKey(type))
             {
-                LogWarning("Encryptor.encryptMessage - Unavailable type: {0}", type);
+                debug.LogWarning("Encryptor.encryptMessage - Unavailable type: {0}", type);
                 return false;
             }
 
             Encryptor encryptor = encryptors_[type];
             if (encryptor.state != Encryptor.State.kEstablished)
             {
-                LogWarning("Encryptor.encryptMessage - Can't encrypt '{0}' message. " +
-                           "Encryptor state is not established. state: {1}",
-                           message.msg_type, encryptor.state);
+                debug.LogWarning("Encryptor.encryptMessage - Can't encrypt '{0}' message. " +
+                                 "Encryptor state is not established. state: {1}",
+                                 message.msg_type, encryptor.state);
                 return false;
             }
 
@@ -439,7 +439,7 @@ namespace Fun
                 Int64 nSize = encryptor.Encrypt(message.body, message.body, ref header);
                 if (nSize <= 0)
                 {
-                    LogWarning("Encryptor.encryptMessage - Failed to encrypt.");
+                    debug.LogWarning("Encryptor.encryptMessage - Failed to encrypt.");
                     return false;
                 }
 
@@ -459,7 +459,7 @@ namespace Fun
 
             if (!encryptors_.ContainsKey(type))
             {
-                LogWarning("Encryptor.decryptMessage - Unavailable type: {0}", type);
+                debug.LogWarning("Encryptor.decryptMessage - Unavailable type: {0}", type);
                 return false;
             }
 
@@ -467,7 +467,7 @@ namespace Fun
             Int64 nSize = encryptor.Decrypt(buffer, buffer, encryption_header);
             if (nSize <= 0)
             {
-                LogWarning("Encryptor.decryptMessage - Failed to decrypt.");
+                debug.LogWarning("Encryptor.decryptMessage - Failed to decrypt.");
                 return false;
             }
 
@@ -479,15 +479,15 @@ namespace Fun
         {
             if (pub_key_ == null)
             {
-                LogError("Please set the value of 'FunapiEncryptor.public_key' first before connecting.\n" +
-                         "  The encryption public key can be found in the MANIFEST file on the server.\n" +
-                         "  You must copy the public key from the [encryption_ecdh_key]'s comment in the MANIFEST file.\n");
+                debug.LogError("Please set the value of 'FunapiEncryptor.public_key' first before connecting.\n" +
+                               "  The encryption public key can be found in the MANIFEST file on the server.\n" +
+                               "  You must copy the public key from the [encryption_ecdh_key]'s comment in the MANIFEST file.\n");
                 return null;
             }
 
             if (!encryptors_.ContainsKey(type))
             {
-                LogWarning("Encryptor.generatePublicKey - Unavailable type: {0}", type);
+                debug.LogWarning("Encryptor.generatePublicKey - Unavailable type: {0}", type);
                 return null;
             }
 
@@ -516,5 +516,8 @@ namespace Fun
         EncryptionType default_encryptor_ = EncryptionType.kNoneEncryption;
         Dictionary<EncryptionType, Encryptor> encryptors_ = new Dictionary<EncryptionType, Encryptor>();
         static byte[] pub_key_ = null;
+
+        // For debugging
+        protected FunDebugLog debug = new FunDebugLog();
     }
 }
