@@ -51,10 +51,10 @@ namespace Fun
                 addr_ = new HostIP(host, port);
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
-                Log("TCP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}, Reconnect:{7}, Nagle:{8}, Ping:{9}",
-                    addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
-                    tcp_option.CompressionType, tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
-                    tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
+                debug.Log("TCP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}, Reconnect:{7}, Nagle:{8}, Ping:{9}",
+                          addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
+                          tcp_option.CompressionType, tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
+                          tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
             }
 
             protected override void onStart ()
@@ -112,7 +112,7 @@ namespace Fun
                         }
                     }
 
-                    DebugLog2("TCP sending {0} messages. ({1}bytes)", sending_.Count, length);
+                    debug.DebugLog2("TCP sending {0} messages. ({1}bytes)", sending_.Count, length);
                 }
 
                 try
@@ -129,7 +129,7 @@ namespace Fun
                 {
                     if (e is ObjectDisposedException || e is NullReferenceException)
                     {
-                        DebugLog1("TCP BeginSend operation has been cancelled.");
+                        debug.DebugLog1("TCP BeginSend operation has been cancelled.");
                         return;
                     }
 
@@ -156,7 +156,7 @@ namespace Fun
                             event_.Add(onFailure);
                             return;
                         }
-                        DebugLog1("TCP transport connected. Starts handshaking..");
+                        debug.DebugLog1("TCP transport connected. Starts handshaking..");
 
                         state_ = State.kHandshaking;
 
@@ -172,7 +172,7 @@ namespace Fun
                 }
                 catch (ObjectDisposedException)
                 {
-                    DebugLog1("TCP BeginConnect operation has been cancelled.");
+                    debug.DebugLog1("TCP BeginConnect operation has been cancelled.");
                 }
                 catch (Exception e)
                 {
@@ -197,7 +197,7 @@ namespace Fun
                     }
                     FunDebug.Assert(nSent > 0, "TCP failed to transfer messages.");
 
-                    DebugLog2("TCP sent {0} bytes.", nSent);
+                    debug.DebugLog2("TCP sent {0} bytes.", nSent);
 
                     lock (sending_lock_)
                     {
@@ -213,7 +213,7 @@ namespace Fun
                             nSent -= length;
                             sending_.RemoveAt(0);
 
-                            DebugLog3("TCP removes '{0}' message ({1}bytes)", msg.msg_type, length);
+                            debug.DebugLog3("TCP removes '{0}' message ({1}bytes)", msg.msg_type, length);
                         }
 
                         FunDebug.Assert(sending_.Count == 0,
@@ -225,7 +225,7 @@ namespace Fun
                 }
                 catch (ObjectDisposedException)
                 {
-                    DebugLog1("TCP BeginSend operation has been cancelled.");
+                    debug.DebugLog1("TCP BeginSend operation has been cancelled.");
                 }
                 catch (Exception e)
                 {
@@ -254,8 +254,8 @@ namespace Fun
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            DebugLog3("TCP received {0} bytes. Buffer has {1} bytes.",
-                                      nRead, received_size_ - next_decoding_offset_);
+                            debug.DebugLog3("TCP received {0} bytes. Buffer has {1} bytes.",
+                                            nRead, received_size_ - next_decoding_offset_);
 
                             // Decoding a messages
                             tryToDecodeMessage();
@@ -273,18 +273,18 @@ namespace Fun
                             lock (sock_lock_)
                             {
                                 sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
-                                DebugLog3("TCP ready to receive more. We can receive upto {0} more bytes.",
-                                          receive_buffer_.Length - received_size_);
+                                debug.DebugLog3("TCP ready to receive more. We can receive upto {0} more bytes.",
+                                                receive_buffer_.Length - received_size_);
                             }
                         }
                         else
                         {
-                            LogWarning("TCP socket closed");
+                            debug.LogWarning("TCP socket closed");
 
                             if (received_size_ - next_decoding_offset_ > 0)
                             {
-                                LogWarning("TCP buffer has {0} bytes but they failed to decode. Discarding.",
-                                           received_size_ - next_decoding_offset_);
+                                debug.LogWarning("TCP buffer has {0} bytes but they failed to decode. Discarding.",
+                                                 received_size_ - next_decoding_offset_);
                             }
 
                             last_error_code_ = TransportError.Type.kDisconnected;
@@ -298,7 +298,7 @@ namespace Fun
                     // When Stop is called Socket.EndReceive may return a NullReferenceException
                     if (e is ObjectDisposedException || e is NullReferenceException)
                     {
-                        DebugLog1("TCP BeginReceive operation has been cancelled.");
+                        debug.DebugLog1("TCP BeginReceive operation has been cancelled.");
                         return;
                     }
 
@@ -347,9 +347,9 @@ namespace Fun
             {
                 addr_ = new HostIP(host, port);
 
-                Log("UDP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}",
-                    addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
-                    option_.CompressionType, option_.SequenceValidation, option_.ConnectionTimeout);
+                debug.Log("UDP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}",
+                          addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
+                          option_.CompressionType, option_.SequenceValidation, option_.ConnectionTimeout);
             }
 
             protected override void onStart ()
@@ -373,7 +373,7 @@ namespace Fun
                         sock_.Bind(new IPEndPoint(IPAddress.Any, port));
 
                     IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
-                    DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
+                    debug.DebugLog1("UDP bind - local:{0}:{1}", lep.Address, lep.Port);
 
                     send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
                     if (addr_.inet == AddressFamily.InterNetworkV6)
@@ -435,7 +435,7 @@ namespace Fun
                         offset += msg.body.Count;
                     }
 
-                    DebugLog2("UDP sending {0} bytes.", length);
+                    debug.DebugLog2("UDP sending {0} bytes.", length);
                 }
 
                 if (offset > 0)
@@ -450,7 +450,7 @@ namespace Fun
                     }
                     catch (ObjectDisposedException)
                     {
-                        DebugLog1("UDP BeginSendTo operation has been cancelled.");
+                        debug.DebugLog1("UDP BeginSendTo operation has been cancelled.");
                     }
                 }
             }
@@ -475,7 +475,7 @@ namespace Fun
                         FunDebug.Assert(sending_.Count > 0);
 
                         FunapiMessage msg = sending_[0];
-                        DebugLog2("UDP sent a message - '{0}' ({1}bytes)", msg.msg_type, nSent);
+                        debug.DebugLog2("UDP sent a message - '{0}' ({1}bytes)", msg.msg_type, nSent);
 
                         // Removes header and body segment
                         int nLength = msg.header.Count + msg.body.Count;
@@ -494,7 +494,7 @@ namespace Fun
                 }
                 catch (ObjectDisposedException)
                 {
-                    DebugLog1("UDP BeginSendTo operation has been cancelled.");
+                    debug.DebugLog1("UDP BeginSendTo operation has been cancelled.");
                 }
                 catch (Exception e)
                 {
@@ -525,8 +525,8 @@ namespace Fun
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            DebugLog3("UDP received {0} bytes. Buffer has {1} bytes.",
-                                      nRead, received_size_ - next_decoding_offset_);
+                            debug.DebugLog3("UDP received {0} bytes. Buffer has {1} bytes.",
+                                            nRead, received_size_ - next_decoding_offset_);
                         }
 
                         // Decoding a message
@@ -546,18 +546,18 @@ namespace Fun
                                                        SocketFlags.None, ref receive_ep_,
                                                        new AsyncCallback(this.receiveBytesCb), this);
 
-                                DebugLog3("UDP ready to receive more. We can receive upto {0} more bytes",
-                                          receive_buffer_.Length);
+                                debug.DebugLog3("UDP ready to receive more. We can receive upto {0} more bytes",
+                                                receive_buffer_.Length);
                             }
                         }
                         else
                         {
-                            LogWarning("UDP socket closed");
+                            debug.LogWarning("UDP socket closed");
 
                             if (received_size_ - next_decoding_offset_ > 0)
                             {
-                                LogWarning("UDP buffer has {0} bytes but they failed to decode. Discarding.",
-                                           received_size_ - next_decoding_offset_);
+                                debug.LogWarning("UDP buffer has {0} bytes but they failed to decode. Discarding.",
+                                                 received_size_ - next_decoding_offset_);
                             }
 
                             last_error_code_ = TransportError.Type.kDisconnected;
@@ -570,7 +570,7 @@ namespace Fun
                 {
                     if (e is ObjectDisposedException || e is NullReferenceException)
                     {
-                        DebugLog1("UDP BeginReceiveFrom operation has been cancelled.");
+                        debug.DebugLog1("UDP BeginReceiveFrom operation has been cancelled.");
                         return;
                     }
 
@@ -603,7 +603,7 @@ namespace Fun
                         File.WriteAllText(save_path_, local_port_.ToString());
                     }
 
-                    FunDebug.Log("The udp local port start value ({0}) has been loaded.", local_port_);
+                    FunDebug.debug.Log("The udp local port start value ({0}) has been loaded.", local_port_);
                 }
 
                 public static int Next ()
@@ -688,10 +688,10 @@ namespace Fun
                                           FunapiVersion.kProtocolVersion);
 
                 HttpTransportOption http_option = (HttpTransportOption)option_;
-                Log("HTTP connect - {0}, {1}, {2}, Compression:{3}, Sequence:{4}, Timeout:{5}, WWW:{6}",
-                    host_url_, convertString(encoding_), convertString(http_option.Encryption),
-                    http_option.CompressionType, http_option.SequenceValidation,
-                    http_option.ConnectionTimeout, http_option.UseWWW);
+                debug.Log("HTTP connect - {0}, {1}, {2}, Compression:{3}, Sequence:{4}, Timeout:{5}, WWW:{6}",
+                          host_url_, convertString(encoding_), convertString(http_option.Encryption),
+                          http_option.CompressionType, http_option.SequenceValidation,
+                          http_option.ConnectionTimeout, http_option.UseWWW);
             }
 
             protected override void onStart ()
@@ -730,7 +730,7 @@ namespace Fun
                 lock (sending_lock_)
                 {
                     FunDebug.Assert(sending_.Count > 0);
-                    DebugLog2("HTTP Host Url: {0}", host_url_);
+                    debug.DebugLog2("HTTP Host Url: {0}", host_url_);
 
                     FunapiMessage msg = sending_[0];
 
@@ -755,7 +755,7 @@ namespace Fun
                     if (str_cookie_.Length > 0)
                         headers.Add(kCookieHeaderField, str_cookie_);
 
-                    DebugLog2("HTTP sending {0} bytes.", msg.body.Count);
+                    debug.DebugLog2("HTTP sending {0} bytes.", msg.body.Count);
 
 #if !NO_UNITY
                     // Sending a message
@@ -834,7 +834,7 @@ namespace Fun
                             break;
                         case "set-cookie":
                             str_cookie_ = value;
-                            DebugLog3("HTTP set-cookie : {0}", str_cookie_);
+                            debug.DebugLog3("HTTP set-cookie : {0}", str_cookie_);
                             break;
                         case "content-length":
                             body_length = Convert.ToInt32(value);
@@ -889,7 +889,7 @@ namespace Fun
                     lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-                        DebugLog2("HTTP sent a message - '{0}' ({1}bytes)", msg.msg_type, msg.body.Count);
+                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)", msg.msg_type, msg.body.Count);
 
                         sending_.RemoveAt(0);
                     }
@@ -903,7 +903,7 @@ namespace Fun
                         (e is ObjectDisposedException || e is NullReferenceException))
                     {
                         // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
-                        DebugLog1("HTTP request operation has been cancelled.");
+                        debug.DebugLog1("HTTP request operation has been cancelled.");
                         return;
                     }
 
@@ -920,7 +920,7 @@ namespace Fun
                     Request request = (Request)ar.AsyncState;
                     if (request.was_aborted)
                     {
-                        Log("HTTP responseCb - request aborted. ({0})", request.message.msg_type);
+                        debug.Log("HTTP responseCb - request aborted. ({0})", request.message.msg_type);
                         return;
                     }
 
@@ -956,7 +956,7 @@ namespace Fun
                         (e is ObjectDisposedException || e is NullReferenceException))
                     {
                         // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
-                        DebugLog1("Http request operation has been cancelled.");
+                        debug.DebugLog1("Http request operation has been cancelled.");
                         return;
                     }
 
@@ -992,7 +992,7 @@ namespace Fun
                             return;
                         }
 
-                        DebugLog3("HTTP received {0} bytes.", received_size_);
+                        debug.DebugLog3("HTTP received {0} bytes.", received_size_);
 
                         lock (receive_lock_)
                         {
@@ -1013,7 +1013,7 @@ namespace Fun
                 {
                     if (e is ObjectDisposedException || e is NullReferenceException)
                     {
-                        DebugLog1("HTTP request operation has been cancelled.");
+                        debug.DebugLog1("HTTP request operation has been cancelled.");
                         return;
                     }
 
@@ -1049,7 +1049,7 @@ namespace Fun
                     {
                         FunDebug.Assert(sending_.Count > 0);
                         FunapiMessage msg = sending_[0];
-                        DebugLog2("HTTP sent a message - '{0}' ({1}bytes)", msg.msg_type, msg.body.Count);
+                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)", msg.msg_type, msg.body.Count);
 
                         sending_.RemoveAt(0);
                     }
@@ -1075,7 +1075,7 @@ namespace Fun
                         Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
                         received_size_ += www.bytes.Length;
 
-                        DebugLog3("HTTP received {0} bytes.", received_size_);
+                        debug.DebugLog3("HTTP received {0} bytes.", received_size_);
 
                         // Decoding a message
                         tryToDecodeMessage();

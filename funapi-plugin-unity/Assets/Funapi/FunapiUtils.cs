@@ -23,12 +23,10 @@ namespace Fun
     }
 
 
-    public class FunapiUpdater : FunDebugLog
+    public class FunapiUpdater
     {
         public FunapiUpdater ()
         {
-            setDebugObject(this);
-
 #if NO_UNITY
             funapi_object_ = new FunapiObject();
             funapi_object_.Updater = onUpdate;
@@ -57,7 +55,7 @@ namespace Fun
                         funapi_object_.OnQuit = onQuit;
                     }
 
-                    DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
+                    FunDebug.DebugLog1("CreateUpdater - '{0}' was created.", game_object_.name);
                 }
             }
 #endif
@@ -72,7 +70,7 @@ namespace Fun
                     if (game_object_ == null)
                         return;
 
-                    DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
+                    FunDebug.DebugLog1("ReleaseUpdater - '{0}' was destroyed", game_object_.name);
                     GameObject.Destroy(game_object_);
                     game_object_ = null;
                     funapi_object_ = null;
