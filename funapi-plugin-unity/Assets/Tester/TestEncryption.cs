@@ -19,20 +19,6 @@ public class TestEncryption
     }
 
     [UnityTest]
-    public IEnumerator TCP_Json_Ife1 ()
-    {
-        yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson,
-                                   EncryptionType.kIFunEngine1Encryption, true);
-    }
-
-    [UnityTest]
-    public IEnumerator TCP_Json_Ife2 ()
-    {
-        yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson,
-                                   EncryptionType.kIFunEngine2Encryption);
-    }
-
-    [UnityTest]
     public IEnumerator TCP_Json_Chacha20 ()
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson,
@@ -44,34 +30,6 @@ public class TestEncryption
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson,
                                    EncryptionType.kAes128Encryption);
-    }
-
-    [UnityTest]
-    public IEnumerator UDP_Json_Ife2 ()
-    {
-        yield return new TestImpl (TransportProtocol.kUdp, FunEncoding.kJson,
-                                   EncryptionType.kIFunEngine2Encryption, true);
-    }
-
-    [UnityTest]
-    public IEnumerator HTTP_Json_Ife2 ()
-    {
-        yield return new TestImpl (TransportProtocol.kHttp, FunEncoding.kJson,
-                                   EncryptionType.kIFunEngine2Encryption, true);
-    }
-
-    [UnityTest]
-    public IEnumerator TCP_Protobuf_Ife1 ()
-    {
-        yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf,
-                                   EncryptionType.kIFunEngine1Encryption, true);
-    }
-
-    [UnityTest]
-    public IEnumerator TCP_Protobuf_Ife2 ()
-    {
-        yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf,
-                                   EncryptionType.kIFunEngine2Encryption);
     }
 
     [UnityTest]
@@ -88,25 +46,10 @@ public class TestEncryption
                                    EncryptionType.kAes128Encryption);
     }
 
-    [UnityTest]
-    public IEnumerator UDP_Protobuf_Ife2 ()
-    {
-        yield return new TestImpl (TransportProtocol.kUdp, FunEncoding.kProtobuf,
-                                   EncryptionType.kIFunEngine2Encryption, true);
-    }
-
-    [UnityTest]
-    public IEnumerator HTTP_Protobuf_Ife2 ()
-    {
-        yield return new TestImpl (TransportProtocol.kHttp, FunEncoding.kProtobuf,
-                                   EncryptionType.kIFunEngine2Encryption, true);
-    }
-
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (TransportProtocol protocol, FunEncoding encoding,
-                         EncryptionType enc_type, bool send_all_types = false)
+        public TestImpl (TransportProtocol protocol, FunEncoding encoding, EncryptionType enc_type)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
@@ -123,22 +66,8 @@ public class TestEncryption
 
                 if (type == TransportEventType.kStarted)
                 {
-                    if (send_all_types)
-                    {
-                        sendEchoMessage(protocol, EncryptionType.kDummyEncryption);
-                        sendEchoMessage(protocol, EncryptionType.kIFunEngine2Encryption);
-
-                        if (protocol == TransportProtocol.kTcp)
-                        {
-                            sendEchoMessage(protocol, EncryptionType.kIFunEngine1Encryption);
-                            sendEchoMessage(protocol, EncryptionType.kChaCha20Encryption);
-                            sendEchoMessage(protocol, EncryptionType.kAes128Encryption);
-                        }
-                    }
-                    else
-                    {
-                        sendEchoMessageWithCount(protocol, 3);
-                    }
+                    sendEchoMessage(protocol, EncryptionType.kDummyEncryption);
+                    sendEchoMessageWithCount(protocol, 2);
                 }
             };
 

@@ -19,13 +19,13 @@ using plugin_messages;
 public class TestMulticast
 {
     [UnityTest]
-    public IEnumerator multicastJson ()
+    public IEnumerator Multicast_Json ()
     {
         yield return new TestImpl<FunapiMulticastClient> (TransportProtocol.kTcp, FunEncoding.kJson);
     }
 
     [UnityTest]
-    public IEnumerator multicastProtobuf ()
+    public IEnumerator Multicast_Protobuf ()
     {
         yield return new TestImpl<FunapiMulticastClient> (TransportProtocol.kTcp, FunEncoding.kProtobuf);
     }

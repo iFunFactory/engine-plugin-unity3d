@@ -121,9 +121,7 @@ public class TestRedirect
                 }
                 else if (protocol == TransportProtocol.kHttp)
                 {
-                    HttpTransportOption http_option = new HttpTransportOption();
-                    http_option.Encryption = EncryptionType.kIFunEngine2Encryption;
-                    option = http_option;
+                    option = new HttpTransportOption();
                 }
             }
             else if (flavor == "beta")
@@ -131,14 +129,12 @@ public class TestRedirect
                 if (protocol == TransportProtocol.kTcp)
                 {
                     TcpTransportOption tcp_option = new TcpTransportOption();
-                    tcp_option.Encryption = EncryptionType.kIFunEngine1Encryption;
+                    tcp_option.Encryption = EncryptionType.kChaCha20Encryption;
                     option = tcp_option;
                 }
                 else if (protocol == TransportProtocol.kHttp)
                 {
-                    HttpTransportOption http_option = new HttpTransportOption();
-                    http_option.Encryption = EncryptionType.kIFunEngine2Encryption;
-                    option = http_option;
+                    option = new HttpTransportOption();
                 }
             }
 

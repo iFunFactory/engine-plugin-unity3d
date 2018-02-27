@@ -28,47 +28,61 @@ public class TestCompression
     }
 
     [UnityTest]
-    public IEnumerator Zstd_Json ()
+    public IEnumerator Default_Json ()
     {
-        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kZstd);
+        yield return new TestImpl (FunEncoding.kJson);
     }
 
     [UnityTest]
-    public IEnumerator Zstd_Protobuf ()
+    public IEnumerator Default_Protobuf ()
     {
-        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kZstd);
+        yield return new TestImpl (FunEncoding.kProtobuf);
     }
 
     [UnityTest]
-    [Ignore("Waiting for jinuk to make a tool for dictionary.")]
-    public IEnumerator Zstd_Json_Dic ()
+    public IEnumerator Encrypt_Json ()
     {
-        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kZstd, true);
+        yield return new TestImpl (FunEncoding.kJson, true);
     }
 
     [UnityTest]
-    [Ignore("Waiting for jinuk to make a tool for dictionary.")]
-    public IEnumerator Zstd_Protobuf_Dic ()
+    public IEnumerator Encrypt_Protobuf ()
     {
-        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kZstd, true);
+        yield return new TestImpl (FunEncoding.kProtobuf, true);
     }
 
     [UnityTest]
-    public IEnumerator Deflate_Json ()
+    [Ignore("Waiting to make a dictionary tool.")]
+    public IEnumerator Default_Json_Dic ()
     {
-        yield return new TestImpl (FunEncoding.kJson, FunCompressionType.kDeflate);
+        yield return new TestImpl (FunEncoding.kJson, false, true);
     }
 
     [UnityTest]
-    public IEnumerator Deflate_Protobuf ()
+    [Ignore("Waiting to make a dictionary tool.")]
+    public IEnumerator Default_Protobuf_Dic ()
     {
-        yield return new TestImpl (FunEncoding.kProtobuf, FunCompressionType.kDeflate);
+        yield return new TestImpl (FunEncoding.kJson, false, true);
+    }
+
+    [UnityTest]
+    [Ignore("Waiting to make a dictionary tool.")]
+    public IEnumerator Encrypt_Json_Dic ()
+    {
+        yield return new TestImpl (FunEncoding.kProtobuf, true, true);
+    }
+
+    [UnityTest]
+    [Ignore("Waiting to make a dictionary tool.")]
+    public IEnumerator Encrypt_Protobuf_Dic ()
+    {
+        yield return new TestImpl (FunEncoding.kProtobuf, true, true);
     }
 
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (FunEncoding encoding, FunCompressionType comp_type, bool with_dic = false)
+        public TestImpl (FunEncoding encoding, bool with_enc = false, bool with_dic = false)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
@@ -77,10 +91,7 @@ public class TestCompression
                 if (type == SessionEventType.kStopped)
                 {
                     if (compressor_ != null)
-                    {
-                        if (comp_type == FunCompressionType.kZstd)
-                            ((FunapiZstdCompressor)compressor_).Destroy();
-                    }
+                        compressor_.Destroy();
 
                     isFinished = true;
                 }
@@ -88,7 +99,7 @@ public class TestCompression
 
             session.CreateCompressorCallback += delegate (TransportProtocol protocol)
             {
-                if (comp_type == FunCompressionType.kZstd)
+                if (with_dic)
                 {
                     var compressor = new FunapiZstdCompressor();
                     compressor.compression_threshold = 128;
@@ -121,17 +132,11 @@ public class TestCompression
 
                 if (type == TransportEventType.kStarted)
                 {
-                    if (hasEncryption(protocol, comp_type))
+                    if (with_enc && protocol == TransportProtocol.kTcp)
                     {
                         sendEchoMessage(protocol, EncryptionType.kDummyEncryption);
-                        sendEchoMessage(protocol, EncryptionType.kIFunEngine2Encryption);
-
-                        if (protocol == TransportProtocol.kTcp)
-                        {
-                            sendEchoMessage(protocol, EncryptionType.kIFunEngine1Encryption);
-                            sendEchoMessage(protocol, EncryptionType.kChaCha20Encryption);
-                            sendEchoMessage(protocol, EncryptionType.kAes128Encryption);
-                        }
+                        sendEchoMessage(protocol, EncryptionType.kChaCha20Encryption);
+                        sendEchoMessage(protocol, EncryptionType.kAes128Encryption);
                     }
                     else
                     {
@@ -151,22 +156,20 @@ public class TestCompression
             setEchoMessage(dummyText);
             setTimeoutCallbackWithFail(3f);
 
-            startConnect(TransportProtocol.kTcp, encoding, comp_type);
-            startConnect(TransportProtocol.kUdp, encoding, comp_type);
-            startConnect(TransportProtocol.kHttp, encoding, comp_type);
+            startConnect(TransportProtocol.kTcp, encoding, with_enc);
+            startConnect(TransportProtocol.kUdp, encoding, with_enc);
+            startConnect(TransportProtocol.kHttp, encoding, with_enc);
         }
 
-        void startConnect (TransportProtocol protocol, FunEncoding encoding, FunCompressionType comp_type)
+        void startConnect (TransportProtocol protocol, FunEncoding encoding, bool with_enc)
         {
             TransportOption option = newTransportOption(protocol);
-            option.CompressionType = comp_type;
+            option.CompressionType = getCompressType(protocol, with_enc);
 
-            if (hasEncryption(protocol, comp_type))
+            if (with_enc)
             {
                 if (protocol == TransportProtocol.kTcp)
-                    option.Encryption = EncryptionType.kIFunEngine1Encryption;
-                else
-                    option.Encryption = EncryptionType.kIFunEngine2Encryption;
+                    option.Encryption = EncryptionType.kChaCha20Encryption;
 
                 ushort port = getPort("compression-enc", protocol, encoding);
                 session.Connect(protocol, encoding, port, option);
@@ -178,11 +181,12 @@ public class TestCompression
             }
         }
 
-        bool hasEncryption (TransportProtocol protocol, FunCompressionType comp_type)
+        FunCompressionType getCompressType (TransportProtocol protocol, bool with_enc)
         {
-            return (protocol == TransportProtocol.kTcp && comp_type == FunCompressionType.kZstd) ||
-                   (protocol == TransportProtocol.kUdp && comp_type == FunCompressionType.kZstd) ||
-                   (protocol == TransportProtocol.kHttp && comp_type == FunCompressionType.kDeflate);
+            if (protocol == TransportProtocol.kTcp || protocol == TransportProtocol.kUdp)
+                return with_enc ? FunCompressionType.kZstd : FunCompressionType.kDeflate;
+            else
+                return with_enc ? FunCompressionType.kDeflate : FunCompressionType.kZstd;
         }
 
 
@@ -191,6 +195,6 @@ public class TestCompression
                                            "\"look_x\":1.100000381469727,\"look_z\":11.600100381469727," +
                                            "\"_msgtype\":\"request_move\",\"_nick\":\"snooooooow\"}";
 
-        FunapiCompressor compressor_ = null;
+        FunapiZstdCompressor compressor_ = null;
     }
 }
