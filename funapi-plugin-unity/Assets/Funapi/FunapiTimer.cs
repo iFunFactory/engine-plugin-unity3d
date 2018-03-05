@@ -23,10 +23,15 @@ namespace Fun
             FunDebug.DebugLog1("[Timer] {0}", timer.ToString());
         }
 
-        public void Remove (string name)
+        public bool Remove (string name)
         {
             if (list_.Remove(name))
+            {
                 FunDebug.DebugLog1("[Timer] '{0}' timer deleted.", name);
+                return true;
+            }
+
+            return false;
         }
 
         public void Clear ()
@@ -46,22 +51,17 @@ namespace Fun
 
     public class FunapiTimer : IConcurrentItem
     {
-        public FunapiTimer (string name, Action callback)
-            : this(name, 0f, callback)
-        {
-        }
-
         public FunapiTimer (string name, float start_delay, Action callback)
         {
             if (string.IsNullOrEmpty(name))
                 throw new ArgumentNullException("timer name");
 
-            if (callback == null)
+            if (callback == null && !GetType().Equals(typeof(FunapiLoopTimer)))
                 throw new ArgumentNullException("timer callback");
 
             name_ = name;
+            start_delay_ = start_delay;
             callback_ = callback;
-            wait_time_ = start_delay;
         }
 
         public virtual void Update (float deltaTime)
@@ -69,12 +69,9 @@ namespace Fun
             if (isDone)
                 return;
 
-            if (wait_time_ > 0f)
-            {
-                wait_time_ -= deltaTime;
-                if (wait_time_ > 0f)
-                    return;
-            }
+            elapsed_ += deltaTime;
+            if (elapsed_ < start_delay_)
+                return;
 
             callback_();
 
@@ -87,28 +84,34 @@ namespace Fun
 
         public override string ToString ()
         {
-            return string.Format("'{0}' timer. delay:{1}", name_, wait_time_);
+            return string.Format("'{0}' timer. delay:{1}", name_, start_delay_);
         }
 
 
         // Member variables.
         protected string name_;
-        protected float wait_time_ = 0f;
+        protected float start_delay_ = 0f;
+        protected float elapsed_ = 0f;
         protected Action callback_ = null;
     }
 
 
     public class FunapiLoopTimer : FunapiTimer
     {
-        public FunapiLoopTimer (string name, float interval, Action callback)
+        public FunapiLoopTimer (string name, float interval, Action<float> callback)
             : this(name, 0f, interval, callback)
         {
         }
 
-        public FunapiLoopTimer (string name, float start_delay, float interval, Action callback)
-            : base(name, start_delay, callback)
+        public FunapiLoopTimer (string name, float start_delay,
+                                float interval, Action<float> callback)
+            : base(name, start_delay, null)
         {
+            if (callback == null)
+                throw new ArgumentNullException("loop timer callback");
+
             interval_ = interval;
+            callback_ = callback;
         }
 
         public override void Update (float deltaTime)
@@ -116,26 +119,74 @@ namespace Fun
             if (isDone)
                 return;
 
-            if (wait_time_ > 0f)
+            elapsed_ += deltaTime;
+
+            if (start_delay_ > 0f)
             {
-                wait_time_ -= deltaTime;
-                if (wait_time_ > 0f)
+                if (elapsed_ < start_delay_)
                     return;
+
+                callback_(elapsed_ - start_delay_);
+
+                start_delay_ = 0f;
+                elapsed_ = 0f;
+                return;
             }
 
-            wait_time_ = interval_;
+            if (elapsed_ < interval_)
+                return;
 
-            callback_();
+            callback_(elapsed_);
+
+            elapsed_ = 0f;
         }
 
         public override string ToString ()
         {
             return string.Format("'{0}' loop timer. delay:{1} interval:{2}",
-                                 name_, wait_time_, interval_);
+                                 name_, start_delay_, interval_);
         }
 
 
         float interval_ = 0f;
+        new Action<float> callback_ = null;
+    }
+
+
+    public class FunapiTimeoutTimer : FunapiTimer
+    {
+        public FunapiTimeoutTimer (string name, float timeout, Action callback)
+            : base(name, 0f, callback)
+        {
+            timeout_ = timeout;
+        }
+
+        public void Reset ()
+        {
+            elapsed_ = 0f;
+        }
+
+        public override void Update (float deltaTime)
+        {
+            if (isDone)
+                return;
+
+            elapsed_ += deltaTime;
+            if (elapsed_ < timeout_)
+                return;
+
+            callback_();
+
+            isDone = true;
+        }
+
+        public override string ToString ()
+        {
+            return string.Format("'{0}' timeout timer. timeout:{1}", name_, timeout_);
+        }
+
+
+        float timeout_ = 0f;
     }
 
 
@@ -143,7 +194,7 @@ namespace Fun
     public class FunapiExponentTimer : FunapiTimer
     {
         public FunapiExponentTimer (string name, float limit, Action callback)
-            : base(name, 1f, callback)
+            : base(name, 0f, callback)
         {
             limit_ = limit;
         }
@@ -153,12 +204,11 @@ namespace Fun
             if (isDone)
                 return;
 
-            if (wait_time_ > 0f)
-            {
-                wait_time_ -= deltaTime;
-                if (wait_time_ > 0f)
-                    return;
-            }
+            elapsed_ += deltaTime;
+            if (elapsed_ < exp_time_)
+                return;
+
+            elapsed_ = 0f;
 
             if (exp_time_ < limit_)
             {
@@ -166,8 +216,6 @@ namespace Fun
                 if (exp_time_ > limit_)
                     exp_time_ = limit_;
             }
-
-            wait_time_ = exp_time_;
 
             callback_();
         }
