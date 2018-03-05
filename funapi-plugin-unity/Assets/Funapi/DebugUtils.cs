@@ -280,8 +280,7 @@ namespace Fun
 #endif
 
 #if ENABLE_OUTPUT
-        public delegate void OutputListener (string type, string message);
-        public static event OutputListener OutputCallback;
+        public static event Action<string, string> OutputCallback;  // type, message
 #endif
     }
 

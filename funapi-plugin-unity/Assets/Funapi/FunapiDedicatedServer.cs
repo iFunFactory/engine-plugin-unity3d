@@ -518,11 +518,8 @@ namespace Fun
             public Action<object> callback = null;
         }
 
-        public delegate void UserDataHandler (string uid, string json_string);
-        public delegate void MatchDataHandler (string json_string);
-
-        public static event UserDataHandler UserDataCallback;
-        public static event MatchDataHandler MatchDataCallback;
+        public static event Action<string, string> UserDataCallback;  // uid, json data
+        public static event Action<string> MatchDataCallback;         // json data
 
         static readonly string kInstanceName = "Fun.DedicatedServer";
         static readonly string kServerVersion = "FunapiVersion";

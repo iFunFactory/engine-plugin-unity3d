@@ -212,8 +212,7 @@ namespace Fun
 
 
         // Result callback delegate
-        public delegate void EventHandler(AnnounceResult result);
-        public event EventHandler ResultCallback;
+        public event Action<AnnounceResult> ResultCallback;    // result code
 
         // Url-related constants.
         const string kLocalPath = "/announce/";

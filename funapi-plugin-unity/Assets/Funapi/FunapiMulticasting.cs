@@ -435,15 +435,12 @@ namespace Fun
         const string kLeave = "_leave";
         const string kErrorCode = "_error_code";
 
-        public delegate void ChannelList(object channel_list);
-        public delegate void ChannelNotify(string channel_id, string sender);
         public delegate void ChannelMessage(string channel_id, string sender, object body);
-        public delegate void ErrorNotify(string channel_id, FunMulticastMessage.ErrorCode code);
 
-        public event ChannelList ChannelListCallback;
-        public event ChannelNotify JoinedCallback;
-        public event ChannelNotify LeftCallback;
-        public event ErrorNotify ErrorCallback;
+        public event Action<object> ChannelListCallback;      // channel list
+        public event Action<string, string> JoinedCallback;   // channel id, sender
+        public event Action<string, string> LeftCallback;     // channel id, sender
+        public event Action<string, FunMulticastMessage.ErrorCode> ErrorCallback;  // channel id, error code
 
         protected JsonAccessor json_helper_ = FunapiMessage.JsonHelper;
         protected FunEncoding encoding_;

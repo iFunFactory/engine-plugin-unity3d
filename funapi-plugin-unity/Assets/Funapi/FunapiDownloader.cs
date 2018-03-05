@@ -791,20 +791,16 @@ namespace Fun
             Completed
         }
 
-        public delegate void VerifyEventHandler (string path);
-        public delegate void ReadyEventHandler (int total_count, UInt64 total_size);
-        public delegate void UpdateEventHandler (string path, long bytes_received, long total_bytes, int percentage);
-        public delegate void FinishEventHandler (DownloadResult code);
-
-        public event VerifyEventHandler VerifyCallback;
-        public event ReadyEventHandler ReadyCallback;
-        public event UpdateEventHandler UpdateCallback;
-        public event FinishEventHandler FinishedCallback;
+        public event Action<string> VerifyCallback;                   // path
+        public event Action<int, UInt64> ReadyCallback;               // total count, total size
+        public event Action<string, long, long, int> UpdateCallback;  // path, received bytes, total bytes, percentage
+        public event Action<DownloadResult> FinishedCallback;         // result code
 
         // Save file-related constants.
         const string kRootPath = "client_data";
         const string kCachedFileName = "cached_files";
         const int kRetryCountMax = 3;
+
 
         // member variables.
         State state_ = State.None;

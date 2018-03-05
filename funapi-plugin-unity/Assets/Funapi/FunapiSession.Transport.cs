@@ -1787,10 +1787,10 @@ namespace Fun
             static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
             // Event handlers
-            public event CreateCompressorHandler CreateCompressorCallback;
-            public event TransportEventHandler EventCallback;
-            public event TransportErrorHandler ErrorCallback;
-            public event MessageNotifyHandler ReceivedCallback;
+            public event Func<TransportProtocol, FunapiCompressor> CreateCompressorCallback;
+            public event Action<TransportProtocol, TransportEventType> EventCallback;
+            public event Action<TransportProtocol, TransportError> ErrorCallback;
+            public event Action<TransportProtocol, FunEncoding, string, object> ReceivedCallback;
 
             // member variables.
             protected State state_;
@@ -1853,14 +1853,6 @@ namespace Fun
             protected TransportError.Type last_error_code_ = TransportError.Type.kNone;
             protected string last_error_message_ = "";
         }
-
-
-        // Event handler delegate
-        public delegate FunapiCompressor CreateCompressorHandler (TransportProtocol protocol);
-        public delegate void TransportEventHandler (TransportProtocol protocol, TransportEventType type);
-        public delegate void TransportErrorHandler (TransportProtocol protocol, TransportError type);
-        public delegate void MessageNotifyHandler (TransportProtocol protocol, FunEncoding encoding,
-                                                   string msg_type, object message);
     }
 
 }  // namespace Fun
