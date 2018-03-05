@@ -1430,25 +1430,17 @@ namespace Fun
         const string kRedirectType = "_sc_redirect";
         const string kRedirectConnectType = "_cs_redirect_connect";
 
-        // Delegates
-        public delegate void SessionEventHandler (SessionEventType type, string session_id);
-        public delegate void ReceivedMessageHandler (string msg_type, object message);
-        public delegate void DroppedMessageHandler (string msg_type, object message);
-        public delegate void ResponseTimeoutHandler (string msg_type);
-        public delegate void MaintenanceHandler (FunEncoding encoding, object message);
-        public delegate TransportOption TransportOptionHandler (string flavor, TransportProtocol protocol);
-
         // Funapi message-related events.
-        public event SessionEventHandler SessionEventCallback;
-        public event TransportOptionHandler TransportOptionCallback;
-        public event CreateCompressorHandler CreateCompressorCallback;
-        public event TransportEventHandler TransportEventCallback;
-        public event TransportErrorHandler TransportErrorCallback;
-        public event ReceivedMessageHandler ReceivedMessageCallback;
-        public event ReceivedMessageHandler MulticastMessageCallback;
-        public event DroppedMessageHandler DroppedMessageCallback;
-        public event ResponseTimeoutHandler ResponseTimeoutCallback;
-        public event MaintenanceHandler MaintenanceCallback;
+        public event Action<SessionEventType, string> SessionEventCallback;                     // type, session id
+        public event Func<string, TransportProtocol, TransportOption> TransportOptionCallback;  // flavor, protocol (return: option)
+        public event Func<TransportProtocol, FunapiCompressor> CreateCompressorCallback;        // protocol (return: compressor)
+        public event Action<TransportProtocol, TransportEventType> TransportEventCallback;      // protocol, type
+        public event Action<TransportProtocol, TransportError> TransportErrorCallback;          // protocol, error
+        public event Action<string, object> ReceivedMessageCallback;                            // type, message
+        public event Action<string, object> MulticastMessageCallback;                           // type, message
+        public event Action<string, object> DroppedMessageCallback;                             // type, message
+        public event Action<string> ResponseTimeoutCallback;                                    // type
+        public event Action<FunEncoding, object> MaintenanceCallback;                           // encoding, message
 
         class ReceivedMessage
         {

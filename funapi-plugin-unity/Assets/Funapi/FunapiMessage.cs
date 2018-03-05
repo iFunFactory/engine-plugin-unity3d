@@ -222,7 +222,6 @@ namespace Fun
         static FunMessageSerializer serializer_ = new FunMessageSerializer();
 
         // message error callback
-        public delegate void ParsingErrorHandler (Type msg_type);
-        public static event ParsingErrorHandler ParsingErrorCallback;
+        public static event Action<Type> ParsingErrorCallback;    // message type
     }
 }
