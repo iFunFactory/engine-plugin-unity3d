@@ -155,6 +155,7 @@ namespace Fun
             public Transport ()
             {
                 state_ = State.kUnknown;
+                timer_.debug = debug;
             }
 
             public void Init ()
@@ -215,9 +216,8 @@ namespace Fun
                 state_ = State.kUnknown;
                 cstate_ = ConnectState.kUnknown;
 
-                timer_.Clear();
                 event_.Clear();
-                connect_timer_id_ = 0;
+                timer_.Clear();
                 exponential_time_ = 0f;
 
                 stopPingTimer();
@@ -266,8 +266,7 @@ namespace Fun
 
                 if (IsReliable && delayed_ack_interval_ > 0f)
                 {
-                    timer_.Add(onDelayedAckEvent, true, delayed_ack_interval_);
-                    debug.Log("{0} sets delayed ack timer - interval: {1}s", str_protocol_, delayed_ack_interval_);
+                    timer_.Add(new FunapiLoopTimer("delayed_ack", delayed_ack_interval_, onDelayedAckEvent));
                 }
 
                 sendUnsentMessages();
@@ -537,8 +536,6 @@ namespace Fun
                     auto_reconnect_ = tcp_option.AutoReconnect;
                     enable_ping_ = tcp_option.EnablePing;
                     enable_ping_log_ = tcp_option.EnablePingLog;
-                    ping_interval_ = tcp_option.PingIntervalSeconds;
-                    ping_timeout_ = tcp_option.PingTimeoutSeconds;
                 }
 
                 if (opt.Encryption != EncryptionType.kDefaultEncryption)
@@ -553,11 +550,7 @@ namespace Fun
                 if (option_.ConnectionTimeout <= 0f)
                     return;
 
-                timer_.Remove(connect_timer_id_);
-                connect_timer_id_ = timer_.Add(onConnectionTimedout, option_.ConnectionTimeout);
-
-                debug.DebugLog1("{0} sets connection timeout - id:{1} timeout:{2}.",
-                                str_protocol_, connect_timer_id_, option_.ConnectionTimeout);
+                timer_.Add(new FunapiTimeoutTimer("connection", option_.ConnectionTimeout, onConnectionTimedout), true);
             }
 
             void resetConnectionTimeout ()
@@ -565,8 +558,7 @@ namespace Fun
                 if (option_.ConnectionTimeout <= 0f)
                     return;
 
-                timer_.Remove(connect_timer_id_);
-                connect_timer_id_ = 0;
+                timer_.Remove("connection");
             }
 
 
@@ -794,7 +786,7 @@ namespace Fun
                 }
             }
 
-            void onDelayedAckEvent ()
+            void onDelayedAckEvent (float deltaTime)
             {
                 if (sent_ack_ < (last_seq_ + 1))
                 {
@@ -1603,17 +1595,15 @@ namespace Fun
                 if (!enable_ping_ || protocol_ != TransportProtocol.kTcp)
                     return;
 
-                if (ping_interval_ <= 0)
-                    ping_interval_ = kPingIntervalDefault;
+                TcpTransportOption tcp_option = option_ as TcpTransportOption;
 
-                if (ping_timer_id_ != 0)
-                    timer_.Remove(ping_timer_id_);
+                float interval = tcp_option.PingIntervalSeconds;
+                if (interval <= 0)
+                    interval = kPingIntervalDefault;
 
-                ping_timer_id_ = timer_.Add (() => onPingTimerEvent(), true, ping_interval_);
-                ping_wait_time_ = 0f;
-
-                debug.Log("Start ping - interval seconds: {0}, timeout seconds: {1}",
-                          ping_interval_, ping_timeout_);
+                ping_timer_ = new FunapiTimeoutTimer("ping", interval, onPingUpdate,
+                                                     tcp_option.PingTimeoutSeconds, onPingTimeout);
+                timer_.Add(ping_timer_, true);
             }
 
             void stopPingTimer ()
@@ -1627,17 +1617,16 @@ namespace Fun
                         pending_.RemoveAll(msg => { return msg.msg_type == kClientPingMessageType; });
                 }
 
-                if (ping_timer_id_ != 0)
+                if (ping_timer_ != null)
                 {
-                    timer_.Remove(ping_timer_id_);
-                    ping_timer_id_ = 0;
-                    ping_time_ = 0;
-
-                    debug.Log("{0} ping timer stopped.", str_protocol_);
+                    timer_.Remove(ping_timer_);
+                    ping_timer_ = null;
                 }
+
+                ping_time_ = 0;
             }
 
-            void onPingTimerEvent ()
+            void onPingUpdate (float deltaTime)
             {
                 if (!Connected)
                 {
@@ -1645,15 +1634,14 @@ namespace Fun
                     return;
                 }
 
-                if (ping_wait_time_ > ping_timeout_)
-                {
-                    last_error_code_ = TransportError.Type.kDisconnected;
-                    last_error_message_ = string.Format("{0} has not received a ping message for a long time.", str_protocol_);
-                    onDisconnected();
-                    return;
-                }
-
                 sendPingMessage();
+            }
+
+            void onPingTimeout ()
+            {
+                last_error_code_ = TransportError.Type.kDisconnected;
+                last_error_message_ = string.Format("{0} has not received a ping message for a long time.", str_protocol_);
+                onDisconnected();
             }
 
             void sendPingMessage ()
@@ -1674,8 +1662,8 @@ namespace Fun
                     sendMessage(new FunapiMessage(protocol_, kClientPingMessageType, msg));
                 }
 
-                ping_wait_time_ += ping_interval_;
-                debug.DebugLog1("Send ping - timestamp: {0}", timestamp);
+                if (enable_ping_log_)
+                    debug.DebugLog1("Send ping - timestamp: {0}", timestamp);
             }
 
             void onServerPingMessage (object body)
@@ -1731,13 +1719,11 @@ namespace Fun
                     timestamp = ping.timestamp;
                 }
 
-                if (ping_wait_time_ > 0)
-                    ping_wait_time_ -= ping_interval_;
-
+                ping_timer_.Reset();
                 ping_time_ = (int)((DateTime.Now.Ticks - timestamp) / 10000);
 
                 if (enable_ping_log_)
-                    debug.DebugLog1("Received ping - timestamp:{0} time={1} ms", timestamp, ping_time_);
+                    debug.DebugLog1("Received ping - timestamp:{0} time={1}ms", timestamp, ping_time_);
             }
 
 
@@ -1800,23 +1786,19 @@ namespace Fun
             protected FunEncoding encoding_ = FunEncoding.kNone;
             protected TransportOption option_ = null;
             protected ThreadSafeEventList event_ = new ThreadSafeEventList();
-            protected ThreadSafeEventList timer_ = new ThreadSafeEventList();
+            protected FunapiTimerList timer_ = new FunapiTimerList();
             protected bool is_paused_ = false;
 
             // Connect-related member variables.
             ConnectState cstate_ = ConnectState.kUnknown;
             bool auto_reconnect_ = false;
-            uint connect_timer_id_ = 0;
             float exponential_time_ = 0f;
 
             // Ping-related variables.
             bool enable_ping_ = false;
             bool enable_ping_log_ = false;
+            FunapiTimeoutTimer ping_timer_ = null;
             int ping_time_ = 0;
-            uint ping_timer_id_ = 0;
-            int ping_interval_ = 0;
-            float ping_timeout_ = 0f;
-            float ping_wait_time_ = 0f;
 
             // Message-related variables.
             bool first_sending_ = true;

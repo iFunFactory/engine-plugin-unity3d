@@ -11,23 +11,38 @@ namespace Fun
 {
     public class FunapiTimerList
     {
-        public void Add (FunapiTimer timer)
+        public void Add (FunapiTimer timer, bool removeOld = false)
         {
             if (timer == null)
                 return;
 
-            if (list_.Exists(timer.name))
+            if (removeOld && list_.Exists(timer.name))
                 list_.Remove(timer.name);
 
             list_.Add(timer);
-            FunDebug.DebugLog1("[Timer] {0}", timer.ToString());
+
+            if (debug != null)
+                debug.DebugLog1("[Timer] {0}", timer.ToString());
+        }
+
+        public bool Remove (FunapiTimer timer)
+        {
+            if (list_.Remove(timer))
+            {
+                if (debug != null)
+                    debug.DebugLog1("[Timer] '{0}' timer deleted.", timer.name);
+                return true;
+            }
+
+            return false;
         }
 
         public bool Remove (string name)
         {
             if (list_.Remove(name))
             {
-                FunDebug.DebugLog1("[Timer] '{0}' timer deleted.", name);
+                if (debug != null)
+                    debug.DebugLog1("[Timer] '{0}' timer deleted.", name);
                 return true;
             }
 
@@ -37,12 +52,17 @@ namespace Fun
         public void Clear ()
         {
             list_.Clear();
+
+            if (debug != null)
+                debug.DebugLog1("[Timer] all timers were deleted.");
         }
 
         public void Update (float deltaTime)
         {
             list_.Update(deltaTime);
         }
+
+        public FunDebugLog debug { private get; set; }
 
 
         ConcurrentList<FunapiTimer> list_ = new ConcurrentList<FunapiTimer>();
@@ -84,7 +104,7 @@ namespace Fun
 
         public override string ToString ()
         {
-            return string.Format("'{0}' timer. delay:{1}", name_, start_delay_);
+            return string.Format("'{0}' timer. delay: {1}s", name_, start_delay_);
         }
 
 
@@ -143,7 +163,7 @@ namespace Fun
 
         public override string ToString ()
         {
-            return string.Format("'{0}' loop timer. delay:{1} interval:{2}",
+            return string.Format("'{0}' loop timer. delay: {1}s interval: {2}s",
                                  name_, start_delay_, interval_);
         }
 
@@ -159,6 +179,18 @@ namespace Fun
             : base(name, 0f, callback)
         {
             timeout_ = timeout;
+            onUpdate = onDefaultUpdate;
+        }
+
+        // It will be loop timer
+        public FunapiTimeoutTimer (string name, float interval, Action<float> loopCallback,
+                                   float timeout, Action callback)
+            : base(name, 0f, callback)
+        {
+            timeout_ = timeout;
+            interval_ = interval;
+            loop_callback_ = loopCallback;
+            onUpdate = onLoopUpdate;
         }
 
         public void Reset ()
@@ -167,6 +199,11 @@ namespace Fun
         }
 
         public override void Update (float deltaTime)
+        {
+            onUpdate(deltaTime);
+        }
+
+        void onDefaultUpdate (float deltaTime)
         {
             if (isDone)
                 return;
@@ -180,13 +217,43 @@ namespace Fun
             isDone = true;
         }
 
+        void onLoopUpdate (float deltaTime)
+        {
+            if (isDone)
+                return;
+
+            elapsed_ += deltaTime;
+            if (elapsed_ >= timeout_)
+            {
+                callback_();
+                isDone = true;
+                return;
+            }
+
+            elapsed_loop_ += deltaTime;
+            if (elapsed_loop_ < interval_)
+                return;
+
+            loop_callback_(elapsed_loop_);
+
+            elapsed_loop_ = 0f;
+        }
+
         public override string ToString ()
         {
-            return string.Format("'{0}' timeout timer. timeout:{1}", name_, timeout_);
+            if (loop_callback_ != null)
+                return string.Format("'{0}' timeout loop timer. interval: {1}s timeout: {2}s",
+                                     name_, interval_, timeout_);
+            else
+                return string.Format("'{0}' timeout timer. timeout: {1}s", name_, timeout_);
         }
 
 
         float timeout_ = 0f;
+        float interval_ = 0f;
+        float elapsed_loop_ = 0f;
+        Action<float> onUpdate;
+        Action<float> loop_callback_;
     }
 
 
@@ -222,7 +289,7 @@ namespace Fun
 
         public override string ToString ()
         {
-            return string.Format("'{0}' exponent timer. limit:{1}", name_, limit_);
+            return string.Format("'{0}' exponent timer. limit: {1}s", name_, limit_);
         }
 
 
