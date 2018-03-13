@@ -24,6 +24,11 @@ public enum FunCompressionType
 
 public abstract class FunapiCompressor
 {
+    public FunapiCompressor ()
+    {
+        compression_threshold = 128;
+    }
+
     public abstract ArraySegment<byte> Compress (ArraySegment<byte> src);
     public abstract ArraySegment<byte> Decompress (ArraySegment<byte> src, int expected_size);
 
