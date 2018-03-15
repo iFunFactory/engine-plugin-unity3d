@@ -1,0 +1,90 @@
+# Lines that begins with the '#' are ignored.
+# You should update binary_path to your dedicated server executable's location.
+--binary_path=/Users/arin/work/game-pong-dedicated-server/dedi-server.app/Contents/MacOS/dedi-server
+
+# Engine type. Possible values are 'ue4' (UnrealEngine4) and 'unity' (Unity).
+--engine_type=unity
+
+# Assume binary is an Unity editor. (Unity only)
+--run_as_unity_editor=False
+
+# Also, you should update redis_host, redis_port to match the redis address.
+--redis_host=127.0.0.1
+--redis_port=6379
+
+# Whether enable beacon port or not (default=False)
+# Only effective to UnrealEngine 4.
+#--use_beacon=False
+
+# Heartbeat interval (second)
+#--heartbeat=10
+
+# If the server is behind the proxy or want to use DNS address, please set
+# following flags. Should be a full URL prefix.
+# Also, if you want to use HTTPS, please set the URL schema accordingly.
+#--external_url=http://your-host-1234.example.com
+
+# If the game server (based on iFunEngine) is behind the proxy or loadbalancer,
+# set following flag. Should be a full URL prefix.
+# For example, if you set the flag as
+#     --dsm_api_url=https://dsm-lbs.example.com/dsm/v1/
+# it would send the match result to,
+#     "https://dsm-lbs.example.com/dsm/v1/{match_id}/result/".
+# And the LBS (or reverse proxy) should be configured to forward the request
+# to "http://{foo-server}:{foo-port}/v1/dedicated_server/{match_id}/result/".
+#
+#--dsm_api_url=https://your-dsm-server.example.com:port/prefix/to/api/url
+
+# If you want to bind the specific NIC for clients, update the following lines.
+# And you may choose another NIC for inter-server communication.
+# eg) You may use eno1 for games, and eno2 for inter-server communication.
+# Depends on your OS, NIC name can be varying - eg) eth0, eno1, ens1, enp2s0.
+--game_interface=en0
+--restful_interface=en0
+
+# For Microsoft Windows, you must use following flags, instead of
+# game_interface or restful_interface.
+# IP addresses used by game clients and game servers respectively.
+#--game_ip=10.0.0.7
+#--restful_ip=10.10.1.7
+
+# How many dedicated servers can be run in this server instance
+--max_servers_for_ds_host=8
+
+# Specifies how long a dedicated server is allowed to run.
+# After specified seconds elapsed, it would be terminated.
+# If set to 0, ds host would not limit the uptime of a dedicated server.
+# Default value: 0
+#--max_ds_uptime_seconds=3600
+
+# OAuth
+# If you want to use dedicated server state service, you should enable OAuth.
+# To use oauth you shall provide following parameters:
+#   OAuth endpoint URLs. It could be expressed as
+#     oauth_base_url/oauth_auth_url (or oauth_base_url/oauth_verification_url)
+#   or,
+#     oauth_auth_url, oauth_verification_url. (with empty oauth_base_url)
+#
+#   Aslo, you need to specifiy the client id and secret for client_credentials
+#   grant for OAuth token.
+#
+#   If your OAuth service requires content type other than application/json,
+#   you may specify it using oauth_content_type flag.
+#--enable_oauth=True
+#--oauth_base_url=http://auth.example.com
+#--oauth_verification_url=iam/oauth/info
+#--oauth_auth_url=iam/oauth/token?grant_type=client_credentials
+#--oauth_client_id=YOUR_CLIENT_ID
+#--oauth_client_secret=YOUR_CLIENT_SECRET
+#--oauth_content_type=application/json
+#
+## State service endoint
+#--state_service_endpoint=http://ds-state.example.com:5005
+
+
+# TLS (https)
+# To enable https, please set `enable_tls` to True. And specify file path for
+# the server certificate and corresponding private key. (.pem files)
+--enable_tls=False
+--tls_cert_file_path=/etc/your-cert/example.ifunfactory.com/fullchain.pem
+--tls_key_file_path=/etc/your-cert/example.ifunfactory.com/privkey.pem
