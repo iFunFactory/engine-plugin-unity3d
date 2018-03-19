@@ -22,7 +22,7 @@ public static class TestInfo
 }
 
 
-class TestBase : CustomYieldInstruction
+class TestBase : YieldIndication
 {
     public TestBase ()
     {
@@ -57,7 +57,7 @@ class TestBase : CustomYieldInstruction
 
     IEnumerator onTimedOut (float seconds, Action callback, bool with_fail = false)
     {
-        yield return new WaitForSeconds(seconds);
+        yield return new SleepForSeconds(seconds);
 
         if (callback != null)
             callback();
@@ -161,7 +161,7 @@ class TestSessionBase : TestBase
                 yield break;
 
             sendEchoMessage(protocol);
-            yield return new WaitForSeconds(interval_seconds);
+            yield return new SleepForSeconds(interval_seconds);
         }
     }
 

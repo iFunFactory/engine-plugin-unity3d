@@ -45,7 +45,7 @@ public class TestDefault
                     return;
 
                 if (type == TransportEventType.kStarted)
-                    sendEchoMessage(protocol);
+                    sendEchoMessageWithCount(protocol, 3);
             };
 
             session.ReceivedMessageCallback += delegate (string type, object message)

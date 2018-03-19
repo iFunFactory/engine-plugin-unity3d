@@ -67,7 +67,7 @@ public class TestAutoReconect
                 if (transport.IsEstablished && !transport.Reconnecting)
                     transport.ForcedDisconnect();
 
-                yield return new WaitForSeconds(0.1f);
+                yield return new SleepForSeconds(0.1f);
             }
         }
     }

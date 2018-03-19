@@ -66,7 +66,7 @@ public class TestRedirect
 
         IEnumerator onSessionEvent (SessionEventType type)
         {
-            yield return new WaitForSeconds(1f);
+            yield return new SleepForSeconds(1f);
 
             if (type == SessionEventType.kOpened)
             {
