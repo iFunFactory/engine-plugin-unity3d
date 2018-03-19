@@ -20,7 +20,7 @@ namespace Fun
 {
     public class FunapiDedicatedServer : MonoBehaviour
     {
-        static readonly string kInstanceName = "Fun.DedicatedServer";
+        static readonly string kInstanceName = "FunDedicatedServer";
         static FunapiDedicatedServer instance_ = null;
 
         static FunapiDedicatedServer instance
@@ -323,7 +323,9 @@ namespace Fun
                                 if (!user_data_.ContainsKey(uid) || json_string != user_data_[uid])
                                 {
                                     user_data_[uid] = json_string;
-                                    UserDataCallback(uid, json_string);
+
+                                    if (UserDataCallback != null)
+                                        UserDataCallback(uid, json_string);
                                 }
                             }
                         }
