@@ -56,7 +56,7 @@ public class TestDelayedAck
         IEnumerator onStarted (TransportProtocol protocol)
         {
             keepSendingEchoMessages(protocol, 0.1f);
-            yield return new WaitForSeconds(1f);
+            yield return new SleepForSeconds(1f);
 
             isFinished = true;
         }

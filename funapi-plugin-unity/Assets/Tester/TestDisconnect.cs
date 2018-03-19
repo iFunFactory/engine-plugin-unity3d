@@ -91,7 +91,7 @@ public class TestDisconnect
 
         IEnumerator forcedDisconnect (TransportProtocol protocol)
         {
-            yield return new WaitForSeconds(1f);
+            yield return new SleepForSeconds(1f);
 
             FunapiSession.Transport transport = session.GetTransport(protocol);
             transport.ForcedDisconnect();

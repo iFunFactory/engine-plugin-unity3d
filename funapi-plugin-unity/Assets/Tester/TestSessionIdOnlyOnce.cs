@@ -76,7 +76,7 @@ public class TestSessionIdOnlyOnce
             if (protocol != TransportProtocol.kTcp)
                 sendEchoMessageWithCount(protocol, 2);
 
-            yield return new WaitForSeconds(0.2f);
+            yield return new SleepForSeconds(0.2f);
 
             session.Stop();
         }
@@ -96,7 +96,7 @@ public class TestSessionIdOnlyOnce
                 yield break;
             }
 
-            yield return new WaitForSeconds(0.2f);
+            yield return new SleepForSeconds(0.2f);
 
             session.Connect(protocol);
         }

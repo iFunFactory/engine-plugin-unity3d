@@ -73,7 +73,7 @@ public class TestReconnect
                 yield break;
             }
 
-            yield return new WaitForSeconds(0.2f);
+            yield return new SleepForSeconds(0.2f);
 
             session.Connect(protocol);
         }

@@ -402,7 +402,7 @@ namespace Fun
 
             while (verify_file_list.Count > 0)
             {
-                yield return new WaitForSeconds(0.1f);
+                yield return new SleepForSeconds(0.1f);
             }
 
             removeCachedList(remove_list);
@@ -443,7 +443,7 @@ namespace Fun
 
                 while (verify_file_list.Count > 0)
                 {
-                    yield return new WaitForSeconds(0.1f);
+                    yield return new SleepForSeconds(0.1f);
                 }
 
                 removeCachedList(remove_list);
@@ -748,7 +748,7 @@ namespace Fun
             float time = 1f;
             for (int i = 0; i < retry_download_count_; ++i)
                 time *= 2f;
-            yield return new WaitForSeconds(time);
+            yield return new SleepForSeconds(time);
 
             downloadResourceFile();
         }

@@ -58,7 +58,7 @@ public class TestSessionReliability
 
         IEnumerator onStarted (TransportProtocol protocol)
         {
-            yield return new WaitForSeconds(0.2f);
+            yield return new SleepForSeconds(0.2f);
             session.Stop();
         }
 
@@ -76,7 +76,7 @@ public class TestSessionReliability
                 yield break;
             }
 
-            yield return new WaitForSeconds(0.2f);
+            yield return new SleepForSeconds(0.2f);
 
             session.Connect(protocol);
         }

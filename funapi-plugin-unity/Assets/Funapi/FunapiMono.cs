@@ -69,7 +69,7 @@ namespace Fun
 #endif
 
 
-    public partial class FunapiMono
+    public sealed partial class FunapiMono
     {
         private FunapiMono() {}
 
@@ -148,5 +148,35 @@ namespace Fun
         // Member variables.
         long prev_ticks_ = DateTime.UtcNow.Ticks;
         ConcurrentList<Listener> listener_ = new ConcurrentList<Listener>();
+    }
+
+
+    //
+    // The following class was created by referring to Unity's CustomYieldInstruction class.
+    // And also rest of other classes.
+    //
+    public abstract class YieldIndication : IEnumerator
+    {
+        public object Current { get { return (object)null; } }
+        public bool MoveNext () { return keepWaiting; }
+        public void Reset () {}
+
+        // Indicates if coroutine should be kept suspended.
+        public abstract bool keepWaiting { get; }
+    }
+
+    public sealed class SleepForSeconds : YieldIndication
+    {
+        public SleepForSeconds (float delay)
+        {
+            end_ticks_ = DateTime.UtcNow.Ticks + (long)(delay * 10000000);
+        }
+
+        public override bool keepWaiting
+        {
+            get { return end_ticks_ > DateTime.UtcNow.Ticks; }
+        }
+
+        long end_ticks_ = 0;
     }
 }

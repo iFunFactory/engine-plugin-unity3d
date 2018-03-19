@@ -709,7 +709,7 @@ namespace Fun
             // Wait for stop.
             while (Started)
             {
-                yield return new WaitForSeconds(0.1f);
+                yield return new SleepForSeconds(0.1f);
             }
 
             lock (transports_lock_)
@@ -760,7 +760,7 @@ namespace Fun
                     break;
                 }
 
-                yield return new WaitForSeconds(0.2f);
+                yield return new SleepForSeconds(0.2f);
             }
 
             // Check success.
@@ -1017,7 +1017,7 @@ namespace Fun
                         break;
                     }
 
-                    yield return new WaitForSeconds(0.1f);
+                    yield return new SleepForSeconds(0.1f);
                 }
             }
 

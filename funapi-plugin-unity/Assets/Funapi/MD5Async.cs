@@ -57,7 +57,7 @@ namespace Fun
                     md5 = MD5.Create();
                     stream.Position = 0;
 
-                    yield return new WaitForEndOfFrame();
+                    yield return null;
                 }
 
                 int sleep_count = 0;
@@ -83,7 +83,7 @@ namespace Fun
                     if (sleep_count >= kSleepCountMax)
                     {
                         sleep_count = 0;
-                        yield return new WaitForEndOfFrame();
+                        yield return null;
                     }
                 }
             }
