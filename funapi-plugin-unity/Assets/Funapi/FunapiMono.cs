@@ -84,6 +84,15 @@ namespace Fun
         }
 
 
+        // Member variables.
+        long prev_ticks_ = DateTime.UtcNow.Ticks;
+        ConcurrentList<Listener> listener_ = new ConcurrentList<Listener>();
+    }
+
+
+    // Mono Listener
+    public partial class FunapiMono
+    {
         public abstract class Listener : IConcurrentItem
         {
             // MonoBehaviour-related functions.
@@ -95,8 +104,10 @@ namespace Fun
 
             protected void releaseMonoListener ()
             {
-                instance.listener_.Remove(this);
                 is_active_ = false;
+                routines_.Clear();
+
+                instance.listener_.Remove(this);
             }
 
             public void StartCoroutine (IEnumerator func)
@@ -104,24 +115,16 @@ namespace Fun
                 if (!is_active_)
                     return;
 
-                routines_.Insert(0, func);
+                routines_.Add(new Func(func));
             }
 
             public void Update (float deltaTime)
             {
                 if (!is_active_)
-                {
-                    if (routines_.Count > 0)
-                        routines_.Clear();
                     return;
-                }
 
                 // Updates coroutines
-                for (int i = routines_.Count-1; i >= 0; --i)
-                {
-                    if (!routines_[i].MoveNext())
-                        routines_.RemoveAt(i);
-                }
+                routines_.Update(deltaTime);
 
                 OnUpdate(deltaTime);
             }
@@ -137,17 +140,35 @@ namespace Fun
             public bool isDone { get; set; }
 
 
+            class Func : IConcurrentItem
+            {
+                public Func (IEnumerator func)
+                {
+                    func_ = func;
+                }
+
+                public virtual void Update (float deltaTime)
+                {
+                    if (isDone)
+                        return;
+
+                    if (!func_.MoveNext())
+                        isDone = true;
+                }
+
+                public string name { get { return "Coroutine"; } }
+                public bool isDone { get; set; }
+
+                IEnumerator func_;
+            }
+
+
             // Member variables.
             bool is_active_ = false;
 
             // list of coroutine
-            List<IEnumerator> routines_ = new List<IEnumerator>();
+            ConcurrentList<Func> routines_ = new ConcurrentList<Func>();
         }
-
-
-        // Member variables.
-        long prev_ticks_ = DateTime.UtcNow.Ticks;
-        ConcurrentList<Listener> listener_ = new ConcurrentList<Listener>();
     }
 
 

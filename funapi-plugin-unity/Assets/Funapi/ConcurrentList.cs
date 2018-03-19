@@ -19,7 +19,7 @@ namespace Fun
     }
 
 
-    class ConcurrentList<T> where T : IConcurrentItem
+    public sealed class ConcurrentList<T> where T : IConcurrentItem
     {
         public string Add (T item)
         {
