@@ -267,7 +267,10 @@ public class FunapiCompression
         UIntPtr cdict = ZSTD_createCDict(dict_buf, (UIntPtr)dict_buf.Length, 1);
         UIntPtr ddict = ZSTD_createDDict(dict_buf, (UIntPtr)dict_buf.Length);
 
-        string src = "{\"id\":12032,\"pos_x\":31.01,\"pos_z\":45.5293984741,\"dir_x\":-14.199799809265137,\"dir_z\":11.899918530274,\"look_x\":1.100000381469727,\"look_z\":11.600100381469727,\"_msgtype\":\"request_move\"}";
+        string src = "{\"id\":12032,\"pos_x\":31.01,\"pos_z\":45.5293984741," +
+                     "\"dir_x\":-14.199799809265137,\"dir_z\":11.899918530274," +
+                     "\"look_x\":1.100000381469727,\"look_z\":11.600100381469727," +
+                     "\"_msgtype\":\"request_move\"}";
         var src_buf = Encoding.UTF8.GetBytes(src);
         var dst_buf = new byte[(int)ZSTD_compressBound((UIntPtr)src_buf.Length)];
 
