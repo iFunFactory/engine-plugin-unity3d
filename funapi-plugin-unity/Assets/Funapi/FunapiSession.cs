@@ -693,7 +693,6 @@ namespace Fun
             onSessionEvent(SessionEventType.kRedirectStarted);
 
             wait_redirect_ = true;
-            server_address_ = host;
 
             // Stopping all transports.
             stopAllTransports(true);
@@ -720,13 +719,14 @@ namespace Fun
 
             onSessionClosed();
 
+            server_address_ = host;
             default_protocol_ = TransportProtocol.kDefault;
 
             // Adds transports.
             foreach (RedirectInfo info in list)
             {
                 debug.Log("Redirect: {0} - {1}:{2}, {3}", convertString(info.protocol),
-                          server_address_, info.port, convertString(info.encoding));
+                          host, info.port, convertString(info.encoding));
 
                 Connect(info.protocol, info.encoding, info.port, info.option);
             }
@@ -812,7 +812,7 @@ namespace Fun
 
         void onRedirectFailed ()
         {
-            Stop();
+            stopAllTransports(true);
             onSessionEvent(SessionEventType.kRedirectFailed);
         }
 
