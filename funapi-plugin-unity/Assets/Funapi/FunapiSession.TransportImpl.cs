@@ -53,7 +53,8 @@ namespace Fun
                 addr_ = new HostIP(host, port);
 
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
-                debug.Log("TCP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}, Reconnect:{7}, Nagle:{8}, Ping:{9}",
+                debug.Log("TCP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, " +
+                          "ConnectionTimeout:{6}, AutoReconnect:{7}, Nagle:{8}, Ping:{9}",
                           addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
                           tcp_option.CompressionType, tcp_option.SequenceValidation, tcp_option.ConnectionTimeout,
                           tcp_option.AutoReconnect, !tcp_option.DisableNagle, tcp_option.EnablePing);
@@ -349,7 +350,8 @@ namespace Fun
             {
                 addr_ = new HostIP(host, port);
 
-                debug.Log("UDP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, Timeout:{6}",
+                debug.Log("UDP connect - {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, " +
+                          "ConnectionTimeout:{6}",
                           addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
                           option_.CompressionType, option_.SequenceValidation, option_.ConnectionTimeout);
             }
@@ -688,7 +690,8 @@ namespace Fun
                                           FunapiVersion.kProtocolVersion);
 
                 HttpTransportOption http_option = (HttpTransportOption)option_;
-                debug.Log("HTTP connect - {0}, {1}, {2}, Compression:{3}, Sequence:{4}, Timeout:{5}, WWW:{6}",
+                debug.Log("HTTP connect - {0}, {1}, {2}, Compression:{3}, Sequence:{4}, " +
+                          "ConnectionTimeout:{5}, UseWWW:{6}",
                           host_url_, convertString(encoding_), convertString(http_option.Encryption),
                           http_option.CompressionType, http_option.SequenceValidation,
                           http_option.ConnectionTimeout, http_option.UseWWW);
@@ -700,9 +703,8 @@ namespace Fun
 
                 state_ = State.kConnected;
                 str_cookie_ = "";
-#if !NO_UNITY
                 using_www_ = (option_ as HttpTransportOption).UseWWW;
-#endif
+
                 onStarted();
             }
 
@@ -896,7 +898,8 @@ namespace Fun
                     lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)", msg.msg_type, msg.body.Count);
+                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)",
+                                        msg.msg_type, msg.body.Count);
 
                         sending_.RemoveAt(0);
                     }
@@ -1052,7 +1055,8 @@ namespace Fun
                     {
                         FunDebug.Assert(sending_.Count > 0);
                         FunapiMessage msg = sending_[0];
-                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)", msg.msg_type, msg.body.Count);
+                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)",
+                                        msg.msg_type, msg.body.Count);
 
                         sending_.RemoveAt(0);
                     }
@@ -1158,9 +1162,7 @@ namespace Fun
             HostHttp addr_;
             string host_url_;
             string str_cookie_;
-#if !NO_UNITY
             bool using_www_ = false;
-#endif
             Request cur_request_ = null;
         }
     }

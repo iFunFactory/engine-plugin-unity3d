@@ -8,9 +8,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
 // protobuf
 using funapi.network.fun_message;
@@ -180,20 +177,23 @@ namespace Fun
 
             if (!Started)
             {
-                debug.LogWarning("Session.Stop({0}) - The session is not connected.", str_protocol);
+                debug.LogWarning("Session.Stop({0}) - The session is not connected.",
+                                 str_protocol);
                 return;
             }
 
             Transport transport = GetTransport(protocol);
             if (transport == null)
             {
-                debug.LogWarning("Session.Stop({0}) - Can't find the {1} transport.", str_protocol, str_protocol);
+                debug.LogWarning("Session.Stop({0}) - Can't find the {1} transport.",
+                                 str_protocol, str_protocol);
                 return;
             }
 
             if (transport.state == Transport.State.kUnknown)
             {
-                debug.LogWarning("Session.Stop({0}) - {1} has been already stopped.", str_protocol, str_protocol);
+                debug.LogWarning("Session.Stop({0}) - {1} has been already stopped.",
+                                 str_protocol, str_protocol);
                 return;
             }
 
@@ -507,7 +507,8 @@ namespace Fun
                         if (transport != null)
                         {
                             if (!string.IsNullOrEmpty(msg.msg_type))
-                                debug.DebugLog2("{0} received message - '{1}'", transport.str_protocol, msg.msg_type);
+                                debug.DebugLog2("{0} received message - '{1}'",
+                                                transport.str_protocol, msg.msg_type);
 
                             onProcessMessage(transport, msg);
                         }
@@ -610,7 +611,8 @@ namespace Fun
                 if (option_.sendSessionIdOnlyOnce && transport.protocol == TransportProtocol.kUdp)
                 {
                     transport.SendSessionId = true;
-                    debug.LogWarning("UDP received a wrong session id. Sends the previous session id again. current:{0} received:{1}",
+                    debug.LogWarning("UDP received a wrong session id. " +
+                                     "Sends the previous session id again. current:{0} received:{1}",
                                      (string)session_id_, SessionId.ToString(new_id));
                     return false;
                 }
@@ -624,7 +626,8 @@ namespace Fun
                 }
                 else
                 {
-                    debug.LogWarning("Received a wrong session id. This message is ignored.\ncurrent:{0} received:{1}",
+                    debug.LogWarning("Received a wrong session id. This message is ignored.\n" +
+                                     "current:{0} received:{1}",
                                      (string)session_id_, SessionId.ToString(new_id));
                     return false;
                 }
@@ -839,12 +842,13 @@ namespace Fun
                 if (wait_redirect_)
                 {
                     debug.Log("createTransport - {0} transport use the 'default option'.\n" +
-                              "If you want to use your option, please set FunapiSession.TransportOptionCallback function.",
+                              "If you want to use your option, please set FunapiSession.TransportOptionCallback event.",
                               convertString(protocol));
                 }
                 else
                 {
-                    debug.Log("createTransport - {0} transport use the 'default option'.", convertString(protocol));
+                    debug.Log("createTransport - {0} transport use the 'default option'.",
+                              convertString(protocol));
                 }
             }
 

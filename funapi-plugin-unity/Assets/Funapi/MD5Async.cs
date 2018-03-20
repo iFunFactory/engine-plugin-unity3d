@@ -7,9 +7,6 @@
 using System.Collections;
 using System.IO;
 using System.Security.Cryptography;
-#if !NO_UNITY
-using UnityEngine;
-#endif
 
 
 namespace Fun

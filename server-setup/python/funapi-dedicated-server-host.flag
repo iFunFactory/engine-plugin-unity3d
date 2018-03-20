@@ -1,6 +1,7 @@
 # Lines that begins with the '#' are ignored.
 # You should update binary_path to your dedicated server executable's location.
 --binary_path=/Users/arin/work/game-pong-dedicated-server/dedi-server.app/Contents/MacOS/dedi-server
+#--binary_path=/Users/arin/work/funapi-plugin-unity-5.0/server-setup/python/run.sh
 
 # Engine type. Possible values are 'ue4' (UnrealEngine4) and 'unity' (Unity).
 --engine_type=unity
