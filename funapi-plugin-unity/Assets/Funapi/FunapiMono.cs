@@ -145,9 +145,12 @@ namespace Fun
                 public Func (IEnumerator func)
                 {
                     func_ = func;
+
+                    if (!func_.MoveNext())
+                        isDone = true;
                 }
 
-                public virtual void Update (float deltaTime)
+                public void Update (float deltaTime)
                 {
                     if (isDone)
                         return;
