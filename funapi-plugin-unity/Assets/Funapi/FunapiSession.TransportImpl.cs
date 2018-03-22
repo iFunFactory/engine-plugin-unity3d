@@ -774,13 +774,20 @@ namespace Fun
 #if !NO_UNITY
             void sendWWWRequest (Dictionary<string, string> headers, FunapiMessage msg)
             {
+                Request request = new Request();
+
+                FunDebug.Assert(cur_request_ == null);
+                cur_request_ = request;
+
                 if (msg.body.Count > 0)
                 {
-                    mono.StartCoroutine(wwwPost(new WWW(host_url_, msg.body.Array, headers)));
+                    request.www = new WWW(host_url_, msg.body.Array, headers);
+                    mono.StartCoroutine(wwwPost(request.www));
                 }
                 else
                 {
-                    mono.StartCoroutine(wwwPost(new WWW(host_url_, null, headers)));
+                    request.www = new WWW(host_url_, null, headers);
+                    mono.StartCoroutine(wwwPost(request.www));
                 }
             }
 #endif
@@ -1026,18 +1033,14 @@ namespace Fun
 #if !NO_UNITY
             IEnumerator wwwPost (WWW www)
             {
-                Request request = new Request();
-                request.www = www;
+                FunDebug.Assert(cur_request_ != null);
 
-                FunDebug.Assert(cur_request_ == null);
-                cur_request_ = request;
-
-                while (!www.isDone && !request.cancel)
+                while (!www.isDone && !cur_request_.cancel)
                 {
                     yield return null;
                 }
 
-                if (request.cancel)
+                if (cur_request_.cancel)
                 {
                     cur_request_ = null;
                     yield break;
