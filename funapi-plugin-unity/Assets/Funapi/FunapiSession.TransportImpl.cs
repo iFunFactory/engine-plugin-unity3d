@@ -690,11 +690,13 @@ namespace Fun
                                           FunapiVersion.kProtocolVersion);
 
                 HttpTransportOption http_option = (HttpTransportOption)option_;
+                using_www_ = http_option.UseWWW;
+
                 debug.Log("HTTP connect - {0}, {1}, {2}, Compression:{3}, Sequence:{4}, " +
                           "ConnectionTimeout:{5}, UseWWW:{6}",
                           host_url_, convertString(encoding_), convertString(http_option.Encryption),
                           http_option.CompressionType, http_option.SequenceValidation,
-                          http_option.ConnectionTimeout, http_option.UseWWW);
+                          http_option.ConnectionTimeout, using_www_);
             }
 
             protected override void onStart ()
@@ -703,7 +705,6 @@ namespace Fun
 
                 state_ = State.kConnected;
                 str_cookie_ = "";
-                using_www_ = (option_ as HttpTransportOption).UseWWW;
 
                 onStarted();
             }
