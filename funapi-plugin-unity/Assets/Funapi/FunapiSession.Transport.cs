@@ -638,7 +638,9 @@ namespace Fun
                 debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
                                  str_protocol_, state_, last_error_code_, last_error_message_);
 
-                if (state_ != State.kEstablished)
+                // If an error occurs during connection, stops the connection.
+                // Or if an error occurs while connected from TCP or HTTP, stops the connection.
+                if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
                 {
                     Stop();
                 }
@@ -1613,9 +1615,15 @@ namespace Fun
             protected void onFailedSending ()
             {
                 lock (sending_lock_)
-                    sending_.Clear();
+                {
+                    if (sending_.Count <= 0)
+                        return;
 
-                debug.LogWarning("{0} sending failed. Clears the sending buffer.", str_protocol_);
+                    debug.LogWarning("{0} sending failed. Clears the sending buffer. ({1})",
+                                     str_protocol_, sending_.Count);
+
+                    sending_.Clear();
+                }
             }
 
 
