@@ -1097,8 +1097,8 @@ namespace Fun
 
             if (transport.LastErrorCode != TransportError.Type.kNone)
             {
-                debug.Log("{0} transport stopped. (error:{1})\n{2}",
-                          transport.str_protocol, transport.LastErrorCode, transport.LastErrorMessage);
+                debug.LogWarning("{0} transport stopped. (error:{1})\n{2}", transport.str_protocol,
+                                 transport.LastErrorCode, transport.LastErrorMessage);
             }
 
             onTransportEventCallback(protocol, TransportEventType.kStopped);

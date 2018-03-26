@@ -78,6 +78,81 @@ class TestBase : YieldIndication
 
 class TestSessionBase : TestBase
 {
+    protected static TransportOption newTransportOption (TransportProtocol protocol)
+    {
+        if (protocol == TransportProtocol.kTcp)
+            return new TcpTransportOption();
+        else if (protocol == TransportProtocol.kUdp)
+            return new TransportOption();
+        else if (protocol == TransportProtocol.kHttp)
+            return new HttpTransportOption();
+
+        return null;
+    }
+
+    protected static ushort getPort (string flavor, TransportProtocol protocol, FunEncoding encoding)
+    {
+        ushort port = 0;
+
+        // default
+        if (protocol == TransportProtocol.kTcp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8011 : 8017);
+        else if (protocol == TransportProtocol.kUdp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8018);
+        else if (protocol == TransportProtocol.kHttp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8019);
+
+        if (flavor == "whole")
+            port += 10;  // 8021~
+        else if (flavor == "encryption")
+            port += 20;  // 8031~
+        else if (flavor == "sequence")
+            port += 30;  // 8041~
+        else if (flavor == "multicast")
+            port += 40;  // 8051~
+        else if (flavor == "redirect")
+            port += 50;  // 8061~
+        else if (flavor == "compression")
+            port += 60;  // 8071~
+        else if (flavor == "compression-enc")
+            port += 70;  // 8081~
+
+        return port;
+    }
+
+    protected void onTransportError (TransportProtocol protocol, TransportError error)
+    {
+        session.Stop();
+    }
+
+    protected void setEchoMessage (string new_message)
+    {
+        echo_message = new_message;
+    }
+
+    protected void sendEchoMessageWithCount (TransportProtocol protocol, int count)
+    {
+        for (int i = 0; i < count; ++i)
+            sendEchoMessage(protocol);
+    }
+
+    protected void keepSendingEchoMessages (TransportProtocol protocol, float interval_seconds)
+    {
+        startCoroutine(onKeepSendingEchos(protocol, interval_seconds));
+    }
+
+    IEnumerator onKeepSendingEchos (TransportProtocol protocol, float interval_seconds)
+    {
+        while (true)
+        {
+            if (isFinished)
+                yield break;
+
+            sendEchoMessage(protocol);
+            yield return new SleepForSeconds(interval_seconds);
+        }
+    }
+
     protected void sendEchoMessage (TransportProtocol protocol,
                                     EncryptionType enc_type = EncryptionType.kDefaultEncryption)
     {
@@ -131,81 +206,10 @@ class TestSessionBase : TestBase
         --sending_count;
     }
 
-    protected void setEchoMessage (string new_message)
-    {
-        echo_message = new_message;
-    }
-
     // Did it received all the messages?
     protected bool isReceivedAllMessages
     {
         get { return sending_count <= 0; }
-    }
-
-    protected void sendEchoMessageWithCount (TransportProtocol protocol, int count)
-    {
-        for (int i = 0; i < count; ++i)
-            sendEchoMessage(protocol);
-    }
-
-    protected void keepSendingEchoMessages (TransportProtocol protocol, float interval_seconds)
-    {
-        startCoroutine(onKeepSendingEchos(protocol, interval_seconds));
-    }
-
-    IEnumerator onKeepSendingEchos (TransportProtocol protocol, float interval_seconds)
-    {
-        while (true)
-        {
-            if (isFinished)
-                yield break;
-
-            sendEchoMessage(protocol);
-            yield return new SleepForSeconds(interval_seconds);
-        }
-    }
-
-
-    protected static TransportOption newTransportOption (TransportProtocol protocol)
-    {
-        if (protocol == TransportProtocol.kTcp)
-            return new TcpTransportOption();
-        else if (protocol == TransportProtocol.kUdp)
-            return new TransportOption();
-        else if (protocol == TransportProtocol.kHttp)
-            return new HttpTransportOption();
-
-        return null;
-    }
-
-    protected static ushort getPort (string flavor, TransportProtocol protocol, FunEncoding encoding)
-    {
-        ushort port = 0;
-
-        // default
-        if (protocol == TransportProtocol.kTcp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8011 : 8017);
-        else if (protocol == TransportProtocol.kUdp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8018);
-        else if (protocol == TransportProtocol.kHttp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8019);
-
-        if (flavor == "whole")
-            port += 10;  // 8021~
-        else if (flavor == "encryption")
-            port += 20;  // 8031~
-        else if (flavor == "sequence")
-            port += 30;  // 8041~
-        else if (flavor == "multicast")
-            port += 40;  // 8051~
-        else if (flavor == "redirect")
-            port += 50;  // 8061~
-        else if (flavor == "compression")
-            port += 60;  // 8071~
-        else if (flavor == "compression-enc")
-            port += 70;  // 8081~
-
-        return port;
     }
 
 
