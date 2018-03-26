@@ -57,6 +57,12 @@ namespace Fun
 
         public static void Destroy (FunapiSession session)
         {
+            if (session == null)
+                return;
+
+            if (session.Started)
+                session.stopAllTransports(true);
+
             session.OnDestroy();
         }
 
