@@ -9,20 +9,8 @@ using System.Collections;
 using UnityEngine.TestTools;
 
 
-public class TestDefault
+public class TestSendFail
 {
-    [UnityTest]
-    public IEnumerator ALL_Json ()
-    {
-        yield return new TestImpl (FunEncoding.kJson);
-    }
-
-    [UnityTest]
-    public IEnumerator ALL_Protobuf ()
-    {
-        yield return new TestImpl (FunEncoding.kProtobuf);
-    }
-
     [UnityTest]
     public IEnumerator TCP_Json ()
     {
@@ -62,35 +50,7 @@ public class TestDefault
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (FunEncoding encoding)
-        {
-            createTestSession();
-
-            setTimeoutCallbackWithFail(3f);
-
-            ushort port = getPort("default", TransportProtocol.kTcp, encoding);
-            session.Connect(TransportProtocol.kTcp, encoding, port);
-
-            port = getPort("default", TransportProtocol.kUdp, encoding);
-            session.Connect(TransportProtocol.kUdp, encoding, port);
-
-            port = getPort("default", TransportProtocol.kHttp, encoding);
-            session.Connect(TransportProtocol.kHttp, encoding, port);
-        }
-
-
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
-        {
-            createTestSession();
-
-            setTimeoutCallbackWithFail(2f);
-
-            ushort port = getPort("default", protocol, encoding);
-            session.Connect(protocol, encoding, port);
-        }
-
-
-        void createTestSession ()
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
             session.TransportErrorCallback += onTransportError;
@@ -99,12 +59,20 @@ public class TestDefault
             {
                 if (type == SessionEventType.kStopped)
                 {
-                    FunapiSession.Destroy(session);
-                    isFinished = true;
+                    ++test_step;
+                    if (test_step < kStepCountMax)
+                    {
+                        session.Connect(protocol);
+                    }
+                    else
+                    {
+                        FunapiSession.Destroy(session);
+                        isFinished = true;
+                    }
                 }
             };
 
-            session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)
+            session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
                     return;
@@ -120,8 +88,20 @@ public class TestDefault
                 onReceivedEchoMessage(type, message);
 
                 if (isReceivedAllMessages)
-                    session.Stop();
+                {
+                    if (session.Started)
+                        session.Stop();
+                }
             };
+
+            setTimeoutCallbackWithFail(2f);
+
+            ushort port = getPort("default", protocol, encoding);
+            session.Connect(protocol, encoding, port);
         }
+
+
+        const int kStepCountMax = 3;
+        int test_step = 0;
     }
 }
