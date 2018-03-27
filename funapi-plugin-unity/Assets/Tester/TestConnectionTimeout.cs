@@ -13,13 +13,13 @@ using UnityEngine.TestTools;
 public class TestConnectionTimeout
 {
     [UnityTest]
-    public IEnumerator TCP_Protobuf ()
+    public IEnumerator TCP_Timeout_30ms ()
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf);
     }
 
     [UnityTest]
-    public IEnumerator HTTP_Json ()
+    public IEnumerator HTTP_Timeout_30ms ()
     {
         yield return new TestImpl (TransportProtocol.kHttp, FunEncoding.kJson);
     }
@@ -30,21 +30,9 @@ public class TestConnectionTimeout
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
         {
             TransportOption option = newTransportOption(protocol);
-            option.ConnectionTimeout = 0.01f;
+            option.ConnectionTimeout = 0.03f;
 
             session = FunapiSession.Create(TestInfo.ServerIp);
-
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
-            {
-                if (type == SessionEventType.kStopped)
-                {
-                    if (test_step > kStepCountMax)
-                    {
-                        FunapiSession.Destroy(session);
-                        isFinished = true;
-                    }
-                }
-            };
 
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
@@ -54,17 +42,21 @@ public class TestConnectionTimeout
                 }
                 else if (type == TransportEventType.kStopped)
                 {
-                    ++test_step;
-                    if (test_step < kStepCountMax)
+                    FunapiSession.Transport transport = session.GetTransport(protocol);
+                    if (transport.LastErrorCode == TransportError.Type.kConnectionTimeout)
                     {
-                        ushort port = getPort("default", protocol, encoding);
-                        session.Connect(protocol, encoding, port, option);
-                    }
-                    else if (test_step == kStepCountMax)
-                    {
-                        option.ConnectionTimeout = 3f;
-                        ushort port = getPort("default", protocol, encoding);
-                        session.Connect(protocol, encoding, port, option);
+                        ++test_step;
+                        if (test_step < kStepCountMax)
+                        {
+                            ushort port = getPort("default", protocol, encoding);
+                            session.Connect(protocol, encoding, port, option);
+                        }
+                        else if (test_step == kStepCountMax)
+                        {
+                            option.ConnectionTimeout = 3f;
+                            ushort port = getPort("default", protocol, encoding);
+                            session.Connect(protocol, encoding, port, option);
+                        }
                     }
                 }
             };
@@ -74,10 +66,10 @@ public class TestConnectionTimeout
                 onReceivedEchoMessage(type, message);
 
                 if (isReceivedAllMessages)
-                    session.Stop();
+                    onTestFinished();
             };
 
-            setTimeoutCallback(3f);
+            setTestTimeout(3f);
 
             session.Connect(protocol, encoding, 80, option);
         }

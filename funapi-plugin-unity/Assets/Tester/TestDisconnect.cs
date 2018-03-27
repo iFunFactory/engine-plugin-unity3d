@@ -64,26 +64,26 @@ public class TestDisconnect
                 }
                 else if (type == TransportEventType.kStopped)
                 {
-                    ++test_step;
-                    if (test_step >= kStepCountMax)
+                    FunapiSession.Transport transport = session.GetTransport(protocol);
+                    if (transport.LastErrorCode == TransportError.Type.kDisconnected)
                     {
-                        FunapiSession.Destroy(session);
-                        isFinished = true;
-                    }
-                    else
-                    {
-                        if (protocol == TransportProtocol.kUdp)
+                        ++test_step;
+                        if (test_step >= kStepCountMax)
                         {
-                            FunapiSession.Transport transport = session.GetTransport(protocol);
-                            transport.SendSessionId = false;
+                            onTestFinished();
                         }
+                        else
+                        {
+                            if (protocol == TransportProtocol.kUdp)
+                                transport.SendSessionId = false;
 
-                        session.Connect(protocol);
+                            session.Connect(protocol);
+                        }
                     }
                 }
             };
 
-            setTimeoutCallbackWithFail(5f);
+            setTestTimeout(4f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);
@@ -91,7 +91,7 @@ public class TestDisconnect
 
         IEnumerator forcedDisconnect (TransportProtocol protocol)
         {
-            yield return new SleepForSeconds(1f);
+            yield return new SleepForSeconds(0.5f);
 
             FunapiSession.Transport transport = session.GetTransport(protocol);
             if (transport == null)

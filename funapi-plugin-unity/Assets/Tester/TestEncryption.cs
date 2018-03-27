@@ -53,15 +53,6 @@ public class TestEncryption
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
-            {
-                if (type == SessionEventType.kStopped)
-                {
-                    FunapiSession.Destroy(session);
-                    isFinished = true;
-                }
-            };
-
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
@@ -79,10 +70,10 @@ public class TestEncryption
                 onReceivedEchoMessage(type, message);
 
                 if (isReceivedAllMessages)
-                    session.Stop();
+                    onTestFinished();
             };
 
-            setTimeoutCallbackWithFail(3f);
+            setTestTimeout(3f);
 
             ushort port = getPort("encryption", protocol, encoding);
             TransportOption option = newTransportOption(protocol);

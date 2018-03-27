@@ -45,86 +45,65 @@ class TestBase : YieldIndication
         updater.StartCoroutine(func);
     }
 
-    protected void setTimeoutCallback (float seconds, Action callback = null)
+    protected void setTestTimeout (float seconds)
     {
-        updater.StartCoroutine(onTimedOut(seconds, callback));
+        updater.StartCoroutine(onTestTimedOut(seconds));
     }
 
-    protected void setTimeoutCallbackWithFail (float seconds, Action callback = null)
-    {
-        updater.StartCoroutine(onTimedOut(seconds, callback, true));
-    }
-
-    IEnumerator onTimedOut (float seconds, Action callback, bool with_fail = false)
+    IEnumerator onTestTimedOut (float seconds)
     {
         yield return new SleepForSeconds(seconds);
 
-        if (callback != null)
-            callback();
-
-        if (with_fail)
-            Assert.Fail("'{0}' Test has timed out.", GetType().ToString());
+        Assert.Fail("'{0}' Test has timed out.", GetType().ToString());
 
         isFinished = true;
+    }
+
+    public FunapiTimerList timer { get { return updater.timer; } }
+
+
+    class Updater : MonoBehaviour
+    {
+        void Update ()
+        {
+            if (timer_ != null)
+            {
+                // gets delta time
+                long now = DateTime.UtcNow.Ticks;
+                float delta = (now - prev_) / 10000000f;
+                prev_ = now;
+
+                timer_.Update(delta);
+            }
+        }
+
+        public FunapiTimerList timer
+        {
+            get
+            {
+                if (timer_ == null)
+                {
+                    timer_ = new FunapiTimerList();
+                    prev_ = DateTime.UtcNow.Ticks;
+                }
+
+                return timer_;
+            }
+        }
+
+        long prev_;
+        public FunapiTimerList timer_ = null;
     }
 
 
     protected bool isFinished = false;
 
-    class Updater : MonoBehaviour {}
     Updater updater = null;
 }
 
 
 class TestSessionBase : TestBase
 {
-    protected static TransportOption newTransportOption (TransportProtocol protocol)
-    {
-        if (protocol == TransportProtocol.kTcp)
-            return new TcpTransportOption();
-        else if (protocol == TransportProtocol.kUdp)
-            return new TransportOption();
-        else if (protocol == TransportProtocol.kHttp)
-            return new HttpTransportOption();
-
-        return null;
-    }
-
-    protected static ushort getPort (string flavor, TransportProtocol protocol, FunEncoding encoding)
-    {
-        ushort port = 0;
-
-        // default
-        if (protocol == TransportProtocol.kTcp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8011 : 8017);
-        else if (protocol == TransportProtocol.kUdp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8018);
-        else if (protocol == TransportProtocol.kHttp)
-            port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8019);
-
-        if (flavor == "whole")
-            port += 10;  // 8021~
-        else if (flavor == "encryption")
-            port += 20;  // 8031~
-        else if (flavor == "sequence")
-            port += 30;  // 8041~
-        else if (flavor == "multicast")
-            port += 40;  // 8051~
-        else if (flavor == "redirect")
-            port += 50;  // 8061~
-        else if (flavor == "compression")
-            port += 60;  // 8071~
-        else if (flavor == "compression-enc")
-            port += 70;  // 8081~
-
-        return port;
-    }
-
-    protected void onTransportError (TransportProtocol protocol, TransportError error)
-    {
-        session.Stop();
-    }
-
     protected void setEchoMessage (string new_message)
     {
         echo_message = new_message;
@@ -206,10 +185,63 @@ class TestSessionBase : TestBase
         --sending_count;
     }
 
+    protected void resetSendingCount ()
+    {
+        sending_count = 0;
+    }
+
+    protected virtual void onTestFinished ()
+    {
+        FunapiSession.Destroy(session);
+        isFinished = true;
+    }
+
+
     // Did it received all the messages?
     protected bool isReceivedAllMessages
     {
         get { return sending_count <= 0; }
+    }
+
+
+    protected static TransportOption newTransportOption (TransportProtocol protocol)
+    {
+        if (protocol == TransportProtocol.kTcp)
+            return new TcpTransportOption();
+        else if (protocol == TransportProtocol.kUdp)
+            return new TransportOption();
+        else if (protocol == TransportProtocol.kHttp)
+            return new HttpTransportOption();
+
+        return null;
+    }
+
+    protected static ushort getPort (string flavor, TransportProtocol protocol, FunEncoding encoding)
+    {
+        ushort port = 0;
+
+        // default
+        if (protocol == TransportProtocol.kTcp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8011 : 8017);
+        else if (protocol == TransportProtocol.kUdp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8018);
+        else if (protocol == TransportProtocol.kHttp)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8019);
+
+        if (flavor == "whole")
+            port += 10;  // 8021~
+        else if (flavor == "encryption")
+            port += 20;  // 8031~
+        else if (flavor == "sequence")
+            port += 30;  // 8041~
+        else if (flavor == "multicast")
+            port += 40;  // 8051~
+        else if (flavor == "redirect")
+            port += 50;  // 8061~
+        else if (flavor == "compression")
+            port += 60;  // 8071~
+
+        return port;
     }
 
 

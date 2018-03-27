@@ -48,18 +48,7 @@ public class TestMulticast
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
         {
             // Creates a session
-            ushort port = getPort("multicast", protocol, encoding);
             session = FunapiSession.Create(TestInfo.ServerIp);
-            session.Connect(protocol, encoding, port);
-
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
-            {
-                if (type == SessionEventType.kStopped)
-                {
-                    FunapiSession.Destroy(session);
-                    isFinished = true;
-                }
-            };
 
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
@@ -72,71 +61,40 @@ public class TestMulticast
                     multicast = (FunapiMulticastClient)Activator.CreateInstance(typeof(T), new object[] {session, encoding});
                     multicast.sender = "player_" + UnityEngine.Random.Range(1, 100);
 
-                    multicast.ChannelListCallback += delegate (object channel_list) {
-                        onReceivedChannelList(encoding, channel_list);
+                    multicast.ChannelListCallback += delegate (object channel_list)
+                    {
+                        onReceivedChannelList(channel_list);
                         joinMulticastChannel();
                     };
-                    multicast.JoinedCallback += delegate (string channel_id, string sender) {
-                        sendMulticastMessage();
+
+                    multicast.JoinedCallback += delegate (string channel_id, string sender)
+                    {
+                        for (int i = 0; i < 5; ++i)
+                            sendMulticastMessage();
                     };
-                    multicast.LeftCallback += delegate (string channel_id, string sender) {
+
+                    multicast.LeftCallback += delegate (string channel_id, string sender)
+                    {
                         multicast.Clear();
-                        session.Stop();
+                        onTestFinished();
                     };
+
                     multicast.ErrorCallback += onMulticastError;
 
                     multicast.RequestChannelList();
                 }
             };
 
-            setTimeoutCallbackWithFail(3f);
+            setTestTimeout(3f);
+
+            ushort port = getPort("multicast", protocol, encoding);
+            session.Connect(protocol, encoding, port);
         }
 
-        void joinMulticastChannel ()
-        {
-            if (multicast is FunapiChatClient)
-            {
-                FunapiChatClient chat = (FunapiChatClient)multicast;
-                chat.JoinChannel(kChannelName, onReceivedChatMessage);
-            }
-            else
-                multicast.JoinChannel(kChannelName, onReceivedMulticastMessage);
-        }
 
-        void sendMulticastMessage ()
+        void onReceivedChannelList (object channel_list)
         {
-            if (multicast is FunapiChatClient)
-            {
-                FunapiChatClient chat = (FunapiChatClient)multicast;
-                chat.SendText(kChannelName, "chat message");
-                return;
-            }
-
             if (multicast.encoding == FunEncoding.kJson)
-            {
-                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
-                mcast_msg["_channel"] = kChannelName;
-                mcast_msg["_bounce"] = true;
-                mcast_msg["_message"] = "multicast message";
-
-                multicast.SendToChannel(mcast_msg);
-            }
-            else
-            {
-                PbufHelloMessage hello_msg = new PbufHelloMessage();
-                hello_msg.message = "multicast message";
-
-                FunMulticastMessage mcast_msg = FunapiMessage.CreateMulticastMessage(hello_msg, MulticastMessageType.pbuf_hello);
-                mcast_msg.channel = kChannelName;
-                mcast_msg.bounce = true;
-
-                multicast.SendToChannel(mcast_msg);
-            }
-        }
-
-        void onReceivedChannelList (FunEncoding encoding, object channel_list)
-        {
-            if (encoding == FunEncoding.kJson)
             {
                 List<object> list = channel_list as List<object>;
                 if (list.Count <= 0) {
@@ -172,6 +130,53 @@ public class TestMulticast
             }
         }
 
+        void joinMulticastChannel ()
+        {
+            if (multicast is FunapiChatClient)
+            {
+                FunapiChatClient chat = (FunapiChatClient)multicast;
+                chat.JoinChannel(kChannelName, onReceivedChatMessage);
+            }
+            else
+            {
+                multicast.JoinChannel(kChannelName, onReceivedMulticastMessage);
+            }
+        }
+
+        void sendMulticastMessage ()
+        {
+            if (multicast is FunapiChatClient)
+            {
+                FunapiChatClient chat = (FunapiChatClient)multicast;
+                chat.SendText(kChannelName, "chat message");
+                ++sending_count;
+                return;
+            }
+
+            if (multicast.encoding == FunEncoding.kJson)
+            {
+                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
+                mcast_msg["_channel"] = kChannelName;
+                mcast_msg["_bounce"] = true;
+                mcast_msg["_message"] = "multicast message";
+
+                multicast.SendToChannel(mcast_msg);
+            }
+            else
+            {
+                PbufHelloMessage hello_msg = new PbufHelloMessage();
+                hello_msg.message = "multicast message";
+
+                FunMulticastMessage mcast_msg = FunapiMessage.CreateMulticastMessage(hello_msg, MulticastMessageType.pbuf_hello);
+                mcast_msg.channel = kChannelName;
+                mcast_msg.bounce = true;
+
+                multicast.SendToChannel(mcast_msg);
+            }
+
+            ++sending_count;
+        }
+
         void onReceivedMulticastMessage (string channel_id, string sender, object body)
         {
             if (multicast.encoding == FunEncoding.kJson)
@@ -197,7 +202,9 @@ public class TestMulticast
                              channel_id, hello_msg.message);
             }
 
-            multicast.LeaveChannel(kChannelName);
+            --sending_count;
+            if (sending_count <= 0)
+                multicast.LeaveChannel(kChannelName);
         }
 
         void onReceivedChatMessage (string chat_channel, string sender, string text)
@@ -205,7 +212,9 @@ public class TestMulticast
             FunDebug.Log("Chatting - Received a message.\nChannel={0}, sender={1}, text={2}",
                          chat_channel, sender, text);
 
-            multicast.LeaveChannel(kChannelName);
+            --sending_count;
+            if (sending_count <= 0)
+                multicast.LeaveChannel(kChannelName);
         }
 
         void onMulticastError (string channel_id, FunMulticastMessage.ErrorCode code)
@@ -222,5 +231,6 @@ public class TestMulticast
         const string kChannelName = "multicast";
 
         FunapiMulticastClient multicast;
+        int sending_count = 0;
     }
 }

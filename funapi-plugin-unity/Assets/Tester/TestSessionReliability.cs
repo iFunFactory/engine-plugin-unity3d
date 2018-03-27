@@ -35,6 +35,14 @@ public class TestSessionReliability
             session = FunapiSession.Create(TestInfo.ServerIp, option);
             session.ReceivedMessageCallback += onReceivedEchoMessage;
 
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (type == SessionEventType.kOpened)
+                {
+                    keepSendingEchoMessages(protocol, 0.2f);
+                }
+            };
+
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
@@ -42,47 +50,40 @@ public class TestSessionReliability
 
                 if (type == TransportEventType.kStarted)
                 {
-                    startCoroutine(onStarted(protocol));
+                    startCoroutine(onTransportStarted());
                 }
                 else if (type == TransportEventType.kStopped)
                 {
-                    startCoroutine(onStopped(protocol));
+                    if (test_step < kStepCountMax)
+                    {
+                        sendEchoMessageWithCount(protocol, 2);
+                        session.Connect(protocol);
+                    }
                 }
             };
 
-            setTimeoutCallbackWithFail(7f);
+            setTestTimeout(7f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);
         }
 
-        IEnumerator onStarted (TransportProtocol protocol)
+        IEnumerator onTransportStarted ()
         {
-            yield return new SleepForSeconds(0.2f);
-            session.Stop();
-        }
+            yield return new SleepForSeconds(0.5f);
 
-        IEnumerator onStopped (TransportProtocol protocol)
-        {
             ++test_step;
-            if (test_step == 1)
+            if (test_step >= kStepCountMax)
             {
-                keepSendingEchoMessages(protocol, 0.1f);
-            }
-            else if (test_step >= kStepCountMax)
-            {
-                FunapiSession.Destroy(session);
-                isFinished = true;
+                onTestFinished();
                 yield break;
             }
 
-            yield return new SleepForSeconds(0.2f);
-
-            session.Connect(protocol);
+            session.Stop();
         }
 
 
-        const int kStepCountMax = 5;
+        const int kStepCountMax = 3;
         int test_step = 0;
     }
 }

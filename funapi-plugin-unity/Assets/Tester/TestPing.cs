@@ -5,6 +5,7 @@
 // consent of iFunFactory Inc.
 
 using Fun;
+using NUnit.Framework;
 using System.Collections;
 using UnityEngine.TestTools;
 
@@ -36,16 +37,23 @@ public class TestPing
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
-                if (type == SessionEventType.kStopped)
-                    isFinished = true;
+                if (type == TransportEventType.kStopped)
+                {
+                    FunapiSession.Transport transport = session.GetTransport(protocol);
+                    if (transport.LastErrorCode != TransportError.Type.kNone)
+                    {
+                        FunDebug.LogError("'Ping' Test has failed.");
+                        isFinished = true;
+                    }
+                }
             };
-
-            setTimeoutCallback(5f);
 
             ushort port = getPort("default", protocol, encoding);
             session.Connect(protocol, encoding, port, option);
+
+            timer.Add(new FunapiTimer("finish", 8f, onTestFinished));
         }
     }
 }

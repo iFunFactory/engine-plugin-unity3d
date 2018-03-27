@@ -13,15 +13,51 @@ using UnityEngine.TestTools;
 public class TestDownloader
 {
     [UnityTest]
-    public IEnumerator DownloadAll()
+    public IEnumerator Download_All()
     {
         yield return new TestImpl ();
+    }
+
+    [UnityTest]
+    public IEnumerator Download_Game()
+    {
+        yield return new TestImpl ("game.json");
+    }
+
+    [UnityTest]
+    public IEnumerator Download_Images()
+    {
+        yield return new TestImpl ("images.json");
+    }
+
+    [UnityTest]
+    public IEnumerator Download_Sounds()
+    {
+        yield return new TestImpl ("sounds.json");
     }
 
 
     class TestImpl : TestBase
     {
         public TestImpl ()
+        {
+            FunapiHttpDownloader downloader = createDownloader();
+
+            string url = string.Format("http://{0}:{1}/", TestInfo.ServerIp, 8020);
+            downloader.GetDownloadList(url, FunapiUtils.GetLocalDataPath);
+        }
+
+
+        public TestImpl (string filename)
+        {
+            FunapiHttpDownloader downloader = createDownloader();
+
+            string url = string.Format("http://{0}:{1}/", TestInfo.ServerIp, 8020);
+            downloader.GetDownloadList(url, FunapiUtils.GetLocalDataPath, filename);
+        }
+
+
+        FunapiHttpDownloader createDownloader ()
         {
             FunapiHttpDownloader downloader = new FunapiHttpDownloader();
 
@@ -46,8 +82,7 @@ public class TestDownloader
                 isFinished = true;
             };
 
-            string url = string.Format("http://{0}:{1}/", TestInfo.ServerIp, 8020);
-            downloader.GetDownloadList(url, FunapiUtils.GetLocalDataPath);
+            return downloader;
         }
     }
 }

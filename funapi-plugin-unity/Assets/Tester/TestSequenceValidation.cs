@@ -42,7 +42,6 @@ public class TestSequenceValidation
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
-            int count = 0;
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
@@ -50,20 +49,7 @@ public class TestSequenceValidation
 
                 if (type == TransportEventType.kStarted)
                 {
-                    sendEchoMessageWithCount(protocol, 3);
-                }
-                else if (type == TransportEventType.kStopped)
-                {
-                    ++count;
-                    if (count >= 3)
-                    {
-                        FunapiSession.Destroy(session);
-                        isFinished = true;
-                    }
-                    else
-                    {
-                        session.Connect(protocol);
-                    }
+                    sendEchoMessageWithCount(protocol, 10);
                 }
             };
 
@@ -72,10 +58,12 @@ public class TestSequenceValidation
                 onReceivedEchoMessage(type, message);
 
                 if (isReceivedAllMessages)
-                    session.Stop();
+                {
+                    onTestFinished();
+                }
             };
 
-            setTimeoutCallbackWithFail(3f);
+            setTestTimeout(3f);
 
             ushort port = getPort("sequence", protocol, encoding);
             TransportOption option = newTransportOption(protocol);

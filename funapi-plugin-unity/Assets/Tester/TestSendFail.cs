@@ -9,20 +9,8 @@ using System.Collections;
 using UnityEngine.TestTools;
 
 
-public class TestDefault
+public class TestSendFail
 {
-    [UnityTest]
-    public IEnumerator ALL_Json ()
-    {
-        yield return new TestImpl (FunEncoding.kJson);
-    }
-
-    [UnityTest]
-    public IEnumerator ALL_Protobuf ()
-    {
-        yield return new TestImpl (FunEncoding.kProtobuf);
-    }
-
     [UnityTest]
     public IEnumerator TCP_Json ()
     {
@@ -62,45 +50,35 @@ public class TestDefault
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (FunEncoding encoding)
-        {
-            createTestSession();
-
-            setTestTimeout(3f);
-
-            ushort port = getPort("default", TransportProtocol.kTcp, encoding);
-            session.Connect(TransportProtocol.kTcp, encoding, port);
-
-            port = getPort("default", TransportProtocol.kUdp, encoding);
-            session.Connect(TransportProtocol.kUdp, encoding, port);
-
-            port = getPort("default", TransportProtocol.kHttp, encoding);
-            session.Connect(TransportProtocol.kHttp, encoding, port);
-        }
-
-
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
-        {
-            createTestSession();
-
-            setTestTimeout(2f);
-
-            ushort port = getPort("default", protocol, encoding);
-            session.Connect(protocol, encoding, port);
-        }
-
-
-        void createTestSession ()
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
-            session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (type == SessionEventType.kStopped)
+                {
+                    ++test_step;
+                    if (test_step >= kStepCountMax)
+                    {
+                        onTestFinished();
+                        return;
+                    }
+
+                    session.Connect(protocol);
+                }
+            };
+
+            session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
                     return;
 
                 if (type == TransportEventType.kStarted)
+                {
+                    resetSendingCount();
                     sendEchoMessageWithCount(protocol, 3);
+                }
             };
 
             session.ReceivedMessageCallback += delegate (string type, object message)
@@ -108,8 +86,25 @@ public class TestDefault
                 onReceivedEchoMessage(type, message);
 
                 if (isReceivedAllMessages)
-                    onTestFinished();
+                {
+                    if (session.Started)
+                        session.Stop();
+                }
             };
+
+            session.TransportErrorCallback += delegate (TransportProtocol p, TransportError error)
+            {
+                session.Stop();
+            };
+
+            setTestTimeout(3f);
+
+            ushort port = getPort("default", protocol, encoding);
+            session.Connect(protocol, encoding, port);
         }
+
+
+        const int kStepCountMax = 3;
+        int test_step = 0;
     }
 }
