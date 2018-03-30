@@ -123,13 +123,14 @@ namespace Fun
                 if (!is_active_)
                     return;
 
-                // Updates coroutines
+                // Updates routines
                 routines_.Update(deltaTime);
+                post_event_.Update(deltaTime);
 
                 OnUpdate(deltaTime);
             }
 
-            public abstract void OnUpdate (float deltaTime);
+            public virtual void OnUpdate (float deltaTime) {}
 
             public virtual void OnPause (bool isPaused) {}
 
@@ -138,6 +139,8 @@ namespace Fun
             public abstract string name { get; }
 
             public bool isDone { get; set; }
+
+            protected PostEventList event_ { get { return post_event_; } }
 
 
             class Func : IConcurrentItem
@@ -170,6 +173,7 @@ namespace Fun
             bool is_active_ = false;
 
             // list of coroutine
+            PostEventList post_event_ = new PostEventList();
             ConcurrentList<Func> routines_ = new ConcurrentList<Func>();
         }
     }
