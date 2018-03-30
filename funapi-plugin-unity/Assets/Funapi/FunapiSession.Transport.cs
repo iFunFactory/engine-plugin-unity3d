@@ -199,10 +199,10 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kStartingFailed;
-                    last_error_message_ = string.Format("{0} failure in Start: {1}",
-                                                        str_protocol_, e.ToString());
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kStartingFailed;
+                    error.message = string.Format("{0} failure in Start: {1}", str_protocol_, e.ToString());
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -481,10 +481,11 @@ namespace Fun
             {
                 onClose();
 
-                last_error_code_ = TransportError.Type.kDisconnected;
-                last_error_message_ = string.Format("{0} forcibly closed the connection for testing.",
-                                                    str_protocol_);
-                event_.Add(onDisconnected);
+                TransportError error = new TransportError();
+                error.type = TransportError.Type.kDisconnected;
+                error.message = string.Format("{0} forcibly closed the connection for testing.",
+                                              str_protocol_);
+                event_.Add(onDisconnected, error);
             }
 
             // Creates a socket.
@@ -611,10 +612,13 @@ namespace Fun
                 Stop();
             }
 
-            protected void onDisconnected ()
+            protected void onDisconnected (TransportError error)
             {
+                last_error_code_ = error.type;
+                last_error_message_ = error.message;
+
                 debug.LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
-                                 str_protocol_, state_, last_error_code_, last_error_message_);
+                                 str_protocol_, state_, error.type, error.message);
 
                 if (checkAutoReconnect())
                     return;
@@ -622,21 +626,24 @@ namespace Fun
                 Stop();
             }
 
-            protected virtual void onFailure ()
+            protected virtual void onFailure (TransportError error)
             {
+                last_error_code_ = error.type;
+                last_error_message_ = error.message;
+
                 if (state_ != State.kEstablished)
                 {
                     if (checkAutoReconnect())
                     {
                         debug.Log("{0} connection failed. will try to connect again. " +
                                   "(state: {1}, error: {2})\n{3}\n",
-                                  str_protocol_, state_, last_error_code_, last_error_message_);
+                                  str_protocol_, state_, error.type, error.message);
                         return;
                     }
                 }
 
                 debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
-                                 str_protocol_, state_, last_error_code_, last_error_message_);
+                                 str_protocol_, state_, error.type, error.message);
 
                 // If an error occurs during connection, stops the connection.
                 // Or if an error occurs while connected from TCP or HTTP, stops the connection.
@@ -646,7 +653,8 @@ namespace Fun
                 }
                 else
                 {
-                    onTransportErrorCallback(last_error_code_, last_error_message_);
+                    if (ErrorCallback != null)
+                        ErrorCallback(protocol_, error);
                 }
             }
 
@@ -654,18 +662,6 @@ namespace Fun
             {
                 if (EventCallback != null)
                     EventCallback(protocol_, type);
-            }
-
-            void onTransportErrorCallback (TransportError.Type type, string message)
-            {
-                if (ErrorCallback != null)
-                {
-                    TransportError error = new TransportError();
-                    error.type = type;
-                    error.message = message;
-
-                    ErrorCallback(protocol_, error);
-                }
             }
 
 
@@ -702,7 +698,7 @@ namespace Fun
                 debug.Log("Wait {0} seconds for reconnect to {1} transport.",
                           delay_time, str_protocol_);
 
-                event_.Add (delegate
+                event_.Add (() =>
                     {
                         debug.Log("'{0}' Try to reconnect to server.", str_protocol_);
                         onStart();
@@ -743,10 +739,11 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = string.Format("{0} failure in sendMessage: {1}",
-                                                        str_protocol_, e.ToString());
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = string.Format("{0} failure in sendMessage: {1}",
+                                                  str_protocol_, e.ToString());
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -1083,10 +1080,11 @@ namespace Fun
                 {
                     if (!encryptMessage(msg, enc_type))
                     {
-                        last_error_code_ = TransportError.Type.kEncryptionFailed;
-                        last_error_message_ = string.Format("Message encryption failed. type:{0}",
-                                                            (int)enc_type);
-                        event_.Add(onFailure);
+                        TransportError error = new TransportError();
+                        error.type = TransportError.Type.kEncryptionFailed;
+                        error.message = string.Format("Message encryption failed. type:{0}",
+                                                      (int)enc_type);
+                        event_.Add(onFailure, error);
                         return false;
                     }
                 }
@@ -1095,12 +1093,16 @@ namespace Fun
 
                 msg.ready = true;
 
-                StringBuilder strlog = new StringBuilder();
-                strlog.AppendFormat("{0} built a message - '{1}' ({2} + {3} bytes)",
-                                    str_protocol_, msg.msg_type, msg.header.Count, msg.body.Count);
-                if (msg.seq > 0) strlog.AppendFormat(" (seq : {0})", msg.seq);
-                if (ack > 0) strlog.AppendFormat(" (ack : {0})", ack);
-                debug.DebugLog3(strlog.ToString());
+                debug.DebugLog3("{0} built a message - '{1}' ({2} + {3} bytes)",
+                                str_protocol_, msg.msg_type, msg.header.Count, msg.body.Count);
+                if (msg.seq > 0 || ack > 0)
+                {
+                    StringBuilder strlog = new StringBuilder();
+                    strlog.AppendFormat("{0} send a message - '{1}'", str_protocol_, msg.msg_type);
+                    if (msg.seq > 0) strlog.AppendFormat(" (seq : {0})", msg.seq);
+                    if (ack > 0) strlog.AppendFormat(" (ack : {0})", ack);
+                    debug.DebugLog2(strlog.ToString());
+                }
 
                 return true;
             }
@@ -1126,10 +1128,11 @@ namespace Fun
 
                     if (!encryptMessage(msg, enc_type))
                     {
-                        last_error_code_ = TransportError.Type.kEncryptionFailed;
-                        last_error_message_ = string.Format("Message encryption failed. type:{0}",
-                                                            (int)enc_type);
-                        event_.Add(onFailure);
+                        TransportError error = new TransportError();
+                        error.type = TransportError.Type.kEncryptionFailed;
+                        error.message = string.Format("Message encryption failed. type:{0}",
+                                                      (int)enc_type);
+                        event_.Add(onFailure, error);
                         return false;
                     }
 
@@ -1183,10 +1186,11 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = string.Format("{0} failure in sendPendingMessages: {1}",
-                                                        str_protocol_, e.ToString());
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = string.Format("{0} failure in sendPendingMessages: {1}",
+                                                  str_protocol_, e.ToString());
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -1196,8 +1200,9 @@ namespace Fun
                 {
                     if (sending_.Count > 0)
                     {
-                        debug.DebugLog1("{0} continues to send unsent messages. ({1} remaining messages)",
-                                        str_protocol_, sending_.Count);
+                        debug.DebugLog1("{0} continues to send unsent messages. ({1} remaining {2})",
+                                        str_protocol_, sending_.Count,
+                                        sending_.Count == 1 ? "message" : "messages");
 
                         wireSend();
                     }
@@ -1410,6 +1415,9 @@ namespace Fun
 
                     if (doHandshaking(encryption_type, encryption_header))
                     {
+                        if (state_ == State.kUnknown)
+                            return false;
+
                         state_ = State.kConnected;
                         debug.DebugLog1("{0} handshaking is complete.", str_protocol_);
 
@@ -1679,10 +1687,11 @@ namespace Fun
 
             void onPingTimeout ()
             {
-                last_error_code_ = TransportError.Type.kDisconnected;
-                last_error_message_ = string.Format("{0} has not received a ping message for a long time.",
-                                                    str_protocol_);
-                onDisconnected();
+                TransportError error = new TransportError();
+                error.type = TransportError.Type.kDisconnected;
+                error.message = string.Format("{0} has not received a ping message for a long time.",
+                                              str_protocol_);
+                onDisconnected(error);
             }
 
             void sendPingMessage ()
@@ -1826,7 +1835,7 @@ namespace Fun
             protected string str_protocol_;
             protected FunEncoding encoding_ = FunEncoding.kNone;
             protected TransportOption option_ = null;
-            protected ThreadSafeEventList event_ = new ThreadSafeEventList();
+            protected PostEventList event_ = new PostEventList();
             protected FunapiTimerList timer_ = new FunapiTimerList();
             protected bool is_paused_ = false;
 

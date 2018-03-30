@@ -13,7 +13,7 @@ using UnityEngine.TestTools;
 public class TestReconnect
 {
     [UnityTest]
-    public IEnumerator WithReliability ()
+    public IEnumerator TCP_Reliability ()
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson);
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf);

@@ -136,9 +136,10 @@ namespace Fun
                         return;
                     }
 
-                    last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = "TCP failure in wireSend: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "TCP failure in wireSend: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -154,9 +155,10 @@ namespace Fun
                         sock_.EndConnect(ar);
                         if (sock_.Connected == false)
                         {
-                            last_error_code_ = TransportError.Type.kStartingFailed;
-                            last_error_message_ = string.Format("TCP connection failed.");
-                            event_.Add(onFailure);
+                            TransportError error = new TransportError();
+                            error.type = TransportError.Type.kStartingFailed;
+                            error.message = string.Format("TCP connection failed.");
+                            event_.Add(onFailure, error);
                             return;
                         }
                         debug.DebugLog1("TCP transport connected. Starts handshaking..");
@@ -179,9 +181,10 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kStartingFailed;
-                    last_error_message_ = "TCP failure in startCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kStartingFailed;
+                    error.message = "TCP failure in startCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -232,9 +235,10 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = "TCP failure in sendBytesCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "TCP failure in sendBytesCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -290,9 +294,10 @@ namespace Fun
                                                  received_size_ - next_decoding_offset_);
                             }
 
-                            last_error_code_ = TransportError.Type.kDisconnected;
-                            last_error_message_ = "TCP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected);
+                            TransportError error = new TransportError();
+                            error.type = TransportError.Type.kDisconnected;
+                            error.message = "TCP can't receive messages. Maybe the socket is closed.";
+                            event_.Add(onDisconnected, error);
                         }
                     }
                 }
@@ -305,9 +310,10 @@ namespace Fun
                         return;
                     }
 
-                    last_error_code_ = TransportError.Type.kReceivingFailed;
-                    last_error_message_ = "TCP failure in receiveBytesCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kReceivingFailed;
+                    error.message = "TCP failure in receiveBytesCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -504,9 +510,10 @@ namespace Fun
                 {
                     onFailedSending();
 
-                    last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = "UDP failure in sendBytesCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "UDP failure in sendBytesCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -564,9 +571,10 @@ namespace Fun
                                                  received_size_ - next_decoding_offset_);
                             }
 
-                            last_error_code_ = TransportError.Type.kDisconnected;
-                            last_error_message_ = "UDP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected);
+                            TransportError error = new TransportError();
+                            error.type = TransportError.Type.kDisconnected;
+                            error.message = "UDP can't receive messages. Maybe the socket is closed.";
+                            event_.Add(onDisconnected, error);
                         }
                     }
                 }
@@ -578,9 +586,10 @@ namespace Fun
                         return;
                     }
 
-                    last_error_code_ = TransportError.Type.kReceivingFailed;
-                    last_error_message_ = "UDP failure in receiveBytesCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kReceivingFailed;
+                    error.message = "UDP failure in receiveBytesCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -918,9 +927,10 @@ namespace Fun
                         return;
                     }
 
-                    last_error_code_ = TransportError.Type.kSendingFailed;
-                    last_error_message_ = "HTTP failure in requestStreamCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "HTTP failure in requestStreamCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -954,10 +964,11 @@ namespace Fun
                     }
                     else
                     {
-                        last_error_code_ = TransportError.Type.kReceivingFailed;
-                        last_error_message_ = string.Format("Failed response. status:{0}",
-                                                            request.web_response.StatusDescription);
-                        event_.Add(onFailure);
+                        TransportError error = new TransportError();
+                        error.type = TransportError.Type.kReceivingFailed;
+                        error.message = string.Format("Failed response. status:{0}",
+                                                      request.web_response.StatusDescription);
+                        event_.Add(onFailure, error);
                     }
                 }
                 catch (Exception e)
@@ -971,9 +982,10 @@ namespace Fun
                         return;
                     }
 
-                    last_error_code_ = TransportError.Type.kReceivingFailed;
-                    last_error_message_ = "HTTP failure in responseCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kReceivingFailed;
+                    error.message = "HTTP failure in responseCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -997,9 +1009,10 @@ namespace Fun
                     {
                         if (request.web_response == null)
                         {
-                            last_error_code_ = TransportError.Type.kReceivingFailed;
-                            last_error_message_ = "Response instance is null.";
-                            event_.Add(onFailure);
+                            TransportError error = new TransportError();
+                            error.type = TransportError.Type.kReceivingFailed;
+                            error.message = "Response instance is null.";
+                            event_.Add(onFailure, error);
                             return;
                         }
 
@@ -1028,9 +1041,10 @@ namespace Fun
                         return;
                     }
 
-                    last_error_code_ = TransportError.Type.kReceivingFailed;
-                    last_error_message_ = "HTTP failure in readCb: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kReceivingFailed;
+                    error.message = "HTTP failure in readCb: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 
@@ -1096,9 +1110,10 @@ namespace Fun
                 }
                 catch (Exception e)
                 {
-                    last_error_code_ = TransportError.Type.kRequestFailed;
-                    last_error_message_ = "HTTP failure in wwwPost: " + e.ToString();
-                    event_.Add(onFailure);
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kRequestFailed;
+                    error.message = "HTTP failure in wwwPost: " + e.ToString();
+                    event_.Add(onFailure, error);
                 }
             }
 #endif
@@ -1127,10 +1142,10 @@ namespace Fun
                 }
             }
 
-            protected override void onFailure ()
+            protected override void onFailure (TransportError error)
             {
                 cancelRequest();
-                base.onFailure();
+                base.onFailure(error);
             }
 
 

@@ -94,6 +94,9 @@ public class TestDisconnect
             yield return new SleepForSeconds(1f);
 
             FunapiSession.Transport transport = session.GetTransport(protocol);
+            if (transport == null)
+                yield break;
+
             transport.ForcedDisconnect();
         }
 

@@ -48,12 +48,9 @@ public class TestConnectionTimeout
 
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
-                if (isFinished)
-                    return;
-
                 if (type == TransportEventType.kStarted)
                 {
-                    sendEchoMessage(protocol);
+                    sendEchoMessageWithCount(protocol, 3);
                 }
                 else if (type == TransportEventType.kStopped)
                 {
@@ -63,7 +60,7 @@ public class TestConnectionTimeout
                         ushort port = getPort("default", protocol, encoding);
                         session.Connect(protocol, encoding, port, option);
                     }
-                    else
+                    else if (test_step == kStepCountMax)
                     {
                         option.ConnectionTimeout = 3f;
                         ushort port = getPort("default", protocol, encoding);

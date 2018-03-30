@@ -52,6 +52,15 @@ public class TestMulticast
             session = FunapiSession.Create(TestInfo.ServerIp);
             session.Connect(protocol, encoding, port);
 
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (type == SessionEventType.kStopped)
+                {
+                    FunapiSession.Destroy(session);
+                    isFinished = true;
+                }
+            };
+
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
@@ -72,7 +81,7 @@ public class TestMulticast
                     };
                     multicast.LeftCallback += delegate (string channel_id, string sender) {
                         multicast.Clear();
-                        isFinished = true;
+                        session.Stop();
                     };
                     multicast.ErrorCallback += onMulticastError;
 

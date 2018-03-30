@@ -165,11 +165,9 @@ namespace Fun
 
         public void Stop ()
         {
-            debug.DebugLog1("Session.Stop() called. (state:{0})", state_);
-
             if (!Started)
             {
-                debug.LogWarning("Session.Stop() - The session is not connected.");
+                debug.LogWarning("Session.Stop() - The session is not connected. (state:{0})", state_);
                 return;
             }
 
@@ -411,8 +409,6 @@ namespace Fun
         //
         public override void OnUpdate (float deltaTime)
         {
-            event_.Update(deltaTime);
-
             checkConnectionRequest();
 
             lock (transports_lock_)
@@ -963,19 +959,16 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
-            debug.DebugLog1("Stopping a session module.");
+            debug.DebugLog1("Stopping a session module. (state:{0})", state_);
 
             if (force_stop)
             {
                 // Stops all transport
-                lock (connect_lock_)
+                lock (transports_lock_)
                 {
-                    lock (transports_lock_)
+                    foreach (Transport transport in transports_.Values)
                     {
-                        foreach (Transport transport in transports_.Values)
-                        {
-                            transport.Stop();
-                        }
+                        transport.Stop();
                     }
                 }
             }
@@ -1510,7 +1503,6 @@ namespace Fun
         State state_;
         string server_address_ = "";
         object state_lock_ = new object();
-        ThreadSafeEventList event_ = new ThreadSafeEventList();
 
         // Session-related variables.
         SessionId session_id_ = new SessionId();

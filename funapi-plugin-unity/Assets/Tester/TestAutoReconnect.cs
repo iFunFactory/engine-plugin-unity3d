@@ -18,12 +18,41 @@ public class TestAutoReconect
         TcpTransportOption option = new TcpTransportOption();
         option.AutoReconnect = true;
 
+        yield return new TestImpl (TransportProtocol.kTcp, option);
+    }
+
+    [UnityTest]
+    public IEnumerator TCP_ForcedDisconnect ()
+    {
+        TcpTransportOption option = new TcpTransportOption();
+        option.AutoReconnect = true;
+
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson, option);
     }
 
 
     class TestImpl : TestSessionBase
     {
+        public TestImpl (TransportProtocol protocol, TransportOption option)
+        {
+            session = FunapiSession.Create(TestInfo.ServerIp);
+
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (type == SessionEventType.kStopped)
+                {
+                    FunapiSession.Destroy(session);
+                    isFinished = true;
+                }
+            };
+
+            setTimeoutCallback(10f);
+
+            option.ConnectionTimeout = 5f;
+            session.Connect(protocol, FunEncoding.kJson, 80, option);
+        }
+
+
         public TestImpl (TransportProtocol protocol, FunEncoding encoding, TransportOption option)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
@@ -47,10 +76,10 @@ public class TestAutoReconect
                     sendEchoMessage(protocol);
             };
 
-            setTimeoutCallback(30f);
+            setTimeoutCallback(10f);
 
             ushort port = getPort("default", protocol, encoding);
-            option.ConnectionTimeout = 20f;
+            option.ConnectionTimeout = 5f;
             session.Connect(protocol, encoding, port, option);
 
             startCoroutine(onDisconnectLoop(protocol));
@@ -67,7 +96,7 @@ public class TestAutoReconect
                 if (transport.IsEstablished && !transport.Reconnecting)
                     transport.ForcedDisconnect();
 
-                yield return new SleepForSeconds(0.1f);
+                yield return new SleepForSeconds(1f);
             }
         }
     }

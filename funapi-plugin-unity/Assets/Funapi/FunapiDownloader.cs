@@ -46,11 +46,6 @@ namespace Fun
             web_client_.DownloadFileCompleted += downloadFileCompleteCb;
         }
 
-        public override void OnUpdate (float deltaTime)
-        {
-            event_.Update(deltaTime);
-        }
-
         public override void OnQuit ()
         {
             Stop();
@@ -349,7 +344,7 @@ namespace Fun
                     if (!File.Exists(path) || item.size != info.Length || item.hash != file.hash)
                     {
                         remove_list.Add(file.path);
-                        FunDebug.LogWarning("The file has been changed or deleted: {0}", file.path);
+                        FunDebug.LogWarning("'{0}' file has been changed or deleted.", file.path);
                     }
                     else
                     {
@@ -812,7 +807,6 @@ namespace Fun
 
         Mutex mutex_ = new Mutex();
         WebClient web_client_ = new WebClient();
-        ThreadSafeEventList event_ = new ThreadSafeEventList();
         List<DownloadFileInfo> cached_list_ = new List<DownloadFileInfo>();
         List<DownloadFileInfo> download_list_ = new List<DownloadFileInfo>();
         List<string> delete_file_list_ = new List<string>();
