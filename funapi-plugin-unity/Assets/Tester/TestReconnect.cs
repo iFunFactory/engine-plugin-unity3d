@@ -13,9 +13,14 @@ using UnityEngine.TestTools;
 public class TestReconnect
 {
     [UnityTest]
-    public IEnumerator TCP_Reliability ()
+    public IEnumerator TCP_Json ()
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson);
+    }
+
+    [UnityTest]
+    public IEnumerator TCP_Protobuf ()
+    {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf);
     }
 
@@ -45,7 +50,7 @@ public class TestReconnect
                 }
             };
 
-            setTimeoutCallbackWithFail(3f);
+            setTestTimeout(3f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);
@@ -53,23 +58,19 @@ public class TestReconnect
 
         IEnumerator onStarted (TransportProtocol protocol)
         {
-            yield return null;
+            sendEchoMessageWithCount(protocol, 3);
 
-            ++test_step;
-            if (test_step < kStepCountMax)
-            {
-                sendEchoMessageWithCount(protocol, 5);
-            }
+            yield return new SleepForSeconds(0.2f);
 
             session.Stop();
         }
 
         IEnumerator onStopped (TransportProtocol protocol)
         {
+            ++test_step;
             if (test_step >= kStepCountMax)
             {
-                FunapiSession.Destroy(session);
-                isFinished = true;
+                onTestFinished();
                 yield break;
             }
 

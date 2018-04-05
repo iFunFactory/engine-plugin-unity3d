@@ -13,73 +13,80 @@ using UnityEngine.TestTools;
 public class TestAutoReconect
 {
     [UnityTest]
-    public IEnumerator TCP_Default ()
+    public IEnumerator TCP_WrongPort ()
     {
-        TcpTransportOption option = new TcpTransportOption();
-        option.AutoReconnect = true;
-
-        yield return new TestImpl (TransportProtocol.kTcp, option);
+        yield return new TestImpl (TransportProtocol.kTcp);
     }
 
     [UnityTest]
-    public IEnumerator TCP_ForcedDisconnect ()
+    public IEnumerator TCP_Disconnect ()
     {
-        TcpTransportOption option = new TcpTransportOption();
-        option.AutoReconnect = true;
-
-        yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson, option);
+        yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kJson);
     }
 
 
     class TestImpl : TestSessionBase
     {
-        public TestImpl (TransportProtocol protocol, TransportOption option)
+        public TestImpl (TransportProtocol protocol)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
 
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
-                if (type == SessionEventType.kStopped)
+                if (type == TransportEventType.kStopped)
                 {
-                    FunapiSession.Destroy(session);
-                    isFinished = true;
+                    FunapiSession.Transport transport = session.GetTransport(protocol);
+                    if (transport.LastErrorCode == TransportError.Type.kConnectionTimeout)
+                    {
+                        onTestFinished();
+                    }
                 }
             };
 
-            setTimeoutCallback(10f);
+            setTestTimeout(8f);
 
+            TcpTransportOption option = new TcpTransportOption();
+            option.AutoReconnect = true;
             option.ConnectionTimeout = 5f;
+
             session.Connect(protocol, FunEncoding.kJson, 80, option);
         }
 
 
-        public TestImpl (TransportProtocol protocol, FunEncoding encoding, TransportOption option)
+        public TestImpl (TransportProtocol protocol, FunEncoding encoding)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
-            session.ReceivedMessageCallback += onReceivedEchoMessage;
-
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
-            {
-                if (type == SessionEventType.kStopped)
-                {
-                    FunapiSession.Destroy(session);
-                    isFinished = true;
-                }
-            };
 
             session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
             {
                 if (isFinished)
                     return;
 
-                if (type == TransportEventType.kStarted || type == TransportEventType.kReconnecting)
-                    sendEchoMessage(protocol);
+                if (type == TransportEventType.kStarted)
+                    sendEchoMessageWithCount(protocol, 3);
             };
 
-            setTimeoutCallback(10f);
+            session.ReceivedMessageCallback += delegate (string type, object message)
+            {
+                onReceivedEchoMessage(type, message);
+
+                if (isReceivedAllMessages)
+                {
+                    ++test_step;
+                    if (test_step >= kStepCountMax)
+                    {
+                        onTestFinished();
+                    }
+                }
+            };
+
+            setTestTimeout(10f);
+
+            TcpTransportOption option = new TcpTransportOption();
+            option.AutoReconnect = true;
+            option.ConnectionTimeout = 8f;
 
             ushort port = getPort("default", protocol, encoding);
-            option.ConnectionTimeout = 5f;
             session.Connect(protocol, encoding, port, option);
 
             startCoroutine(onDisconnectLoop(protocol));
@@ -99,5 +106,9 @@ public class TestAutoReconect
                 yield return new SleepForSeconds(1f);
             }
         }
+
+
+        const int kStepCountMax = 5;
+        int test_step = 0;
     }
 }

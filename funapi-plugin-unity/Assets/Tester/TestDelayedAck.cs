@@ -47,7 +47,7 @@ public class TestDelayedAck
                 }
             };
 
-            setTimeoutCallbackWithFail(3f);
+            setTestTimeout(4f);
 
             ushort port = getPort("whole", protocol, encoding);
             session.Connect(protocol, encoding, port);
@@ -56,9 +56,9 @@ public class TestDelayedAck
         IEnumerator onStarted (TransportProtocol protocol)
         {
             keepSendingEchoMessages(protocol, 0.1f);
-            yield return new SleepForSeconds(1f);
+            yield return new SleepForSeconds(2f);
 
-            isFinished = true;
+            onTestFinished();
         }
     }
 }

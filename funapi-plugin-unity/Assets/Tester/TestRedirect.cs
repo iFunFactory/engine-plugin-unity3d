@@ -20,14 +20,8 @@ using plugin_messages;
 
 public class TestRedirect
 {
-    [OneTimeSetUp]
-    protected void Init ()
-    {
-        FunapiEncryptor.public_key = "0b8504a9c1108584f4f0a631ead8dd548c0101287b91736566e13ead3f008f5d";
-    }
-
     [UnityTest]
-    public IEnumerator Test ()
+    public IEnumerator Redirect ()
     {
         yield return new TestImpl ();
     }
@@ -42,7 +36,7 @@ public class TestRedirect
 
             session = FunapiSession.Create(TestInfo.ServerIp, option);
             session.ReceivedMessageCallback += onReceivedEchoMessage;
-            session.TransportOptionCallback += onTransportOption;
+            //session.TransportOptionCallback += onTransportOption;
 
             session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
@@ -55,10 +49,10 @@ public class TestRedirect
                     return;
 
                 if (type == TransportEventType.kStarted)
-                    sendEchoMessage(protocol);
+                    sendEchoMessageWithCount(protocol, 3);
             };
 
-            setTimeoutCallbackWithFail(10f);
+            setTestTimeout(10f);
 
             ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kJson);
             session.Connect(TransportProtocol.kTcp, FunEncoding.kJson, port);
@@ -72,17 +66,18 @@ public class TestRedirect
             {
                 if (test_step == 0)
                 {
-                    ++test_step;
                     requestRedirect(TransportProtocol.kTcp);
                 }
             }
             else if (type == SessionEventType.kRedirectSucceeded)
             {
-                ++test_step;
-                if (test_step > kStepCountMax)
-                    isFinished = true;
-                else
-                    requestRedirect(TransportProtocol.kTcp);
+                if (test_step >= kStepCountMax)
+                {
+                    onTestFinished();
+                    yield break;
+                }
+
+                requestRedirect(TransportProtocol.kTcp);
             }
         }
 
@@ -105,6 +100,8 @@ public class TestRedirect
                 FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
                 session.SendMessage("pbuf_echo", message, protocol);
             }
+
+            ++test_step;
         }
 
         TransportOption onTransportOption (string flavor, TransportProtocol protocol)

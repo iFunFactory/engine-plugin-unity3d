@@ -13,7 +13,7 @@ using UnityEngine.TestTools;
 public class TestAnnounce
 {
     [UnityTest]
-    public IEnumerator Test()
+    public IEnumerator GetList()
     {
         yield return new TestImpl ();
     }
@@ -45,6 +45,8 @@ public class TestAnnounce
 
                 isFinished = true;
             };
+
+            setTestTimeout(2f);
 
             string url = string.Format("http://{0}:{1}", TestInfo.ServerIp, 8080);
             announce.Init(url);

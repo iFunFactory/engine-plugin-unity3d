@@ -66,7 +66,7 @@ public class TestDefault
         {
             createTestSession();
 
-            setTimeoutCallbackWithFail(3f);
+            setTestTimeout(3f);
 
             ushort port = getPort("default", TransportProtocol.kTcp, encoding);
             session.Connect(TransportProtocol.kTcp, encoding, port);
@@ -83,7 +83,7 @@ public class TestDefault
         {
             createTestSession();
 
-            setTimeoutCallbackWithFail(2f);
+            setTestTimeout(2f);
 
             ushort port = getPort("default", protocol, encoding);
             session.Connect(protocol, encoding, port);
@@ -93,16 +93,6 @@ public class TestDefault
         void createTestSession ()
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
-            session.TransportErrorCallback += onTransportError;
-
-            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
-            {
-                if (type == SessionEventType.kStopped)
-                {
-                    FunapiSession.Destroy(session);
-                    isFinished = true;
-                }
-            };
 
             session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)
             {
@@ -110,9 +100,7 @@ public class TestDefault
                     return;
 
                 if (type == TransportEventType.kStarted)
-                {
                     sendEchoMessageWithCount(protocol, 3);
-                }
             };
 
             session.ReceivedMessageCallback += delegate (string type, object message)
@@ -120,7 +108,7 @@ public class TestDefault
                 onReceivedEchoMessage(type, message);
 
                 if (isReceivedAllMessages)
-                    session.Stop();
+                    onTestFinished();
             };
         }
     }

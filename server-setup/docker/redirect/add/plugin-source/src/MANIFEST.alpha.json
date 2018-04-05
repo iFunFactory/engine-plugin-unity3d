@@ -48,7 +48,7 @@
             "use_session_reliability": true,
             "delayed_ack_interval_in_ms": 0,
             "use_sequence_number_validation": false,
-            "use_encryption": true,
+            "use_encryption": false,
             "tcp_encryptions": ["ife1", "ife2", "chacha20", "aes128"],
             "udp_encryptions": [],
             "http_encryptions": ["ife2"],

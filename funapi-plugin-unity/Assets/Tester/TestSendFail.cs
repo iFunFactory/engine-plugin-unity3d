@@ -53,22 +53,19 @@ public class TestSendFail
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
-            session.TransportErrorCallback += onTransportError;
 
             session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
                 if (type == SessionEventType.kStopped)
                 {
                     ++test_step;
-                    if (test_step < kStepCountMax)
+                    if (test_step >= kStepCountMax)
                     {
-                        session.Connect(protocol);
+                        onTestFinished();
+                        return;
                     }
-                    else
-                    {
-                        FunapiSession.Destroy(session);
-                        isFinished = true;
-                    }
+
+                    session.Connect(protocol);
                 }
             };
 
@@ -79,6 +76,7 @@ public class TestSendFail
 
                 if (type == TransportEventType.kStarted)
                 {
+                    resetSendingCount();
                     sendEchoMessageWithCount(protocol, 3);
                 }
             };
@@ -94,7 +92,12 @@ public class TestSendFail
                 }
             };
 
-            setTimeoutCallbackWithFail(2f);
+            session.TransportErrorCallback += delegate (TransportProtocol p, TransportError error)
+            {
+                session.Stop();
+            };
+
+            setTestTimeout(3f);
 
             ushort port = getPort("default", protocol, encoding);
             session.Connect(protocol, encoding, port);
