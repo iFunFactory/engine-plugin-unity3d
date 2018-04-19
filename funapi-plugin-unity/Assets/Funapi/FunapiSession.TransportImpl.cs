@@ -115,7 +115,7 @@ namespace Fun
                         }
                     }
 
-                    debug.DebugLog2("TCP sending {0} messages. ({1}bytes)", sending_.Count, length);
+                    debug.DebugLog2("TCP sending {0} message(s). ({1}bytes)", sending_.Count, length);
                 }
 
                 try
@@ -139,7 +139,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
                     error.message = "TCP failure in wireSend: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -158,7 +158,7 @@ namespace Fun
                             TransportError error = new TransportError();
                             error.type = TransportError.Type.kStartingFailed;
                             error.message = string.Format("TCP connection failed.");
-                            event_.Add(onFailure, error);
+                            onFailure(error);
                             return;
                         }
                         debug.DebugLog1("TCP transport connected. Starts handshaking..");
@@ -184,7 +184,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kStartingFailed;
                     error.message = "TCP failure in startCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -218,12 +218,10 @@ namespace Fun
                             int length = msg.header.Count + msg.body.Count;
                             nSent -= length;
                             sending_.RemoveAt(0);
-
-                            debug.DebugLog3("TCP removes '{0}' message ({1}bytes)", msg.msg_type, length);
                         }
 
                         FunDebug.Assert(sending_.Count == 0,
-                            string.Format("sendBytesCb - sending buffer has {0} messages.", sending_.Count));
+                            string.Format("sendBytesCb - sending buffer has {0} message(s).", sending_.Count));
 
                         // Sends pending messages
                         checkPendingMessages();
@@ -238,7 +236,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
                     error.message = "TCP failure in sendBytesCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -264,8 +262,8 @@ namespace Fun
                             debug.DebugLog3("TCP received {0} bytes. Buffer has {1} bytes.",
                                             nRead, received_size_ - next_decoding_offset_);
 
-                            // Decoding a messages
-                            tryToDecodeMessage();
+                            // Parses messages
+                            parseMessages();
 
                             // Checks buffer space
                             checkReceiveBuffer();
@@ -280,7 +278,7 @@ namespace Fun
                             lock (sock_lock_)
                             {
                                 sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
-                                debug.DebugLog3("TCP ready to receive more. We can receive upto {0} more bytes.",
+                                debug.DebugLog3("TCP ready to receive more. TCP can receive upto {0} more bytes.",
                                                 receive_buffer_.Length - received_size_);
                             }
                         }
@@ -297,7 +295,7 @@ namespace Fun
                             TransportError error = new TransportError();
                             error.type = TransportError.Type.kDisconnected;
                             error.message = "TCP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected, error);
+                            onDisconnected(error);
                         }
                     }
                 }
@@ -313,7 +311,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
                     error.message = "TCP failure in receiveBytesCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -479,13 +477,12 @@ namespace Fun
                         nSent = sock_.EndSend(ar);
                         FunDebug.Assert(nSent > 0, "UDP failed to transfer messages.");
                     }
+                    debug.DebugLog2("UDP sent {0} bytes.", nSent);
 
                     lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-
                         FunapiMessage msg = sending_[0];
-                        debug.DebugLog2("UDP sent a message - '{0}' ({1}bytes)", msg.msg_type, nSent);
 
                         // Removes header and body segment
                         int nLength = msg.header.Count + msg.body.Count;
@@ -513,7 +510,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
                     error.message = "UDP failure in sendBytesCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -540,8 +537,8 @@ namespace Fun
                                             nRead, received_size_ - next_decoding_offset_);
                         }
 
-                        // Decoding a message
-                        tryToDecodeMessage();
+                        // Parses a message
+                        parseMessages();
 
                         if (nRead > 0)
                         {
@@ -557,7 +554,7 @@ namespace Fun
                                                        SocketFlags.None, ref receive_ep_,
                                                        new AsyncCallback(this.receiveBytesCb), this);
 
-                                debug.DebugLog3("UDP ready to receive more. We can receive upto {0} more bytes",
+                                debug.DebugLog3("UDP ready to receive more. UDP can receive upto {0} more bytes",
                                                 receive_buffer_.Length);
                             }
                         }
@@ -574,7 +571,7 @@ namespace Fun
                             TransportError error = new TransportError();
                             error.type = TransportError.Type.kDisconnected;
                             error.message = "UDP can't receive messages. Maybe the socket is closed.";
-                            event_.Add(onDisconnected, error);
+                            onDisconnected(error);
                         }
                     }
                 }
@@ -589,7 +586,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
                     error.message = "UDP failure in receiveBytesCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -727,7 +724,7 @@ namespace Fun
             {
                 get
                 {
-                    if (is_paused_)
+                    if (!base.isSendable)
                         return false;
 
                     if (cur_request_ != null)
@@ -739,11 +736,12 @@ namespace Fun
 
             protected override void wireSend ()
             {
+                if (cur_request_ != null)
+                    return;
+
                 lock (sending_lock_)
                 {
                     FunDebug.Assert(sending_.Count > 0);
-                    debug.DebugLog2("HTTP Host Url: {0}", host_url_);
-
                     FunapiMessage msg = sending_[0];
 
                     // Header
@@ -767,7 +765,7 @@ namespace Fun
                     if (str_cookie_.Length > 0)
                         headers.Add(kCookieHeaderField, str_cookie_);
 
-                    debug.DebugLog2("HTTP sending {0} bytes.", msg.body.Count);
+                    debug.DebugLog2("HTTP sending {0} bytes.", msg.header.Count + msg.body.Count);
 
 #if !NO_UNITY
                     // Sending a message
@@ -788,8 +786,11 @@ namespace Fun
             {
                 Request request = new Request();
 
-                FunDebug.Assert(cur_request_ == null);
-                cur_request_ = request;
+                lock (request_lock_)
+                {
+                    FunDebug.Assert(cur_request_ == null);
+                    cur_request_ = request;
+                }
 
                 if (msg.body.Count > 0)
                 {
@@ -821,8 +822,11 @@ namespace Fun
                 request.message = msg;
                 request.web_request = web_request;
 
-                FunDebug.Assert(cur_request_ == null);
-                cur_request_ = request;
+                lock (request_lock_)
+                {
+                    FunDebug.Assert(cur_request_ == null);
+                    cur_request_ = request;
+                }
 
                 web_request.BeginGetRequestStream(new AsyncCallback(requestStreamCb), request);
             }
@@ -908,8 +912,7 @@ namespace Fun
                     lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-                        debug.DebugLog2("HTTP sent a message - '{0}' ({1}bytes)",
-                                        msg.msg_type, msg.body.Count);
+                        debug.DebugLog2("HTTP sent {0} bytes.", msg.header.Count + msg.body.Count);
 
                         sending_.RemoveAt(0);
                     }
@@ -930,7 +933,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
                     error.message = "HTTP failure in requestStreamCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -968,7 +971,7 @@ namespace Fun
                         error.type = TransportError.Type.kReceivingFailed;
                         error.message = string.Format("Failed response. status:{0}",
                                                       request.web_response.StatusDescription);
-                        event_.Add(onFailure, error);
+                        onFailure(error);
                     }
                 }
                 catch (Exception e)
@@ -985,7 +988,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
                     error.message = "HTTP failure in responseCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -1012,7 +1015,7 @@ namespace Fun
                             TransportError error = new TransportError();
                             error.type = TransportError.Type.kReceivingFailed;
                             error.message = "Response instance is null.";
-                            event_.Add(onFailure, error);
+                            onFailure(error);
                             return;
                         }
 
@@ -1020,14 +1023,17 @@ namespace Fun
 
                         lock (receive_lock_)
                         {
-                            // Decoding a message
-                            tryToDecodeMessage();
+                            // Parses a message
+                            parseMessages();
                         }
 
                         request.read_stream.Close();
                         request.web_response.Close();
 
-                        cur_request_ = null;
+                        lock (request_lock_)
+                        {
+                            cur_request_ = null;
+                        }
 
                         // Checks unsent messages
                         checkPendingMessages();
@@ -1044,7 +1050,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
                     error.message = "HTTP failure in readCb: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -1058,10 +1064,13 @@ namespace Fun
                     yield return null;
                 }
 
-                if (cur_request_.cancel)
+                lock (request_lock_)
                 {
-                    cur_request_ = null;
-                    yield break;
+                    if (cur_request_.cancel)
+                    {
+                        cur_request_ = null;
+                        yield break;
+                    }
                 }
 
                 try
@@ -1099,11 +1108,14 @@ namespace Fun
 
                         debug.DebugLog3("HTTP received {0} bytes.", received_size_);
 
-                        // Decoding a message
-                        tryToDecodeMessage();
+                        // Parses a message
+                        parseMessages();
                     }
 
-                    cur_request_ = null;
+                    lock (request_lock_)
+                    {
+                        cur_request_ = null;
+                    }
 
                     // Checks unsent messages
                     checkPendingMessages();
@@ -1113,32 +1125,35 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kRequestFailed;
                     error.message = "HTTP failure in wwwPost: " + e.ToString();
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 #endif
 
             void cancelRequest ()
             {
-                if (cur_request_ != null)
+                lock (request_lock_)
                 {
-                    if (cur_request_.web_request != null)
+                    if (cur_request_ != null)
                     {
-                        cur_request_.was_aborted = true;
-                        cur_request_.web_request.Abort();
-                    }
+                        if (cur_request_.web_request != null)
+                        {
+                            cur_request_.was_aborted = true;
+                            cur_request_.web_request.Abort();
+                        }
 
-                    if (cur_request_.web_response != null)
-                        cur_request_.web_response.Close();
+                        if (cur_request_.web_response != null)
+                            cur_request_.web_response.Close();
 
-                    if (cur_request_.read_stream != null)
-                        cur_request_.read_stream.Close();
+                        if (cur_request_.read_stream != null)
+                            cur_request_.read_stream.Close();
 
 #if !NO_UNITY
-                    if (cur_request_.www != null)
-                        cur_request_.cancel = true;
+                        if (cur_request_.www != null)
+                            cur_request_.cancel = true;
 #endif
-                    cur_request_ = null;
+                        cur_request_ = null;
+                    }
                 }
             }
 
@@ -1179,6 +1194,7 @@ namespace Fun
             string host_url_;
             string str_cookie_;
             bool using_www_ = false;
+            object request_lock_ = new object();
             Request cur_request_ = null;
         }
     }

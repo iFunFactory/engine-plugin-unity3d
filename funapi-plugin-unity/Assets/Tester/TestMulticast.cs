@@ -148,7 +148,7 @@ public class TestMulticast
             if (multicast is FunapiChatClient)
             {
                 FunapiChatClient chat = (FunapiChatClient)multicast;
-                chat.SendText(kChannelName, "chat message");
+                chat.SendText(kChannelName, "test chat message");
                 ++sending_count;
                 return;
             }
@@ -158,14 +158,14 @@ public class TestMulticast
                 Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
                 mcast_msg["_channel"] = kChannelName;
                 mcast_msg["_bounce"] = true;
-                mcast_msg["_message"] = "multicast message";
+                mcast_msg["_message"] = "test multicast message";
 
                 multicast.SendToChannel(mcast_msg);
             }
             else
             {
                 PbufHelloMessage hello_msg = new PbufHelloMessage();
-                hello_msg.message = "multicast message";
+                hello_msg.message = "test multicast message";
 
                 FunMulticastMessage mcast_msg = FunapiMessage.CreateMulticastMessage(hello_msg, MulticastMessageType.pbuf_hello);
                 mcast_msg.channel = kChannelName;
@@ -185,7 +185,7 @@ public class TestMulticast
                 FunDebug.Assert(channel != null && channel == channel_id);
 
                 string message = FunapiMessage.JsonHelper.GetStringField(body, "_message");
-                FunDebug.Log("Multicast - Received a message from the '{0}' channel.\nMessage: {1}",
+                FunDebug.Log("Received message - channel: '{0}', message: {1}",
                              channel_id, message);
             }
             else
@@ -198,7 +198,7 @@ public class TestMulticast
                 if (hello_msg == null)
                     return;
 
-                FunDebug.Log("Multicast - Received a message from the '{0}' channel.\nMessage: {1}",
+                FunDebug.Log("Received message - channel: '{0}', message: {1}",
                              channel_id, hello_msg.message);
             }
 
@@ -209,7 +209,7 @@ public class TestMulticast
 
         void onReceivedChatMessage (string chat_channel, string sender, string text)
         {
-            FunDebug.Log("Chatting - Received a message.\nChannel={0}, sender={1}, text={2}",
+            FunDebug.Log("Received message - Channel={0}, sender={1}, text={2}",
                          chat_channel, sender, text);
 
             --sending_count;
@@ -228,7 +228,7 @@ public class TestMulticast
         }
 
 
-        const string kChannelName = "multicast";
+        const string kChannelName = "test";
 
         FunapiMulticastClient multicast;
         int sending_count = 0;

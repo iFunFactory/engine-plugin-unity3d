@@ -13,13 +13,13 @@ using UnityEngine.TestTools;
 public class TestConnectionTimeout
 {
     [UnityTest]
-    public IEnumerator TCP_Timeout_30ms ()
+    public IEnumerator TCP_Timeout ()
     {
         yield return new TestImpl (TransportProtocol.kTcp, FunEncoding.kProtobuf);
     }
 
     [UnityTest]
-    public IEnumerator HTTP_Timeout_30ms ()
+    public IEnumerator HTTP_Timeout ()
     {
         yield return new TestImpl (TransportProtocol.kHttp, FunEncoding.kJson);
     }
@@ -30,7 +30,7 @@ public class TestConnectionTimeout
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
         {
             TransportOption option = newTransportOption(protocol);
-            option.ConnectionTimeout = 0.03f;
+            option.ConnectionTimeout = 0.02f;
 
             session = FunapiSession.Create(TestInfo.ServerIp);
 
@@ -42,8 +42,10 @@ public class TestConnectionTimeout
                 }
                 else if (type == TransportEventType.kStopped)
                 {
-                    FunapiSession.Transport transport = session.GetTransport(protocol);
-                    if (transport.LastErrorCode == TransportError.Type.kConnectionTimeout)
+                    TransportError.Type errorCode = session.GetLastError(protocol);
+                    if (errorCode == TransportError.Type.kStartingFailed ||
+                        errorCode == TransportError.Type.kSendingFailed ||
+                        errorCode == TransportError.Type.kConnectionTimeout)
                     {
                         ++test_step;
                         if (test_step < kStepCountMax)

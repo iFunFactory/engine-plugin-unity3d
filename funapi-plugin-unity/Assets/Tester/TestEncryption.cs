@@ -129,10 +129,8 @@ public class TestEncryption
                             sendEchoMessage(protocol, EncryptionType.kAes128Encryption);
                         }
                     }
-                    else
-                    {
-                        sendEchoMessageWithCount(protocol, 3);
-                    }
+
+                    sendEchoMessageWithCount(protocol, 3);
                 }
             };
 

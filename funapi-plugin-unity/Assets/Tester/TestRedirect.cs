@@ -40,6 +40,9 @@ public class TestRedirect
 
             session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
+                if (isFinished)
+                    return;
+
                 startCoroutine(onSessionEvent(type));
             };
 
