@@ -202,7 +202,7 @@ namespace Fun
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kStartingFailed;
                     error.message = string.Format("{0} failure in Start: {1}", str_protocol_, e.ToString());
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -216,6 +216,8 @@ namespace Fun
 
                 state_ = State.kUnknown;
                 cstate_ = ConnectState.kUnknown;
+
+                decodeMessages();
 
                 event_.Clear();
                 timer_.Clear();
@@ -316,6 +318,9 @@ namespace Fun
             // Update
             public void Update (float deltaTime)
             {
+                // Decodes messages
+                decodeMessages();
+
                 // Events
                 event_.Update(deltaTime);
                 timer_.Update(deltaTime);
@@ -485,7 +490,7 @@ namespace Fun
                 error.type = TransportError.Type.kDisconnected;
                 error.message = string.Format("{0} forcibly closed the connection for testing.",
                                               str_protocol_);
-                event_.Add(onDisconnected, error);
+                onDisconnected(error);
             }
 
             // Creates a socket.
@@ -501,10 +506,8 @@ namespace Fun
                 lock (receive_lock_)
                 {
                     first_message_ = true;
-                    header_decoded_ = false;
                     received_size_ = 0;
                     next_decoding_offset_ = 0;
-                    header_fields_.Clear();
                 }
 
                 last_error_code_ = TransportError.Type.kNone;
@@ -620,8 +623,11 @@ namespace Fun
                 debug.LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
                                  str_protocol_, state_, error.type, error.message);
 
-                if (checkAutoReconnect())
+                if (auto_reconnect_)
+                {
+                    onAutoReconnect();
                     return;
+                }
 
                 Stop();
             }
@@ -633,11 +639,13 @@ namespace Fun
 
                 if (state_ != State.kEstablished)
                 {
-                    if (checkAutoReconnect())
+                    if (auto_reconnect_)
                     {
                         debug.Log("{0} connection failed. will try to connect again. " +
                                   "(state: {1}, error: {2})\n{3}\n",
                                   str_protocol_, state_, error.type, error.message);
+
+                        onAutoReconnect();
                         return;
                     }
                 }
@@ -649,7 +657,8 @@ namespace Fun
                 // Or if an error occurs while connected from TCP or HTTP, stops the connection.
                 if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
                 {
-                    Stop();
+                    if (Connected)
+                        Stop();
                 }
                 else
                 {
@@ -668,7 +677,7 @@ namespace Fun
             //---------------------------------------------------------------------
             // auto-reconnect-related functions
             //---------------------------------------------------------------------
-            bool checkAutoReconnect ()
+            bool onAutoReconnect ()
             {
                 if (!auto_reconnect_)
                     return false;
@@ -684,12 +693,6 @@ namespace Fun
                     onTransportEventCallback(TransportEventType.kReconnecting);
                 }
 
-                event_.Add(onReconnecting);
-                return true;
-            }
-
-            void onReconnecting ()
-            {
                 // 1, 2, 4, 8, 8, 8,...
                 float delay_time = exponential_time_;
                 if (exponential_time_ < 8f)
@@ -698,13 +701,9 @@ namespace Fun
                 debug.Log("Wait {0} seconds for reconnect to {1} transport.",
                           delay_time, str_protocol_);
 
-                event_.Add (() =>
-                    {
-                        debug.Log("'{0}' Try to reconnect to server.", str_protocol_);
-                        onStart();
-                    },
-                    delay_time
-                );
+                timer_.Add(new FunapiTimer("reconnect", delay_time, onStart));
+
+                return true;
             }
 
 
@@ -743,7 +742,7 @@ namespace Fun
                     error.type = TransportError.Type.kSendingFailed;
                     error.message = string.Format("{0} failure in sendMessage: {1}",
                                                   str_protocol_, e.ToString());
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -794,7 +793,7 @@ namespace Fun
                     if (unsent_queue_.Count <= 0)
                         return;
 
-                    debug.DebugLog1("{0} has {1} unsent messages.",
+                    debug.DebugLog1("{0} has {1} unsent message(s).",
                                     str_protocol_, unsent_queue_.Count);
 
                     foreach (FunapiMessage msg in unsent_queue_)
@@ -860,12 +859,12 @@ namespace Fun
                 if (!Connected)
                     return;
 
-                debug.DebugLog1("{0} Received ack number - {1}", str_protocol_, ack);
+                debug.DebugLog1("{0} received ack number - {1}", str_protocol_, ack);
 
                 lock (sending_lock_)
                 {
                     if (sent_queue_.Count > 0)
-                        debug.DebugLog1("The send queue has {0} messages.", sent_queue_.Count);
+                        debug.DebugLog1("The send queue has {0} message(s).", sent_queue_.Count);
 
                     while (sent_queue_.Count > 0)
                     {
@@ -900,7 +899,7 @@ namespace Fun
                                 }
                             }
 
-                            debug.Log("Resending {0} messages.", sent_queue_.Count);
+                            debug.Log("Resending {0} message(s).", sent_queue_.Count);
                         }
 
                         onStandby();
@@ -1058,7 +1057,7 @@ namespace Fun
                     ArraySegment<byte> compressed = compressor_.Compress(msg.body);
                     if (compressed.Count > 0)
                     {
-                        debug.DebugLog3("{0} compression successed: {1}bytes -> {2}bytes",
+                        debug.DebugLog3("{0} compress message: {1}bytes -> {2}bytes",
                                         str_protocol_, msg.body.Count, compressed.Count);
 
                         uncompressed_size = msg.body.Count;
@@ -1084,7 +1083,7 @@ namespace Fun
                         error.type = TransportError.Type.kEncryptionFailed;
                         error.message = string.Format("Message encryption failed. type:{0}",
                                                       (int)enc_type);
-                        event_.Add(onFailure, error);
+                        onFailure(error);
                         return false;
                     }
                 }
@@ -1093,16 +1092,12 @@ namespace Fun
 
                 msg.ready = true;
 
-                debug.DebugLog3("{0} built a message - '{1}' ({2} + {3} bytes)",
-                                str_protocol_, msg.msg_type, msg.header.Count, msg.body.Count);
-                if (msg.seq > 0 || ack > 0)
-                {
-                    StringBuilder strlog = new StringBuilder();
-                    strlog.AppendFormat("{0} send a message - '{1}'", str_protocol_, msg.msg_type);
-                    if (msg.seq > 0) strlog.AppendFormat(" (seq : {0})", msg.seq);
-                    if (ack > 0) strlog.AppendFormat(" (ack : {0})", ack);
-                    debug.DebugLog2(strlog.ToString());
-                }
+                StringBuilder strlog = new StringBuilder();
+                strlog.AppendFormat("{0} built a message - '{1}' ({2}bytes)",
+                                    str_protocol_, msg.msg_type, msg.header.Count + msg.body.Count);
+                if (msg.seq > 0) strlog.AppendFormat(" (seq : {0})", msg.seq);
+                if (ack > 0) strlog.AppendFormat(" (ack : {0})", ack);
+                debug.DebugLog2(strlog.ToString());
 
                 return true;
             }
@@ -1132,7 +1127,7 @@ namespace Fun
                         error.type = TransportError.Type.kEncryptionFailed;
                         error.message = string.Format("Message encryption failed. type:{0}",
                                                       (int)enc_type);
-                        event_.Add(onFailure, error);
+                        onFailure(error);
                         return false;
                     }
 
@@ -1190,7 +1185,7 @@ namespace Fun
                     error.type = TransportError.Type.kSendingFailed;
                     error.message = string.Format("{0} failure in sendPendingMessages: {1}",
                                                   str_protocol_, e.ToString());
-                    event_.Add(onFailure, error);
+                    onFailure(error);
                 }
             }
 
@@ -1200,9 +1195,8 @@ namespace Fun
                 {
                     if (sending_.Count > 0)
                     {
-                        debug.DebugLog1("{0} continues to send unsent messages. ({1} remaining {2})",
-                                        str_protocol_, sending_.Count,
-                                        sending_.Count == 1 ? "message" : "messages");
+                        debug.DebugLog1("{0} continues to send unsent messages. {1} remaining message(s).",
+                                        str_protocol_, sending_.Count);
 
                         wireSend();
                     }
@@ -1210,6 +1204,17 @@ namespace Fun
                     {
                         sendPendingMessages();
                     }
+                }
+            }
+
+            void sendPublicKey (EncryptionType type)
+            {
+                debug.DebugLog1("{0} sending a {1}-pubkey message.", str_protocol_, (int)type);
+
+                lock (sending_lock_)
+                {
+                    FunapiMessage msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
+                    first_.Add(msg);
                 }
             }
 
@@ -1249,273 +1254,214 @@ namespace Fun
                 }
             }
 
-            // Decoding a messages
-            protected void tryToDecodeMessage ()
+            protected void parseMessages ()
             {
-                if (protocol_ == TransportProtocol.kTcp)
+                lock (messages_lock_)
                 {
-                    // Try to decode as many messages as possible.
                     while (true)
                     {
-                        if (!header_decoded_)
+                        if (next_decoding_offset_ >= received_size_)
+                            break;
+
+                        int offset = next_decoding_offset_;
+                        bool valid = false;
+
+                        for (; offset + 1 < received_size_; ++offset)
                         {
-                            if (!tryToDecodeHeader())
+                            if (receive_buffer_[offset] == '\n' && receive_buffer_[offset + 1] == '\n')
+                            {
+                                valid = true;
                                 break;
+                            }
                         }
 
-                        if (header_decoded_)
+                        if (!valid)
                         {
-                            if (!tryToDecodeBody())
+                            // Not enough bytes. Wait for more bytes to come.
+                            debug.DebugLog3("{0} need more bytes for a header field. Waiting.", str_protocol_);
+                            break;
+                        }
+
+                        // The last two bytes are two '\n'
+                        int header_length = offset - next_decoding_offset_ + 2;
+                        string header = System.Text.Encoding.ASCII.GetString(receive_buffer_,
+                                                                             next_decoding_offset_, header_length);
+
+                        Dictionary<string, string> fields = new Dictionary<string, string>();
+                        string[] lines = header.Split(kHeaderDelimeterAsChars);
+
+                        foreach (string line in lines)
+                        {
+                            if (line.Length == 0)
                                 break;
+
+                            string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
+                            if (tuple.Length != 2)
+                            {
+                                debug.LogWarning("{0} header has a invalid tuple - '{1}'", str_protocol_, line);
+                                continue;
+                            }
+
+                            fields[tuple[0].ToUpper()] = tuple[1];
                         }
-                    }
-                }
-                else
-                {
-                    // Try to decode a message.
-                    if (tryToDecodeHeader())
-                    {
-                        if (!tryToDecodeBody())
+
+                        if (!fields.ContainsKey(kVersionHeaderField))
                         {
-                            debug.LogError("{0} failed to decode body.", str_protocol_);
+                            throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
+                                                              str_protocol_, kVersionHeaderField));
                         }
-                    }
-                    else
-                    {
-                        debug.LogError("{0} failed to decode header.", str_protocol_);
+
+                        if (!fields.ContainsKey(kLengthHeaderField))
+                        {
+                            throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
+                                                              str_protocol_, kLengthHeaderField));
+                        }
+
+                        // Protocol version
+                        int version = Convert.ToInt32(fields[kVersionHeaderField]);
+                        if (version != FunapiVersion.kProtocolVersion)
+                        {
+                            throw new Exception(string.Format("The protocol version doesn't match. client:{0} server:{1}",
+                                                              FunapiVersion.kProtocolVersion, version));
+                        }
+
+                        offset = next_decoding_offset_ + header_length;
+
+                        // Body length
+                        int body_length = Convert.ToInt32(fields[kLengthHeaderField]);
+                        if (received_size_ - offset < body_length)
+                        {
+                            // Need more bytes.
+                            debug.DebugLog3("{0} need more bytes for a message body. Waiting.", str_protocol_);
+                            break;
+                        }
+
+                        debug.DebugLog3("{0} header {1} bytes. body {2} bytes. ({3} bytes)",
+                                        str_protocol_, header_length, body_length,
+                                        header_length + body_length);
+
+                        // Makes raw message buffer
+                        RawMessage message = new RawMessage();
+
+                        if (fields.ContainsKey(kEncryptionHeaderField))
+                            message.encryption_header = Convert.ToString(fields[kEncryptionHeaderField]);
+
+                        if (fields.ContainsKey(kUncompressedLengthHeaderField))
+                            message.uncompressed_size = Convert.ToInt32(fields[kUncompressedLengthHeaderField]);
+
+                        if (body_length > 0)
+                        {
+                            byte[] buffer = new byte[body_length];
+                            Buffer.BlockCopy(receive_buffer_, offset, buffer, 0, body_length);
+                            message.body = new ArraySegment<byte>(buffer, 0, body_length);
+                        }
+                        else
+                        {
+                            message.body = new ArraySegment<byte>();
+                        }
+
+                        messages_.Enqueue(message);
+
+                        next_decoding_offset_ += header_length + body_length;
+                        debug.DebugLog3("{0} {1} bytes left in buffer.",
+                                        str_protocol_, received_size_ - next_decoding_offset_);
                     }
                 }
             }
 
-            bool tryToDecodeHeader ()
+            bool decodeMessages ()
             {
-                debug.DebugLog3("{0} trying to decode header fields.", str_protocol_);
-                int length = 0;
-
-                for (; next_decoding_offset_ < received_size_; )
+                lock (messages_lock_)
                 {
-                    ArraySegment<byte> haystack = new ArraySegment<byte>(
-                        receive_buffer_, next_decoding_offset_, received_size_ - next_decoding_offset_);
-                    int offset = bytePatternMatch(haystack, kHeaderDelimeterAsNeedle);
-                    if (offset < 0)
-                    {
-                        // Not enough bytes. Wait for more bytes to come.
-                        debug.DebugLog3("{0} need more bytes for a header field. Waiting.", str_protocol_);
-                        return false;
-                    }
-
-                    string line = System.Text.Encoding.ASCII.GetString(
-                        receive_buffer_, next_decoding_offset_, offset - next_decoding_offset_);
-                    length += (offset - next_decoding_offset_ + 1);
-                    next_decoding_offset_ = offset + 1;
-
-                    if (line == "")
-                    {
-                        // End of header.
-                        header_decoded_ = true;
-                        debug.DebugLog3("{0} read {1} bytes for header.", str_protocol_, length);
+                    if (messages_.Count == 0)
                         return true;
-                    }
 
-                    string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
-                    if (tuple.Length == 2)
+                    debug.DebugLog1("{0} update messages. ({1})", str_protocol_, messages_.Count);
+
+                    while (messages_.Count > 0)
                     {
-                        tuple[0] = tuple[0].ToUpper();
-                        header_fields_[tuple[0]] = tuple[1];
-                        debug.DebugLog3("  > {0} header '{1} : {2}'", str_protocol_, tuple[0], tuple[1]);
-                    }
-                    else
-                    {
-                        debug.LogWarning("  > {0} header: invalid tuple - '{1}'", str_protocol_, line);
-                    }
-                }
+                        RawMessage msg = messages_.Dequeue();
 
-                return false;
-            }
+                        // Encryption
+                        string encryption_type = "";
+                        if (!string.IsNullOrEmpty(msg.encryption_header))
+                            parseEncryptionHeader(ref encryption_type, ref msg.encryption_header);
 
-            static int bytePatternMatch (ArraySegment<byte> haystack, ArraySegment<byte> needle)
-            {
-                if (haystack.Count < needle.Count)
-                {
-                    return -1;
-                }
-
-                for (int i = 0; i <= haystack.Count - needle.Count; ++i)
-                {
-                    bool found = true;
-                    for (int j = 0; j < needle.Count; ++j)
-                    {
-                        if (haystack.Array[haystack.Offset + i + j] != needle.Array[needle.Offset + j])
+                        if (state_ == State.kHandshaking)
                         {
-                            found = false;
-                        }
-                    }
-                    if (found)
-                    {
-                        return haystack.Offset + i;
-                    }
-                }
+                            FunDebug.Assert(msg.body.Count == 0);
 
-                return -1;
-            }
+                            if (doHandshaking(encryption_type, msg.encryption_header))
+                            {
+                                if (state_ == State.kUnknown)
+                                    return false;
 
-            bool tryToDecodeBody ()
-            {
-                if (!header_fields_.ContainsKey(kVersionHeaderField) ||
-                    !header_fields_.ContainsKey(kLengthHeaderField))
-                {
-                    debug.LogWarning("{0} header is invalid. It doesn't have '{1}' field or '{2}' field",
-                                     str_protocol_, kVersionHeaderField, kLengthHeaderField);
-                    return false;
-                }
+                                state_ = State.kConnected;
+                                debug.DebugLog1("{0} handshaking is complete.", str_protocol_);
 
-                // Header version
-                int version = Convert.ToUInt16(header_fields_[kVersionHeaderField]);
-                if (version != FunapiVersion.kProtocolVersion)
-                {
-                    debug.LogWarning("The protocol version does not match with server. client:{0} server:{1}",
-                                     FunapiVersion.kProtocolVersion, version);
-                }
+                                // Send public key (Do not change this order)
+                                if (hasEncryption(EncryptionType.kChaCha20Encryption))
+                                    sendPublicKey(EncryptionType.kChaCha20Encryption);
 
-                // Header length
-                int body_length = Convert.ToInt32(header_fields_[kLengthHeaderField]);
-                if (body_length > 0)
-                {
-                    debug.DebugLog3("{0} message body is {1} bytes. Buffer has {2} bytes.",
-                                    str_protocol_, body_length, received_size_ - next_decoding_offset_);
-                }
-                else
-                {
-                    debug.DebugLog3("{0} {1} bytes left in buffer.",
-                                    str_protocol_, received_size_ - next_decoding_offset_);
-                }
+                                if (hasEncryption(EncryptionType.kAes128Encryption))
+                                    sendPublicKey(EncryptionType.kAes128Encryption);
 
-                if (received_size_ - next_decoding_offset_ < body_length)
-                {
-                    // Need more bytes.
-                    debug.DebugLog3("{0} need more bytes for a message body. Waiting.", str_protocol_);
-                    return false;
-                }
+                                onStarted();
 
-                // Encryption
-                string encryption_type = "";
-                string encryption_header = "";
-                string compression_header = "";
-                int uncompressed_size = 0;
-
-                if (header_fields_.TryGetValue(kEncryptionHeaderField, out encryption_header))
-                    parseEncryptionHeader(ref encryption_type, ref encryption_header);
-
-                if (header_fields_.TryGetValue(kUncompressedLengthHeaderField, out compression_header))
-                    uncompressed_size = Convert.ToInt32(compression_header);
-
-                if (state_ == State.kHandshaking)
-                {
-                    FunDebug.Assert(body_length == 0);
-
-                    if (doHandshaking(encryption_type, encryption_header))
-                    {
-                        if (state_ == State.kUnknown)
-                            return false;
-
-                        state_ = State.kConnected;
-                        debug.DebugLog1("{0} handshaking is complete.", str_protocol_);
-
-                        // Send public key (Do not change this order)
-                        if (hasEncryption(EncryptionType.kChaCha20Encryption))
-                            sendPublicKey(EncryptionType.kChaCha20Encryption);
-
-                        if (hasEncryption(EncryptionType.kAes128Encryption))
-                            sendPublicKey(EncryptionType.kAes128Encryption);
-
-                        event_.Add(onHandshakeComplete);
-                    }
-                }
-
-                if (body_length > 0)
-                {
-                    if (!Connected)
-                    {
-                        debug.LogWarning("{0} received a message but the transport has been stopped.",
-                                         str_protocol_);
-                    }
-
-                    ArraySegment<byte> body = new ArraySegment<byte>(receive_buffer_, next_decoding_offset_, body_length);
-                    FunDebug.Assert(body.Count == body_length);
-                    next_decoding_offset_ += body_length;
-
-                    if (encryption_type.Length > 0)
-                    {
-                        if (!decryptMessage(body, encryption_type, encryption_header))
-                            return false;
-                    }
-
-                    if (uncompressed_size > 0)
-                    {
-                        if (compressor_ == null)
-                        {
-                            debug.LogError("Received a compressed message. " +
-                                           "But the transport is not configured with compression.");
-                            return false;
+                                if (state_ == State.kEstablished)
+                                {
+                                    sendPendingMessages();
+                                }
+                            }
                         }
 
-                        ArraySegment<byte> decompressed = compressor_.Decompress(body, uncompressed_size);
-                        if (decompressed.Count == 0)
+                        if (msg.body.Count > 0)
                         {
-                            debug.LogError("Failed to decompress the mssage.");
-                            return false;
+                            if (encryption_type.Length > 0)
+                            {
+                                if (!decryptMessage(msg.body, encryption_type, msg.encryption_header))
+                                    return false;
+                            }
+
+                            if (msg.uncompressed_size > 0)
+                            {
+                                if (compressor_ == null)
+                                {
+                                    debug.LogError("Received a compressed message. " +
+                                                   "But the transport is not configured with compression.");
+                                    return false;
+                                }
+
+                                ArraySegment<byte> decompressed = compressor_.Decompress(msg.body, msg.uncompressed_size);
+                                if (decompressed.Count == 0)
+                                {
+                                    debug.LogError("Failed to decompress the message.");
+                                    return false;
+                                }
+
+                                debug.DebugLog3("{0} decompress message: {1}bytes -> {2}bytes",
+                                                str_protocol_, msg.body.Count, decompressed.Count);
+
+                                msg.body = decompressed;
+                            }
+
+                            if (first_message_)
+                            {
+                                first_message_ = false;
+                                cstate_ = ConnectState.kConnected;
+
+                                resetConnectionTimeout();
+                            }
                         }
 
-                        debug.DebugLog3("{0} decompression successed: {1}bytes -> {2}bytes",
-                                        str_protocol_, body.Count, decompressed.Count);
-
-                        body = decompressed;
+                        onReceivedMessage(msg.body);
                     }
-
-                    if (first_message_)
-                    {
-                        first_message_ = false;
-                        cstate_ = ConnectState.kConnected;
-
-                        resetConnectionTimeout();
-                    }
-
-                    onReceived(header_fields_, body);
-                }
-                else
-                {
-                    onReceived(header_fields_, new ArraySegment<byte>());
                 }
 
-                // Prepares a next message.
-                header_decoded_ = false;
-                header_fields_.Clear();
                 return true;
             }
 
-            void sendPublicKey (EncryptionType type)
-            {
-                debug.DebugLog1("{0} sending a {1}-pubkey message.", str_protocol_, (int)type);
-
-                lock (sending_lock_)
-                {
-                    FunapiMessage msg = new FunapiMessage(protocol_, kEncryptionPublicKey, null, type);
-                    first_.Add(msg);
-                }
-            }
-
-            // Sends messages & Calls start callback
-            void onHandshakeComplete ()
-            {
-                onStarted();
-
-                if (state_ == State.kEstablished)
-                {
-                    sendPendingMessages();
-                }
-            }
-
-            void onReceived (Dictionary<string, string> header, ArraySegment<byte> body)
+            void onReceivedMessage (ArraySegment<byte> body)
             {
                 if (body.Count <= 0)
                     return;
@@ -1607,6 +1553,8 @@ namespace Fun
                         onClientPingMessage(message);
                         return;
                     }
+
+                    debug.DebugLog2("{0} received message - '{1}'", str_protocol_, msg_type);
                 }
                 else
                 {
@@ -1617,7 +1565,7 @@ namespace Fun
                 }
 
                 if (ReceivedCallback != null)
-                    ReceivedCallback(protocol_, encoding_, msg_type, message);
+                    ReceivedCallback(this, msg_type, message);
             }
 
             protected void onFailedSending ()
@@ -1795,6 +1743,13 @@ namespace Fun
                 kConnected
             };
 
+            class RawMessage
+            {
+                public string encryption_header = "";
+                public int uncompressed_size = 0;
+                public ArraySegment<byte> body;
+            }
+
 
             // constants.
             const int kReconnectCountMax = 3;
@@ -1819,14 +1774,14 @@ namespace Fun
             const string kPingTimestampField = "timestamp";
 
             // for speed-up.
-            static readonly ArraySegment<byte> kHeaderDelimeterAsNeedle = new ArraySegment<byte>(System.Text.Encoding.ASCII.GetBytes(kHeaderDelimeter));
+            static readonly char[] kHeaderDelimeterAsChars = kHeaderDelimeter.ToCharArray();
             static readonly char[] kHeaderFieldDelimeterAsChars = kHeaderFieldDelimeter.ToCharArray();
 
             // Event handlers
             public event Func<TransportProtocol, FunapiCompressor> CreateCompressorCallback;
             public event Action<TransportProtocol, TransportEventType> EventCallback;
             public event Action<TransportProtocol, TransportError> ErrorCallback;
-            public event Action<TransportProtocol, FunEncoding, string, object> ReceivedCallback;
+            public event Action<Transport, string, object> ReceivedCallback;        // msg_type, message
 
             // member variables.
             protected State state_;
@@ -1853,17 +1808,17 @@ namespace Fun
             // Message-related variables.
             bool first_sending_ = true;
             bool first_message_ = true;
-            bool header_decoded_ = false;
+            protected int received_size_ = 0;
+            protected int next_decoding_offset_ = 0;
+            protected object receive_lock_ = new object();
+            protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
+            object messages_lock_ = new object();
+            Queue<RawMessage> messages_ = new Queue<RawMessage>();
+
             bool send_session_id_only_once_ = false;
             bool session_id_has_been_sent = false;
             object session_id_sent_lock_ = new object();
-            Dictionary<string, string> header_fields_ = new Dictionary<string, string>();
-
-            protected int received_size_ = 0;
-            protected int next_decoding_offset_ = 0;
             protected object sending_lock_ = new object();
-            protected object receive_lock_ = new object();
-            protected byte[] receive_buffer_ = new byte[kUnitBufferSize];
             protected List<FunapiMessage> first_ = new List<FunapiMessage>();
             protected List<FunapiMessage> pending_ = new List<FunapiMessage>();
             protected List<FunapiMessage> sending_ = new List<FunapiMessage>();

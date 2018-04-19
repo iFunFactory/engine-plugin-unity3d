@@ -164,9 +164,6 @@ class TestSessionBase : TestBase
 
     protected void onReceivedEchoMessage (string type, object message)
     {
-        if (isFinished)
-            return;
-
         if (type == "echo")
         {
             FunDebug.Assert(message is Dictionary<string, object>);

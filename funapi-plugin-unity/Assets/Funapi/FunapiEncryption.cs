@@ -343,32 +343,24 @@ namespace Fun
         {
             if (encryption_type == kEncryptionHandshakeBegin)
             {
-                // encryption list
-                List<EncryptionType> encryption_list = new List<EncryptionType>();
-
+                // Creates encryptors
                 if (encryption_header.Length > 0)
                 {
+                    EncryptionType type;
                     int begin = 0;
                     int end = encryption_header.IndexOf(kDelim2);
-                    EncryptionType type;
 
                     while (end != -1)
                     {
                         type = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin, end - begin));
-                        encryption_list.Add(type);
                         begin = end + 1;
                         end = encryption_header.IndexOf(kDelim2, begin);
+
+                        createEncryptor(type);
                     }
 
                     type = (EncryptionType)Convert.ToInt32(encryption_header.Substring(begin));
-                    encryption_list.Add(type);
-                }
-
-                // Create encryptors
-                foreach (EncryptionType type in encryption_list)
-                {
-                    if (!createEncryptor(type))
-                        return false;
+                    createEncryptor(type);
                 }
             }
             else
