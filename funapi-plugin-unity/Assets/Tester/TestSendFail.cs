@@ -94,7 +94,8 @@ public class TestSendFail
 
             session.TransportErrorCallback += delegate (TransportProtocol p, TransportError error)
             {
-                session.Stop();
+                if (protocol == TransportProtocol.kUdp)
+                    session.Stop();
             };
 
             setTestTimeout(3f);
