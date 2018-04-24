@@ -619,6 +619,16 @@ namespace Fun
 
         void onSessionEventCallback (SessionEventType type)
         {
+            if (!Started)
+            {
+                if (type == SessionEventType.kOpened || type == SessionEventType.kConnected)
+                {
+                    debug.Log("Session event callback called. But the session has been stopped." +
+                              " state: {0} event: {1}", state_, type);
+                    return;
+                }
+            }
+
             debug.Log("EVENT: Session ({0}).", type);
 
             if (SessionEventCallback != null)
@@ -1015,6 +1025,20 @@ namespace Fun
 
             event_.Add (delegate
             {
+                if (!Started)
+                {
+                    if (type == TransportEventType.kStarted)
+                    {
+                        Transport transport = GetTransport(protocol);
+                        if (transport != null)
+                        {
+                            debug.Log("{0} event callback called. But the transport has been stopped." +
+                                      " state: {1} event: {2}", transport.str_protocol, transport.state, type);
+                        }
+                        return;
+                    }
+                }
+
                 debug.Log("EVENT: {0} transport ({1}).", convertString(protocol), type);
 
                 if (TransportEventCallback != null)

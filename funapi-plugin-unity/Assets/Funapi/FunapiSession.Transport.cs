@@ -212,7 +212,7 @@ namespace Fun
                 if (state_ == State.kUnknown)
                     return;
 
-                debug.DebugLog1("{0} stopping transport. (state:{1})", str_protocol_, state_);
+                debug.DebugLog1("{0} stopping transport. state:{1}", str_protocol_, state_);
 
                 state_ = State.kUnknown;
                 cstate_ = ConnectState.kUnknown;
@@ -612,7 +612,16 @@ namespace Fun
                                                     str_protocol_);
                 debug.LogWarning(last_error_message_);
 
-                Stop();
+                if (ErrorCallback != null)
+                {
+                    TransportError error = new TransportError();
+                    error.type = last_error_code_;
+                    error.message = last_error_message_;
+
+                    ErrorCallback(protocol_, error);
+                }
+
+                event_.Add(Stop);
             }
 
             protected void onDisconnected (TransportError error)
@@ -623,19 +632,28 @@ namespace Fun
                 debug.LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
                                  str_protocol_, state_, error.type, error.message);
 
+                if (ErrorCallback != null)
+                    ErrorCallback(protocol_, error);
+
                 if (auto_reconnect_)
                 {
                     onAutoReconnect();
                     return;
                 }
 
-                Stop();
+                event_.Add(Stop);
             }
 
             protected virtual void onFailure (TransportError error)
             {
                 last_error_code_ = error.type;
                 last_error_message_ = error.message;
+
+                debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
+                                 str_protocol_, state_, error.type, error.message);
+
+                if (ErrorCallback != null)
+                    ErrorCallback(protocol_, error);
 
                 if (state_ != State.kEstablished)
                 {
@@ -650,20 +668,11 @@ namespace Fun
                     }
                 }
 
-                debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
-                                 str_protocol_, state_, error.type, error.message);
-
                 // If an error occurs during connection, stops the connection.
                 // Or if an error occurs while connected from TCP or HTTP, stops the connection.
                 if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
                 {
-                    if (Connected)
-                        Stop();
-                }
-                else
-                {
-                    if (ErrorCallback != null)
-                        ErrorCallback(protocol_, error);
+                    event_.Add(Stop);
                 }
             }
 
