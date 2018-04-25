@@ -890,7 +890,12 @@ namespace Fun
 
         void stopAllTransports (bool force_stop = false)
         {
+            if (state == State.kWaitForStop)
+                return;
+
             debug.DebugLog1("Stopping a session module. (state:{0})", state_);
+
+            state = State.kWaitForStop;
 
             if (force_stop)
             {
@@ -1377,6 +1382,7 @@ namespace Fun
             kStarted,
             kConnected,
             kWaitForSessionId,
+            kWaitForStop,
             kStopped
         };
 
