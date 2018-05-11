@@ -5,12 +5,13 @@
 // consent of iFunFactory Inc.
 
 using System;
+using System.IO;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using WebSocketSharp;
 #if !NO_UNITY
 using UnityEngine;
 #endif
@@ -1198,6 +1199,219 @@ namespace Fun
             bool using_www_ = false;
             object request_lock_ = new object();
             Request cur_request_ = null;
+        }
+
+
+        // Websocket transport layer
+        class WebsocketTransport : Transport
+        {
+            public WebsocketTransport (string hostname_or_ip, UInt16 port,
+                                       FunEncoding type, TransportOption websocket_option)
+            {
+                protocol_ = TransportProtocol.kWebsocket;
+                str_protocol_ = convertString(protocol_);
+                encoding_ = type;
+                option = websocket_option;
+
+                setAddress(hostname_or_ip, port);
+            }
+
+            public override HostAddr address
+            {
+                get { return addr_; }
+            }
+
+            public override bool Connected
+            {
+                get
+                {
+                    lock (sock_lock_)
+                        return wsock_ != null && state_ >= State.kConnected;
+                }
+            }
+
+            void setAddress (string host, UInt16 port)
+            {
+                addr_ = new HostIP(host, port);
+
+                // Sets host url
+                host_url_ = string.Format("ws://{0}:{1}/", host, port);
+
+                debug.Log("Websocket connect - {0}, {1}, {2}, Compression:{3}, ConnectionTimeout:{4}",
+                          host_url_, convertString(encoding_), convertString(option_.Encryption),
+                          option_.CompressionType, option_.ConnectionTimeout);
+            }
+
+            protected override void onStart ()
+            {
+                base.onStart();
+
+                state_ = State.kConnecting;
+
+                addr_.refresh();
+
+                lock (sock_lock_)
+                {
+                    wsock_ = new WebSocket(host_url_);
+                    wsock_.OnOpen += startCb;
+                    wsock_.OnClose += closeCb;
+                    wsock_.OnError += errorCb;
+                    wsock_.OnMessage += receiveBytesCb;
+
+                    wsock_.ConnectAsync();
+                }
+            }
+
+            protected override void onClose ()
+            {
+                lock (sock_lock_)
+                {
+                    if (wsock_ != null)
+                    {
+                        wsock_.Close();
+                        wsock_ = null;
+                    }
+                }
+            }
+
+            protected override void wireSend ()
+            {
+                try
+                {
+                    byte[] buffer = null;
+
+                    lock (sending_lock_)
+                    {
+                        FunDebug.Assert(sending_.Count > 0);
+                        FunapiMessage msg = sending_[0];
+
+                        int length = msg.header.Count + msg.body.Count;
+                        buffer = new byte[length];
+
+                        if (msg.header.Count > 0)
+                            Buffer.BlockCopy(msg.header.Array, 0, buffer, 0, msg.header.Count);
+
+                        if (msg.body.Count > 0)
+                            Buffer.BlockCopy(msg.body.Array, 0, buffer, msg.header.Count, msg.body.Count);
+
+                        debug.DebugLog3("Websocket sending {0} bytes.", length);
+                    }
+
+                    lock (sock_lock_)
+                    {
+                        if (wsock_ == null)
+                            return;
+
+                        wsock_.SendAsync(buffer, sendBytesCb);
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "Websocket failure in wireSend: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+
+            void startCb (object sender, EventArgs args)
+            {
+                state_ = State.kHandshaking;
+
+                debug.DebugLog1("Websocket transport connected. Starts handshaking..");
+            }
+
+            void closeCb (object sender, CloseEventArgs args)
+            {
+                debug.Log("Websocket closeCb called. ({0}) {1}", args.Code, args.Reason);
+            }
+
+            void errorCb (object sender, WebSocketSharp.ErrorEventArgs args)
+            {
+                TransportError error = new TransportError();
+                error.type = TransportError.Type.kWebsocketError;
+                error.message = "Websocket failure: " + args.Message;
+                onFailure(error);
+            }
+
+            void sendBytesCb (bool completed)
+            {
+                try
+                {
+                    FunDebug.Assert(completed, "Websocket failed to transfer messages.");
+
+                    lock (sending_lock_)
+                    {
+                        FunDebug.Assert(sending_.Count > 0);
+                        sending_.RemoveAt(0);
+
+                        debug.DebugLog3("Websocket sent 1 message.");
+
+                        // Sends pending messages
+                        checkPendingMessages();
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "Websocket failure in sendBytesCb: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+
+            void receiveBytesCb (object sender, MessageEventArgs args)
+            {
+                try
+                {
+                    lock (receive_lock_)
+                    {
+                        if (args.RawData != null)
+                        {
+                            // Checks buffer space
+                            checkReceiveBuffer(args.RawData.Length);
+
+                            // Copy the recieved messages
+                            Buffer.BlockCopy(args.RawData, 0, receive_buffer_, received_size_, args.RawData.Length);
+                            received_size_ += args.RawData.Length;
+
+                            debug.DebugLog3("Websocket received {0} bytes. Buffer has {1} bytes.",
+                                            args.RawData.Length, received_size_ - next_decoding_offset_);
+
+                            // Parses messages
+                            parseMessages();
+                        }
+                        else
+                        {
+                            debug.LogWarning("Websocket socket closed");
+
+                            if (received_size_ - next_decoding_offset_ > 0)
+                            {
+                                debug.LogWarning("Websocket buffer has {0} bytes but they failed to decode. Discarding.",
+                                                 received_size_ - next_decoding_offset_);
+                            }
+
+                            TransportError error = new TransportError();
+                            error.type = TransportError.Type.kDisconnected;
+                            error.message = "Websocket can't receive messages. Maybe the socket is closed.";
+                            onDisconnected(error);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kReceivingFailed;
+                    error.message = "Websocket failure in receiveBytesCb: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+
+
+            HostIP addr_;
+            string host_url_;
+            WebSocket wsock_;
+            object sock_lock_ = new object();
         }
     }
 
