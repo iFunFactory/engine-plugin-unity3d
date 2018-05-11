@@ -224,8 +224,12 @@ class TestSessionBase : TestBase
             port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8018);
         else if (protocol == TransportProtocol.kHttp)
             port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8019);
+        else if (protocol == TransportProtocol.kWebsocket)
+            port = (ushort)(encoding == FunEncoding.kJson ? 8011 : 8017);
 
-        if (flavor == "whole")
+        if (flavor == "default")
+            return port; // 8011~
+        else if (flavor == "whole")
             port += 10;  // 8021~
         else if (flavor == "encryption")
             port += 20;  // 8031~
@@ -237,6 +241,8 @@ class TestSessionBase : TestBase
             port += 50;  // 8061~
         else if (flavor == "compression")
             port += 60;  // 8071~
+        else if (flavor == "websocket")
+            port += 70;  // 8081~
 
         return port;
     }

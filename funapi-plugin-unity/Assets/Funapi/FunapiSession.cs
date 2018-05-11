@@ -770,10 +770,10 @@ namespace Fun
             {
                 if (protocol == TransportProtocol.kTcp)
                     option = new TcpTransportOption();
-                else if (protocol == TransportProtocol.kUdp)
-                    option = new TransportOption();
                 else if (protocol == TransportProtocol.kHttp)
                     option = new HttpTransportOption();
+                else
+                    option = new TransportOption();
 
                 if (wait_redirect_)
                 {
@@ -795,8 +795,7 @@ namespace Fun
 
             if (protocol == TransportProtocol.kTcp)
             {
-                TcpTransport tcp_transport = new TcpTransport(server_address_, port, encoding, option);
-                transport = tcp_transport;
+                transport = new TcpTransport(server_address_, port, encoding, option);
             }
             else if (protocol == TransportProtocol.kUdp)
             {
@@ -805,8 +804,11 @@ namespace Fun
             else if (protocol == TransportProtocol.kHttp)
             {
                 bool https = ((HttpTransportOption)option).HTTPS;
-                HttpTransport http_transport = new HttpTransport(server_address_, port, https, encoding, option);
-                transport = http_transport;
+                transport = new HttpTransport(server_address_, port, https, encoding, option);
+            }
+            else if (protocol == TransportProtocol.kWebsocket)
+            {
+                transport = new WebsocketTransport(server_address_, port, encoding, option);
             }
             else
             {
@@ -1001,7 +1003,8 @@ namespace Fun
                 // Priority order : TCP > HTTP > UDP
                 if (protocol == TransportProtocol.kTcp ||
                     (protocol == TransportProtocol.kUdp && transportCount == 1) ||
-                    (protocol == TransportProtocol.kHttp && !HasTransport(TransportProtocol.kTcp)))
+                    (protocol == TransportProtocol.kHttp && !HasTransport(TransportProtocol.kTcp)) ||
+                    (protocol == TransportProtocol.kWebsocket && !HasTransport(TransportProtocol.kTcp)))
                 {
                     state = State.kWaitForSessionId;
                     transport.SendMessage(new FunapiMessage(protocol, kEmptyMessageType), true);
@@ -1295,6 +1298,8 @@ namespace Fun
                 return "UDP";
             else if (protocol == TransportProtocol.kHttp)
                 return "HTTP";
+            else if (protocol == TransportProtocol.kWebsocket)
+                return "Websocket";
 
             return "Protocol-required";
         }

@@ -22,7 +22,8 @@ namespace Fun
         kDefault = 0,
         kTcp,
         kUdp,
-        kHttp
+        kHttp,
+        kWebsocket
     };
 
     // Message encoding type
@@ -51,6 +52,7 @@ namespace Fun
             kSendingFailed,
             kReceivingFailed,
             kRequestFailed,
+            kWebsocketError,
             kDisconnected
         }
 
@@ -669,7 +671,7 @@ namespace Fun
                 }
 
                 // If an error occurs during connection, stops the connection.
-                // Or if an error occurs while connected from TCP or HTTP, stops the connection.
+                // Or if an error occurs while connected from not UDP, stops the connection.
                 if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
                 {
                     event_.Add(Stop);
