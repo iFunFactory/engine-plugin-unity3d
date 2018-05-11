@@ -739,45 +739,47 @@ namespace Fun
                 if (cur_request_ != null)
                     return;
 
+                FunapiMessage msg = null;
+
                 lock (sending_lock_)
                 {
                     FunDebug.Assert(sending_.Count > 0);
-                    FunapiMessage msg = sending_[0];
+                    msg = sending_[0];
+                }
 
-                    // Header
-                    Dictionary<string, string> headers = new Dictionary<string, string>();
-                    string str_header = System.Text.Encoding.ASCII.GetString(msg.header.Array);
-                    string[] list = str_header.Split(kHeaderSeparator, StringSplitOptions.None);
+                // Header
+                Dictionary<string, string> headers = new Dictionary<string, string>();
+                string str_header = System.Text.Encoding.ASCII.GetString(msg.header.Array);
+                string[] list = str_header.Split(kHeaderSeparator, StringSplitOptions.None);
 
-                    for (int i = 0; i < list.Length; i += 2)
-                    {
-                        if (list[i].Length <= 0)
-                            break;
+                for (int i = 0; i < list.Length; i += 2)
+                {
+                    if (list[i].Length <= 0)
+                        break;
 
-                        if (list[i] == kEncryptionHeaderField)
-                            headers.Add(kEncryptionHttpHeaderField, list[i+1]);
-                        else if (list[i] == kUncompressedLengthHeaderField)
-                            headers.Add(kUncompressedLengthHttpHeaderField, list[i+1]);
-                        else
-                            headers.Add(list[i], list[i+1]);
-                    }
+                    if (list[i] == kEncryptionHeaderField)
+                        headers.Add(kEncryptionHttpHeaderField, list[i+1]);
+                    else if (list[i] == kUncompressedLengthHeaderField)
+                        headers.Add(kUncompressedLengthHttpHeaderField, list[i+1]);
+                    else
+                        headers.Add(list[i], list[i+1]);
+                }
 
-                    if (str_cookie_.Length > 0)
-                        headers.Add(kCookieHeaderField, str_cookie_);
+                if (str_cookie_.Length > 0)
+                    headers.Add(kCookieHeaderField, str_cookie_);
 
-                    debug.DebugLog2("HTTP sending {0} bytes.", msg.header.Count + msg.body.Count);
+                debug.DebugLog2("HTTP sending {0} bytes.", msg.header.Count + msg.body.Count);
 
 #if !NO_UNITY
-                    // Sending a message
-                    if (using_www_)
-                    {
-                        sendWWWRequest(headers, msg);
-                    }
-                    else
+                // Sending a message
+                if (using_www_)
+                {
+                    sendWWWRequest(headers, msg);
+                }
+                else
 #endif
-                    {
-                        sendHttpWebRequest(headers, msg);
-                    }
+                {
+                    sendHttpWebRequest(headers, msg);
                 }
             }
 
