@@ -99,8 +99,8 @@ namespace Fun
                 total_download_count_ = 0;
                 total_download_size_ = 0;
 
-                if (host_url.ToLower().Contains("https"))
-                    MozRoots.LoadRootCertificates();
+                if (host_url.ToLower().StartsWith("https"))
+                    TrustManager.LoadMozRoots();
 
                 setMonoListener();
                 loadCachedList();

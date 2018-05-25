@@ -1,4 +1,4 @@
-// Copyright 2013 iFunFactory Inc. All Rights Reserved.
+﻿// Copyright 2013 iFunFactory Inc. All Rights Reserved.
 //
 // This work is confidential and proprietary to iFunFactory Inc. and
 // must not be used, disclosed, copied, or distributed without the prior
@@ -22,7 +22,7 @@ using UnityEngine;
 
 namespace Fun
 {
-    public class MozRoots
+    public class TrustManager
     {
         public static bool DownloadMozRoots ()
         {
@@ -36,7 +36,7 @@ namespace Fun
             }
             catch (WebException we)
             {
-                FunDebug.LogError("MozRoots.DownloadMozRoots - Download certificates failed.\n{0}", we.Message);
+                FunDebug.LogError("DownloadMozRoots - Download certificates failed.\n{0}", we.Message);
                 File.Delete(tempPath);
                 return false;
             }
@@ -74,29 +74,29 @@ namespace Fun
             }
             catch (Exception e)
             {
-                FunDebug.LogError("MozRoots.DownloadMozRoots - The creation of the zip file of certificates failed.\n{0}", e.Message);
+                FunDebug.LogError("DownloadMozRoots - The creation of the zip file of certificates failed.\n{0}", e.Message);
                 return false;
             }
 #endif
-
             return true;
         }
 
-        public static void LoadRootCertificates ()
+
+        public static bool LoadMozRoots ()
         {
 #if !NO_UNITY
-            if (trustedCerificates != null)
-                return;
+            if (trusted_cerificates_ != null)
+                return true;
 
             try
             {
                 TextAsset zippedMozRootsRawData = Resources.Load<TextAsset>(kResourceCertificatesPath);
                 if (zippedMozRootsRawData == null)
-                    throw new System.Exception("MozRoots.LoadRootCertificates - Certificates file does not exist!");
+                    throw new System.Exception("LoadMozRoots - Certificates file does not exist!");
                 if (zippedMozRootsRawData.bytes == null || zippedMozRootsRawData.bytes.Length <= 0)
-                    throw new System.Exception("MozRoots.LoadRootCertificates - The certificates file is corrupted!");
+                    throw new System.Exception("LoadMozRoots - The certificates file is corrupted!");
 
-                trustedCerificates = new X509Certificate2Collection();
+                trusted_cerificates_ = new X509Certificate2Collection();
 
                 using (MemoryStream zippedMozRootsRawDataStream = new MemoryStream(zippedMozRootsRawData.bytes))
                 {
@@ -105,14 +105,14 @@ namespace Fun
                         ZipEntry zipEntry = zipInputStream.GetNextEntry();
                         if (zipEntry != null)
                         {
-                            using (StreamReader streamReader = new StreamReader(zipInputStream))
+                            using (StreamReader stream = new StreamReader(zipInputStream))
                             {
                                 StringBuilder sb = new StringBuilder();
                                 bool processing = false;
 
                                 while (true)
                                 {
-                                    string line = streamReader.ReadLine();
+                                    string line = stream.ReadLine();
                                     if (line == null)
                                         break;
                                     if (processing)
@@ -121,7 +121,7 @@ namespace Fun
                                         {
                                             processing = false;
                                             X509Certificate root = decodeCertificate(sb.ToString());
-                                            trustedCerificates.Add(root);
+                                            trusted_cerificates_.Add(root);
 
                                             sb = new StringBuilder();
                                             continue;
@@ -133,9 +133,10 @@ namespace Fun
                                         processing = line.StartsWith("CKA_VALUE MULTILINE_OCTAL");
                                     }
                                 }
-                                streamReader.Close();
+                                stream.Close();
 
-                                FunDebug.Log("MozRoots - {0} Root certificates loaded.", trustedCerificates.Count);
+                                FunDebug.Log("LoadMozRoots - {0} certificates have been loaded.",
+                                             trusted_cerificates_.Count);
                             }
                         }
                         zipInputStream.Close();
@@ -144,54 +145,25 @@ namespace Fun
             }
             catch (Exception e)
             {
-                FunDebug.LogError("MozRoots - Failed to load certificate files.\n{0}", e.Message);
+                FunDebug.LogError("LoadMozRoots - Failed to load certificate files.\n{0}", e.Message);
+                return false;
             }
 #endif
 
-            ServicePointManager.ServerCertificateValidationCallback = certificateValidationCallback;
+            ServicePointManager.ServerCertificateValidationCallback = CertValidationCallback;
+            return true;
         }
 
-        static bool checkRootCertificate (X509Chain chain)
-        {
-            if (trustedCerificates == null)
-                return false;
 
-            for (int i = chain.ChainElements.Count - 1; i >= 0; i--)
-            {
-                X509ChainElement chainElement = chain.ChainElements[i];
-                foreach (X509Certificate2 trusted in trustedCerificates)
-                {
-                    if (chainElement.Certificate.Equals(trusted))
-                        return true;
-                }
-            }
-
-            return false;
-        }
-
-        static byte[] decodeOctalString (string s)
-        {
-            string[] pieces = s.Split('\\');
-            byte[] data = new byte[pieces.Length - 1];
-            for (int i = 1; i < pieces.Length; i++)
-            {
-                data[i - 1] = (byte)((pieces[i][0] - '0' << 6) + (pieces[i][1] - '0' << 3) + (pieces[i][2] - '0'));
-            }
-            return data;
-        }
-
-        static X509Certificate2 decodeCertificate (string s)
-        {
-            byte[] rawdata = decodeOctalString(s);
-            return new X509Certificate2(rawdata);
-        }
-
-        static bool certificateValidationCallback (System.Object sender, X509Certificate certificate,
+        public static bool CertValidationCallback (System.Object sender, X509Certificate certificate,
                                                    X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
 #if !NO_UNITY
             if (sslPolicyErrors == SslPolicyErrors.None)
                 return true;
+
+            if (chain.ChainStatus.Length <= 0)
+                return false;
 
             for (int i = 0; i < chain.ChainStatus.Length; ++i)
             {
@@ -203,7 +175,7 @@ namespace Fun
                 {
                     if (!checkRootCertificate(chain))
                     {
-                        FunDebug.LogWarning("MozRoots - Untrusted Root chain : {0}", certificate);
+                        FunDebug.LogWarning("Untrusted certificate chain : {0}", certificate);
                         return false;
                     }
                     else
@@ -217,14 +189,51 @@ namespace Fun
                     chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
                     if (!chain.Build((X509Certificate2)certificate))
                     {
-                        FunDebug.LogWarning("MozRoots - Invalid Certificate : {0}", certificate);
+                        FunDebug.LogWarning("Invalid certificate : {0}", certificate);
                         return false;
                     }
                 }
             }
 #endif
-
             return true;
+        }
+
+
+        static X509Certificate2 decodeCertificate (string cert)
+        {
+            byte[] rawdata = decodeOctalString(cert);
+            return new X509Certificate2(rawdata);
+        }
+
+        static byte[] decodeOctalString (string cert)
+        {
+            string[] pieces = cert.Split('\\');
+            byte[] data = new byte[pieces.Length - 1];
+
+            for (int i = 1; i < pieces.Length; i++)
+            {
+                data[i - 1] = (byte)((pieces[i][0] - '0' << 6) + (pieces[i][1] - '0' << 3) + (pieces[i][2] - '0'));
+            }
+
+            return data;
+        }
+
+        static bool checkRootCertificate (X509Chain chain)
+        {
+            if (trusted_cerificates_ == null)
+                return false;
+
+            for (int i = chain.ChainElements.Count - 1; i >= 0; i--)
+            {
+                X509ChainElement chainElement = chain.ChainElements[i];
+                foreach (X509Certificate2 trusted in trusted_cerificates_)
+                {
+                    if (chainElement.Certificate.Equals(trusted))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
 
@@ -232,6 +241,6 @@ namespace Fun
         const string kDownloadCertificatesPath = "/Resources/Funapi/MozRoots.bytes";
         const string kResourceCertificatesPath = "Funapi/MozRoots";
 
-        static X509Certificate2Collection trustedCerificates = null;
+        static X509Certificate2Collection trusted_cerificates_ = null;
     }
 }

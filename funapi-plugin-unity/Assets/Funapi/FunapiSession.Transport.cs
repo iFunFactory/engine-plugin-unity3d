@@ -147,6 +147,26 @@ namespace Fun
         }
     }
 
+    public class WebsocketTransportOption : TransportOption
+    {
+        public bool WSS = false;
+
+        public override bool Equals (object obj)
+        {
+            if (obj == null || !base.Equals(obj) || !(obj is WebsocketTransportOption))
+                return false;
+
+            WebsocketTransportOption option = obj as WebsocketTransportOption;
+
+            return WSS == option.WSS;
+        }
+
+        public override int GetHashCode ()
+        {
+            return base.GetHashCode ();
+        }
+    }
+
 
     public partial class FunapiSession
     {
@@ -1834,7 +1854,7 @@ namespace Fun
             protected List<FunapiMessage> pending_ = new List<FunapiMessage>();
             protected List<FunapiMessage> sending_ = new List<FunapiMessage>();
 
-            // Compression releated variables.
+            // Compression related variables.
             FunCompressionType compression_type_ = FunCompressionType.kNone;
             FunapiCompressor compressor_ = null;
 
