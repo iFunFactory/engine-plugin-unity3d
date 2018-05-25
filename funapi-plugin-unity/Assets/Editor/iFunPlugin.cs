@@ -22,10 +22,10 @@ public class iFunPlugin : ScriptableObject
         makePackage();
     }
 
-    [MenuItem("iFun Plugin/Download MozRoots", false, 20)]
+    [MenuItem("iFun Plugin/Download Root Certificates", false, 20)]
     static void DownloadMozRoots ()
     {
-        bool ret = Fun.MozRoots.DownloadMozRoots();
+        bool ret = Fun.TrustManager.DownloadMozRoots();
 
         string text = string.Format("Download certificates {0}!!", ret ? "succeeded" : "failed");
         EditorUtility.DisplayDialog("Funapi Plugin", text, "OK");
