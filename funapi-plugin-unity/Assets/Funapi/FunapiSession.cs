@@ -19,9 +19,9 @@ namespace Fun
     public enum SessionEventType
     {
         kOpened,                // Session opened
+        kConnected,             // All transports connected
         kStopped,               // Session stopped
         kClosed,                // Session closed
-        kConnected,             // All transports connected
         kRedirectStarted,       // Server move started
         kRedirectSucceeded,     // Server move successful
         kRedirectFailed         // Server move failed
