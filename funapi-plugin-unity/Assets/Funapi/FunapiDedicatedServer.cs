@@ -4,6 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+#if !NO_UNITY
 #if !FUNAPI_DEDICATED_SERVER
 #pragma warning disable 67
 #endif
@@ -571,3 +572,4 @@ namespace Fun
         public static event Action<string> MatchDataCallback;          // json string
     }
 }
+#endif

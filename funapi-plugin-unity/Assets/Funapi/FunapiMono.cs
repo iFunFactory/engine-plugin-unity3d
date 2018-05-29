@@ -181,7 +181,7 @@ namespace Fun
 
     //
     // The following class was created by referring to Unity's CustomYieldInstruction class.
-    // And also rest of other classes.
+    // And also rest of the other classes.
     //
     public abstract class YieldIndication : IEnumerator
     {
@@ -192,6 +192,7 @@ namespace Fun
         // Indicates if coroutine should be kept suspended.
         public abstract bool keepWaiting { get; }
     }
+
 
     public sealed class SleepForSeconds : YieldIndication
     {
