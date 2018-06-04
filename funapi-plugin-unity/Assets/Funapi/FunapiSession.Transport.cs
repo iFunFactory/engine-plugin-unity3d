@@ -16,7 +16,7 @@ using funapi.network.ping_message;
 
 namespace Fun
 {
-    // Funapi transport protocol
+    // Transport protocol
     public enum TransportProtocol
     {
         kDefault = 0,
@@ -1475,14 +1475,14 @@ namespace Fun
 
                                 msg.body = decompressed;
                             }
+                        }
 
-                            if (first_message_)
-                            {
-                                first_message_ = false;
-                                cstate_ = ConnectState.kConnected;
+                        if (first_message_)
+                        {
+                            first_message_ = false;
+                            cstate_ = ConnectState.kConnected;
 
-                                resetConnectionTimeout();
-                            }
+                            resetConnectionTimeout();
                         }
 
                         onReceivedMessage(msg.body);
