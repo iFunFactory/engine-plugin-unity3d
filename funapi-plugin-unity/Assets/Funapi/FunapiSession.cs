@@ -762,9 +762,7 @@ namespace Fun
         Transport createTransport (TransportProtocol protocol, FunEncoding encoding,
                                    UInt16 port, TransportOption option = null)
         {
-            Transport transport = getTransport(protocol, encoding, port, option);
-            if (transport != null)
-                return transport;
+            Transport transport = null;
 
             if (option == null)
             {
@@ -774,6 +772,10 @@ namespace Fun
                     option = new HttpTransportOption();
                 else
                     option = new TransportOption();
+
+                transport = getTransport(protocol, encoding, port, option);
+                if (transport != null)
+                    return transport;
 
                 if (wait_redirect_)
                 {
@@ -786,6 +788,12 @@ namespace Fun
                     debug.Log("createTransport - {0} transport use the 'default option'.",
                               convertString(protocol));
                 }
+            }
+            else
+            {
+                transport = getTransport(protocol, encoding, port, option);
+                if (transport != null)
+                    return transport;
             }
 
             if (option_.sessionReliability && protocol == TransportProtocol.kTcp)

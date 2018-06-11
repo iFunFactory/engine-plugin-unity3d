@@ -209,7 +209,7 @@ namespace Fun
                 {
                     if (state_ != State.kUnknown)
                     {
-                        debug.LogWarning("{0} Transport.Start() called, but the state is {1}.",
+                        debug.LogWarning("{0} Start() called, but this transport already started. ({1})",
                                          str_protocol_, state_);
                         return;
                     }
