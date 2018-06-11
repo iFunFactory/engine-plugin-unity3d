@@ -180,15 +180,11 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             return encrypt(src, dst, ref enc_key_);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             if (in_header.Length > 0)
             {
                 FunDebug.LogWarning("Encryptor1.Decrypt - Wrong encryptor header.");
@@ -257,15 +253,11 @@ namespace Fun
 
         public override Int64 Encrypt (ArraySegment<byte> src, ArraySegment<byte> dst, ref string out_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             return encrypt(src, dst);
         }
 
         public override Int64 Decrypt (ArraySegment<byte> src, ArraySegment<byte> dst, string in_header)
         {
-            FunDebug.Assert(state == State.kEstablished);
-
             if (in_header.Length > 0)
             {
                 FunDebug.LogWarning("Encryptor2.Decrypt - Wrong encryptor header.");

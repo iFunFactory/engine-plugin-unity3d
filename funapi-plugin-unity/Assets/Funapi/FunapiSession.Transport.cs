@@ -1135,12 +1135,16 @@ namespace Fun
 
             bool rebuildMessage (FunapiMessage msg)
             {
+                if (msg.body.Count <= 0)
+                    return true;
+
                 // Encrypt message
                 EncryptionType enc_type = getEncryption(msg);
                 if (enc_type != EncryptionType.kNoneEncryption)
                 {
                     // Serializes message
                     msg.body = new ArraySegment<byte>(msg.GetBytes(encoding_));
+
                     int uncompressed_size = 0;
                     if (compressor_ != null && msg.body.Count >= compressor_.compression_threshold)
                     {
