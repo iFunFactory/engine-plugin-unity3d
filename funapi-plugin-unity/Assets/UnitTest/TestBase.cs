@@ -50,11 +50,17 @@ class TestBase : YieldIndication
         updater.StartCoroutine(onTestTimedOut(seconds));
     }
 
-    IEnumerator onTestTimedOut (float seconds)
+    protected void setTestTimeoutWithoutFail (float seconds)
+    {
+        updater.StartCoroutine(onTestTimedOut(seconds, false));
+    }
+
+    IEnumerator onTestTimedOut (float seconds, bool with_fail = true)
     {
         yield return new SleepForSeconds(seconds);
 
-        Assert.Fail("'{0}' Test has timed out.", GetType().ToString());
+        if (with_fail)
+            Assert.Fail("'{0}' Test has timed out.", GetType().ToString());
 
         isFinished = true;
     }
