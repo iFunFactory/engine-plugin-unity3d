@@ -43,7 +43,7 @@ public class TestAutoReconect
                 }
             };
 
-            setTestTimeout(8f);
+            setTestTimeout(10f);
 
             TcpTransportOption option = new TcpTransportOption();
             option.AutoReconnect = true;
@@ -66,21 +66,9 @@ public class TestAutoReconect
                     sendEchoMessageWithCount(protocol, 3);
             };
 
-            session.ReceivedMessageCallback += delegate (string type, object message)
-            {
-                onReceivedEchoMessage(type, message);
+            session.ReceivedMessageCallback += onReceivedEchoMessage;
 
-                if (isReceivedAllMessages)
-                {
-                    ++test_step;
-                    if (test_step >= kStepCountMax)
-                    {
-                        onTestFinished();
-                    }
-                }
-            };
-
-            setTestTimeout(10f);
+            setTestTimeoutWithoutFail(10f);
 
             TcpTransportOption option = new TcpTransportOption();
             option.AutoReconnect = true;
@@ -103,12 +91,8 @@ public class TestAutoReconect
                 if (transport.IsEstablished && !transport.Reconnecting)
                     transport.ForcedDisconnect();
 
-                yield return new SleepForSeconds(1f);
+                yield return new SleepForSeconds(1.5f);
             }
         }
-
-
-        const int kStepCountMax = 5;
-        int test_step = 0;
     }
 }
