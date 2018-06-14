@@ -13,13 +13,13 @@ using UnityEngine.TestTools;
 public class TestWebsocket
 {
     [UnityTest]
-    public IEnumerator TCP_Json ()
+    public IEnumerator Websocket_Json ()
     {
         yield return new TestImpl (FunEncoding.kJson);
     }
 
     [UnityTest]
-    public IEnumerator TCP_Protobuf ()
+    public IEnumerator Websocket_Protobuf ()
     {
         yield return new TestImpl (FunEncoding.kProtobuf);
     }
