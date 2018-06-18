@@ -96,6 +96,7 @@ namespace Fun
                 cur_download_size_ = 0;
                 total_download_count_ = 0;
                 total_download_size_ = 0;
+                partial_download_size_ = 0;
 
                 if (host_url.ToLower().StartsWith("https"))
                     TrustManager.LoadMozRoots();
@@ -128,9 +129,14 @@ namespace Fun
                     return;
                 }
 
-                if (total_download_count_ > 0)
+                if (partial_downloading_)
                 {
-                    FunDebug.Log("Downloader - Ready to download {0} files ({1})",
+                    FunDebug.Log("Downloader - Ready to download {0} file(s) ({1})",
+                                 partial_download_list_.Count, getSizeString(partial_download_size_));
+                }
+                else if (total_download_count_ > 0)
+                {
+                    FunDebug.Log("Downloader - Ready to download {0} file(s) ({1})",
                                  total_download_count_, getSizeString(total_download_size_));
                 }
 
@@ -138,19 +144,45 @@ namespace Fun
                 retry_download_count_ = 0;
                 download_time_.Start();
 
-                // Deletes files
-                deleteLocalFiles();
-
                 // Starts download
                 downloadResourceFile();
             }
+        }
+
+        public void StartDownload (string prefix_path)
+        {
+            lock (lock_)
+            {
+                partial_download_list_ = download_list_.FindAll(
+                    item => { return item.path.StartsWith(prefix_path); });
+
+                if (partial_download_list_.Count <= 0)
+                {
+                    FunDebug.Log("Downloader.StartDownload - '{0}' is up to date.", prefix_path);
+                    return;
+                }
+
+                List<string> list = new List<string>();
+
+                partial_download_size_ = 0;
+                partial_download_list_.ForEach(
+                    item => { partial_download_size_ += item.size; list.Add(item.path); });
+
+                download_list_.RemoveAll(item => { return list.Contains(item.path); });
+
+                partial_downloading_ = true;
+            }
+
+            // Starts download
+            StartDownload();
         }
 
         public void ContinueDownload ()
         {
             lock (lock_)
             {
-                if (state_ == State.Paused && download_list_.Count > 0)
+                if (state_ == State.Paused &&
+                    (download_list_.Count > 0 || partial_download_list_.Count > 0))
                 {
                     state_ = State.Downloading;
                     retry_download_count_ = 0;
@@ -240,7 +272,7 @@ namespace Fun
                 cached_list_.Add(info);
             }
 
-            FunDebug.DebugLog1("Downloader - Loads cached list : {0}", cached_list_.Count);
+            FunDebug.DebugLog2("Downloader - Loads cached list : {0}", cached_list_.Count);
         }
 
         void updateCachedList ()
@@ -270,7 +302,7 @@ namespace Fun
             stream.Flush();
             stream.Close();
 
-            FunDebug.DebugLog1("Downloader - Updates cached list : {0}", cached_list_.Count);
+            FunDebug.DebugLog2("Downloader - Updates cached list : {0}", cached_list_.Count);
         }
 
         // Checks download file list
@@ -302,7 +334,7 @@ namespace Fun
                     if (!rnd_list.Contains(rnd_index))
                         rnd_list.Enqueue(rnd_index);
                 }
-                FunDebug.DebugLog1("Downloader - Random check file count is {0}", rnd_list.Count);
+                FunDebug.DebugLog2("Downloader - Random check file count is {0}", rnd_list.Count);
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
             }
@@ -375,7 +407,7 @@ namespace Fun
 
             removeCachedList(remove_list);
 
-            FunDebug.DebugLog1("Downloader - Random validation has {0}",
+            FunDebug.DebugLog2("Downloader - Random validation has {0}",
                                (verify_success ? "succeeded" : "failed"));
 
             // Checks all local files
@@ -429,19 +461,23 @@ namespace Fun
                 total_download_size_ += item.size;
             }
 
+            // Deletes files
+            deleteLocalFiles();
+
             if (total_download_count_ > 0)
             {
                 state_ = State.Ready;
 
                 event_.Add (delegate
                 {
+                    FunDebug.Log("Downloader - Ready to download.");
+
                     if (ReadyCallback != null)
                         ReadyCallback(total_download_count_, total_download_size_);
                 });
             }
             else
             {
-                deleteLocalFiles();
                 updateCachedList();
 
                 state_ = State.Completed;
@@ -507,7 +543,8 @@ namespace Fun
             if (state_ != State.Downloading)
                 return;
 
-            if (download_list_.Count <= 0)
+            if (download_list_.Count <= 0 ||
+                (partial_downloading_ && partial_download_list_.Count <= 0))
             {
                 updateCachedList();
 
@@ -515,13 +552,32 @@ namespace Fun
                 FunDebug.Log("Downloader took {0:F2}s for download all files.",
                              download_time_.ElapsedMilliseconds / 1000f);
 
-                state_ = State.Completed;
-                FunDebug.Log("Downloader - Download completed.");
+                if (partial_downloading_)
+                {
+                    if (download_list_.Count > 0)
+                        state_ = State.Ready;
+                    else
+                        state_ = State.Completed;
+
+                    partial_downloading_ = false;
+                    FunDebug.Log("Downloader - Partial downloading completed.");
+                }
+                else
+                {
+                    state_ = State.Completed;
+                    FunDebug.Log("Downloader - Download completed.");
+                }
+
                 onFinished(DownloadResult.SUCCESS);
             }
             else
             {
-                DownloadFileInfo info = download_list_[0];
+                DownloadFileInfo info = null;
+
+                if (partial_downloading_)
+                    info = partial_download_list_[0];
+                else
+                    info = download_list_[0];
 
                 // Check directory
                 string path = target_path_;
@@ -592,6 +648,7 @@ namespace Fun
                         else
                         {
                             download_list_.Clear();
+                            partial_download_list_.Clear();
 
                             foreach (Dictionary<string, object> node in list)
                             {
@@ -674,8 +731,12 @@ namespace Fun
                             ++cur_download_count_;
                             retry_download_count_ = 0;
                             cur_download_size_ += info.size;
-                            download_list_.Remove(info);
                             cached_list_.Add(info);
+
+                            if (partial_downloading_)
+                                partial_download_list_.Remove(info);
+                            else
+                                download_list_.Remove(info);
 
                             downloadResourceFile();
                         }
@@ -781,5 +842,10 @@ namespace Fun
         List<DownloadFileInfo> download_list_ = new List<DownloadFileInfo>();
         List<string> delete_file_list_ = new List<string>();
         Stopwatch download_time_ = new Stopwatch();
+
+        // partial download-related variables
+        bool partial_downloading_ = false;
+        UInt64 partial_download_size_ = 0;
+        List<DownloadFileInfo> partial_download_list_ = new List<DownloadFileInfo>();
     }
 }

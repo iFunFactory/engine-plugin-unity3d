@@ -36,6 +36,18 @@ public class TestDownloader
         yield return new TestImpl ("sounds.json");
     }
 
+    [UnityTest]
+    public IEnumerator Download_Prefix_Images()
+    {
+        yield return new TestPrefixImpl ("images");
+    }
+
+    [UnityTest]
+    public IEnumerator Download_Prefix_Sounds()
+    {
+        yield return new TestPrefixImpl ("sounds");
+    }
+
 
     class TestImpl : TestBase
     {
@@ -83,6 +95,34 @@ public class TestDownloader
             };
 
             return downloader;
+        }
+    }
+
+
+    class TestPrefixImpl : TestBase
+    {
+        public TestPrefixImpl (string prefix)
+        {
+            FunapiHttpDownloader downloader = new FunapiHttpDownloader();
+
+            downloader.ReadyCallback += delegate (int total_count, UInt64 total_size)
+            {
+                downloader.StartDownload(prefix);
+            };
+
+            downloader.UpdateCallback += delegate (string path, long bytes_received, long total_bytes, int percentage)
+            {
+                FunDebug.DebugLog2("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+                                   path, bytes_received, total_bytes, percentage);
+            };
+
+            downloader.FinishedCallback += delegate (DownloadResult code)
+            {
+                isFinished = true;
+            };
+
+            string url = string.Format("http://{0}:{1}/", TestInfo.ServerIp, 8020);
+            downloader.GetDownloadList(url, FunapiUtils.GetLocalDataPath);
         }
     }
 }
