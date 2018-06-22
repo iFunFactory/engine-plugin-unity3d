@@ -168,6 +168,26 @@ class TestSessionBase : TestBase
         ++sending_count;
     }
 
+    protected void sendPbufEchoMessage (TransportProtocol protocol)
+    {
+        if (isFinished)
+            return;
+
+        FunapiSession.Transport transport = session.GetTransport(protocol);
+        if (transport == null)
+        {
+            FunDebug.LogWarning("sendEchoMessage - transport is null.");
+            return;
+        }
+
+        PbufEchoMessage echo = new PbufEchoMessage();
+        echo.msg = string.Format("[{0}] {1}", transport.str_protocol, echo_message);
+        FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+        session.SendMessage(MessageType.pbuf_echo, message, protocol);
+
+        ++sending_count;
+    }
+
     protected void onReceivedEchoMessage (string type, object message)
     {
         if (type == "echo")
