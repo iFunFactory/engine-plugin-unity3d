@@ -66,13 +66,18 @@ namespace Fun
         private FunapiSession (string hostname_or_ip, SessionOption option)
         {
             FunDebug.Assert(option != null);
+
             debug.SetDebugObject(this);
+            response_timeout_.debugLog = debug;
 
             state = State.kUnknown;
             server_address_ = hostname_or_ip;
             option_ = option;
 
             setMonoListener();
+
+            response_timeout_.SetCallbackHandler<int>(onResponseTimeoutCallback);
+            response_timeout_.SetCallbackHandler<string>(onResponseTimeoutCallback);
 
             debug.Log("Plugin:{0} Protocol:{1} Reliability:{2}, SessionIdOnce:{3}",
                       FunapiVersion.kPluginVersion, FunapiVersion.kProtocolVersion,
@@ -316,34 +321,64 @@ namespace Fun
             }
         }
 
-        public void SetResponseTimeout (string msg_type, float waiting_time)
+
+        //
+        // Response Timeout-related functions
+        //
+#if PROTOBUF_ENUM_STRING_LEGACY
+        public bool SetResponseTimeout (MessageType msg_type, float waiting_time)
         {
-            if (msg_type == null || msg_type.Length <= 0)
-                return;
+            return response_timeout_.Add(MessageTable.Lookup(msg_type), waiting_time);
+        }
+#else
+        public bool SetResponseTimeout (MessageType msg_type, float waiting_time)
+        {
+            return response_timeout_.Add((int)msg_type, waiting_time);
+        }
+#endif
 
-            lock (expected_responses_)
-            {
-                if (expected_responses_.ContainsKey(msg_type))
-                {
-                    debug.LogWarning("'{0}' expected response type is already added. Ignored.");
-                    return;
-                }
-
-                expected_responses_[msg_type] = new ExpectedResponse(msg_type, waiting_time);
-                debug.DebugLog1("Expected response message added - '{0}' ({1}s)", msg_type, waiting_time);
-            }
+        public bool SetResponseTimeout (int msg_type, float waiting_time)
+        {
+            return response_timeout_.Add(msg_type, waiting_time);
         }
 
-        public void RemoveResponseTimeout (string msg_type)
+        public bool SetResponseTimeout (string msg_type, float waiting_time)
         {
-            lock (expected_responses_)
-            {
-                if (expected_responses_.ContainsKey(msg_type))
-                {
-                    expected_responses_.Remove(msg_type);
-                    debug.DebugLog1("Expected response message removed - {0}", msg_type);
-                }
-            }
+            return response_timeout_.Add(msg_type, waiting_time);
+        }
+
+#if PROTOBUF_ENUM_STRING_LEGACY
+        public bool RemoveResponseTimeout (MessageType msg_type)
+        {
+            return response_timeout_.Remove(MessageTable.Lookup(msg_type));
+        }
+#else
+        public bool RemoveResponseTimeout (MessageType msg_type)
+        {
+            return response_timeout_.Remove((int)msg_type);
+        }
+#endif
+
+        public bool RemoveResponseTimeout (int msg_type)
+        {
+            return response_timeout_.Remove(msg_type);
+        }
+
+        public bool RemoveResponseTimeout (string msg_type)
+        {
+            return response_timeout_.Remove(msg_type);
+        }
+
+        void onResponseTimeoutCallback (int msg_type)
+        {
+            if (ResponseTimeoutIntCallback != null)
+                ResponseTimeoutIntCallback(msg_type);
+        }
+
+        void onResponseTimeoutCallback (string msg_type)
+        {
+            if (ResponseTimeoutCallback != null)
+                ResponseTimeoutCallback(msg_type);
         }
 
 
@@ -437,7 +472,7 @@ namespace Fun
                 }
             }
 
-            updateExpectedResponse(deltaTime);
+            response_timeout_.Update(deltaTime);
         }
 
         public override void OnPause (bool isPaused)
@@ -468,56 +503,6 @@ namespace Fun
 
 
         //
-        // Update-related functions
-        //
-        void updateExpectedResponse (float deltaTime)
-        {
-            lock (expected_responses_)
-            {
-                if (expected_responses_.Count > 0)
-                {
-                    List<string> remove_list = new List<string>();
-                    Dictionary<string, ExpectedResponse> temp_list = expected_responses_;
-                    expected_responses_ = new Dictionary<string, ExpectedResponse>();
-
-                    foreach (ExpectedResponse er in temp_list.Values)
-                    {
-                        er.wait_time -= deltaTime;
-                        if (er.wait_time <= 0f)
-                        {
-                            debug.LogWarning("'{0}' message waiting time has been exceeded.", er.type);
-                            remove_list.Add(er.type);
-
-                            if (ResponseTimeoutCallback != null)
-                                ResponseTimeoutCallback(er.type);
-                        }
-                    }
-
-                    if (remove_list.Count > 0)
-                    {
-                        foreach (string key in remove_list)
-                        {
-                            temp_list.Remove(key);
-                        }
-                    }
-
-                    if (temp_list.Count > 0)
-                    {
-                        Dictionary<string, ExpectedResponse> added_list = expected_responses_;
-                        expected_responses_ = temp_list;
-
-                        if (added_list.Count > 0)
-                        {
-                            foreach (var item in added_list)
-                            {
-                                expected_responses_[item.Key] = item.Value;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         void onStopped ()
         {
             if (!Started)
@@ -528,10 +513,7 @@ namespace Fun
             else
                 state = State.kUnknown;
 
-            lock (expected_responses_)
-            {
-                expected_responses_.Clear();
-            }
+            response_timeout_.Clear();
 
             onSessionEvent(SessionEventType.kStopped);
         }
@@ -1199,7 +1181,16 @@ namespace Fun
 
             default:
                 {
-                    RemoveResponseTimeout(msg_type);
+                    if (transport.encoding == FunEncoding.kProtobuf)
+                    {
+                        FunMessage funmsg = message as FunMessage;
+                        if (funmsg.msgtype2Specified)
+                            RemoveResponseTimeout(funmsg.msgtype2);
+                    }
+                    else
+                    {
+                        RemoveResponseTimeout(msg_type);
+                    }
 
                     if (ReceivedMessageCallback != null)
                         ReceivedMessageCallback(msg_type, message);
@@ -1378,21 +1369,10 @@ namespace Fun
         public event Action<string, object> ReceivedMessageCallback;                            // type, message
         public event Action<string, object> MulticastMessageCallback;                           // type, message
         public event Action<string, object> DroppedMessageCallback;                             // type, message
-        public event Action<string> ResponseTimeoutCallback;                                    // type
+        public event Action<string> ResponseTimeoutCallback;                                    // type (string)
+        public event Action<int> ResponseTimeoutIntCallback;                                    // type (int)
         public event Action<FunEncoding, object> MaintenanceCallback;                           // encoding, message
 
-
-        class ExpectedResponse
-        {
-            public ExpectedResponse (string type, float wait_time)
-            {
-                this.type = type;
-                this.wait_time = wait_time;
-            }
-
-            public string type = "";
-            public float wait_time = 0f;
-        }
 
         class RedirectInfo
         {
@@ -1441,7 +1421,7 @@ namespace Fun
 
         // Message-related variables.
         static JsonAccessor json_helper_ = FunapiMessage.JsonHelper;
-        Dictionary<string, ExpectedResponse> expected_responses_ = new Dictionary<string, ExpectedResponse>();
+        ResponseTimeout response_timeout_ = new ResponseTimeout();
 
         // For debugging
         FunDebugLog debug = new FunDebugLog();
