@@ -165,7 +165,7 @@ namespace Fun
                 return;
             }
 
-            stopAllTransports();
+            event_.Add(() => stopAllTransports());
         }
 
         public void Stop (TransportProtocol protocol)
@@ -1106,7 +1106,7 @@ namespace Fun
             {
                 foreach (Transport t in transports_.Values)
                 {
-                    if (t.Connected || t.Reconnecting)
+                    if (t.Connected || t.Connecting || t.Reconnecting)
                         return;
                 }
             }
