@@ -36,12 +36,9 @@ public class TestDelayedAck
             session = FunapiSession.Create(TestInfo.ServerIp, option);
             session.ReceivedMessageCallback += onReceivedEchoMessage;
 
-            session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
-                if (isFinished)
-                    return;
-
-                if (type == TransportEventType.kStarted)
+                if (type == SessionEventType.kConnected)
                 {
                     startCoroutine(onStarted(protocol));
                 }

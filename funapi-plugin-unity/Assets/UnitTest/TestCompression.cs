@@ -65,14 +65,13 @@ public class TestCompression
                 return null;
             };
 
-            session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
-                if (isFinished)
-                    return;
-
-                if (type == TransportEventType.kStarted)
+                if (type == SessionEventType.kConnected)
                 {
-                    sendEchoMessageWithCount(protocol, 5);
+                    sendEchoMessageWithCount(TransportProtocol.kTcp, 5);
+                    sendEchoMessageWithCount(TransportProtocol.kUdp, 5);
+                    sendEchoMessageWithCount(TransportProtocol.kHttp, 5);
                 }
             };
 

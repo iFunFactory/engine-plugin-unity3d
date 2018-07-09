@@ -38,6 +38,7 @@ public class TestConnectionTimeout
             {
                 if (type == TransportEventType.kStarted)
                 {
+                    resetSendingCount();
                     sendEchoMessageWithCount(protocol, 3);
                 }
                 else if (type == TransportEventType.kStopped)

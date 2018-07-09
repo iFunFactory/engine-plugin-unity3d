@@ -403,6 +403,11 @@ namespace Fun
                 get { return state_ == State.kEstablished; }
             }
 
+            public bool IsStopped
+            {
+                get { return state_ == State.kUnknown; }
+            }
+
             public bool sendSessionIdOnlyOnce
             {
                 set { send_session_id_only_once_ = value; }

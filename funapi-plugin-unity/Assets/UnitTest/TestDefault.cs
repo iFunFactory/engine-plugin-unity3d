@@ -62,9 +62,52 @@ public class TestDefault
 
     class TestImpl : TestSessionBase
     {
+        public TestImpl (TransportProtocol protocol, FunEncoding encoding)
+        {
+            session = FunapiSession.Create(TestInfo.ServerIp);
+
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (type == SessionEventType.kConnected)
+                    sendEchoMessageWithCount(protocol, 10);
+            };
+
+            session.ReceivedMessageCallback += delegate (string type, object message)
+            {
+                onReceivedEchoMessage(type, message);
+
+                if (isReceivedAllMessages)
+                    onTestFinished();
+            };
+
+            setTestTimeout(2f);
+
+            ushort port = getPort("default", protocol, encoding);
+            session.Connect(protocol, encoding, port);
+        }
+
+        // Tests all protocols
         public TestImpl (FunEncoding encoding)
         {
-            createTestSession();
+            session = FunapiSession.Create(TestInfo.ServerIp);
+
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (type == SessionEventType.kConnected)
+                {
+                    sendEchoMessageWithCount(TransportProtocol.kTcp, 10);
+                    sendEchoMessageWithCount(TransportProtocol.kUdp, 10);
+                    sendEchoMessageWithCount(TransportProtocol.kHttp, 10);
+                }
+            };
+
+            session.ReceivedMessageCallback += delegate (string type, object message)
+            {
+                onReceivedEchoMessage(type, message);
+
+                if (isReceivedAllMessages)
+                    onTestFinished();
+            };
 
             setTestTimeout(3f);
 
@@ -76,40 +119,6 @@ public class TestDefault
 
             port = getPort("default", TransportProtocol.kHttp, encoding);
             session.Connect(TransportProtocol.kHttp, encoding, port);
-        }
-
-
-        public TestImpl (TransportProtocol protocol, FunEncoding encoding)
-        {
-            createTestSession();
-
-            setTestTimeout(2f);
-
-            ushort port = getPort("default", protocol, encoding);
-            session.Connect(protocol, encoding, port);
-        }
-
-
-        void createTestSession ()
-        {
-            session = FunapiSession.Create(TestInfo.ServerIp);
-
-            session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)
-            {
-                if (isFinished)
-                    return;
-
-                if (type == TransportEventType.kStarted)
-                    sendEchoMessageWithCount(protocol, 10);
-            };
-
-            session.ReceivedMessageCallback += delegate (string type, object message)
-            {
-                onReceivedEchoMessage(type, message);
-
-                if (isReceivedAllMessages)
-                    onTestFinished();
-            };
         }
     }
 }

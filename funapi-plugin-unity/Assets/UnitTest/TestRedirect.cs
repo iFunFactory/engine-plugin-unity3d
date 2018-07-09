@@ -55,7 +55,7 @@ public class TestRedirect
                     sendEchoMessageWithCount(protocol, 3);
             };
 
-            setTestTimeout(10f);
+            setTestTimeout(15f);
 
             ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kJson);
             session.Connect(TransportProtocol.kTcp, FunEncoding.kJson, port);

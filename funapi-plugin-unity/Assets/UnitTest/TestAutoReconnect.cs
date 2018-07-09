@@ -56,17 +56,16 @@ public class TestAutoReconect
         public TestImpl (TransportProtocol protocol, FunEncoding encoding)
         {
             session = FunapiSession.Create(TestInfo.ServerIp);
+            session.ReceivedMessageCallback += onReceivedEchoMessage;
 
-            session.TransportEventCallback += delegate (TransportProtocol p, TransportEventType type)
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
                 if (isFinished)
                     return;
 
-                if (type == TransportEventType.kStarted)
+                if (type == SessionEventType.kConnected)
                     sendEchoMessageWithCount(protocol, 3);
             };
-
-            session.ReceivedMessageCallback += onReceivedEchoMessage;
 
             setTestTimeoutWithoutFail(10f);
 
