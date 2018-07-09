@@ -28,7 +28,7 @@ namespace Fun
 
             lock (lock_)
             {
-                pending_list_.Add(item);
+                pending_.Add(item);
             }
 
             return item.name;
@@ -41,13 +41,13 @@ namespace Fun
 
             lock (lock_)
             {
-                if (primary_list_.Contains(item))
+                if (list_.Contains(item))
                 {
                     item.isDone = true;
                     return true;
                 }
 
-                return pending_list_.Remove(item);
+                return pending_.Remove(item);
             }
         }
 
@@ -55,7 +55,7 @@ namespace Fun
         {
             lock (lock_)
             {
-                List<T> list = primary_list_.FindAll(predicate(name));
+                List<T> list = list_.FindAll(predicate(name));
                 if (list.Count > 0)
                 {
                     if (list.Count > 1)
@@ -65,7 +65,7 @@ namespace Fun
                     return true;
                 }
 
-                int count = pending_list_.RemoveAll(predicate(name));
+                int count = pending_.RemoveAll(predicate(name));
                 if (count > 0)
                 {
                     if (count > 1)
@@ -77,46 +77,23 @@ namespace Fun
             return false;
         }
 
-        public bool Exists (string name)
-        {
-            lock (lock_)
-            {
-                if (primary_list_.Exists(predicate(name)))
-                    return true;
-
-                if (pending_list_.Exists(predicate(name)))
-                    return true;
-            }
-
-            return false;
-        }
-
-        public void Clear ()
-        {
-            lock (lock_)
-            {
-                pending_list_.Clear();
-                primary_list_.ForEach(t => { t.isDone = true; });
-            }
-        }
-
         public void Update (float delta_time)
         {
             lock (lock_)
             {
-                // adds from pending list
-                if (pending_list_.Count > 0)
+                // Adds from pending list
+                if (pending_.Count > 0)
                 {
-                    primary_list_.AddRange(pending_list_);
-                    pending_list_.Clear();
+                    list_.AddRange(pending_);
+                    pending_.Clear();
                 }
 
-                // updates item
-                if (primary_list_.Count > 0)
+                // Updates item
+                if (list_.Count > 0)
                 {
-                    primary_list_.RemoveAll(t => { return t.isDone; });
+                    list_.RemoveAll(t => { return t.isDone; });
 
-                    foreach (T item in primary_list_)
+                    foreach (T item in list_)
                     {
                         item.Update(delta_time);
                     }
@@ -124,13 +101,36 @@ namespace Fun
             }
         }
 
+        public void Clear ()
+        {
+            lock (lock_)
+            {
+                pending_.Clear();
+                list_.ForEach(t => { t.isDone = true; });
+            }
+        }
+
         public void ForEach (Action<T> action)
         {
             lock (lock_)
             {
-                if (primary_list_.Count > 0)
-                    primary_list_.ForEach(action);
+                if (list_.Count > 0)
+                    list_.ForEach(action);
             }
+        }
+
+        public bool Exists (string name)
+        {
+            lock (lock_)
+            {
+                if (list_.Exists(predicate(name)))
+                    return true;
+
+                if (pending_.Exists(predicate(name)))
+                    return true;
+            }
+
+            return false;
         }
 
         static Predicate<T> predicate (string name)
@@ -141,7 +141,7 @@ namespace Fun
 
         // Member variables.
         object lock_ = new object();
-        List<T> primary_list_ = new List<T>();
-        List<T> pending_list_ = new List<T>();
+        List<T> list_ = new List<T>();
+        List<T> pending_ = new List<T>();
     }
 }
