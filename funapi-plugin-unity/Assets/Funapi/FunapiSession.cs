@@ -225,6 +225,17 @@ namespace Fun
             return null;
         }
 
+        public FunEncoding GetEncoding (TransportProtocol protocol)
+        {
+            lock (transports_lock_)
+            {
+                if (transports_.ContainsKey(protocol))
+                    return transports_[protocol].encoding;
+            }
+
+            return FunEncoding.kNone;
+        }
+
         public TransportError.Type GetLastError (TransportProtocol protocol)
         {
             lock (transports_lock_)

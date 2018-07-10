@@ -86,17 +86,17 @@ public class TestRedirect
 
         public void requestRedirect (TransportProtocol protocol)
         {
-            FunapiSession.Transport transport = session.GetTransport(protocol);
-            if (transport == null)
+            FunEncoding encoding = session.GetEncoding(protocol);
+            if (encoding == FunEncoding.kNone)
                 return;
 
-            if (transport.encoding == FunEncoding.kJson)
+            if (encoding == FunEncoding.kJson)
             {
                 Dictionary<string, object> message = new Dictionary<string, object>();
                 message["message"] = "request_redirect";
                 session.SendMessage("echo", message, protocol);
             }
-            else if (transport.encoding == FunEncoding.kProtobuf)
+            else if (encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
                 echo.msg = "request_redirect";
