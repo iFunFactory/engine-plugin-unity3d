@@ -139,11 +139,6 @@ namespace Fun
             }
         }
 
-        public void Stop ()
-        {
-            addCommand(new CmdStopAll(this));
-        }
-
         public void Stop (TransportProtocol protocol)
         {
             Transport transport = GetTransport(protocol);
@@ -155,6 +150,11 @@ namespace Fun
             }
 
             addCommand(new CmdStop(this, transport));
+        }
+
+        public void Stop ()
+        {
+            addCommand(new CmdStopAll(this));
         }
 
 
@@ -632,16 +632,32 @@ namespace Fun
             return list;
         }
 
-        public bool HasTransport (TransportProtocol protocol)
+        public bool HasTransport (TransportProtocol protocol = TransportProtocol.kDefault)
         {
+            if (protocol == TransportProtocol.kDefault)
+            {
+                if (default_protocol_ == TransportProtocol.kDefault)
+                    return false;
+
+                protocol = default_protocol_;
+            }
+
             lock (transports_lock_)
             {
                 return transports_.ContainsKey(protocol);
             }
         }
 
-        public Transport GetTransport (TransportProtocol protocol)
+        public Transport GetTransport (TransportProtocol protocol = TransportProtocol.kDefault)
         {
+            if (protocol == TransportProtocol.kDefault)
+            {
+                if (default_protocol_ == TransportProtocol.kDefault)
+                    return null;
+
+                protocol = default_protocol_;
+            }
+
             lock (transports_lock_)
             {
                 if (transports_.ContainsKey(protocol))
@@ -651,8 +667,16 @@ namespace Fun
             return null;
         }
 
-        public FunEncoding GetEncoding (TransportProtocol protocol)
+        public FunEncoding GetEncoding (TransportProtocol protocol = TransportProtocol.kDefault)
         {
+            if (protocol == TransportProtocol.kDefault)
+            {
+                if (default_protocol_ == TransportProtocol.kDefault)
+                    return FunEncoding.kNone;
+
+                protocol = default_protocol_;
+            }
+
             lock (transports_lock_)
             {
                 if (transports_.ContainsKey(protocol))
@@ -662,8 +686,16 @@ namespace Fun
             return FunEncoding.kNone;
         }
 
-        public TransportError.Type GetLastError (TransportProtocol protocol)
+        public TransportError.Type GetLastError (TransportProtocol protocol = TransportProtocol.kDefault)
         {
+            if (protocol == TransportProtocol.kDefault)
+            {
+                if (default_protocol_ == TransportProtocol.kDefault)
+                    return TransportError.Type.kNone;
+
+                protocol = default_protocol_;
+            }
+
             lock (transports_lock_)
             {
                 if (transports_.ContainsKey(protocol))
