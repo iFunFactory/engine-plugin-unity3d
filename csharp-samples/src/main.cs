@@ -23,6 +23,12 @@ namespace Tester
         {
             Client.address = kServerIp;
 
+            // You can specify the size of the console window from the Console menu.
+            // Also you can resize it here.
+            //Console.WindowWidth = 180;
+            //Console.WindowHeight = 50;
+            //Console.BufferHeight = 2000;
+
             new TesterMain().start();
         }
 
