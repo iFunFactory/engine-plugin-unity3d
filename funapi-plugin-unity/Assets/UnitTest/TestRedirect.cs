@@ -26,13 +26,21 @@ public class TestRedirect
         yield return new TestImpl ();
     }
 
+    [UnityTest]
+    public IEnumerator Queueing ()
+    {
+        yield return new TestQueueImpl ();
+    }
 
+
+    // This test is about the basic redirect feature.
     class TestImpl : TestSessionBase
     {
         public TestImpl ()
         {
             SessionOption option = new SessionOption();
             option.sessionReliability = true;
+            option.sendSessionIdOnlyOnce = true;
 
             session = FunapiSession.Create(TestInfo.ServerIp, option);
             session.ReceivedMessageCallback += onReceivedEchoMessage;
@@ -57,8 +65,8 @@ public class TestRedirect
 
             setTestTimeout(15f);
 
-            ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kJson);
-            session.Connect(TransportProtocol.kTcp, FunEncoding.kJson, port);
+            ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kProtobuf);
+            session.Connect(TransportProtocol.kTcp, FunEncoding.kProtobuf, port);
         }
 
         IEnumerator onSessionEvent (SessionEventType type)
@@ -84,7 +92,7 @@ public class TestRedirect
             }
         }
 
-        public void requestRedirect (TransportProtocol protocol)
+        void requestRedirect (TransportProtocol protocol)
         {
             FunEncoding encoding = session.GetEncoding(protocol);
             if (encoding == FunEncoding.kNone)
@@ -147,5 +155,195 @@ public class TestRedirect
 
         const int kStepCountMax = 3;
         int test_step = 0;
+    }
+
+
+    // This test is for queueing messages while on redirect.
+    class TestQueueImpl : TestSessionBase
+    {
+        public TestQueueImpl ()
+        {
+            SessionOption option = new SessionOption();
+            option.sessionReliability = true;
+            option.sendSessionIdOnlyOnce = true;
+            option.useRedirectQueue = true;
+
+            session = FunapiSession.Create(TestInfo.ServerIp, option);
+            session.ReceivedMessageCallback += onReceivedEchoMessage;
+
+            session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
+            {
+                if (isFinished)
+                    return;
+
+                if (type == SessionEventType.kOpened)
+                {
+                    requestRedirect(TransportProtocol.kTcp);
+                }
+                else if (type == SessionEventType.kRedirectStarted)
+                {
+                    startCoroutine(onSendingJsonEchos(TransportProtocol.kTcp, 3));
+                }
+                else if (type == SessionEventType.kRedirectSucceeded)
+                {
+                    onTestFinished();
+                }
+            };
+
+            session.TransportEventCallback += delegate (TransportProtocol protocol, TransportEventType type)
+            {
+                if (isFinished)
+                    return;
+
+                if (type == TransportEventType.kStarted)
+                {
+                    if (protocol == TransportProtocol.kTcp)
+                    {
+                        startCoroutine(onKeepSendingEchos(protocol, 0.01f));
+                    }
+                }
+            };
+
+            session.RedirectQueueCallback += delegate (TransportProtocol protocol,
+                                                       List<string> current_tags, List<string> target_tags,
+                                                       Queue<UnsentMessage> queue)
+            {
+                FunDebug.Log("RedirectQueueCallback called - queue:{0}", queue.Count);
+
+                int skip = Math.Min(3, queue.Count);
+
+                foreach (UnsentMessage msg in queue)
+                {
+                    if (skip > 0)
+                    {
+                        msg.abort = true;
+
+                        FunEncoding encoding = session.GetEncoding(protocol);
+                        if (encoding == FunEncoding.kJson)
+                        {
+                            Dictionary<string, object> json = msg.message as Dictionary<string, object>;
+                            FunDebug.Log("'{0}' message is aborted.", json["message"]);
+                        }
+                        else if (encoding == FunEncoding.kProtobuf)
+                        {
+                            FunMessage pbuf = msg.message as FunMessage;
+                            PbufEchoMessage echo = FunapiMessage.GetMessage<PbufEchoMessage>(pbuf, MessageType.pbuf_echo);
+                            FunDebug.Log("'{0}' message is aborted.", echo.msg);
+                        }
+
+                        --skip;
+                    }
+                }
+            };
+
+            setTestTimeout(5f);
+
+            ushort port = getPort("redirect", TransportProtocol.kTcp, FunEncoding.kProtobuf);
+            session.Connect(TransportProtocol.kTcp, FunEncoding.kProtobuf, port);
+        }
+
+        void requestRedirect (TransportProtocol protocol)
+        {
+            FunEncoding encoding = session.GetEncoding(protocol);
+            if (encoding == FunEncoding.kNone)
+                return;
+
+            if (encoding == FunEncoding.kJson)
+            {
+                Dictionary<string, object> message = new Dictionary<string, object>();
+                message["message"] = "request_redirect";
+                session.SendMessage("echo", message, protocol);
+            }
+            else if (encoding == FunEncoding.kProtobuf)
+            {
+                PbufEchoMessage echo = new PbufEchoMessage();
+                echo.msg = "request_redirect";
+                FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+                session.SendMessage("pbuf_echo", message, protocol);
+            }
+        }
+
+        void sendEchoMessage (TransportProtocol protocol)
+        {
+            if (isFinished)
+                return;
+
+            FunapiSession.Transport transport = session.GetTransport(protocol);
+            if (transport == null)
+            {
+                FunDebug.LogWarning("sendEchoMessage - transport is null.");
+                return;
+            }
+
+            lock (lock_)
+            {
+                ++index;
+                FunDebug.Log("send message - hello_{0}", index);
+
+                if (transport.encoding == FunEncoding.kJson)
+                {
+                    Dictionary<string, object> message = new Dictionary<string, object>();
+                    message["message"] = "hello_" + index;
+                    session.SendMessage("echo", message, protocol);
+                }
+                else if (transport.encoding == FunEncoding.kProtobuf)
+                {
+                    PbufEchoMessage echo = new PbufEchoMessage();
+                    echo.msg = "hello_" + index;
+                    FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+                    session.SendMessage("pbuf_echo", message, protocol);
+                }
+            }
+        }
+
+        void sendEchoMessage (TransportProtocol protocol, FunEncoding encoding)
+        {
+            lock (lock_)
+            {
+                ++index;
+                FunDebug.Log("send message - hello_{0} ({1})", index, encoding);
+
+                if (encoding == FunEncoding.kJson)
+                {
+                    Dictionary<string, object> message = new Dictionary<string, object>();
+                    message["message"] = "hello_" + index;
+                    session.SendMessage("echo", message, protocol);
+                }
+                else if (encoding == FunEncoding.kProtobuf)
+                {
+                    PbufEchoMessage echo = new PbufEchoMessage();
+                    echo.msg = "hello_" + index;
+                    FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+                    session.SendMessage("pbuf_echo", message, protocol);
+                }
+            }
+        }
+
+        IEnumerator onKeepSendingEchos (TransportProtocol protocol, float interval_seconds)
+        {
+            while (true)
+            {
+                if (isFinished)
+                    yield break;
+
+                sendEchoMessage(protocol);
+                yield return new SleepForSeconds(interval_seconds);
+            }
+        }
+
+        IEnumerator onSendingJsonEchos (TransportProtocol protocol, int count)
+        {
+            yield return new SleepForSeconds(0.1f);
+
+            for (int i = 0; i < count; ++i)
+            {
+                sendEchoMessage(TransportProtocol.kTcp, FunEncoding.kJson);
+                yield return new SleepForSeconds(0.01f);
+            }
+        }
+
+
+        int index = 0;
+        object lock_ = new object();
     }
 }
