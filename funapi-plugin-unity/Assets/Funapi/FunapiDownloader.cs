@@ -158,7 +158,8 @@ namespace Fun
 
                 if (partial_download_list_.Count <= 0)
                 {
-                    FunDebug.Log("Downloader.StartDownload - '{0}' is up to date.", prefix_path);
+                    FunDebug.Log("Downloader.StartDownload - There's no '{0}' files to download.", prefix_path);
+                    Stop();
                     return;
                 }
 
@@ -206,14 +207,14 @@ namespace Fun
                     state_ = State.Paused;
                     web_client_.CancelAsync();
                     download_time_.Stop();
-                    FunDebug.Log("Downloader - paused.");
+                    FunDebug.Log("Downloader - Paused.");
 
                     onFinished(DownloadResult.PAUSED);
                 }
                 else
                 {
                     state_ = State.None;
-                    FunDebug.Log("Downloader - stopped.");
+                    FunDebug.Log("Downloader - Stopped.");
 
                     onFinished(DownloadResult.FAILED);
                 }
@@ -272,7 +273,7 @@ namespace Fun
                 cached_list_.Add(info);
             }
 
-            FunDebug.DebugLog2("Downloader - Loads cached list : {0}", cached_list_.Count);
+            FunDebug.DebugLog1("Downloader - Loads cached list : {0}", cached_list_.Count);
         }
 
         void updateCachedList ()
@@ -302,7 +303,7 @@ namespace Fun
             stream.Flush();
             stream.Close();
 
-            FunDebug.DebugLog2("Downloader - Updates cached list : {0}", cached_list_.Count);
+            FunDebug.DebugLog1("Downloader - Updates cached list : {0}", cached_list_.Count);
         }
 
         // Checks download file list
@@ -334,7 +335,7 @@ namespace Fun
                     if (!rnd_list.Contains(rnd_index))
                         rnd_list.Enqueue(rnd_index);
                 }
-                FunDebug.DebugLog2("Downloader - Random check file count is {0}", rnd_list.Count);
+                FunDebug.DebugLog1("Downloader - Random check file count is {0}", rnd_list.Count);
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
             }
@@ -407,7 +408,7 @@ namespace Fun
 
             removeCachedList(remove_list);
 
-            FunDebug.DebugLog2("Downloader - Random validation has {0}",
+            FunDebug.DebugLog1("Downloader - Random validation has {0}",
                                (verify_success ? "succeeded" : "failed"));
 
             // Checks all local files
@@ -780,6 +781,8 @@ namespace Fun
         {
             event_.Add (delegate
             {
+                FunDebug.Log("Downloader - Finished.");
+
                 releaseMonoListener();
 
                 if (FinishedCallback != null)
