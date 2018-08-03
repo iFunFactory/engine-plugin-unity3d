@@ -216,7 +216,7 @@ public class TestRedirect
                 {
                     if (skip > 0)
                     {
-                        msg.abort = true;
+                        msg.discard = true;
 
                         FunEncoding encoding = session.GetEncoding(protocol);
                         if (encoding == FunEncoding.kJson)

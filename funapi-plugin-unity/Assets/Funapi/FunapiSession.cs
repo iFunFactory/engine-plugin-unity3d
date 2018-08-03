@@ -1501,7 +1501,7 @@ namespace Fun
                         while (queue.Count > 0)
                         {
                             UnsentMessage msg = queue.Dequeue();
-                            if (msg.abort)
+                            if (msg.discard)
                                 continue;
 
                             FunapiMessage message = null;
@@ -1776,6 +1776,6 @@ namespace Fun
         public string msg_type;
         public object message;
         public EncryptionType enc_type;
-        public bool abort = false;
+        public bool discard = false;
     }
 }
