@@ -19,8 +19,8 @@ public class UIOptionFields : MonoBehaviour
         foreach (Dropdown d in dnlist)
             drops[d.name] = d;
 
-        protocol = new Protocol(drops["Protocol"]);
-        encoding = new Encoding(drops["Encoding"]);
+        protocol = new OptionProtocol(drops["Protocol"]);
+        encoding = new OptionEncoding(drops["Encoding"]);
     }
 
 
@@ -149,6 +149,6 @@ public class UIOptionFields : MonoBehaviour
 
     public InputField address;
     public InputField port;
-    public Protocol protocol;
-    public Encoding encoding;
+    public OptionProtocol protocol;
+    public OptionEncoding encoding;
 }

@@ -8,55 +8,66 @@
 using Fun;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 // protobuf
 using plugin_messages;
 using funapi.network.fun_message;
 
 
-public class TestSession : MonoBehaviour
+public class Test2 : MonoBehaviour
 {
+    void Awake ()
+    {
+        Transform transform = GameObject.Find("Options").transform;
+        Dropdown[] dnlist = transform.GetComponentsInChildren<Dropdown>();
+        Dictionary<string, Dropdown> drops = new Dictionary<string, Dropdown>();
+        foreach (Dropdown d in dnlist)
+            drops[d.name] = d;
+
+        protocol1 = new OptionProtocol(drops["Protocol1"]);
+        encoding1 = new OptionEncoding(drops["Encoding1"]);
+        protocol2 = new OptionProtocol(drops["Protocol2"]);
+        encoding2 = new OptionEncoding(drops["Encoding2"]);
+        protocol3 = new OptionProtocol(drops["Protocol3"]);
+        encoding3 = new OptionEncoding(drops["Encoding3"]);
+    }
+
     public void OnButtonConnect ()
     {
-        if (session == null)
-            createSession();
-
-        TransportOption option = null;
-        if (info.protocol == TransportProtocol.kTcp)
+        if (session != null)
         {
-            TcpTransportOption tcp = new TcpTransportOption();
-
-            // If this option is set to true,
-            // it will automatically try to reconnect within the Transport when it is disconnected.
-            tcp.AutoReconnect = false;
-            option = tcp;
+            FunapiSession.Destroy(session);
+            session = null;
         }
 
-        session.Connect(info.protocol, info.encoding, info.port, option);
+        // Create session
+        SessionOption option = new SessionOption();
+        option.sessionReliability = false;
+        option.sendSessionIdOnlyOnce = false;
+
+        session = FunapiSession.Create(address.text, option);
+        session.SessionEventCallback += onSessionEvent;
+        session.TransportEventCallback += onTransportEvent;
+        session.TransportErrorCallback += onTransportError;
+        session.ReceivedMessageCallback += onReceivedMessage;
+
+        if (protocol1.type != TransportProtocol.kDefault)
+            session.Connect(protocol1.type, encoding1.type, ushort.Parse(port1.text));
+
+        if (protocol2.type != TransportProtocol.kDefault)
+            session.Connect(protocol2.type, encoding2.type, ushort.Parse(port2.text));
+
+        if (protocol3.type != TransportProtocol.kDefault)
+            session.Connect(protocol3.type, encoding3.type, ushort.Parse(port3.text));
     }
 
     public void OnButtonSendEcho ()
     {
-        FunapiSession.Transport transport = session.GetTransport(info.protocol);
-        if (transport == null)
-        {
-            FunDebug.LogWarning("sendEchoMessage - transport is null.");
-            return;
-        }
-
-        if (transport.encoding == FunEncoding.kJson)
-        {
-            Dictionary<string, object> message = new Dictionary<string, object>();
-            message["message"] = string.Format("[{0}] hello", transport.str_protocol);
-            session.SendMessage("echo", message, info.protocol);
-        }
-        else if (transport.encoding == FunEncoding.kProtobuf)
-        {
-            PbufEchoMessage echo = new PbufEchoMessage();
-            echo.msg = string.Format("[{0}] hello", transport.str_protocol);
-            FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-            session.SendMessage("pbuf_echo", message, info.protocol);
-        }
+        sendEcho(TransportProtocol.kTcp);
+        sendEcho(TransportProtocol.kUdp);
+        sendEcho(TransportProtocol.kHttp);
+        sendEcho(TransportProtocol.kWebsocket);
     }
 
     public void OnButtonStop ()
@@ -65,34 +76,26 @@ public class TestSession : MonoBehaviour
             session.Stop();
     }
 
-    public void OnButtonDisconnect ()
+
+    void sendEcho (TransportProtocol protocol)
     {
-        if (session == null && session.Connected)
+        FunapiSession.Transport transport = session.GetTransport(protocol);
+        if (transport == null)
             return;
 
-        FunapiSession.Transport transport = session.GetTransport(info.protocol);
-        if (transport != null)
-            transport.ForcedDisconnect();
-    }
-
-    public void OnClearLogs ()
-    {
-        logs.Clear();
-    }
-
-
-    void createSession ()
-    {
-        // Create session
-        SessionOption option = new SessionOption();
-        option.sessionReliability = false;
-        option.sendSessionIdOnlyOnce = false;
-
-        session = FunapiSession.Create(info.address, option);
-        session.SessionEventCallback += onSessionEvent;
-        session.TransportEventCallback += onTransportEvent;
-        session.TransportErrorCallback += onTransportError;
-        session.ReceivedMessageCallback += onReceivedMessage;
+        if (transport.encoding == FunEncoding.kJson)
+        {
+            Dictionary<string, object> message = new Dictionary<string, object>();
+            message["message"] = string.Format("[{0}] hello", transport.str_protocol);
+            session.SendMessage("echo", message, protocol);
+        }
+        else if (transport.encoding == FunEncoding.kProtobuf)
+        {
+            PbufEchoMessage echo = new PbufEchoMessage();
+            echo.msg = string.Format("[{0}] hello", transport.str_protocol);
+            FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
+            session.SendMessage("pbuf_echo", message, protocol);
+        }
     }
 
     void onSessionEvent (SessionEventType type, string sessionid)
@@ -128,7 +131,7 @@ public class TestSession : MonoBehaviour
         if (error.type == TransportError.Type.kDisconnected)
         {
             // If the connection is lost due to external factors, trys to reconnect.
-            session.Connect(info.protocol);
+            //session.Connect(info.protocol);
         }
         else
         {
@@ -157,9 +160,17 @@ public class TestSession : MonoBehaviour
     }
 
 
+    public InputField address;
+    public InputField port1;
+    public InputField port2;
+    public InputField port3;
 
-    public UIOption info;
-    public UILogs logs;
+    OptionProtocol protocol1;
+    OptionEncoding encoding1;
+    OptionProtocol protocol2;
+    OptionEncoding encoding2;
+    OptionProtocol protocol3;
+    OptionEncoding encoding3;
 
     FunapiSession session = null;
 }
