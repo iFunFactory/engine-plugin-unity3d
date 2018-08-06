@@ -90,6 +90,11 @@ public class TestRedirect
 
                 requestRedirect(TransportProtocol.kTcp);
             }
+            else if (type == SessionEventType.kRedirectFailed)
+            {
+                isFinished = true;
+                Assert.Fail("'Redirect' test has failed.");
+            }
         }
 
         void requestRedirect (TransportProtocol protocol)
@@ -187,6 +192,11 @@ public class TestRedirect
                 else if (type == SessionEventType.kRedirectSucceeded)
                 {
                     onTestFinished();
+                }
+                else if (type == SessionEventType.kRedirectFailed)
+                {
+                    isFinished = true;
+                    Assert.Fail("'Redirect' test has failed.");
                 }
             };
 

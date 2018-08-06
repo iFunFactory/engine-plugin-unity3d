@@ -15,6 +15,7 @@ namespace Fun
     {
         void Excute ();
 
+        string name { get; }
         bool canExcute { get; set; }
         bool keepWaiting { get; }
     }
@@ -32,6 +33,9 @@ namespace Fun
             lock (pending_lock_)
             {
                 pending_.Add(cmd);
+
+                if (debug != null)
+                    debug.DebugLog1("[Command] '{0}' added.", cmd.name);
             }
 
             return true;
@@ -41,6 +45,19 @@ namespace Fun
         {
             lock (lock_)
             {
+                if (clear_)
+                {
+                    if (list_.Count > 0)
+                    {
+                        if (debug != null)
+                            debug.Log("[Command] Deletes all. ({0})", list_.Count);
+
+                        list_.Clear();
+                    }
+
+                    clear_ = false;
+                }
+
                 lock (pending_lock_)
                 {
                     // Adds from pending list
@@ -58,6 +75,9 @@ namespace Fun
 
                     if (cmd.canExcute)
                     {
+                        if (debug != null)
+                            debug.DebugLog1("[Command] '{0}' called.", cmd.name);
+
                         cmd.canExcute = false;
                         cmd.Excute();
                     }
@@ -72,16 +92,16 @@ namespace Fun
 
         public void Clear ()
         {
-            lock (lock_)
-            {
-                list_.Clear();
-            }
+            clear_ = true;
         }
+
+        public FunDebugLog debug { private get; set; }
 
 
         object lock_ = new object();
         object pending_lock_ = new object();
         List<ICommand> list_ = new List<ICommand>();
         List<ICommand> pending_ = new List<ICommand>();
+        bool clear_ = false;
     }
 }

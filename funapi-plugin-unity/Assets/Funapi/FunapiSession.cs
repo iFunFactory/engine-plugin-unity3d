@@ -68,18 +68,20 @@ namespace Fun
         {
             FunDebug.Assert(option != null);
 
-            debug.SetDebugObject(this);
-            response_timeout_.debugLog = debug;
             debug.Log("Starting a session module.");
 
             state = State.kUnknown;
             server_address_ = hostname_or_ip;
             option_ = option;
 
-            setMonoListener();
+            debug.SetDebugObject(this);
+            cmd_list_.debug = debug;
+            response_timeout_.debugLog = debug;
 
             response_timeout_.SetCallbackHandler<int>(onResponseTimeoutCallback);
             response_timeout_.SetCallbackHandler<string>(onResponseTimeoutCallback);
+
+            setMonoListener();
 
             debug.Log("Plugin:{0} Protocol:{1} Reliability:{2}, SessionIdOnce:{3}",
                       FunapiVersion.kPluginVersion, FunapiVersion.kProtocolVersion,
@@ -531,6 +533,9 @@ namespace Fun
         {
             debug.Log("Redirect: Failed to redirect.");
 
+            wait_for_redirect_ = false;
+            cmd_list_.Clear();
+
             stopAll(true);
             onSessionEvent(SessionEventType.kRedirectFailed);
         }
@@ -780,9 +785,6 @@ namespace Fun
 
         void onSessionEvent (SessionEventType type)
         {
-            if (type == SessionEventType.kStopped)
-                state = State.kUnknown;
-
             if (wait_for_redirect_)
             {
                 debug.Log("Redirect: Session event ({0}).\nThis event callback is skipped.", type);
@@ -1153,7 +1155,12 @@ namespace Fun
                 }
             }
 
+            state = State.kUnknown;
+
             response_timeout_.Clear();
+
+            if (!wait_for_redirect_)
+                cmd_list_.Clear();
 
             onSessionEvent(SessionEventType.kStopped);
         }
@@ -1201,7 +1208,7 @@ namespace Fun
                         return;
 
                     addCommand(new CmdStopAll(this, true));
-                    addCommand(new CmdEvent(onSessionClosed));
+                    addCommand(new CmdEvent("onSessionClosed", onSessionClosed));
                 }
                 break;
 
@@ -1382,7 +1389,7 @@ namespace Fun
             // Notify start to redirect.
             onSessionEventCallback(SessionEventType.kRedirectStarted);
 
-            addCommand(new CmdEvent(() => StartCoroutine(onRedirect(host))));
+            addCommand(new CmdEvent("onRedirect", () => StartCoroutine(onRedirect(host))));
         }
 
         void onRedirectResultMessage (FunEncoding encoding, object message)
@@ -1412,13 +1419,12 @@ namespace Fun
                 }
             }
 
-            wait_for_redirect_ = false;
-
             if (succeeded)
             {
                 sendUnsentQueueMessages();
 
                 state = State.kConnected;
+                wait_for_redirect_ = false;
 
                 debug.Log("The default protocol is '{0}'", convertString(default_protocol_));
 
@@ -1579,6 +1585,8 @@ namespace Fun
                 }
             }
 
+            public string name { get { return name_; } }
+
             public bool keepWaiting
             {
                 get { return !failed && !isDone(); }
@@ -1586,6 +1594,7 @@ namespace Fun
 
             public bool canExcute { get; set; }
 
+            protected string name_ = "";
             protected Func<bool> excute = null;
             protected Func<bool> isDone = null;
             protected bool failed = false;
@@ -1593,8 +1602,10 @@ namespace Fun
 
         class CmdEvent : Command
         {
-            public CmdEvent (Action func)
+            public CmdEvent (string name, Action func)
             {
+                name_ = string.Format("Event({0})", name);
+
                 excute = delegate () {
                     func();
                     return true;
@@ -1610,6 +1621,8 @@ namespace Fun
         {
             public CmdConnect (FunapiSession session, Transport transport)
             {
+                name_ = string.Format("Connect({0})", transport.str_protocol);
+
                 excute = delegate () {
                     return session.connect(transport);
                 };
@@ -1627,6 +1640,8 @@ namespace Fun
         {
             public CmdStop (FunapiSession session, Transport transport)
             {
+                name_ = string.Format("Stop({0})", transport.str_protocol);
+
                 excute = delegate () {
                     return session.stop(transport);
                 };
@@ -1641,6 +1656,8 @@ namespace Fun
         {
             public CmdStopAll (FunapiSession session, bool immediately = false)
             {
+                name_ = "StopAll";
+
                 excute = delegate () {
                     return session.stopAll(immediately);
                 };
@@ -1655,6 +1672,8 @@ namespace Fun
         {
             public CmdPause (Transport transport, bool isPaused)
             {
+                name_ = string.Format("Pause({0})", isPaused);
+
                 excute = delegate () {
                     transport.OnPaused(isPaused);
                     return true;
