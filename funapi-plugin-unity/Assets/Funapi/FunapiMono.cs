@@ -147,10 +147,9 @@ namespace Fun
             {
                 public Func (IEnumerator func)
                 {
-                    func_ = func;
+                    list_.Push(func);
 
-                    if (!func_.MoveNext())
-                        isDone = true;
+                    moveNext();
                 }
 
                 public void Update (float deltaTime)
@@ -158,14 +157,36 @@ namespace Fun
                     if (isDone)
                         return;
 
-                    if (!func_.MoveNext())
+                    if (list_.Count > 0)
+                    {
+                        moveNext();
+                    }
+                    else
+                    {
                         isDone = true;
+                    }
+                }
+
+                void moveNext ()
+                {
+                    IEnumerator func = list_.Peek();
+
+                    if (!func.MoveNext())
+                    {
+                        list_.Pop();
+                        return;
+                    }
+
+                    if (func.Current != null)
+                    {
+                        list_.Push((IEnumerator)func.Current);
+                    }
                 }
 
                 public string name { get { return "Coroutine"; } }
                 public bool isDone { get; set; }
 
-                IEnumerator func_;
+                Stack<IEnumerator> list_ = new Stack<IEnumerator>();
             }
 
 
