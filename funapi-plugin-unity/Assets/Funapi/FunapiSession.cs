@@ -475,6 +475,9 @@ namespace Fun
                 Connect(info.protocol, info.encoding, info.port, info.option);
             }
 
+            // Waits for starting connect by update.
+            yield return new SleepForSeconds(0.1f);
+
             // Converts seconds to ticks.
             long redirect_timeout = DateTime.UtcNow.Ticks + (option_.redirectTimeout * 1000 * 10000);
 
