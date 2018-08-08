@@ -109,7 +109,10 @@ namespace Fun
         {
             Transport transport = createTransport(protocol, encoding, port, option);
             if (transport == null)
+            {
+                debug.LogWarning("Failed to create the {0} transport.", convertString(protocol));
                 return;
+            }
 
             transport.sendSessionIdOnlyOnce = option_.sendSessionIdOnlyOnce;
             transport.delayedAckInterval = option_.delayedAckInterval;
@@ -832,7 +835,8 @@ namespace Fun
                 if (wait_for_redirect_)
                 {
                     debug.Log("createTransport - {0} transport use the 'default option'.\n" +
-                              "If you want to use your option, please set FunapiSession.TransportOptionCallback event.",
+                              "If you want to use your option, " +
+                              "please set FunapiSession.TransportOptionCallback event.",
                               convertString(protocol));
                 }
                 else
@@ -853,40 +857,49 @@ namespace Fun
             else
                 option.ReliableTransport = false;
 
-            if (protocol == TransportProtocol.kTcp)
+            try
             {
-                transport = new TcpTransport(server_address_, port, encoding, option);
+                if (protocol == TransportProtocol.kTcp)
+                {
+                    transport = new TcpTransport(server_address_, port, encoding, option);
+                }
+                else if (protocol == TransportProtocol.kUdp)
+                {
+                    transport = new UdpTransport(server_address_, port, encoding, option);
+                }
+                else if (protocol == TransportProtocol.kHttp)
+                {
+                    bool https = ((HttpTransportOption)option).HTTPS;
+                    transport = new HttpTransport(server_address_, port, https, encoding, option);
+                }
+                else if (protocol == TransportProtocol.kWebsocket)
+                {
+                    transport = new WebsocketTransport(server_address_, port, encoding, option);
+                }
+                else
+                {
+                    debug.LogWarning("createTransport - {0} is invalid protocol type.",
+                                     convertString(protocol));
+                    return null;
+                }
+
+                // Callback functions
+                transport.CreateCompressorCallback += onCreateCompressor;
+                transport.EventCallback += onTransportEvent;
+                transport.ErrorCallback += onTransportError;
+                transport.ReceivedCallback += onTransportMessage;
+                transport.mono = this;
+
+                transport.Init();
+
+                lock (transports_lock_)
+                    transports_[protocol] = transport;
             }
-            else if (protocol == TransportProtocol.kUdp)
+            catch (Exception e)
             {
-                transport = new UdpTransport(server_address_, port, encoding, option);
-            }
-            else if (protocol == TransportProtocol.kHttp)
-            {
-                bool https = ((HttpTransportOption)option).HTTPS;
-                transport = new HttpTransport(server_address_, port, https, encoding, option);
-            }
-            else if (protocol == TransportProtocol.kWebsocket)
-            {
-                transport = new WebsocketTransport(server_address_, port, encoding, option);
-            }
-            else
-            {
-                debug.LogError("createTransport - {0} is invalid protocol type.", convertString(protocol));
+                FunDebug.LogWarning("Failure in createTransport: {0}", e.ToString());
                 return null;
             }
-
-            // Callback functions
-            transport.CreateCompressorCallback += onCreateCompressor;
-            transport.EventCallback += onTransportEvent;
-            transport.ErrorCallback += onTransportError;
-            transport.ReceivedCallback += onTransportMessage;
-            transport.mono = this;
-
-            transport.Init();
-
-            lock (transports_lock_)
-                transports_[protocol] = transport;
 
             reliable_protocol_ = getTheMostReliableProtocol();
 

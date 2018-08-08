@@ -40,38 +40,16 @@ public partial class UIOption : MonoBehaviour
 
     void saveData ()
     {
-        if (!checkChanges())
-            return;
-
         data_.address = fields_.address.text;
         data_.port = int.Parse(fields_.port.text);
         data_.protocol = fields_.protocol.typeInt;
         data_.encoding = fields_.encoding.typeInt;
     }
 
-    bool checkChanges ()
-    {
-        if (bChanged)
-            return true;
-
-        if (data_.address != fields_.address.text ||
-            data_.port != int.Parse(fields_.port.text) ||
-            data_.protocol != fields_.protocol.typeInt ||
-            data_.encoding != fields_.encoding.typeInt)
-        {
-            bChanged = true;
-        }
-
-        return bChanged;
-    }
-
-
     public string address { get { return fields_.address.text; } }
     public ushort port { get { return ushort.Parse(fields_.port.text); } }
     public TransportProtocol protocol { get { return fields_.protocol.type; } }
     public FunEncoding encoding { get { return fields_.encoding.type; } }
-
-    public bool bChanged { get; set; }
 
     public GameObject fieldsObject;
 

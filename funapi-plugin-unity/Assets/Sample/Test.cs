@@ -18,8 +18,10 @@ public class Test : MonoBehaviour
 {
     public void OnButtonConnect ()
     {
-        if (session == null)
+        if (session == null || address_changed)
+        {
             createSession();
+        }
 
         TransportOption option = null;
         if (info.protocol == TransportProtocol.kTcp)
@@ -37,6 +39,9 @@ public class Test : MonoBehaviour
 
     public void OnButtonSendEcho ()
     {
+        if (session == null)
+            return;
+
         FunapiSession.Transport transport = session.GetTransport(info.protocol);
         if (transport == null)
         {
@@ -67,7 +72,7 @@ public class Test : MonoBehaviour
 
     public void OnButtonDisconnect ()
     {
-        if (session == null && session.Connected)
+        if (session == null || !session.Connected)
             return;
 
         FunapiSession.Transport transport = session.GetTransport(info.protocol);
@@ -78,6 +83,11 @@ public class Test : MonoBehaviour
     public void OnClearLogs ()
     {
         logs.Clear();
+    }
+
+    public void OnChangedAddress (string text)
+    {
+        address_changed = true;
     }
 
 
@@ -93,6 +103,8 @@ public class Test : MonoBehaviour
         session.TransportEventCallback += onTransportEvent;
         session.TransportErrorCallback += onTransportError;
         session.ReceivedMessageCallback += onReceivedMessage;
+
+        address_changed = false;
     }
 
     void onSessionEvent (SessionEventType type, string sessionid)
@@ -104,6 +116,7 @@ public class Test : MonoBehaviour
         else if (type == SessionEventType.kStopped)
         {
             // All transports are stopped.
+            session = null;
         }
     }
 
@@ -128,7 +141,8 @@ public class Test : MonoBehaviour
         if (error.type == TransportError.Type.kDisconnected)
         {
             // If the connection is lost due to external factors, trys to reconnect.
-            session.Connect(info.protocol);
+            if (session != null)
+                session.Connect(info.protocol);
         }
         else
         {
@@ -136,7 +150,8 @@ public class Test : MonoBehaviour
             // You can try to reconnect for these errors,
             // but the reconnect may fail if the cause of the error is not resolved.
 
-            session.Stop();
+            if (session != null)
+                session.Stop();
         }
     }
 
@@ -162,4 +177,5 @@ public class Test : MonoBehaviour
     public UILogs logs;
 
     FunapiSession session = null;
+    bool address_changed = false;
 }
