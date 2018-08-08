@@ -1046,7 +1046,7 @@ namespace Fun
             else if (state != State.kWaitForSessionId)
             {
                 // Sends the first message with reliable protocol to get session id.
-                if (protocol == reliable_protocol_)
+                if (protocol == reliable_protocol_ || protocol != TransportProtocol.kUdp)
                 {
                     state = State.kWaitForSessionId;
                     transport.SendMessage(new FunapiMessage(protocol, kEmptyMessageType), true);
