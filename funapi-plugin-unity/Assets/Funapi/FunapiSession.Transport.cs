@@ -723,6 +723,8 @@ namespace Fun
                     cstate_ = ConnectState.kReconnecting;
                     exponential_time_ = 1f;
 
+                    resetEncryptors();
+
                     if (state_ == State.kEstablished)
                         setConnectionTimeout();
 
