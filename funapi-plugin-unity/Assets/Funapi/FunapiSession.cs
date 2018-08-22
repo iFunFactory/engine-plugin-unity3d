@@ -40,6 +40,9 @@ namespace Fun
         // Redirect-related variables
         public int redirectTimeout = 10;         // seconds
         public bool useRedirectQueue = false;
+
+        // Encryption-related variables
+        public string encryptionPublicKey = null;
     }
 
 
@@ -116,6 +119,7 @@ namespace Fun
 
             transport.sendSessionIdOnlyOnce = option_.sendSessionIdOnlyOnce;
             transport.delayedAckInterval = option_.delayedAckInterval;
+            transport.encryptionPublicKey = option_.encryptionPublicKey;
 
             addCommand(new CmdConnect(this, transport));
         }

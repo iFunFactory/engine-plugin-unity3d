@@ -262,6 +262,18 @@ namespace Fun
             debug.SetDebugObject(this);
         }
 
+        public static byte[] UnHexifyKey(string key)
+        {
+            if (key.Length != 64)
+            {
+                throw new ArgumentException("Length of public key is not 64. The length should be 64 bytes.",
+                                            "FunapiEncryptor.public_key");
+            }
+
+            return Sodium.Unhexify(key);
+
+        }
+
         bool createEncryptor (EncryptionType type)
         {
             if (encryptors_.ContainsKey(type))
@@ -467,9 +479,15 @@ namespace Fun
         }
 
         // return value: client public key
-        protected string generatePublicKey (EncryptionType type)
+        protected string generatePublicKey (EncryptionType type, byte[] pub_key)
         {
-            if (pub_key_ == null)
+            if (pub_key == null)
+            {
+                // use default encryption key
+                pub_key = default_pub_key_;
+            }
+
+            if (pub_key == null)
             {
                 debug.LogError("Please set the value of 'FunapiEncryptor.public_key' first before connecting.\n" +
                                "  The encryption public key can be found in the MANIFEST file on the server.\n" +
@@ -483,20 +501,14 @@ namespace Fun
                 return null;
             }
 
-            return encryptors_[type].generatePublicKey(pub_key_);
+            return encryptors_[type].generatePublicKey(pub_key);
         }
 
         public static string public_key
         {
             set
             {
-                if (value.Length != 64)
-                {
-                    throw new ArgumentException("Length of public key is not 64. The length should be 64 bytes.",
-                                                "FunapiEncryptor.public_key");
-                }
-
-                pub_key_ = Sodium.Unhexify(value);
+                default_pub_key_ = UnHexifyKey(value);
             }
         }
 
@@ -507,7 +519,9 @@ namespace Fun
 
         EncryptionType default_encryptor_ = EncryptionType.kNoneEncryption;
         Dictionary<EncryptionType, Encryptor> encryptors_ = new Dictionary<EncryptionType, Encryptor>();
-        static byte[] pub_key_ = null;
+
+        // default encryption key
+        static byte[] default_pub_key_ = null;
 
         // For debugging
         protected FunDebugLog debug = new FunDebugLog();

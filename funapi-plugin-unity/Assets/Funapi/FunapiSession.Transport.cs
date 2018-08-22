@@ -405,6 +405,17 @@ namespace Fun
                 set { delayed_ack_interval_ = value; }
             }
 
+            public string encryptionPublicKey
+            {
+                set
+                {
+                    if (value != null)
+                    {
+                        encryption_pub_key_ = UnHexifyKey(value);
+                    }
+                }
+            }
+
             public abstract bool Connected { get; }
 
             public bool Connecting
@@ -1105,7 +1116,7 @@ namespace Fun
                 EncryptionType enc_type = getEncryption(msg);
                 if (msg.msg_type == kEncryptionPublicKey)
                 {
-                    string enc_key = generatePublicKey(enc_type);
+                    string enc_key = generatePublicKey(enc_type, encryption_pub_key_);
                     if (enc_key == null)
                         return false;
 
@@ -1877,6 +1888,7 @@ namespace Fun
             UInt32 sent_ack_ = 0;
             bool first_seq_ = true;
             float delayed_ack_interval_ = 0f;
+            byte[] encryption_pub_key_ = null;
             Queue<FunapiMessage> sent_queue_ = new Queue<FunapiMessage>();
             Queue<FunapiMessage> unsent_queue_ = new Queue<FunapiMessage>();
 
