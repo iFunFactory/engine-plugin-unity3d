@@ -245,20 +245,7 @@ namespace Fun
                 timer_.Clear();
                 exponential_time_ = 0f;
 
-                stopPingTimer();
-
                 onClose();
-
-                if (!IsReliable)
-                {
-                    lock (sending_lock_)
-                        pending_.Clear();
-                }
-
-                lock (session_id_sent_lock_)
-                    session_id_has_been_sent = false;
-
-                resetEncryptors();
 
                 onTransportEventCallback(TransportEventType.kStopped);
             }
@@ -511,8 +498,6 @@ namespace Fun
 
             public void ForcedDisconnect()
             {
-                onClose();
-
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kDisconnected;
                 error.message = string.Format("{0} forcibly closed the connection for testing.",
@@ -542,7 +527,20 @@ namespace Fun
             }
 
             // Closes a socket
-            protected abstract void onClose ();
+            protected virtual void onClose ()
+            {
+                stopPingTimer();
+                resetEncryptors();
+
+                if (!IsReliable)
+                {
+                    lock (sending_lock_)
+                        pending_.Clear();
+                }
+
+                lock (session_id_sent_lock_)
+                    session_id_has_been_sent = false;
+            }
 
             // Sends a packet.
             protected abstract void wireSend ();
@@ -723,7 +721,7 @@ namespace Fun
                     cstate_ = ConnectState.kReconnecting;
                     exponential_time_ = 1f;
 
-                    resetEncryptors();
+                    onClose();
 
                     if (state_ == State.kEstablished)
                         setConnectionTimeout();

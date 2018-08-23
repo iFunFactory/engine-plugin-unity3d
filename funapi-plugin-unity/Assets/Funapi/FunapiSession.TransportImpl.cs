@@ -91,6 +91,8 @@ namespace Fun
                         sock_ = null;
                     }
                 }
+
+                base.onClose();
             }
 
             protected override void wireSend ()
@@ -410,6 +412,8 @@ namespace Fun
                         sock_ = null;
                     }
                 }
+
+                base.onClose();
             }
 
             // Send a packet.
@@ -719,6 +723,7 @@ namespace Fun
             protected override void onClose ()
             {
                 cancelRequest();
+                base.onClose();
             }
 
             protected override bool isSendable
@@ -1282,6 +1287,8 @@ namespace Fun
                         wsock_ = null;
                     }
                 }
+
+                base.onClose();
             }
 
             protected override void wireSend ()
