@@ -1757,7 +1757,11 @@ namespace Fun
                     timestamp = ping.timestamp;
                 }
 
-                ping_timer_.Reset();
+                if (ping_timer_ != null)
+                {
+                    ping_timer_.Reset();
+                }
+
                 ping_time_ = (int)((DateTime.Now.Ticks - timestamp) / 10000);
 
                 if (enable_ping_log_)
