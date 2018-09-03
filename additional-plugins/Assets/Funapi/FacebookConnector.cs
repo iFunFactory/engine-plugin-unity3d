@@ -51,14 +51,14 @@ namespace Fun
             FB.LogOut();
         }
 
+        [System.Obsolete("This is an obsolete method. This method is no longer used because the 'publish_actions' permission has been removed.")]
         public override void PostWithImage (string message, byte[] image)
         {
-            StartCoroutine(PostWithImageEnumerator(message, image));
         }
 
+        [System.Obsolete("This is an obsolete method. This method is no longer used because the 'publish_actions' permission has been removed.")]
         public override void PostWithScreenshot (string message)
         {
-            StartCoroutine(PostWithScreenshotEnumerator(message));
         }
 
         public bool IsLoggedIn
@@ -81,14 +81,9 @@ namespace Fun
             FB.API(query, HttpMethod.GET, OnFriendListCb);
         }
 
+        [System.Obsolete("This is an obsolete method. This method is no longer used because the 'invitable_friends' has been removed.")]
         public void RequestInviteList (int limit)
         {
-            string query = string.Format("me?fields=invitable_friends.limit({0})" +
-                                         ".fields(id,name,picture.width(128).height(128))", limit);
-            FunDebug.Log("Facebook request: {0}", query);
-
-            // Reqests friend list
-            FB.API(query, HttpMethod.GET, OnInviteListCb);
         }
 
 
@@ -250,109 +245,6 @@ namespace Fun
                 FunDebug.LogError("Failure in OnFriendListCb: {0}", e.ToString());
             }
         }
-
-        void OnInviteListCb (IGraphResult result)
-        {
-            try
-            {
-                Dictionary<string, object> json = Json.Deserialize(result.RawResult) as Dictionary<string, object>;
-                if (json == null)
-                {
-                    FunDebug.LogError("OnInviteListCb - json is null.");
-                    OnEventNotify(SNResultCode.kError);
-                    return;
-                }
-
-                object invitable_friends = null;
-                json.TryGetValue("invitable_friends", out invitable_friends);
-                if (invitable_friends == null)
-                {
-                    FunDebug.LogError("OnInviteListCb - invitable_friends is null.");
-                    OnEventNotify(SNResultCode.kError);
-                    return;
-                }
-
-                lock (invite_list_)
-                {
-                    invite_list_.Clear();
-
-                    List<object> list = ((Dictionary<string, object>)invitable_friends)["data"] as List<object>;
-                    foreach (object item in list)
-                    {
-                        Dictionary<string, object> info = item as Dictionary<string, object>;
-                        Dictionary<string, object> picture = ((Dictionary<string, object>)info["picture"])["data"] as Dictionary<string, object>;
-
-                        string url = picture["url"] as string;
-                        UserInfo user = new UserInfo();
-                        user.id = info["id"] as string;
-                        user.name = info["name"] as string;
-                        user.url = url;
-
-                        invite_list_.Add(user);
-                        FunDebug.DebugLog1(">> id:{0} name:{1} image:{2}", user.id, user.name, user.url);
-                    }
-                }
-
-                FunDebug.Log("Succeeded in getting the invite friend list.");
-                OnEventNotify(SNResultCode.kInviteList);
-
-                lock (invite_list_)
-                {
-                    if (auto_request_picture_ && invite_list_.Count > 0)
-                        StartCoroutine(RequestPictures(GetInviteList()));
-                }
-            }
-            catch (Exception e)
-            {
-                FunDebug.LogError("Failure in OnInviteListCb: {0}", e.ToString());
-            }
-        }
-
-
-        // Post-related functions
-        IEnumerator PostWithImageEnumerator (string message, byte[] image)
-        {
-            yield return new WaitForEndOfFrame();
-
-            var wwwForm = new WWWForm();
-            wwwForm.AddBinaryData("image", image, "image.png");
-            wwwForm.AddField("message", message);
-
-            FB.API("me/photos", HttpMethod.POST, PostCallback, wwwForm);
-        }
-
-        IEnumerator PostWithScreenshotEnumerator (string message)
-        {
-            yield return new WaitForEndOfFrame();
-
-            var width = Screen.width;
-            var height = Screen.height;
-            var tex = new Texture2D(width, height, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            tex.Apply();
-            byte[] screenshot = tex.EncodeToPNG();
-
-            var wwwForm = new WWWForm();
-            wwwForm.AddBinaryData("image", screenshot, "screenshot.png");
-            wwwForm.AddField("message", message);
-
-            FB.API("me/photos", HttpMethod.POST, PostCallback, wwwForm);
-        }
-
-        void PostCallback (IGraphResult result)
-        {
-            FunDebug.DebugLog1("FacebookConnector.PostCallback called.");
-            if (result.Error != null)
-            {
-                FunDebug.LogError(result.Error);
-                OnEventNotify(SNResultCode.kPostFailed);
-                return;
-            }
-
-            FunDebug.Log("Facebook post succeeded!");
-            OnEventNotify(SNResultCode.kPosted);
-        }
-
 
         // member variables.
         bool auto_request_picture_ = true;
