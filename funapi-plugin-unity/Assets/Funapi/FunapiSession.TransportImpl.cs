@@ -1337,6 +1337,18 @@ namespace Fun
             void closeCb (object sender, CloseEventArgs args)
             {
                 debug.Log("Websocket closeCb called. ({0}) {1}", args.Code, args.Reason);
+
+                CloseStatusCode code = (CloseStatusCode)args.Code;
+                if (code != CloseStatusCode.Normal && code != CloseStatusCode.NoStatus)
+                {
+                    TransportError error = new TransportError();
+                    if (state != State.kEstablished)
+                        error.type = TransportError.Type.kStartingFailed;
+                    else
+                        error.type = TransportError.Type.kDisconnected;
+                    error.message = string.Format("Websocket failure: {0}({1}) : {2}", code, args.Code, args.Reason);
+                    onFailure(error);
+                }
             }
 
             void errorCb (object sender, WebSocketSharp.ErrorEventArgs args)
