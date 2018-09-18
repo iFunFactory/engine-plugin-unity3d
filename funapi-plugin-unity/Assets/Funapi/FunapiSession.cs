@@ -127,7 +127,7 @@ namespace Fun
             {
                 debug.LogWarning("Session.Connect({0}) called but can't find a {1} transport. " +
                                  "You should call FunapiSession.Connect(protocol, encoding, ...) function.",
-                                 transport.str_protocol, transport.str_protocol);
+                                 convertString(protocol), convertString(protocol));
                 return;
             }
 
@@ -151,7 +151,7 @@ namespace Fun
             if (transport == null)
             {
                 debug.LogWarning("Session.Stop({0}) called but can't find a {1} transport.",
-                                 transport.str_protocol, transport.str_protocol);
+                                 convertString(protocol), convertString(protocol));
                 return;
             }
 
