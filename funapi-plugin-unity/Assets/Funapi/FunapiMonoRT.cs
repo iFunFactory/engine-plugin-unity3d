@@ -44,16 +44,18 @@ namespace Fun
 
         void onStop ()
         {
-            if (thread_ == null)
+            if (thread_ == null || running_ == false)
                 return;
 
-            thread_.Abort();
+            running_ = false;
+
+            thread_.Join();
             thread_ = null;
         }
 
         void onUpdate ()
         {
-            while (true)
+            while (running_)
             {
                 Update();
                 Thread.Sleep(33);
@@ -64,6 +66,7 @@ namespace Fun
         static FunapiMono instance_ = null;
 
         Thread thread_ = null;
+        bool running_ = true;
     }
 }
 #endif
