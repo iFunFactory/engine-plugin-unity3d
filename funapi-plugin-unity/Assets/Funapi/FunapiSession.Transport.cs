@@ -1668,9 +1668,12 @@ namespace Fun
                 if (interval <= 0)
                     interval = kPingIntervalDefault;
 
-                ping_timer_ = new FunapiTimeoutTimer("ping", interval, onPingUpdate,
-                                                     tcp_option.PingTimeoutSeconds, onPingTimeout);
+                ping_timer_ = new FunapiPingTimer(interval, tcp_option.PingTimeoutSeconds,
+                                                  onPingUpdate, onPingTimeout);
                 timer_.Add(ping_timer_, true);
+
+                debug.Log("{0} ping timer started. interval: {1}s timeout: {2}s",
+                          str_protocol_, interval, tcp_option.PingTimeoutSeconds);
             }
 
             void stopPingTimer ()
@@ -1688,6 +1691,8 @@ namespace Fun
                 {
                     timer_.Remove(ping_timer_);
                     ping_timer_ = null;
+
+                    debug.Log("{0} ping timer stopped.", str_protocol_);
                 }
 
                 ping_time_ = 0;
@@ -1706,6 +1711,8 @@ namespace Fun
 
             void onPingTimeout ()
             {
+                debug.LogWarning("{0} ping timer timed out.", str_protocol_);
+
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kDisconnected;
                 error.message = string.Format("{0} has not received a ping message for a long time.",
@@ -1793,10 +1800,19 @@ namespace Fun
                     ping_timer_.Reset();
                 }
 
-                ping_time_ = (int)((DateTime.Now.Ticks - timestamp) / 10000);
+                if (timestamp != 0)
+                {
+                    ping_time_ = (int)((DateTime.Now.Ticks - timestamp) / 10000);
+                }
+                else
+                {
+                    ping_time_ = 0;
+                }
 
                 if (enable_ping_log_)
+                {
                     debug.DebugLog1("Received ping - timestamp:{0} time={1}ms", timestamp, ping_time_);
+                }
             }
 
 
@@ -1878,7 +1894,7 @@ namespace Fun
             // Ping-related variables.
             bool enable_ping_ = false;
             bool enable_ping_log_ = false;
-            FunapiTimeoutTimer ping_timer_ = null;
+            FunapiPingTimer ping_timer_ = null;
             int ping_time_ = 0;
 
             // Message-related variables.

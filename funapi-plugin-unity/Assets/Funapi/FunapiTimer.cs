@@ -296,4 +296,57 @@ namespace Fun
         float limit_ = 0f;
         float exp_time_ = 1f;
     }
+
+
+    // This is loop timer for sending ping.
+    public class FunapiPingTimer : FunapiTimer
+    {
+        public FunapiPingTimer (float interval, float timeout,
+                                Action<float> update_callback, Action timeout_callback)
+            : base("ping", 0f, timeout_callback)
+        {
+            timeout_ = timeout;
+            interval_ = interval;
+            update_callback_ = update_callback;
+            callback_ = timeout_callback;
+        }
+
+        public void Reset ()
+        {
+            elapsed_ = 0f;
+        }
+
+        public override void Update (float deltaTime)
+        {
+            if (isDone)
+                return;
+
+            // Checks timeout
+            if (elapsed_ >= timeout_)
+            {
+                callback_();
+                isDone = true;
+                return;
+            }
+
+            // Adds elapsed time after checking the timeout.
+            // This is to rule out huge delay in the update.
+            elapsed_ += deltaTime;
+
+            // Checks update
+            elapsed_update_ += deltaTime;
+            if (elapsed_update_ < interval_)
+                return;
+
+            update_callback_(elapsed_update_);
+
+            elapsed_update_ = 0f;
+        }
+
+
+        float timeout_ = 0f;
+        float interval_ = 0f;
+        float elapsed_update_ = 0f;
+        Action<float> update_callback_;
+    }
 }
