@@ -543,6 +543,9 @@ namespace Fun
                 stopPingTimer();
                 resetEncryptors();
 
+                lock (messages_lock_)
+                    messages_.Clear();
+
                 if (!IsReliable)
                 {
                     lock (sending_lock_)
@@ -1440,7 +1443,12 @@ namespace Fun
 
                         if (state_ == State.kHandshaking)
                         {
-                            FunDebug.Assert(msg.body.Count == 0);
+                            if (msg.body.Count != 0)
+                            {
+                                debug.LogWarning("{0} this message will be ignore. " +
+                                                 "This message might come from previous connection.", str_protocol_);
+                                return false;
+                            }
 
                             if (doHandshaking(encryption_type, msg.encryption_header))
                             {
