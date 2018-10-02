@@ -456,9 +456,6 @@ namespace Fun
 
         IEnumerator onRedirect (string host)
         {
-            // Stopping all transports.
-            stopAll(true);
-
             // Wait for stop.
             while (Started)
             {
@@ -1405,6 +1402,16 @@ namespace Fun
 
             redirect_token_ = token;
             wait_for_redirect_ = true;
+
+            // Stopping all transports.
+            lock (transports_lock_)
+            {
+                foreach (Transport transport in transports_.Values)
+                {
+                    transport.IsRedirecting = true;
+                    transport.Stop();
+                }
+            }
 
             // Notify start to redirect.
             onSessionEventCallback(SessionEventType.kRedirectStarted);

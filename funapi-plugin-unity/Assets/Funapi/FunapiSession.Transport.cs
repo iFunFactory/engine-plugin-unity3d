@@ -395,6 +395,12 @@ namespace Fun
                 get { return state_ == State.kUnknown; }
             }
 
+            public bool IsRedirecting
+            {
+                get { return redirecting_; }
+                set { redirecting_ = value; }
+            }
+
             public bool sendSessionIdOnlyOnce
             {
                 set { send_session_id_only_once_ = value; }
@@ -665,54 +671,60 @@ namespace Fun
 
             protected void onDisconnected (TransportError error)
             {
-                last_error_code_ = error.type;
-                last_error_message_ = error.message;
-
-                debug.LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
-                                 str_protocol_, state_, error.type, error.message);
-
-                if (ErrorCallback != null)
-                    ErrorCallback(protocol_, error);
-
-                if (auto_reconnect_)
+                event_.Add(delegate ()
                 {
-                    onAutoReconnect();
-                    return;
-                }
+                    last_error_code_ = error.type;
+                    last_error_message_ = error.message;
 
-                event_.Add(Stop);
+                    debug.LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
+                                     str_protocol_, state_, error.type, error.message);
+
+                    if (ErrorCallback != null)
+                        ErrorCallback(protocol_, error);
+
+                    if (auto_reconnect_ && !redirecting_)
+                    {
+                        onAutoReconnect();
+                        return;
+                    }
+
+                    event_.Add(Stop);
+                });
             }
 
             protected virtual void onFailure (TransportError error)
             {
-                last_error_code_ = error.type;
-                last_error_message_ = error.message;
-
-                debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
-                                 str_protocol_, state_, error.type, error.message);
-
-                if (ErrorCallback != null)
-                    ErrorCallback(protocol_, error);
-
-                if (state_ != State.kEstablished)
+                event_.Add(delegate ()
                 {
-                    if (auto_reconnect_)
+                    last_error_code_ = error.type;
+                    last_error_message_ = error.message;
+
+                    debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
+                                    str_protocol_, state_, error.type, error.message);
+
+                    if (ErrorCallback != null)
+                        ErrorCallback(protocol_, error);
+
+                    if (state_ != State.kEstablished)
                     {
-                        debug.Log("{0} connection failed. will try to connect again. " +
-                                  "(state: {1}, error: {2})\n{3}\n",
-                                  str_protocol_, state_, error.type, error.message);
+                        if (auto_reconnect_ && !redirecting_)
+                        {
+                            debug.Log("{0} connection failed. will try to connect again. " +
+                                      "(state: {1}, error: {2})\n{3}\n",
+                                      str_protocol_, state_, error.type, error.message);
 
-                        onAutoReconnect();
-                        return;
+                            onAutoReconnect();
+                            return;
+                        }
                     }
-                }
 
-                // If an error occurs during connection, stops the connection.
-                // Or if an error occurs while connected from not UDP, stops the connection.
-                if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
-                {
-                    event_.Add(Stop);
-                }
+                    // If an error occurs during connection, stops the connection.
+                    // Or if an error occurs while connected from not UDP, stops the connection.
+                    if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
+                    {
+                        event_.Add(Stop);
+                    }
+                });
             }
 
             void onTransportEventCallback (TransportEventType type)
@@ -727,7 +739,7 @@ namespace Fun
             //---------------------------------------------------------------------
             bool onAutoReconnect ()
             {
-                if (!auto_reconnect_)
+                if (!auto_reconnect_ || redirecting_)
                     return false;
 
                 if (cstate_ != ConnectState.kReconnecting)
@@ -1861,6 +1873,7 @@ namespace Fun
             ConnectState cstate_ = ConnectState.kUnknown;
             bool auto_reconnect_ = false;
             float exponential_time_ = 0f;
+            bool redirecting_ = false;
 
             // Ping-related variables.
             bool enable_ping_ = false;

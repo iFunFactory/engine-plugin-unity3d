@@ -204,30 +204,36 @@ namespace Fun
 
                         nSent = sock_.EndSend(ar);
                     }
-                    FunDebug.Assert(nSent > 0, "TCP failed to transfer messages.");
 
-                    debug.DebugLog3("TCP sent {0} bytes.", nSent);
-
-                    lock (sending_lock_)
+                    if (nSent > 0)
                     {
-                        while (nSent > 0)
+                        debug.DebugLog3("TCP sent {0} bytes.", nSent);
+
+                        lock (sending_lock_)
                         {
-                            FunDebug.Assert(sending_.Count > 0,
-                                string.Format("TCP couldn't find the sending buffers that sent messages.\n" +
-                                              "Sent {0} more bytes but there are no sending buffers.", nSent));
+                            while (nSent > 0)
+                            {
+                                FunDebug.Assert(sending_.Count > 0,
+                                    string.Format("TCP couldn't find the sending buffers that sent messages.\n" +
+                                                "Sent {0} more bytes but there are no sending buffers.", nSent));
 
-                            // removes a sent message.
-                            FunapiMessage msg = sending_[0];
-                            int length = msg.header.Count + msg.body.Count;
-                            nSent -= length;
-                            sending_.RemoveAt(0);
+                                // removes a sent message.
+                                FunapiMessage msg = sending_[0];
+                                int length = msg.header.Count + msg.body.Count;
+                                nSent -= length;
+                                sending_.RemoveAt(0);
+                            }
+
+                            FunDebug.Assert(sending_.Count == 0,
+                                string.Format("sendBytesCb - sending buffer has {0} message(s).", sending_.Count));
+
+                            // Sends pending messages
+                            checkPendingMessages();
                         }
-
-                        FunDebug.Assert(sending_.Count == 0,
-                            string.Format("sendBytesCb - sending buffer has {0} message(s).", sending_.Count));
-
-                        // Sends pending messages
-                        checkPendingMessages();
+                    }
+                    else
+                    {
+                        debug.LogWarning("TCP socket closed");
                     }
                 }
                 catch (ObjectDisposedException)
