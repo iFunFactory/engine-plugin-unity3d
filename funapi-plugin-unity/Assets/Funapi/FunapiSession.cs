@@ -824,8 +824,6 @@ namespace Fun
                     option = new TcpTransportOption();
                 else if (protocol == TransportProtocol.kHttp)
                     option = new HttpTransportOption();
-                else if (protocol == TransportProtocol.kWebsocket)
-                    option = new WebsocketTransportOption();
                 else
                     option = new TransportOption();
 

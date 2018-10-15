@@ -147,25 +147,6 @@ namespace Fun
         }
     }
 
-    public class WebsocketTransportOption : TransportOption
-    {
-        public bool WSS = false;
-
-        public override bool Equals (object obj)
-        {
-            if (obj == null || !base.Equals(obj) || !(obj is WebsocketTransportOption))
-                return false;
-
-            WebsocketTransportOption option = obj as WebsocketTransportOption;
-
-            return WSS == option.WSS;
-        }
-
-        public override int GetHashCode ()
-        {
-            return base.GetHashCode ();
-        }
-    }
 
 
     public partial class FunapiSession

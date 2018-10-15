@@ -1245,11 +1245,8 @@ namespace Fun
             {
                 addr_ = new HostIP(host, port);
 
-                WebsocketTransportOption ws_option = (WebsocketTransportOption)option_;
-                wss_ = ws_option.WSS;
-
                 // Sets host url
-                host_url_ = string.Format("{0}://{1}:{2}/", wss_ ? "wss" : "ws", host, port);
+                host_url_ = string.Format("ws://{0}:{1}/", host, port);
 
                 debug.Log("Websocket connect - {0}, {1}, {2}, Compression:{3}, ConnectionTimeout:{4}",
                           host_url_, convertString(encoding_), convertString(option_.Encryption),
@@ -1271,13 +1268,6 @@ namespace Fun
                     wsock_.OnClose += closeCb;
                     wsock_.OnError += errorCb;
                     wsock_.OnMessage += receiveBytesCb;
-
-                    // Callback function for secure connection with SSL/TLS.
-                    if (wss_)
-                    {
-                        TrustManager.LoadMozRoots();
-                        wsock_.SslConfiguration.ServerCertificateValidationCallback = TrustManager.CertValidationCallback;
-                    }
 
                     wsock_.ConnectAsync();
                 }
@@ -1433,7 +1423,6 @@ namespace Fun
 
             HostIP addr_;
             string host_url_;
-            bool wss_ = false;
             WebSocket wsock_;
             object sock_lock_ = new object();
         }
