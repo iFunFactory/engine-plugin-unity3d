@@ -583,7 +583,7 @@ namespace Fun
                 // Check directory
                 string path = target_path_;
                 int offset = info.path.LastIndexOf('/');
-                if (offset >= 0)
+                if (offset > 0)
                     path += info.path.Substring(0, offset);
 
                 if (!Directory.Exists(path))

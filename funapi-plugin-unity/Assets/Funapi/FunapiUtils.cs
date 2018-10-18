@@ -91,6 +91,9 @@ namespace Fun
                     {
                         string path = Application.dataPath;
                         path_ = path.Substring(0, path.LastIndexOf('/')) + "/Data";
+
+                        if (!System.IO.Directory.Exists(path_))
+                            System.IO.Directory.CreateDirectory(path_);
                     }
                     else
                     {
