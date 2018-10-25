@@ -96,6 +96,7 @@ namespace Fun
         public bool EnablePingLog = false;
         public int PingIntervalSeconds = 0;
         public float PingTimeoutSeconds = 0f;
+        public bool UseTLS = false;
 
         public void SetPing (int interval, float timeout, bool enable_log = false)
         {
@@ -117,7 +118,8 @@ namespace Fun
                    EnablePing == option.EnablePing &&
                    EnablePingLog == option.EnablePingLog &&
                    PingIntervalSeconds == option.PingIntervalSeconds &&
-                   PingTimeoutSeconds == option.PingTimeoutSeconds;
+                   PingTimeoutSeconds == option.PingTimeoutSeconds &&
+                   UseTLS == option.UseTLS;
         }
 
         public override int GetHashCode ()

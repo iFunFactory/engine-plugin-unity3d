@@ -9,6 +9,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
 using WebSocketSharp;
@@ -33,6 +34,12 @@ namespace Fun
                 option = tcp_option;
 
                 setAddress(hostname_or_ip, port);
+
+                ssl_ = (option as TcpTransportOption).UseTLS;
+                if (ssl_)
+                {
+                    TrustManager.LoadMozRoots();
+                }
             }
 
             public override HostAddr address
@@ -85,6 +92,12 @@ namespace Fun
             {
                 lock (sock_lock_)
                 {
+                    if (ssl_stream_ != null)
+                    {
+                        ssl_stream_.Close();
+                        ssl_stream_ = null;
+                    }
+
                     if (sock_ != null)
                     {
                         sock_.Close();
@@ -97,12 +110,12 @@ namespace Fun
 
             protected override void wireSend ()
             {
+                byte[] send_buffer = null;
                 List<ArraySegment<byte>> list = new List<ArraySegment<byte>>();
+                int length = 0;
 
                 lock (sending_lock_)
                 {
-                    int length = 0;
-
                     foreach (FunapiMessage msg in sending_)
                     {
                         if (msg.header.Count > 0)
@@ -118,6 +131,19 @@ namespace Fun
                         }
                     }
 
+                    if (ssl_)
+                    {
+                        ssl_send_size_ = length;
+
+                        send_buffer = new byte[ssl_send_size_];
+                        int offset = 0;
+                        foreach (ArraySegment<byte> data in list)
+                        {
+                            Buffer.BlockCopy(data.Array, 0, send_buffer, offset, data.Count);
+                            offset += data.Count;
+                        }
+                    }
+
                     debug.DebugLog2("TCP sending {0} message(s). ({1}bytes)", sending_.Count, length);
                 }
 
@@ -126,9 +152,24 @@ namespace Fun
                     lock (sock_lock_)
                     {
                         if (sock_ == null)
+                        {
                             return;
+                        }
 
-                        sock_.BeginSend(list, SocketFlags.None, new AsyncCallback(this.sendBytesCb), this);
+                        if (ssl_)
+                        {
+                            if (ssl_stream_ == null)
+                            {
+                                debug.DebugLog2("TCP - SslStream is null.");
+                                return;
+                            }
+
+                            ssl_stream_.BeginWrite(send_buffer, 0, length, new AsyncCallback(this.sendBytesCb), ssl_stream_);
+                        }
+                        else
+                        {
+                            sock_.BeginSend(list, SocketFlags.None, new AsyncCallback(this.sendBytesCb), this);
+                        }
                     }
                 }
                 catch (Exception e)
@@ -153,7 +194,9 @@ namespace Fun
                     lock (sock_lock_)
                     {
                         if (sock_ == null)
+                        {
                             return;
+                        }
 
                         sock_.EndConnect(ar);
                         if (sock_.Connected == false)
@@ -166,15 +209,34 @@ namespace Fun
                         }
                         debug.DebugLog1("TCP transport connected. Starts handshaking..");
 
+                        if (ssl_)
+                        {
+                            ssl_stream_ = new SslStream(new NetworkStream(sock_), false, TrustManager.CertValidationCallback);
+                        }
+
                         state_ = State.kHandshaking;
 
                         lock (receive_lock_)
                         {
                             // Wait for handshaking message.
-                            ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
-                            List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                            buffer.Add(wrapped);
-                            sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                            if (ssl_)
+                            {
+                                if (ssl_stream_ == null)
+                                {
+                                    debug.DebugLog2("TCP - SslStream is null.");
+                                    return;
+                                }
+
+                                ssl_stream_.BeginAuthenticateAsClient(addr_.host, new AsyncCallback(this.authenticateCb), ssl_stream_);
+                            }
+                            else
+                            {
+                                ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
+                                List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                                buffer.Add(wrapped);
+
+                                sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                            }
                         }
                     }
                 }
@@ -191,7 +253,28 @@ namespace Fun
                 }
             }
 
-            void sendBytesCb (IAsyncResult ar)
+            void authenticateCb (IAsyncResult ar)
+            {
+                try
+                {
+                    ssl_stream_.EndAuthenticateAsClient(ar);
+
+                    ssl_stream_.BeginRead(receive_buffer_, 0, receive_buffer_.Length, new AsyncCallback(this.receiveBytesCb), ssl_stream_);
+                }
+                catch (ObjectDisposedException)
+                {
+                    debug.DebugLog1("TCP BeginAuthenticateAsClient operation has been cancelled.");
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kStartingFailed;
+                    error.message = "TCP failure in authenticateCb: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+
+            void  sendBytesCb (IAsyncResult ar)
             {
                 try
                 {
@@ -200,9 +283,27 @@ namespace Fun
                     lock (sock_lock_)
                     {
                         if (sock_ == null)
+                        {
                             return;
+                        }
 
-                        nSent = sock_.EndSend(ar);
+                        if (ssl_)
+                        {
+                            if (ssl_stream_ == null)
+                            {
+                                debug.DebugLog2("TCP - SslStream is null.");
+                                return;
+                            }
+
+                            ssl_stream_.EndWrite(ar);
+
+                            nSent = ssl_send_size_;
+                            ssl_send_size_ = 0;
+                        }
+                        else
+                        {
+                            nSent = sock_.EndSend(ar);
+                        }
                     }
 
                     if (nSent > 0)
@@ -225,7 +326,7 @@ namespace Fun
                             }
 
                             FunDebug.Assert(sending_.Count == 0,
-                                string.Format("sendBytesCb - sending buffer has {0} message(s).", sending_.Count));
+                            string.Format("sendBytesCb - sending buffer has {0} message(s).", sending_.Count));
 
                             // Sends pending messages
                             checkPendingMessages();
@@ -258,9 +359,24 @@ namespace Fun
                     lock (sock_lock_)
                     {
                         if (sock_ == null)
+                        {
                             return;
+                        }
 
-                        nRead = sock_.EndReceive(ar);
+                        if (ssl_)
+                        {
+                            if (ssl_stream_ == null)
+                            {
+                                debug.DebugLog2("TCP - SslStream is null.");
+                                return;
+                            }
+
+                            nRead = ssl_stream_.EndRead(ar);
+                        }
+                        else
+                        {
+                            nRead = sock_.EndReceive(ar);
+                        }
                     }
 
                     lock (receive_lock_)
@@ -278,15 +394,23 @@ namespace Fun
                             checkReceiveBuffer();
 
                             // Starts another async receive
-                            ArraySegment<byte> residual = new ArraySegment<byte>(
-                                receive_buffer_, received_size_, receive_buffer_.Length - received_size_);
-
-                            List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                            buffer.Add(residual);
-
                             lock (sock_lock_)
                             {
-                                sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                                if (ssl_)
+                                {
+                                    ssl_stream_.BeginRead(receive_buffer_, received_size_, receive_buffer_.Length - received_size_,
+                                                         new AsyncCallback(this.receiveBytesCb), ssl_stream_);
+                                }
+                                else
+                                {
+                                    ArraySegment<byte> residual = new ArraySegment<byte>(
+                                    receive_buffer_, received_size_, receive_buffer_.Length - received_size_);
+
+                                    List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                                    buffer.Add(residual);
+
+                                    sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                                }
                                 debug.DebugLog3("TCP ready to receive more. TCP can receive upto {0} more bytes.",
                                                 receive_buffer_.Length - received_size_);
                             }
@@ -327,6 +451,9 @@ namespace Fun
 
             Socket sock_;
             HostIP addr_;
+            bool ssl_ = false;
+            int ssl_send_size_;
+            SslStream ssl_stream_ = null;
             object sock_lock_ = new object();
         }
 
