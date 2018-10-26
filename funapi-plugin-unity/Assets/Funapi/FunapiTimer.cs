@@ -22,7 +22,7 @@ namespace Fun
             list_.Add(timer);
 
             if (debug != null)
-                debug.DebugLog1("[Timer] {0}", timer.ToString());
+                debug.LogDebug("[Timer] {0}", timer.ToString());
         }
 
         public bool Remove (FunapiTimer timer)
@@ -30,7 +30,7 @@ namespace Fun
             if (list_.Remove(timer))
             {
                 if (debug != null)
-                    debug.DebugLog1("[Timer] '{0}' timer deleted.", timer.name);
+                    debug.LogDebug("[Timer] '{0}' timer deleted.", timer.name);
                 return true;
             }
 
@@ -42,7 +42,7 @@ namespace Fun
             if (list_.Remove(name))
             {
                 if (debug != null)
-                    debug.DebugLog1("[Timer] '{0}' timer deleted.", name);
+                    debug.LogDebug("[Timer] '{0}' timer deleted.", name);
                 return true;
             }
 
@@ -54,7 +54,7 @@ namespace Fun
             list_.Clear();
 
             if (debug != null)
-                debug.DebugLog1("[Timer] all timers were deleted.");
+                debug.LogDebug("[Timer] all timers were deleted.");
         }
 
         public void Update (float deltaTime)

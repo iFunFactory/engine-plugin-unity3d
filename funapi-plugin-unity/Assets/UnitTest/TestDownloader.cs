@@ -75,7 +75,7 @@ public class TestDownloader
 
             downloader.VerifyCallback += delegate (string path)
             {
-                FunDebug.DebugLog2("Check file - {0}", path);
+                FunDebug.LogDebug("Check file - {0}", path);
             };
 
             downloader.ReadyCallback += delegate (int total_count, UInt64 total_size)
@@ -85,8 +85,8 @@ public class TestDownloader
 
             downloader.UpdateCallback += delegate (string path, long bytes_received, long total_bytes, int percentage)
             {
-                FunDebug.DebugLog2("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
-                                   path, bytes_received, total_bytes, percentage);
+                FunDebug.LogDebug("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+                                  path, bytes_received, total_bytes, percentage);
             };
 
             downloader.FinishedCallback += delegate (DownloadResult code)
@@ -112,8 +112,8 @@ public class TestDownloader
 
             downloader.UpdateCallback += delegate (string path, long bytes_received, long total_bytes, int percentage)
             {
-                FunDebug.DebugLog2("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
-                                   path, bytes_received, total_bytes, percentage);
+                FunDebug.LogDebug("Downloading - path:{0} / received:{1} / total:{2} / {3}%",
+                                  path, bytes_received, total_bytes, percentage);
             };
 
             downloader.FinishedCallback += delegate (DownloadResult code)

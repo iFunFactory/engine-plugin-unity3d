@@ -158,7 +158,7 @@ namespace Fun
 
                 if (partial_download_list_.Count <= 0)
                 {
-                    FunDebug.Log("Downloader.StartDownload - There's no '{0}' files to download.", prefix_path);
+                    FunDebug.Log("Downloader - There's no '{0}' file to download.", prefix_path);
                     Stop();
                     return;
                 }
@@ -273,7 +273,7 @@ namespace Fun
                 cached_list_.Add(info);
             }
 
-            FunDebug.DebugLog1("Downloader - Loads cached list : {0}", cached_list_.Count);
+            FunDebug.LogDebug("Downloader - Cached list loaded : {0}", cached_list_.Count);
         }
 
         void updateCachedList ()
@@ -303,7 +303,7 @@ namespace Fun
             stream.Flush();
             stream.Close();
 
-            FunDebug.DebugLog1("Downloader - Updates cached list : {0}", cached_list_.Count);
+            FunDebug.LogDebug("Downloader - Updates cached list : {0}", cached_list_.Count);
         }
 
         // Checks download file list
@@ -335,7 +335,7 @@ namespace Fun
                     if (!rnd_list.Contains(rnd_index))
                         rnd_list.Enqueue(rnd_index);
                 }
-                FunDebug.DebugLog1("Downloader - Random check file count is {0}", rnd_list.Count);
+                FunDebug.LogDebug("Downloader - {0} files are randomly selected for check.", rnd_list.Count);
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
             }
@@ -408,7 +408,7 @@ namespace Fun
 
             removeCachedList(remove_list);
 
-            FunDebug.DebugLog1("Downloader - Random validation has {0}",
+            FunDebug.LogDebug("Downloader - Random validation has {0}",
                                (verify_success ? "succeeded" : "failed"));
 
             // Checks all local files
@@ -452,7 +452,7 @@ namespace Fun
 
             elapsed_time.Stop();
 
-            FunDebug.Log("Downloader took {0:F2}s to check local files.",
+            FunDebug.Log("Downloader - Took {0:F2}s to check local files.",
                          elapsed_time.ElapsedMilliseconds / 1000f);
 
             total_download_count_ = list.Count;
@@ -516,7 +516,7 @@ namespace Fun
                 if (File.Exists(path))
                 {
                     File.Delete(path);
-                    FunDebug.DebugLog1("'{0}' file deleted.\npath: {1}", Path.GetFileName(path), path);
+                    FunDebug.LogDebug("'{0}' file deleted.\npath: {1}", Path.GetFileName(path), path);
                 }
             }
 
@@ -550,7 +550,7 @@ namespace Fun
                 updateCachedList();
 
                 download_time_.Stop();
-                FunDebug.Log("Downloader took {0:F2}s for download all files.",
+                FunDebug.Log("Downloader - Took {0:F2}s for downloading all files.",
                              download_time_.ElapsedMilliseconds / 1000f);
 
                 if (partial_downloading_)
@@ -595,7 +595,7 @@ namespace Fun
 
                 // Requests a file.
                 string request_url = host_url_ + info.path;
-                FunDebug.DebugLog1("Download a file - {0}\nSave to {1}\n", request_url, file_path);
+                FunDebug.LogDebug("Download a file - {0}\nSave to {1}\n", request_url, file_path);
                 cur_download_path_ = Path.GetDirectoryName(file_path);
                 cur_download_path_ += "/" + Path.GetRandomFileName();
 
@@ -636,7 +636,7 @@ namespace Fun
                                 url += "/";
 
                             host_url_ = url;
-                            FunDebug.Log("Redirect download url: {0}", host_url_);
+                            FunDebug.Log("Downloader - Redirect Url: {0}", host_url_);
                         }
 
                         List<object> list = json["data"] as List<object>;

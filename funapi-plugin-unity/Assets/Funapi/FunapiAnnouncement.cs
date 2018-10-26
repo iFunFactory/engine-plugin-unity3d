@@ -125,14 +125,14 @@ namespace Fun
                     }
                 }
 
-                FunDebug.Log("Announcement list has been updated. total list count: {0}", announce_list_.Count);
+                FunDebug.Log("Announcement - List has been updated. total: {0}", announce_list_.Count);
 
                 if (image_list_.Count > 0)
                 {
                     // Request a file.
                     KeyValuePair<string, string> item = image_list_[0];
                     web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                    FunDebug.DebugLog1("Download announcement image: {0}", item.Key);
+                    FunDebug.LogDebug("Download announcement image: {0}", item.Key);
                 }
                 else
                 {
@@ -160,17 +160,17 @@ namespace Fun
                 {
                     KeyValuePair<string, string> item = image_list_[0];
                     web_client_.DownloadFileAsync(new Uri(item.Key), item.Value);
-                    FunDebug.DebugLog1("Download announcement image: {0}", item.Key);
+                    FunDebug.LogDebug("Announcement - Downloading image: {0}", item.Key);
                 }
                 else
                 {
-                    FunDebug.Log("All announcement images has been downloaded.\npath:{0}", local_path_);
+                    FunDebug.Log("Announcement - All images has been downloaded.\npath:{0}", local_path_);
                     onResult(AnnounceResult.kSucceeded);
                 }
             }
             catch (Exception e)
             {
-                FunDebug.LogError("Failure in Announcement.downloadFileCompleteCb:\n{0}", e.ToString());
+                FunDebug.LogError("Announcement - Failure in downloadFileCompleteCb:\n{0}", e.ToString());
                 onResult(AnnounceResult.kExceptionError);
             }
         }

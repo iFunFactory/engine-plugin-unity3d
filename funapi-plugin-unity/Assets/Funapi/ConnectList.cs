@@ -41,13 +41,6 @@ namespace Fun
             : base(host, port)
         {
             refresh();
-
-            if (ip_list_ != null)
-            {
-                FunDebug.DebugLog3("dns.get from '{0}'", host);
-                foreach (IPAddress i in ip_list_)
-                    FunDebug.DebugLog3("  - {0} ({1})", i, i.AddressFamily);
-            }
         }
 
         public bool refresh ()

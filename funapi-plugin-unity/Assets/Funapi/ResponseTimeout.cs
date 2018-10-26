@@ -26,7 +26,7 @@ namespace Fun
                 int_list_[msg_type] = new ResponseInfo<int>(msg_type, waiting_time);
 
                 if (debug != null)
-                    debug.DebugLog1("Response timeout type added - '{0}' ({1}s)", msg_type, waiting_time);
+                    debug.LogDebug("Response timeout type added - '{0}' ({1}s)", msg_type, waiting_time);
             }
 
             return true;
@@ -49,7 +49,7 @@ namespace Fun
                 str_list_[msg_type] = new ResponseInfo<string>(msg_type, waiting_time);
 
                 if (debug != null)
-                    debug.DebugLog1("Response timeout type added - '{0}' ({1}s)", msg_type, waiting_time);
+                    debug.LogDebug("Response timeout type added - '{0}' ({1}s)", msg_type, waiting_time);
             }
 
             return true;
@@ -62,7 +62,7 @@ namespace Fun
                 if (int_list_.ContainsKey(msg_type))
                 {
                     if (debug != null)
-                        debug.DebugLog1("Response timeout type removed - {0}", msg_type);
+                        debug.LogDebug("Response timeout type removed - {0}", msg_type);
 
                     int_list_.Remove(msg_type);
                     return true;
@@ -79,7 +79,7 @@ namespace Fun
                 if (str_list_.ContainsKey(msg_type))
                 {
                     if (debug != null)
-                        debug.DebugLog1("Response timeout type removed - {0}", msg_type);
+                        debug.LogDebug("Response timeout type removed - {0}", msg_type);
 
                     str_list_.Remove(msg_type);
                     return true;

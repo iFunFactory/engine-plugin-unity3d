@@ -154,7 +154,7 @@ class TestSessionBase : TestBase
         if (transport.encoding == FunEncoding.kJson)
         {
             Dictionary<string, object> message = new Dictionary<string, object>();
-            message["message"] = string.Format("[{0}] {1}", transport.str_protocol, echo_message);
+            message["message"] = echo_message;
             session.SendMessage("echo", message, protocol, enc_type);
         }
         else if (transport.encoding == FunEncoding.kProtobuf)
@@ -181,7 +181,7 @@ class TestSessionBase : TestBase
         }
 
         PbufEchoMessage echo = new PbufEchoMessage();
-        echo.msg = string.Format("[{0}] {1}", transport.str_protocol, echo_message);
+        echo.msg = echo_message;
         FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
         session.SendMessage(MessageType.pbuf_echo, message, protocol);
 
@@ -190,22 +190,10 @@ class TestSessionBase : TestBase
 
     protected void onReceivedEchoMessage (string type, object message)
     {
-        if (type == "echo")
+        if (type == "echo" || type == "pbuf_echo")
         {
-            FunDebug.Assert(message is Dictionary<string, object>);
-            Dictionary<string, object> json = message as Dictionary<string, object>;
-            FunDebug.Log("Received an echo message: {0}", json["message"]);
+            --sending_count;
         }
-        else if (type == "pbuf_echo")
-        {
-            FunMessage msg = message as FunMessage;
-            PbufEchoMessage echo = FunapiMessage.GetMessage<PbufEchoMessage>(msg, MessageType.pbuf_echo);
-            FunDebug.Log("Received an echo message: {0}", echo.msg);
-        }
-        else
-            return;
-
-        --sending_count;
     }
 
     protected void resetSendingCount ()

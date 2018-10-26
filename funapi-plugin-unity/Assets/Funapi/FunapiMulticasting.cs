@@ -295,14 +295,14 @@ namespace Fun
 
         void onUserJoined (string channel_id, string user_id)
         {
-            FunDebug.Log("Multicast - {0} joined the '{1}' channel", user_id, channel_id);
+            FunDebug.Log("Multicast - '{0}' joined the '{1}' channel", user_id, channel_id);
             if (JoinedCallback != null)
                 JoinedCallback(channel_id, user_id);
         }
 
         void onUserLeft (string channel_id, string user_id)
         {
-            FunDebug.Log("Multicast - {0} left the '{1}' channel", user_id, channel_id);
+            FunDebug.Log("Multicast - '{0}' left the '{1}' channel", user_id, channel_id);
             if (LeftCallback != null)
                 LeftCallback(channel_id, user_id);
         }

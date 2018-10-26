@@ -182,7 +182,7 @@ namespace Fun
             if (encoding == FunEncoding.kJson)
             {
                 string str = System.Text.Encoding.UTF8.GetString(buffer.Array, buffer.Offset, buffer.Count);
-                //FunDebug.DebugLog2("Parsed json: {0}", str);
+                //FunDebug.LogDebug("Parsed json: {0}", str);
                 return json_helper_.Deserialize(str);
             }
             else if (encoding == FunEncoding.kProtobuf)

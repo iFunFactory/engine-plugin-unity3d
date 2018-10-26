@@ -32,7 +32,6 @@ namespace Fun
                     {
                         GameObject obj = new GameObject("FunapiMono");
                         instance_ = obj.AddComponent(typeof(FunapiMono)) as FunapiMono;
-                        Debug.Log ("FunapiMono was generated automaticly.");
                     }
                 }
 

@@ -163,7 +163,7 @@ namespace Fun
                 {
                     instance.httpPost(CmdVersion, version, delegate (object obj)
                     {
-                        FunDebug.Log("Sent the dedicated server version. ({0})", version);
+                        FunDebug.Log("Dedicated Server - Sent the version. ({0})", version);
                     });
                 }
 
@@ -408,8 +408,8 @@ namespace Fun
                 if ((we != null && we.Status == WebExceptionStatus.RequestCanceled) ||
                     (e is ObjectDisposedException || e is NullReferenceException))
                 {
-                    // When Stop is called HttpWebRequest.EndGetRequestStream may return a Exception
-                    FunDebug.DebugLog1("Dedicated server request operation has been cancelled.");
+                    // When Stop is called HttpWebRequest.EndGetRequestStream may return an Exception
+                    FunDebug.DebugLog1("Dedicated Server - Request operation has been cancelled.");
                     return;
                 }
             }
@@ -422,7 +422,7 @@ namespace Fun
                 Request request = (Request)ar.AsyncState;
                 if (request.was_aborted)
                 {
-                    FunDebug.Log("Dedicated manager server response callback - request aborted.");
+                    FunDebug.Log("Dedicated Server - Response callback. Request aborted.");
                     return;
                 }
 
