@@ -237,7 +237,7 @@ namespace Fun
         }
 
 
-        const string kMozillaCertificatesUrl = "http://mxr.mozilla.org/seamonkey/source/security/nss/lib/ckfw/builtins/certdata.txt?raw=1";
+        const string kMozillaCertificatesUrl = "https://hg.mozilla.org/mozilla-central/raw-file/tip/security/nss/lib/ckfw/builtins/certdata.txt";
         const string kDownloadCertificatesPath = "/Resources/Funapi/MozRoots.bytes";
         const string kResourceCertificatesPath = "Funapi/MozRoots";
 
