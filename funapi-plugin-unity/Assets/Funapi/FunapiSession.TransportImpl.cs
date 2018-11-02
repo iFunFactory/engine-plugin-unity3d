@@ -16,6 +16,7 @@ using WebSocketSharp;
 #if !NO_UNITY
 using UnityEngine;
 #endif
+using System.Runtime.InteropServices;
 
 
 namespace Fun
@@ -1326,10 +1327,192 @@ namespace Fun
             Request cur_request_ = null;
         }
 
-
         // Websocket transport layer
         class WebsocketTransport : Transport
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            public class WebSocketJS
+            {
+                public WebSocketJS(Uri url)
+                {
+                    url_ = url;
+
+                    string protocol = url_.Scheme;
+                    if (!protocol.Equals("ws") && !protocol.Equals("wss"))
+                    {
+                        throw new ArgumentException("Unsupported protocol: " + protocol);
+                    }
+
+                    alive_ = true;
+                }
+
+                [DllImport("__Internal")]
+                private static extern int SocketCreate (string url);
+
+                [DllImport("__Internal")]
+                private static extern int SocketState (int socketInstance);
+
+                [DllImport("__Internal")]
+                private static extern void SocketSend (int socketInstance, byte[] ptr, int length);
+
+                [DllImport("__Internal")]
+                private static extern void SocketRecv (int socketInstance, byte[] ptr, int length);
+
+                [DllImport("__Internal")]
+                private static extern int SocketRecvLength (int socketInstance);
+
+                [DllImport("__Internal")]
+                private static extern void SocketClose (int socketInstance);
+
+                [DllImport("__Internal")]
+                private static extern string SocketError (int socketInstance);
+
+                [DllImport("__Internal")]
+                private static extern string SocketCloseReason (int socketInstance);
+
+                [DllImport("__Internal")]
+                private static extern int SocketCloseCode (int socketInstance);
+
+                public void Send(byte[] buffer)
+                {
+                    SocketSend (native_ref_, buffer, buffer.Length);
+
+                    if (SendCallback != null)
+                    {
+                        SendCallback();
+                    }
+                }
+
+                public IEnumerator Recv()
+                {
+                    int length;
+                    while (true)
+                    {
+                        if (!alive_)
+                        {
+                            yield break;
+                        }
+
+                        length = SocketRecvLength (native_ref_);
+                        if (length != 0)
+                        {
+                            break;
+                        }
+
+                        yield return null;
+                    }
+
+                    byte[] buffer = new byte[length];
+                    SocketRecv (native_ref_, buffer, length);
+
+                    if (ReceiveCallback != null)
+                    {
+                        ReceiveCallback(buffer);
+                    }
+                }
+
+                public IEnumerator GetError()
+                {
+                    string reason = null;
+
+                    while (true)
+                    {
+                        if (!alive_)
+                        {
+                            yield break;
+                        }
+
+                        reason = SocketError(native_ref_);
+                        if (reason != null)
+                        {
+                            break;
+                        }
+
+                        yield return null;
+                    }
+
+                    if (ErrorCallback != null)
+                    {
+                        ErrorCallback(reason);
+                    }
+                }
+
+                public IEnumerator Connect()
+                {
+                    native_ref_ = SocketCreate (url_.ToString());
+
+                    while (true)
+                    {
+                        if (!alive_)
+                        {
+                            yield break;
+                        }
+
+                        if (SocketState(native_ref_) != 0)
+                        {
+                            break;
+                        }
+
+                        yield return null;
+                    }
+
+                    if (StartCallback != null)
+                    {
+                        StartCallback();
+                    }
+                }
+
+                public IEnumerator Close()
+                {
+                    SocketClose(native_ref_);
+
+                    while (true)
+                    {
+                        if(SocketCloseCode(native_ref_) != 0)
+                        {
+                            break;
+                        }
+
+                        yield return null;
+                    }
+
+                    alive_ = false;
+
+                    if (CloseCallback != null)
+                    {
+                        CloseCallback();
+                    }
+                }
+
+                public string close_reason
+                {
+                    get
+                    {
+                        string reason = SocketCloseReason (native_ref_);
+                        return reason == null ? "" : reason;
+                    }
+                }
+
+                public int close_code
+                {
+                    get
+                    {
+                        return SocketCloseCode (native_ref_);
+                    }
+                }
+
+                public event System.Action StartCallback;
+                public event System.Action CloseCallback;
+                public event System.Action<string> ErrorCallback;
+                public event System.Action SendCallback;
+                public event System.Action<byte[]> ReceiveCallback;
+
+                Uri url_;
+                int native_ref_ = 0;
+                bool alive_ = false;
+            }
+#endif
+
             public WebsocketTransport (string hostname_or_ip, UInt16 port,
                                        FunEncoding type, TransportOption websocket_option)
             {
@@ -1351,7 +1534,9 @@ namespace Fun
                 get
                 {
                     lock (sock_lock_)
+                    {
                         return wsock_ != null && state_ >= State.kConnected;
+                    }
                 }
             }
 
@@ -1377,6 +1562,16 @@ namespace Fun
 
                 lock (sock_lock_)
                 {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                    wsock_ = new WebSocketJS(new Uri(host_url_));
+                    wsock_.StartCallback += startJSCb;
+                    wsock_.CloseCallback += closeJSCb;
+                    wsock_.ErrorCallback += errorJSCb;
+                    wsock_.SendCallback += sendBytesJSCb;
+                    wsock_.ReceiveCallback += receiveBytesJSCb;
+
+                    mono.StartCoroutine(wsock_.Connect());
+#else
                     wsock_ = new WebSocket(host_url_);
                     wsock_.OnOpen += startCb;
                     wsock_.OnClose += closeCb;
@@ -1384,6 +1579,7 @@ namespace Fun
                     wsock_.OnMessage += receiveBytesCb;
 
                     wsock_.ConnectAsync();
+#endif
                 }
             }
 
@@ -1393,7 +1589,11 @@ namespace Fun
                 {
                     if (wsock_ != null)
                     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                        mono.StartCoroutine(wsock_.Close());
+#else
                         wsock_.Close();
+#endif
                         wsock_ = null;
                     }
                 }
@@ -1427,9 +1627,14 @@ namespace Fun
                     lock (sock_lock_)
                     {
                         if (wsock_ == null)
+                        {
                             return;
-
+                        }
+#if UNITY_WEBGL && !UNITY_EDITOR
+                        wsock_.Send(buffer);
+#else
                         wsock_.SendAsync(buffer, sendBytesCb);
+#endif
                     }
                 }
                 catch (Exception e)
@@ -1441,12 +1646,43 @@ namespace Fun
                 }
             }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+            void startJSCb ()
+            {
+                state_ = State.kHandshaking;
+
+                debug.LogDebug("Websocket transport connected. Starts handshaking..");
+
+                mono.StartCoroutine(wsock_.Recv());
+                mono.StartCoroutine(wsock_.GetError());
+            }
+#endif
+
             void startCb (object sender, EventArgs args)
             {
                 state_ = State.kHandshaking;
 
                 debug.LogDebug("[Websocket] transport connected. Starts handshaking..");
             }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            void closeJSCb ()
+            {
+                debug.Log("Websocket closeCb called. ({0}) {1}", wsock_.close_code, wsock_.close_reason);
+
+                CloseStatusCode code = (CloseStatusCode)wsock_.close_code;
+                if (code != CloseStatusCode.Normal && code != CloseStatusCode.NoStatus)
+                {
+                    TransportError error = new TransportError();
+                    if (state != State.kEstablished)
+                        error.type = TransportError.Type.kStartingFailed;
+                    else
+                        error.type = TransportError.Type.kDisconnected;
+                    error.message = string.Format("Websocket failure: {0}({1}) : {2}", code, wsock_.close_code, wsock_.close_reason);
+                    onFailure(error);
+                }
+            }
+#endif
 
             void closeCb (object sender, CloseEventArgs args)
             {
@@ -1465,6 +1701,16 @@ namespace Fun
                 }
             }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+            void errorJSCb (string error_msg)
+            {
+                TransportError error = new TransportError();
+                error.type = TransportError.Type.kWebsocketError;
+                error.message = "Websocket failure: " + error_msg;
+                onFailure(error);
+            }
+#endif
+
             void errorCb (object sender, WebSocketSharp.ErrorEventArgs args)
             {
                 TransportError error = new TransportError();
@@ -1472,6 +1718,32 @@ namespace Fun
                 error.message = "[Websocket] failure: " + args.Message;
                 onFailure(error);
             }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            void sendBytesJSCb ()
+            {
+                try
+                {
+                    lock (sending_lock_)
+                    {
+                        FunDebug.Assert(sending_.Count > 0);
+                        sending_.RemoveAt(0);
+
+                        debug.LogDebug("Websocket sent 1 message.");
+
+                        // Sends pending messages
+                        checkPendingMessages();
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kSendingFailed;
+                    error.message = "Websocket failure in sendBytesCb: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+#endif
 
             void sendBytesCb (bool completed)
             {
@@ -1502,6 +1774,45 @@ namespace Fun
                     onFailure(error);
                 }
             }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+            void receiveBytesJSCb (byte[] buffer)
+            {
+                try
+                {
+                    lock (receive_lock_)
+                    {
+                        int len = buffer.Length;
+
+                        checkReceiveBuffer(len);
+
+                        // Copy the recieved messages
+                        Buffer.BlockCopy(buffer, 0, receive_buffer_, received_size_, len);
+                        received_size_ += len;
+
+                        debug.LogDebug("Websocket received {0} bytes. Buffer has {1} bytes.",
+                                        len, received_size_ - next_decoding_offset_);
+
+                        // Parses messages
+                        parseMessages();
+
+                        if (wsock_ == null)
+                        {
+                            return;
+                        }
+
+                        mono.StartCoroutine(wsock_.Recv());
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kReceivingFailed;
+                    error.message = "Websocket failure in receiveBytesCb: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+#endif
 
             void receiveBytesCb (object sender, MessageEventArgs args)
             {
@@ -1553,7 +1864,11 @@ namespace Fun
 
             HostIP addr_;
             string host_url_;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            WebSocketJS wsock_;
+#else
             WebSocket wsock_;
+#endif
             object sock_lock_ = new object();
         }
     }
