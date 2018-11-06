@@ -1377,24 +1377,10 @@ namespace Fun
                             fields[tuple[0].ToUpper()] = tuple[1];
                         }
 
-                        if (!fields.ContainsKey(kVersionHeaderField))
-                        {
-                            throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
-                                                              str_protocol_, kVersionHeaderField));
-                        }
-
                         if (!fields.ContainsKey(kLengthHeaderField))
                         {
                             throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
                                                               str_protocol_, kLengthHeaderField));
-                        }
-
-                        // Protocol version
-                        int version = Convert.ToInt32(fields[kVersionHeaderField]);
-                        if (version != FunapiVersion.kProtocolVersion)
-                        {
-                            throw new Exception(string.Format("The protocol version doesn't match. client:{0} server:{1}",
-                                                              FunapiVersion.kProtocolVersion, version));
                         }
 
                         offset = next_decoding_offset_ + header_length;
@@ -1412,33 +1398,83 @@ namespace Fun
                                        str_protocol_, header_length, body_length,
                                        header_length + body_length);
 
-                        // Makes raw message buffer
-                        RawMessage message = new RawMessage();
-
-                        if (fields.ContainsKey(kEncryptionHeaderField))
-                            message.encryption_header = Convert.ToString(fields[kEncryptionHeaderField]);
-
-                        if (fields.ContainsKey(kUncompressedLengthHeaderField))
-                            message.uncompressed_size = Convert.ToInt32(fields[kUncompressedLengthHeaderField]);
-
-                        if (body_length > 0)
+                        // Makes a raw message
+                        if (!readBodyAndSaveMessage(fields, offset))
                         {
-                            byte[] buffer = new byte[body_length];
-                            Buffer.BlockCopy(receive_buffer_, offset, buffer, 0, body_length);
-                            message.body = new ArraySegment<byte>(buffer, 0, body_length);
+                            break;
                         }
-                        else
-                        {
-                            message.body = new ArraySegment<byte>();
-                        }
-
-                        messages_.Enqueue(message);
-
-                        next_decoding_offset_ += header_length + body_length;
-                        debug.LogDebug("{0} {1} bytes left in buffer.",
-                                       str_protocol_, received_size_ - next_decoding_offset_);
                     }
                 }
+            }
+
+            protected bool readBodyAndSaveMessage (Dictionary<string, string> headers, int offset = 0)
+            {
+                lock (messages_lock_)
+                {
+                    if (headers.Count <= 0)
+                    {
+                        debug.LogWarning("{0} header fields are empty.", str_protocol_);
+                        return false;
+                    }
+
+                    if (!headers.ContainsKey(kVersionHeaderField))
+                    {
+                        throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
+                                                          str_protocol_, kVersionHeaderField));
+                    }
+
+                    if (!headers.ContainsKey(kLengthHeaderField))
+                    {
+                        throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
+                                                          str_protocol_, kLengthHeaderField));
+                    }
+
+                    // Protocol version
+                    int version = Convert.ToInt32(headers[kVersionHeaderField]);
+                    if (version != FunapiVersion.kProtocolVersion)
+                    {
+                        throw new Exception(string.Format("The protocol version doesn't match. client:{0} server:{1}",
+                                                          FunapiVersion.kProtocolVersion, version));
+                    }
+
+                    // Body length
+                    int body_length = Convert.ToInt32(headers[kLengthHeaderField]);
+                    if (received_size_ - offset < body_length)
+                    {
+                        // Need more bytes.
+                        debug.LogError("{0} received bytes less than 'LEN({1})'", str_protocol_, body_length);
+                        return false;
+                    }
+
+                    // Makes raw message buffer
+                    RawMessage message = new RawMessage();
+
+                    if (headers.ContainsKey(kEncryptionHeaderField))
+                        message.encryption_header = Convert.ToString(headers[kEncryptionHeaderField]);
+
+                    if (headers.ContainsKey(kUncompressedLengthHeaderField))
+                        message.uncompressed_size = Convert.ToInt32(headers[kUncompressedLengthHeaderField]);
+
+                    if (body_length > 0)
+                    {
+                        byte[] buffer = new byte[body_length];
+                        Buffer.BlockCopy(receive_buffer_, offset, buffer, 0, body_length);
+                        message.body = new ArraySegment<byte>(buffer, 0, body_length);
+                    }
+                    else
+                    {
+                        message.body = new ArraySegment<byte>();
+                    }
+
+                    next_decoding_offset_ = offset + body_length;
+
+                    messages_.Enqueue(message);
+
+                    debug.LogDebug("{0} {1} bytes left in buffer.",
+                                   str_protocol_, received_size_ - next_decoding_offset_);
+                }
+
+                return true;
             }
 
             bool decodeMessages ()

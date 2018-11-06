@@ -978,70 +978,40 @@ namespace Fun
                 web_request.BeginGetRequestStream(new AsyncCallback(requestStreamCb), request);
             }
 
-            void onReceiveHeader (string headers)
+            void onReceiveHeader (Dictionary<string, string> headers)
             {
-                StringBuilder buffer = new StringBuilder();
-                string[] lines = headers.Replace("\r", "").Split('\n');
-                int body_length = 0;
+                headers.Add(kVersionHeaderField, FunapiVersion.kProtocolVersion.ToString());
 
-                buffer.AppendFormat("{0}{1}{2}{3}", kVersionHeaderField, kHeaderFieldDelimeter,
-                                    FunapiVersion.kProtocolVersion, kHeaderDelimeter);
-
-                foreach (string n in lines)
+                if (headers.ContainsKey("set-cookie"))
                 {
-                    if (n.Length > 0)
-                    {
-                        string[] tuple = n.Split(kHeaderSeparator, StringSplitOptions.RemoveEmptyEntries);
-                        string key = tuple[0].ToLower();
-                        string value = "";
-
-                        if (tuple.Length >= 2)
-                            value = tuple[1];
-
-                        switch (key)
-                        {
-                        case "content-type":
-                            break;
-                        case "set-cookie":
-                            str_cookie_ = value;
-                            debug.LogDebug("[HTTP] set-cookie : {0}", str_cookie_);
-                            break;
-                        case "content-length":
-                            body_length = Convert.ToInt32(value);
-                            buffer.AppendFormat("{0}{1}{2}{3}", kLengthHeaderField,
-                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
-                            break;
-                        case "x-ifun-enc":
-                            buffer.AppendFormat("{0}{1}{2}{3}", kEncryptionHeaderField,
-                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
-                            break;
-                        case "x-ifun-c":
-                            buffer.AppendFormat("{0}{1}{2}{3}", kUncompressedLengthHeaderField,
-                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
-                            break;
-                        default:
-                            buffer.AppendFormat("{0}{1}{2}{3}", tuple[0],
-                                                kHeaderFieldDelimeter, value, kHeaderDelimeter);
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    str_cookie_ = headers["set-cookie"];
+                    debug.LogDebug("[HTTP] set-cookie : {0}", str_cookie_);
                 }
-                buffer.Append(kHeaderDelimeter);
 
-                byte[] header_bytes = System.Text.Encoding.ASCII.GetBytes(buffer.ToString());
+                if (headers.ContainsKey("x-ifun-enc"))
+                {
+                    headers.Add(kEncryptionHeaderField, headers["x-ifun-enc"]);
+                    headers.Remove("x-ifun-enc");
+                }
+
+                if (headers.ContainsKey("x-ifun-c"))
+                {
+                    headers.Add(kUncompressedLengthHeaderField, headers["x-ifun-c"]);
+                    headers.Remove("x-ifun-c");
+                }
+
+                int body_length = 0;
+                if (headers.ContainsKey("content-length"))
+                {
+                    body_length = Convert.ToInt32(headers["content-length"]);
+                    headers.Add(kLengthHeaderField, body_length.ToString());
+                    headers.Remove("content-length");
+                }
 
                 // Checks buffer's space
                 received_size_ = 0;
                 next_decoding_offset_ = 0;
-                checkReceiveBuffer(header_bytes.Length + body_length);
-
-                // Copy to buffer
-                Buffer.BlockCopy(header_bytes, 0, receive_buffer_, 0, header_bytes.Length);
-                received_size_ += header_bytes.Length;
+                checkReceiveBuffer(body_length);
             }
 
             void requestStreamCb (IAsyncResult ar)
@@ -1102,9 +1072,13 @@ namespace Fun
                     {
                         lock (receive_lock_)
                         {
-                            byte[] header = request.web_response.Headers.ToByteArray();
-                            string str_header = System.Text.Encoding.ASCII.GetString(header, 0, header.Length);
-                            onReceiveHeader(str_header);
+                            var headers = request.web_response.Headers;
+                            foreach (string key in headers.AllKeys)
+                            {
+                                request.headers.Add(key.ToLower(), headers[key]);
+                            }
+
+                            onReceiveHeader(request.headers);
 
                             request.read_stream = request.web_response.GetResponseStream();
                             request.read_stream.BeginRead(receive_buffer_, received_size_,
@@ -1170,8 +1144,8 @@ namespace Fun
 
                         lock (receive_lock_)
                         {
-                            // Parses a message
-                            parseMessages();
+                            // Makes a raw message
+                            readBodyAndSaveMessage(request.headers);
                         }
 
                         request.read_stream.Close();
@@ -1237,26 +1211,32 @@ namespace Fun
                         throw new Exception(www.error);
                     }
 
-                    // Decodes message
-                    StringBuilder headers = new StringBuilder();
-                    foreach (KeyValuePair<string, string> item in www.responseHeaders)
+                    // Gets the headers
+                    foreach (var item in www.responseHeaders)
                     {
-                        headers.AppendFormat("{0}{1}{2}{3}",
-                            item.Key, kHeaderFieldDelimeter, item.Value, kHeaderDelimeter);
+                        cur_request_.headers.Add(item.Key.ToLower(), item.Value);
                     }
-                    headers.Append(kHeaderDelimeter);
+#if UNITY_WEBGL
+                    // If there is no content-length, adds the content-length.
+                    // This is for the WebGL client.
+                    if (!cur_request_.headers.ContainsKey("content-length"))
+                    {
+                        cur_request_.headers.Add("content-length", www.bytes.Length.ToString());
+                    }
+#endif
 
+                    // Decodes message
                     lock (receive_lock_)
                     {
-                        onReceiveHeader(headers.ToString());
+                        onReceiveHeader(cur_request_.headers);
 
                         Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
                         received_size_ += www.bytes.Length;
 
                         debug.LogDebug("[HTTP] received {0} bytes.", received_size_);
 
-                        // Parses a message
-                        parseMessages();
+                        // Makes a raw message
+                        readBodyAndSaveMessage(cur_request_.headers);
                     }
 
                     lock (request_lock_)
@@ -1326,6 +1306,7 @@ namespace Fun
                 public WWW www = null;
                 public bool cancel = false;
 #endif
+                public Dictionary<string, string> headers = new Dictionary<string, string>();
             }
 
 
