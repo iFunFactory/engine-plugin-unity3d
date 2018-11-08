@@ -135,9 +135,9 @@ namespace Fun
 
                     if (ssl_)
                     {
+                        send_buffer = new byte[length];
                         ssl_send_size_ = length;
 
-                        send_buffer = new byte[ssl_send_size_];
                         int offset = 0;
                         foreach (ArraySegment<byte> data in list)
                         {
@@ -145,8 +145,6 @@ namespace Fun
                             offset += data.Count;
                         }
                     }
-
-                    debug.LogDebug("[TCP] sending {0} message(s). ({1}bytes)", sending_.Count, length);
                 }
 
                 try
@@ -184,7 +182,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[TCP] failure in wireSend: " + e.ToString();
+                    error.message = "[TCP] Failure in wireSend: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -209,7 +207,7 @@ namespace Fun
                             onFailure(error);
                             return;
                         }
-                        debug.LogDebug("[TCP] transport connected. Starts handshaking..");
+                        debug.LogDebug("[TCP] Connected. Starts handshaking..");
 
                         if (ssl_)
                         {
@@ -250,7 +248,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kStartingFailed;
-                    error.message = "[TCP] failure in startCb: " + e.ToString();
+                    error.message = "[TCP] Failure in startCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -271,7 +269,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kStartingFailed;
-                    error.message = "TCP failure in authenticateCb: " + e.ToString();
+                    error.message = "TCP Failure in authenticateCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -310,8 +308,6 @@ namespace Fun
 
                     if (nSent > 0)
                     {
-                        debug.LogDebug("[TCP] sent {0} bytes.", nSent);
-
                         lock (sending_lock_)
                         {
                             while (nSent > 0)
@@ -322,19 +318,19 @@ namespace Fun
                                     FunapiMessage msg = sending_[0];
                                     int length = msg.header.Count + msg.body.Count;
                                     nSent -= length;
+
                                     sending_.RemoveAt(0);
                                 }
                                 else
                                 {
-                                    debug.LogError("[TCP] couldn't find the sending buffers that sent messages.\n" +
-                                                   "Sent {0} more bytes but there are no sending buffers.", nSent);
+                                    debug.LogError("[TCP] Sent {0} more bytes but couldn't find the sending buffer.", nSent);
                                     break;
                                 }
                             }
 
                             if (sending_.Count != 0)
                             {
-                                debug.LogError("sendBytesCb - sending buffer has {0} message(s).", sending_.Count);
+                                debug.LogError("[TCP] {0} message(s) left in the sending buffer.", sending_.Count);
                             }
 
                             // Sends pending messages.
@@ -354,7 +350,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[TCP] failure in sendBytesCb: " + e.ToString();
+                    error.message = "[TCP] Failure in sendBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -393,8 +389,6 @@ namespace Fun
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            debug.LogDebug("[TCP] received {0} bytes. Buffer has {1} bytes.",
-                                            nRead, received_size_ - next_decoding_offset_);
 
                             // Parses messages
                             parseMessages();
@@ -420,9 +414,6 @@ namespace Fun
 
                                     sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
                                 }
-
-                                debug.LogDebug("[TCP] ready to receive more. TCP can receive upto {0} more bytes.",
-                                               receive_buffer_.Length - received_size_);
                             }
                         }
                         else
@@ -447,7 +438,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
-                    error.message = "[TCP] failure in receiveBytesCb: " + e.ToString();
+                    error.message = "[TCP] Failure in receiveBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -521,7 +512,7 @@ namespace Fun
                         sock_.Bind(new IPEndPoint(IPAddress.Any, port));
 
                     IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
-                    debug.LogDebug("[UDP] bind - local:{0}:{1}", lep.Address, lep.Port);
+                    debug.LogDebug("[UDP] bind {0}:{1}", lep.Address, lep.Port);
 
                     send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
                     if (addr_.inet == AddressFamily.InterNetworkV6)
@@ -584,8 +575,6 @@ namespace Fun
                         Buffer.BlockCopy(msg.body.Array, 0, send_buffer_, offset, msg.body.Count);
                         offset += msg.body.Count;
                     }
-
-                    debug.LogDebug("[UDP] sending {0} bytes.", length);
                 }
 
                 if (offset > 0)
@@ -624,7 +613,6 @@ namespace Fun
                             return;
                         }
                     }
-                    debug.LogDebug("[UDP] sent {0} bytes.", nSent);
 
                     lock (sending_lock_)
                     {
@@ -655,7 +643,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[UDP] failure in sendBytesCb: " + e.ToString();
+                    error.message = "[UDP] Failure in sendBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -679,8 +667,6 @@ namespace Fun
                         if (nRead > 0)
                         {
                             received_size_ += nRead;
-                            debug.LogDebug("[UDP] received {0} bytes. Buffer has {1} bytes.",
-                                            nRead, received_size_ - next_decoding_offset_);
                         }
 
                         // Parses a message
@@ -699,20 +685,11 @@ namespace Fun
                                                        receive_buffer_.Length - received_size_,
                                                        SocketFlags.None, ref receive_ep_,
                                                        new AsyncCallback(this.receiveBytesCb), this);
-
-                                debug.LogDebug("[UDP] ready to receive more. UDP can receive upto {0} more bytes",
-                                                receive_buffer_.Length);
                             }
                         }
                         else
                         {
                             debug.LogWarning("[UDP] socket closed");
-
-                            if (received_size_ - next_decoding_offset_ > 0)
-                            {
-                                debug.LogWarning("[UDP] buffer has {0} bytes but they failed to decode. Discarding.",
-                                                 received_size_ - next_decoding_offset_);
-                            }
 
                             TransportError error = new TransportError();
                             error.type = TransportError.Type.kDisconnected;
@@ -731,7 +708,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
-                    error.message = "[UDP] failure in receiveBytesCb: " + e.ToString();
+                    error.message = "[UDP] Failure in receiveBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -914,8 +891,6 @@ namespace Fun
                 if (str_cookie_.Length > 0)
                     headers.Add(kCookieHeaderField, str_cookie_);
 
-                debug.LogDebug("[HTTP] sending {0} bytes.", msg.header.Count + msg.body.Count);
-
 #if !NO_UNITY
                 // Sending a message
                 if (using_www_)
@@ -1030,8 +1005,6 @@ namespace Fun
                     lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-                        debug.LogDebug("[HTTP] sent {0} bytes.", msg.header.Count + msg.body.Count);
-
                         sending_.RemoveAt(0);
                     }
 
@@ -1050,7 +1023,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[HTTP] failure in requestStreamCb: " + e.ToString();
+                    error.message = "[HTTP] Failure in requestStreamCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1109,7 +1082,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
-                    error.message = "[HTTP] failure in responseCb: " + e.ToString();
+                    error.message = "[HTTP] Failure in responseCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1141,8 +1114,6 @@ namespace Fun
                             return;
                         }
 
-                        debug.LogDebug("[HTTP] received {0} bytes.", received_size_);
-
                         lock (receive_lock_)
                         {
                             // Makes a raw message
@@ -1171,7 +1142,7 @@ namespace Fun
 
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
-                    error.message = "[HTTP] failure in readCb: " + e.ToString();
+                    error.message = "[HTTP] Failure in readCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1200,10 +1171,6 @@ namespace Fun
                     lock (sending_lock_)
                     {
                         FunDebug.Assert(sending_.Count > 0);
-                        FunapiMessage msg = sending_[0];
-                        debug.LogDebug("[HTTP] sent a message - '{0}' ({1}bytes)",
-                                        msg.msg_type, msg.body.Count);
-
                         sending_.RemoveAt(0);
                     }
 
@@ -1234,8 +1201,6 @@ namespace Fun
                         Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
                         received_size_ += www.bytes.Length;
 
-                        debug.LogDebug("[HTTP] received {0} bytes.", received_size_);
-
                         // Makes a raw message
                         readBodyAndSaveMessage(cur_request_.headers);
                     }
@@ -1252,7 +1217,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kRequestFailed;
-                    error.message = "[HTTP] failure in wwwPost: " + e.ToString();
+                    error.message = "[HTTP] Failure in wwwPost: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1340,7 +1305,7 @@ namespace Fun
                     string protocol = url_.Scheme;
                     if (!protocol.Equals("ws") && !protocol.Equals("wss"))
                     {
-                        throw new ArgumentException("Unsupported protocol: " + protocol);
+                        throw new ArgumentException("[Websocket] Unsupported protocol: " + protocol);
                     }
 
                     alive_ = true;
@@ -1620,8 +1585,6 @@ namespace Fun
 
                         if (msg.body.Count > 0)
                             Buffer.BlockCopy(msg.body.Array, 0, buffer, msg.header.Count, msg.body.Count);
-
-                        debug.LogDebug("[Websocket] sending {0} bytes.", length);
                     }
 
                     lock (sock_lock_)
@@ -1641,7 +1604,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[Websocket] failure in wireSend: " + e.ToString();
+                    error.message = "[Websocket] Failure in wireSend: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1651,7 +1614,7 @@ namespace Fun
             {
                 state_ = State.kHandshaking;
 
-                debug.LogDebug("Websocket transport connected. Starts handshaking..");
+                debug.LogDebug("[Websocket] Connected. Starts handshaking..");
 
                 mono.StartCoroutine(wsock_.Recv());
                 mono.StartCoroutine(wsock_.GetError());
@@ -1662,13 +1625,13 @@ namespace Fun
             {
                 state_ = State.kHandshaking;
 
-                debug.LogDebug("[Websocket] transport connected. Starts handshaking..");
+                debug.LogDebug("[Websocket] Connected. Starts handshaking..");
             }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
             void closeJSCb ()
             {
-                debug.Log("Websocket closeCb called. ({0}) {1}", wsock_.close_code, wsock_.close_reason);
+                debug.Log("[Websocket] Closed. ({0}) {1}", wsock_.close_code, wsock_.close_reason);
 
                 CloseStatusCode code = (CloseStatusCode)wsock_.close_code;
                 if (code != CloseStatusCode.Normal && code != CloseStatusCode.NoStatus)
@@ -1678,7 +1641,7 @@ namespace Fun
                         error.type = TransportError.Type.kStartingFailed;
                     else
                         error.type = TransportError.Type.kDisconnected;
-                    error.message = string.Format("Websocket failure: {0}({1}) : {2}", code, wsock_.close_code, wsock_.close_reason);
+                    error.message = string.Format("[Websocket] Failure: {0}({1}) : {2}", code, wsock_.close_code, wsock_.close_reason);
                     onFailure(error);
                 }
             }
@@ -1686,7 +1649,7 @@ namespace Fun
 
             void closeCb (object sender, CloseEventArgs args)
             {
-                debug.LogDebug("[Websocket] closeCb called. ({0}) {1}", args.Code, args.Reason);
+                debug.LogDebug("[Websocket] Closed. ({0}) {1}", args.Code, args.Reason);
 
                 CloseStatusCode code = (CloseStatusCode)args.Code;
                 if (code != CloseStatusCode.Normal && code != CloseStatusCode.NoStatus)
@@ -1696,7 +1659,7 @@ namespace Fun
                         error.type = TransportError.Type.kStartingFailed;
                     else
                         error.type = TransportError.Type.kDisconnected;
-                    error.message = string.Format("[Websocket] failure: {0}({1}) : {2}", code, args.Code, args.Reason);
+                    error.message = string.Format("[Websocket] Failure: {0}({1}) : {2}", code, args.Code, args.Reason);
                     onFailure(error);
                 }
             }
@@ -1706,7 +1669,7 @@ namespace Fun
             {
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kWebsocketError;
-                error.message = "Websocket failure: " + error_msg;
+                error.message = "[Websocket] Error: " + error_msg;
                 onFailure(error);
             }
 #endif
@@ -1715,7 +1678,7 @@ namespace Fun
             {
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kWebsocketError;
-                error.message = "[Websocket] failure: " + args.Message;
+                error.message = "[Websocket] Error: " + args.Message;
                 onFailure(error);
             }
 
@@ -1729,8 +1692,6 @@ namespace Fun
                         FunDebug.Assert(sending_.Count > 0);
                         sending_.RemoveAt(0);
 
-                        debug.LogDebug("Websocket sent 1 message.");
-
                         // Sends pending messages
                         checkPendingMessages();
                     }
@@ -1739,7 +1700,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "Websocket failure in sendBytesCb: " + e.ToString();
+                    error.message = "[Websocket] Failure in sendBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1751,7 +1712,7 @@ namespace Fun
                 {
                     if (!completed)
                     {
-                        debug.LogError("[Websocket] failed to transfer messages.");
+                        debug.LogError("[Websocket] Failed to transfer messages.");
                         return;
                     }
 
@@ -1759,8 +1720,6 @@ namespace Fun
                     {
                         FunDebug.Assert(sending_.Count > 0);
                         sending_.RemoveAt(0);
-
-                        debug.LogDebug("[Websocket] sent 1 message.");
 
                         // Sends pending messages
                         checkPendingMessages();
@@ -1770,7 +1729,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[Websocket] failure in sendBytesCb: " + e.ToString();
+                    error.message = "[Websocket] Failure in sendBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1790,9 +1749,6 @@ namespace Fun
                         Buffer.BlockCopy(buffer, 0, receive_buffer_, received_size_, len);
                         received_size_ += len;
 
-                        debug.LogDebug("Websocket received {0} bytes. Buffer has {1} bytes.",
-                                        len, received_size_ - next_decoding_offset_);
-
                         // Parses messages
                         parseMessages();
 
@@ -1808,7 +1764,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
-                    error.message = "Websocket failure in receiveBytesCb: " + e.ToString();
+                    error.message = "[Websocket] Failure in receiveBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }
@@ -1829,9 +1785,6 @@ namespace Fun
                             Buffer.BlockCopy(args.RawData, 0, receive_buffer_, received_size_, args.RawData.Length);
                             received_size_ += args.RawData.Length;
 
-                            debug.LogDebug("[Websocket] received {0} bytes. Buffer has {1} bytes.",
-                                            args.RawData.Length, received_size_ - next_decoding_offset_);
-
                             // Parses messages
                             parseMessages();
                         }
@@ -1839,15 +1792,9 @@ namespace Fun
                         {
                             debug.LogWarning("[Websocket] socket closed");
 
-                            if (received_size_ - next_decoding_offset_ > 0)
-                            {
-                                debug.LogWarning("[Websocket] buffer has {0} bytes but they failed to decode. Discarding.",
-                                                 received_size_ - next_decoding_offset_);
-                            }
-
                             TransportError error = new TransportError();
                             error.type = TransportError.Type.kDisconnected;
-                            error.message = "Websocket can't receive messages. Maybe the socket is closed.";
+                            error.message = "[Websocket] Can't receive messages. Maybe the socket is closed.";
                             onDisconnected(error);
                         }
                     }
@@ -1856,7 +1803,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kReceivingFailed;
-                    error.message = "[Websocket] failure in receiveBytesCb: " + e.ToString();
+                    error.message = "[Websocket] Failure in receiveBytesCb: " + e.ToString();
                     onFailure(error);
                 }
             }

@@ -60,6 +60,13 @@ public class TestSessionIdOnlyOnce
                 }
                 else if (type == TransportEventType.kStopped)
                 {
+                    ++test_step;
+                    if (test_step >= kStepCountMax)
+                    {
+                        onTestFinished();
+                        return;
+                    }
+
                     session.Connect(protocol);
                 }
             };
@@ -70,13 +77,6 @@ public class TestSessionIdOnlyOnce
 
                 if (isReceivedAllMessages)
                 {
-                    ++test_step;
-                    if (test_step >= kStepCountMax)
-                    {
-                        onTestFinished();
-                        return;
-                    }
-
                     session.Stop();
                 }
             };

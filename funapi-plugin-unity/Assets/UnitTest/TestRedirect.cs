@@ -174,7 +174,6 @@ public class TestRedirect
             option.useRedirectQueue = true;
 
             session = FunapiSession.Create(TestInfo.ServerIp, option);
-            session.ReceivedMessageCallback += onReceivedEchoMessage;
 
             session.SessionEventCallback += delegate (SessionEventType type, string sessionid)
             {
@@ -232,19 +231,37 @@ public class TestRedirect
                         if (encoding == FunEncoding.kJson)
                         {
                             Dictionary<string, object> json = msg.message as Dictionary<string, object>;
-                            FunDebug.Log("'{0}' message is aborted.", json["message"]);
+                            FunDebug.Log("[Test] '{0}' message is aborted.", json["message"]);
                         }
                         else if (encoding == FunEncoding.kProtobuf)
                         {
                             FunMessage pbuf = msg.message as FunMessage;
                             PbufEchoMessage echo = FunapiMessage.GetMessage<PbufEchoMessage>(pbuf, MessageType.pbuf_echo);
-                            FunDebug.Log("'{0}' message is aborted.", echo.msg);
+                            FunDebug.Log("[Test] '{0}' message is aborted.", echo.msg);
                         }
 
                         --skip;
                     }
                 }
             };
+
+            session.ReceivedMessageCallback += delegate (string type, object message)
+            {
+                onReceivedEchoMessage(type, message);
+
+                if (type == "echo")
+                {
+                    Dictionary<string, object> json = message as Dictionary<string, object>;
+                    FunDebug.Log("[Test] received message - {0}", json["message"]);
+                }
+                else if (type == "pbuf_echo")
+                {
+                    FunMessage msg = message as FunMessage;
+                    PbufEchoMessage echo = FunapiMessage.GetMessage<PbufEchoMessage>(msg, MessageType.pbuf_echo);
+                    FunDebug.Log("[Test] received message - {0}", echo.msg);
+                }
+            };
+
 
             setTestTimeout(5f);
 
@@ -288,7 +305,7 @@ public class TestRedirect
             lock (lock_)
             {
                 ++index;
-                FunDebug.Log("send message - hello_{0}", index);
+                FunDebug.Log("[Test] send message - hello_{0}", index);
 
                 if (transport.encoding == FunEncoding.kJson)
                 {
