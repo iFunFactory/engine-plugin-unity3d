@@ -84,13 +84,13 @@ namespace Fun
                 if (host_url[host_url.Length - 1] != '/')
                     host_url += "/";
                 host_url_ = host_url;
-                FunDebug.Log("Downloader - url: {0}", host_url_);
+                FunDebug.Log("[Downloader] Download from {0}", host_url_);
 
                 target_path_ = target_path;
                 if (target_path_[target_path_.Length - 1] != '/')
                     target_path_ += "/";
                 target_path_ += kRootPath + "/";
-                FunDebug.Log("Downloader - path: {0}", target_path_);
+                FunDebug.Log("[Downloader] Save to {0}", target_path_);
 
                 cur_download_count_ = 0;
                 cur_download_size_ = 0;
@@ -131,12 +131,12 @@ namespace Fun
 
                 if (partial_downloading_)
                 {
-                    FunDebug.Log("Downloader - Ready to download {0} file(s) ({1})",
+                    FunDebug.Log("[Downloader] Ready to download {0} file(s) ({1})",
                                  partial_download_list_.Count, getSizeString(partial_download_size_));
                 }
                 else if (total_download_count_ > 0)
                 {
-                    FunDebug.Log("Downloader - Ready to download {0} file(s) ({1})",
+                    FunDebug.Log("[Downloader] Ready to download {0} file(s) ({1})",
                                  total_download_count_, getSizeString(total_download_size_));
                 }
 
@@ -158,7 +158,7 @@ namespace Fun
 
                 if (partial_download_list_.Count <= 0)
                 {
-                    FunDebug.Log("Downloader - There's no '{0}' file to download.", prefix_path);
+                    FunDebug.Log("[Downloader] There's no '{0}' file to download.", prefix_path);
                     Stop();
                     return;
                 }
@@ -207,14 +207,14 @@ namespace Fun
                     state_ = State.Paused;
                     web_client_.CancelAsync();
                     download_time_.Stop();
-                    FunDebug.Log("Downloader - Paused.");
+                    FunDebug.Log("[Downloader] Paused.");
 
                     onFinished(DownloadResult.PAUSED);
                 }
                 else
                 {
                     state_ = State.None;
-                    FunDebug.Log("Downloader - Stopped.");
+                    FunDebug.Log("[Downloader] Stopped.");
 
                     onFinished(DownloadResult.FAILED);
                 }
@@ -273,7 +273,7 @@ namespace Fun
                 cached_list_.Add(info);
             }
 
-            FunDebug.LogDebug("Downloader - Cached list loaded : {0}", cached_list_.Count);
+            FunDebug.LogDebug("[Downloader] Cached list loaded : {0}", cached_list_.Count);
         }
 
         void updateCachedList ()
@@ -303,7 +303,7 @@ namespace Fun
             stream.Flush();
             stream.Close();
 
-            FunDebug.LogDebug("Downloader - Updates cached list : {0}", cached_list_.Count);
+            FunDebug.LogDebug("[Downloader] Updates cached list : {0}", cached_list_.Count);
         }
 
         // Checks download file list
@@ -335,7 +335,7 @@ namespace Fun
                     if (!rnd_list.Contains(rnd_index))
                         rnd_list.Enqueue(rnd_index);
                 }
-                FunDebug.LogDebug("Downloader - {0} files are randomly selected for check.", rnd_list.Count);
+                FunDebug.LogDebug("[Downloader] {0} files are randomly selected for check.", rnd_list.Count);
 
                 rnd_index = rnd_list.Count > 0 ? rnd_list.Dequeue() : -1;
             }
@@ -408,7 +408,7 @@ namespace Fun
 
             removeCachedList(remove_list);
 
-            FunDebug.LogDebug("Downloader - Random validation has {0}",
+            FunDebug.LogDebug("[Downloader] Random validation has {0}",
                                (verify_success ? "succeeded" : "failed"));
 
             // Checks all local files
@@ -452,7 +452,7 @@ namespace Fun
 
             elapsed_time.Stop();
 
-            FunDebug.Log("Downloader - Took {0:F2}s to check local files.",
+            FunDebug.Log("[Downloader] Took {0:F2}s to check local files.",
                          elapsed_time.ElapsedMilliseconds / 1000f);
 
             total_download_count_ = list.Count;
@@ -471,7 +471,7 @@ namespace Fun
 
                 event_.Add (delegate
                 {
-                    FunDebug.Log("Downloader - Ready to download.");
+                    FunDebug.Log("[Downloader] Ready to download.");
 
                     if (ReadyCallback != null)
                         ReadyCallback(total_download_count_, total_download_size_);
@@ -482,7 +482,7 @@ namespace Fun
                 updateCachedList();
 
                 state_ = State.Completed;
-                FunDebug.Log("Downloader - All resources are up to date.");
+                FunDebug.Log("[Downloader] All resources are up to date.");
                 onFinished(DownloadResult.SUCCESS);
             }
         }
@@ -509,7 +509,7 @@ namespace Fun
             if (delete_file_list_.Count <= 0)
                 return;
 
-            FunDebug.Log("Downloader - Try to delete {0} local files.", delete_file_list_.Count);
+            FunDebug.Log("[Downloader] Try to delete {0} local files.", delete_file_list_.Count);
 
             foreach (string path in delete_file_list_)
             {
@@ -528,7 +528,7 @@ namespace Fun
             try
             {
                 // Request a list of download files.
-                FunDebug.Log("Downloader - Getting list file from {0}", url);
+                FunDebug.Log("[Downloader] Getting list file from {0}", url);
                 web_client_.DownloadDataAsync(new Uri(url));
             }
             catch (Exception e)
@@ -550,7 +550,7 @@ namespace Fun
                 updateCachedList();
 
                 download_time_.Stop();
-                FunDebug.Log("Downloader - Took {0:F2}s for downloading all files.",
+                FunDebug.Log("[Downloader] Took {0:F2}s for downloading all files.",
                              download_time_.ElapsedMilliseconds / 1000f);
 
                 if (partial_downloading_)
@@ -561,12 +561,12 @@ namespace Fun
                         state_ = State.Completed;
 
                     partial_downloading_ = false;
-                    FunDebug.Log("Downloader - Partial downloading completed.");
+                    FunDebug.Log("[Downloader] Partial downloading completed.");
                 }
                 else
                 {
                     state_ = State.Completed;
-                    FunDebug.Log("Downloader - Download completed.");
+                    FunDebug.Log("[Downloader] Download completed.");
                 }
 
                 onFinished(DownloadResult.SUCCESS);
@@ -613,7 +613,7 @@ namespace Fun
                 {
                     if (ar.Error != null)
                     {
-                        FunDebug.LogError("Downloader - Exception error: {0}", ar.Error);
+                        FunDebug.LogError("[Downloader] Exception error: {0}", ar.Error);
                         failed = true;
                     }
                     else
@@ -636,7 +636,7 @@ namespace Fun
                                 url += "/";
 
                             host_url_ = url;
-                            FunDebug.Log("Downloader - Redirect Url: {0}", host_url_);
+                            FunDebug.Log("[Downloader] Redirect Url: {0}", host_url_);
                         }
 
                         List<object> list = json["data"] as List<object>;
@@ -713,7 +713,7 @@ namespace Fun
 
                     if (ar.Error != null)
                     {
-                        FunDebug.LogError("Downloader - Exception error: {0}", ar.Error);
+                        FunDebug.LogError("[Downloader] Exception error: {0}", ar.Error);
                         failed = true;
                     }
                     else
@@ -721,7 +721,7 @@ namespace Fun
                         var info = (DownloadFileInfo)ar.UserState;
                         if (info == null)
                         {
-                            FunDebug.LogWarning("Downloader - DownloadFileInfo object is null.");
+                            FunDebug.LogWarning("[Downloader] DownloadFileInfo object is null.");
                             failed = true;
                         }
                         else
@@ -781,7 +781,7 @@ namespace Fun
         {
             event_.Add (delegate
             {
-                FunDebug.Log("Downloader - Finished.");
+                FunDebug.Log("[Downloader] Finished.");
 
                 releaseMonoListener();
 

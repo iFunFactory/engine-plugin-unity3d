@@ -32,9 +32,6 @@ namespace Fun
 
             lock (pending_lock_)
             {
-                if (debug != null)
-                    debug.LogDebug("Command: '{0}' added.", cmd.name);
-
                 pending_.Add(cmd);
             }
 
@@ -49,9 +46,6 @@ namespace Fun
                 {
                     if (list_.Count > 0)
                     {
-                        if (debug != null)
-                            debug.LogDebug("Command: clear all. ({0})", list_.Count);
-
                         list_.Clear();
                     }
 
@@ -75,9 +69,6 @@ namespace Fun
 
                     if (cmd.canExcute)
                     {
-                        if (debug != null)
-                            debug.LogDebug("Command: call '{0}'.", cmd.name);
-
                         cmd.canExcute = false;
                         cmd.Excute();
                     }
@@ -94,8 +85,6 @@ namespace Fun
         {
             clear_ = true;
         }
-
-        public FunDebugLog debug { private get; set; }
 
 
         object lock_ = new object();

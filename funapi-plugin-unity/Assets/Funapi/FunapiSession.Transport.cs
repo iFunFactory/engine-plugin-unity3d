@@ -192,12 +192,12 @@ namespace Fun
                 {
                     if (state_ != State.kUnknown)
                     {
-                        debug.LogWarning("{0} Start() called, but this transport already started. ({1})",
+                        debug.LogWarning("[{0}] Start called but the transport already started. ({1})",
                                          str_protocol_, state_);
                         return;
                     }
 
-                    debug.LogDebug("{0} starting transport.", str_protocol_);
+                    debug.LogDebug("[{0}] Starting the transport.", str_protocol_);
                     setConnectionTimeout();
 
                     onStart();
@@ -206,7 +206,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kStartingFailed;
-                    error.message = string.Format("{0} failure in Start: {1}", str_protocol_, e.ToString());
+                    error.message = string.Format("[{0}] Failure in Start: {1}", str_protocol_, e.ToString());
                     onFailure(error);
                 }
             }
@@ -217,7 +217,7 @@ namespace Fun
                 if (state_ == State.kUnknown)
                     return;
 
-                debug.LogDebug("{0} stopping transport. (state:{1})", str_protocol_, state_);
+                debug.LogDebug("[{0}] Stopping transport. (state:{1})", str_protocol_, state_);
 
                 state_ = State.kUnknown;
                 cstate_ = ConnectState.kUnknown;
@@ -252,9 +252,9 @@ namespace Fun
                 }
 
                 if (seq_ == 0)
-                    debug.LogDebug("{0} has been started.", str_protocol_);
+                    debug.LogDebug("[{0}] Established.", str_protocol_);
                 else
-                    debug.LogDebug("{0} has been started. (seq:{1})", str_protocol_, seq_);
+                    debug.LogDebug("[{0}] Established. (seq:{1})", str_protocol_, seq_);
 
                 if (enable_ping_)
                     startPingTimer();
@@ -297,7 +297,7 @@ namespace Fun
                     {
                         unsent_queue_.Enqueue(msg);
 
-                        debug.Log("{0} - '{1}' message queued. state:{2}",
+                        debug.Log("[{0}] - '{1}' message queued. state:{2}",
                                   str_protocol_, msg.msg_type, state_);
                     }
                 }
@@ -500,7 +500,7 @@ namespace Fun
             {
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kDisconnected;
-                error.message = string.Format("{0} forcibly closed the connection for testing.",
+                error.message = string.Format("[{0}] Forcibly closed the connection for testing.",
                                               str_protocol_);
                 onDisconnected(error);
             }
@@ -579,7 +579,7 @@ namespace Fun
                 if (opt.Encryption != EncryptionType.kDefaultEncryption)
                 {
                     setEncryption(opt.Encryption);
-                    debug.Log("{0} encrypt type: {1}", str_protocol_, convertString(opt.Encryption));
+                    debug.Log("[{0}] Encrypt type: {1}", str_protocol_, convertString(opt.Encryption));
                 }
             }
 
@@ -636,7 +636,7 @@ namespace Fun
                     return;
 
                 last_error_code_ = TransportError.Type.kConnectionTimeout;
-                last_error_message_ = string.Format("{0} Connection waiting time has been exceeded.",
+                last_error_message_ = string.Format("[{0}] Connection waiting time has been exceeded.",
                                                     str_protocol_);
                 debug.LogWarning(last_error_message_);
 
@@ -659,7 +659,7 @@ namespace Fun
                     last_error_code_ = error.type;
                     last_error_message_ = error.message;
 
-                    debug.LogWarning("{0} disconnected - state: {1}, error: {2}\n{3}\n",
+                    debug.LogWarning("[{0}] Disconnected. state: {1}, error: {2}\n{3}\n",
                                      str_protocol_, state_, error.type, error.message);
 
                     if (ErrorCallback != null)
@@ -682,8 +682,7 @@ namespace Fun
                     last_error_code_ = error.type;
                     last_error_message_ = error.message;
 
-                    debug.LogWarning("{0} error occurred - state: {1}, error: {2}\n{3}\n",
-                                    str_protocol_, state_, error.type, error.message);
+                    debug.LogWarning(error.message);
 
                     if (ErrorCallback != null)
                         ErrorCallback(protocol_, error);
@@ -692,7 +691,7 @@ namespace Fun
                     {
                         if (auto_reconnect_ && !redirecting_)
                         {
-                            debug.Log("{0} connection failed. will try to connect again. " +
+                            debug.Log("[{0}] Connection failed. Will try to connect again. " +
                                       "(state: {1}, error: {2})\n{3}\n",
                                       str_protocol_, state_, error.type, error.message);
 
@@ -743,8 +742,8 @@ namespace Fun
                 if (exponential_time_ < 8f)
                     exponential_time_ *= 2f;
 
-                debug.Log("Wait {0} seconds for reconnect to {1} transport.",
-                          delay_time, str_protocol_);
+                debug.Log("[{0}] Wait {1} second(s) for reconnecting.",
+                          str_protocol_, delay_time);
 
                 timer_.Add(new FunapiTimer("reconnect", delay_time, onStart));
 
@@ -765,16 +764,10 @@ namespace Fun
                         if (sendingFirst)
                         {
                             first_.Add(msg);
-
-                            debug.LogDebug("{0} adds '{1}' message to first list.",
-                                           str_protocol_, msg.msg_type);
                         }
                         else
                         {
                             pending_.Add(msg);
-
-                            debug.LogDebug("{0} adds '{1}' message to pending list.",
-                                           str_protocol_, msg.msg_type);
                         }
 
                         if (Connected && isSendable)
@@ -785,7 +778,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = string.Format("{0} failure in sendMessage: {1}",
+                    error.message = string.Format("[{0}] Failure in sendMessage: {1}",
                                                   str_protocol_, e.ToString());
                     onFailure(error);
                 }
@@ -793,8 +786,6 @@ namespace Fun
 
             void sendEmptyMessage ()
             {
-                debug.LogDebug("{0} sending a empty message.", str_protocol_);
-
                 if (encoding_ == FunEncoding.kJson)
                 {
                     sendMessage(new FunapiMessage(protocol_, kEmptyMessageType,
@@ -802,30 +793,25 @@ namespace Fun
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)
                 {
-                    sendMessage(new FunapiMessage(protocol_, kEmptyMessageType,
-                                                  new FunMessage()), true);
+                    sendMessage(new FunapiMessage(protocol_, kEmptyMessageType, new FunMessage()), true);
                 }
             }
 
             void sendAck (UInt32 ack, bool sendingFirst = false)
             {
-                debug.LogDebug("{0} sending a ack - {1}", str_protocol_, ack);
-
                 if (encoding_ == FunEncoding.kJson)
                 {
                     object message = FunapiMessage.Deserialize("{}");
                     json_helper_.SetIntegerField(message, kAckNumberField, ack);
 
-                    sendMessage(new FunapiMessage(protocol_, kAckNumberField,
-                                                  message), sendingFirst);
+                    sendMessage(new FunapiMessage(protocol_, kAckNumberField, message), sendingFirst);
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)
                 {
                     FunMessage message = new FunMessage();
                     message.ack = ack;
 
-                    sendMessage(new FunapiMessage(protocol_, kAckNumberField,
-                                                  message), sendingFirst);
+                    sendMessage(new FunapiMessage(protocol_, kAckNumberField, message), sendingFirst);
                 }
 
                 sent_ack_ = ack;
@@ -838,14 +824,11 @@ namespace Fun
                     if (unsent_queue_.Count <= 0)
                         return;
 
-                    debug.LogDebug("{0} has {1} unsent message(s).",
+                    debug.LogDebug("[{0}] {1} unsent message(s).",
                                    str_protocol_, unsent_queue_.Count);
 
                     foreach (FunapiMessage msg in unsent_queue_)
                     {
-                        debug.LogDebug("{0} sending a unsent message - '{1}'",
-                                       str_protocol_, msg.msg_type);
-
                         sendMessage(msg);
                     }
 
@@ -867,8 +850,6 @@ namespace Fun
             //---------------------------------------------------------------------
             bool onSeqReceived (UInt32 seq)
             {
-                debug.LogDebug("{0} received sequence number - {1}", str_protocol_, seq);
-
                 if (first_seq_)
                 {
                     first_seq_ = false;
@@ -877,14 +858,14 @@ namespace Fun
                 {
                     if (!seqLess(last_seq_, seq))
                     {
-                        debug.LogWarning("Last sequence number is {0} but {1} received. Skipping message.",
-                                         last_seq_, seq);
+                        debug.LogWarning("[{0}] Last sequence number is {1} but {2} received. Skipping message.",
+                                         str_protocol_, last_seq_, seq);
                         return false;
                     }
                     else if (seq != last_seq_ + 1)
                     {
-                        debug.LogWarning("Received wrong sequence number {0}. {1} expected.",
-                                         seq, last_seq_ + 1);
+                        debug.LogWarning("[{0}] Received wrong sequence number {1}. {2} expected.",
+                                         str_protocol_, seq, last_seq_ + 1);
 
                         Stop();
                         return false;
@@ -904,24 +885,22 @@ namespace Fun
                 if (!Connected)
                     return;
 
-                debug.LogDebug("{0} received ack number - {1}", str_protocol_, ack);
-
                 lock (sending_lock_)
                 {
                     if (sent_queue_.Count > 0)
-                        debug.LogDebug("The send queue has {0} message(s).", sent_queue_.Count);
-
-                    while (sent_queue_.Count > 0)
                     {
-                        FunapiMessage msg = sent_queue_.Peek();
+                        while (sent_queue_.Count > 0)
+                        {
+                            FunapiMessage msg = sent_queue_.Peek();
 
-                        if (seqLess(msg.seq, ack))
-                        {
-                            sent_queue_.Dequeue();
-                        }
-                        else
-                        {
-                            break;
+                            if (seqLess(msg.seq, ack))
+                            {
+                                sent_queue_.Dequeue();
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                     }
 
@@ -929,22 +908,24 @@ namespace Fun
                     {
                         if (sent_queue_.Count > 0)
                         {
+                            debug.LogDebug("[{0}] ack:{1}, sent queue:{2}",
+                                           str_protocol_, ack, sent_queue_.Count);
+
                             foreach (FunapiMessage msg in sent_queue_)
                             {
                                 if (msg.seq == ack || seqLess(ack, msg.seq))
                                 {
                                     sendMessage(msg);
-                                    debug.Log("{0} resending '{1}' message. (seq:{2})",
+
+                                    debug.Log("[{0}] Resending '{1}' message. (seq:{2})",
                                               str_protocol_, msg.msg_type, msg.seq);
                                 }
                                 else
                                 {
-                                    debug.LogWarning("onAckReceived({0}) - wrong sequence number {1}. ",
-                                                     ack, msg.seq);
+                                    debug.LogWarning("[{0}] Wrong sequence number: {1} ",
+                                                     str_protocol_, msg.seq);
                                 }
                             }
-
-                            debug.Log("Resending {0} message(s).", sent_queue_.Count);
                         }
 
                         onStandby();
@@ -1097,22 +1078,7 @@ namespace Fun
 
                 if (debug.IsDebug)
                 {
-                    StringBuilder log = new StringBuilder();
-                    log.AppendFormat("[C->S] {0}/{1}: type={2}, length={3} ",
-                                    str_protocol_, convertString(encoding_), msg.msg_type, msg.body.Count);
-                    if (msg.body.Count > 0)
-                    {
-                        if (encoding_ == FunEncoding.kJson)
-                        {
-                            string str = System.Text.Encoding.UTF8.GetString(msg.body.Array, msg.body.Offset, msg.body.Count);
-                            log.Append(str);
-                        }
-                        else if (encoding_ == FunEncoding.kProtobuf)
-                        {
-                            // TODO : Generates json string from protobuf message.
-                        }
-                    }
-                    debug.LogDebug(log.ToString());
+                    logSendingMessageInfo(msg, ack);
                 }
 
                 // Compress the message
@@ -1122,7 +1088,7 @@ namespace Fun
                     ArraySegment<byte> compressed = compressor_.Compress(msg.body);
                     if (compressed.Count > 0)
                     {
-                        debug.LogDebug("{0} compress message: {1}bytes -> {2}bytes",
+                        debug.LogDebug("[{0}] Compress message: {1}bytes -> {2}bytes",
                                        str_protocol_, msg.body.Count, compressed.Count);
 
                         uncompressed_size = msg.body.Count;
@@ -1156,13 +1122,6 @@ namespace Fun
                 makeHeader(msg, uncompressed_size);
 
                 msg.ready = true;
-
-                StringBuilder strlog = new StringBuilder();
-                strlog.AppendFormat("{0} built a message - '{1}' ({2}bytes)",
-                                    str_protocol_, msg.msg_type, msg.header.Count + msg.body.Count);
-                if (msg.seq > 0) strlog.AppendFormat(" (seq : {0})", msg.seq);
-                if (ack > 0) strlog.AppendFormat(" (ack : {0})", ack);
-                debug.LogDebug(strlog.ToString());
 
                 return true;
             }
@@ -1204,15 +1163,51 @@ namespace Fun
 
                     if (debug.IsDebug)
                     {
-                        StringBuilder strlog = new StringBuilder();
-                        strlog.AppendFormat("{0} rebuilt a message - '{1}' ({2} + {3} bytes)",
-                                            str_protocol_, msg.msg_type, msg.header.Count, msg.body.Count);
-                        if (msg.seq > 0) strlog.AppendFormat(" (seq : {0})", msg.seq);
-                        debug.LogDebug(strlog.ToString());
+                        logSendingMessageInfo(msg);
                     }
                 }
 
                 return true;
+            }
+
+            void logSendingMessageInfo (FunapiMessage msg, UInt32 ack = 0)
+            {
+                StringBuilder log = new StringBuilder();
+
+                log.AppendFormat("[{0}] [C->S] {1}: type={2}, length={3}",
+                                 str_protocol_, convertString(encoding_), msg.msg_type, msg.body.Count);
+
+                if (msg.body.Count > 0)
+                {
+                    if (encoding_ == FunEncoding.kJson)
+                    {
+                        string str = System.Text.Encoding.UTF8.GetString(msg.body.Array, msg.body.Offset, msg.body.Count);
+                        log.AppendFormat(" {0}", str);
+                    }
+                    else if (encoding_ == FunEncoding.kProtobuf)
+                    {
+                        FunMessage funmsg = msg.message as FunMessage;
+
+                        if (funmsg.sidSpecified)
+                        {
+                            log.AppendFormat(", sid={0}", SessionId.ToString(funmsg.sid));
+                        }
+
+                        if (funmsg.seqSpecified)
+                        {
+                            log.AppendFormat(", seq={0}", funmsg.seq);
+                        }
+
+                        if (funmsg.ackSpecified)
+                        {
+                            log.AppendFormat(", ack={0}", funmsg.ack);
+                        }
+
+                        // TODO : Generates json string from protobuf message.
+                    }
+                }
+
+                debug.LogDebug(log.ToString());
             }
 
             void sendPendingMessages ()
@@ -1255,7 +1250,7 @@ namespace Fun
                 {
                     TransportError error = new TransportError();
                     error.type = TransportError.Type.kSendingFailed;
-                    error.message = string.Format("{0} failure in sendPendingMessages: {1}",
+                    error.message = string.Format("[{0}] Failure in sendPendingMessages: {1}",
                                                   str_protocol_, e.ToString());
                     onFailure(error);
                 }
@@ -1267,9 +1262,6 @@ namespace Fun
                 {
                     if (sending_.Count > 0)
                     {
-                        debug.LogDebug("{0} continues to send unsent messages. {1} remaining message(s).",
-                                       str_protocol_, sending_.Count);
-
                         wireSend();
                     }
                     else if (isSendable)
@@ -1281,7 +1273,7 @@ namespace Fun
 
             void sendPublicKey (EncryptionType type)
             {
-                debug.LogDebug("{0} sending a {1}-pubkey message.", str_protocol_, (int)type);
+                debug.LogDebug("[{0}] Sending a {1}-pubkey message.", str_protocol_, (int)type);
 
                 lock (sending_lock_)
                 {
@@ -1309,7 +1301,7 @@ namespace Fun
                 if (next_decoding_offset_ > 0)
                 {
                     // fit in the receive buffer boundary.
-                    debug.LogDebug("{0} compacting the receive buffer to save {1} bytes.",
+                    debug.LogDebug("[{0}] Compacting the receive buffer to save {1} bytes.",
                                    str_protocol_, next_decoding_offset_);
                     Buffer.BlockCopy(receive_buffer_, next_decoding_offset_, new_buffer, 0,
                                      received_size_ - next_decoding_offset_);
@@ -1319,7 +1311,7 @@ namespace Fun
                 }
                 else
                 {
-                    debug.LogDebug("{0} increasing the receive buffer to {1} bytes.",
+                    debug.LogDebug("[{0}] Increasing the receive buffer to {1} bytes.",
                                    str_protocol_, new_length);
                     Buffer.BlockCopy(receive_buffer_, 0, new_buffer, 0, received_size_);
                     receive_buffer_ = new_buffer;
@@ -1350,7 +1342,6 @@ namespace Fun
                         if (!valid)
                         {
                             // Not enough bytes. Wait for more bytes to come.
-                            debug.LogDebug("{0} need more bytes for a header field. Waiting.", str_protocol_);
                             break;
                         }
 
@@ -1370,7 +1361,7 @@ namespace Fun
                             string[] tuple = line.Split(kHeaderFieldDelimeterAsChars);
                             if (tuple.Length != 2)
                             {
-                                debug.LogWarning("{0} header has a invalid tuple - '{1}'", str_protocol_, line);
+                                debug.LogWarning("[{0}] Header has a invalid tuple - '{1}'", str_protocol_, line);
                                 continue;
                             }
 
@@ -1389,14 +1380,9 @@ namespace Fun
                         int body_length = Convert.ToInt32(fields[kLengthHeaderField]);
                         if (received_size_ - offset < body_length)
                         {
-                            // Need more bytes.
-                            debug.LogDebug("{0} need more bytes for a message body. Waiting.", str_protocol_);
+                            // Need more bytes for a message body. Waiting.
                             break;
                         }
-
-                        debug.LogDebug("{0} header {1} bytes. body {2} bytes. ({3} bytes)",
-                                       str_protocol_, header_length, body_length,
-                                       header_length + body_length);
 
                         // Makes a raw message
                         if (!readBodyAndSaveMessage(fields, offset))
@@ -1413,19 +1399,19 @@ namespace Fun
                 {
                     if (headers.Count <= 0)
                     {
-                        debug.LogWarning("{0} header fields are empty.", str_protocol_);
+                        debug.LogWarning("[{0}] Header list is empty.", str_protocol_);
                         return false;
                     }
 
                     if (!headers.ContainsKey(kVersionHeaderField))
                     {
-                        throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
+                        throw new Exception(string.Format("[{0}] Header is invalid. It doesn't have '{1}' field",
                                                           str_protocol_, kVersionHeaderField));
                     }
 
                     if (!headers.ContainsKey(kLengthHeaderField))
                     {
-                        throw new Exception(string.Format("{0} header is invalid. It doesn't have '{1}' field",
+                        throw new Exception(string.Format("[{0}] Header is invalid. It doesn't have '{1}' field",
                                                           str_protocol_, kLengthHeaderField));
                     }
 
@@ -1442,7 +1428,8 @@ namespace Fun
                     if (received_size_ - offset < body_length)
                     {
                         // Need more bytes.
-                        debug.LogError("{0} received bytes less than 'LEN({1})'", str_protocol_, body_length);
+                        debug.LogError("[{0}] Received {1} bytes but body length is {2}.",
+                                       str_protocol_, received_size_ - offset, body_length);
                         return false;
                     }
 
@@ -1469,9 +1456,6 @@ namespace Fun
                     next_decoding_offset_ = offset + body_length;
 
                     messages_.Enqueue(message);
-
-                    debug.LogDebug("{0} {1} bytes left in buffer.",
-                                   str_protocol_, received_size_ - next_decoding_offset_);
                 }
 
                 return true;
@@ -1483,8 +1467,6 @@ namespace Fun
                 {
                     if (messages_.Count == 0)
                         return true;
-
-                    debug.LogDebug("{0} update messages. ({1})", str_protocol_, messages_.Count);
 
                     while (messages_.Count > 0)
                     {
@@ -1499,8 +1481,8 @@ namespace Fun
                         {
                             if (msg.body.Count != 0)
                             {
-                                debug.LogWarning("{0} this message will be ignore. " +
-                                                 "This message might come from previous connection.", str_protocol_);
+                                debug.LogWarning("[{0}] This message will be ignored. " +
+                                                 "It might come from previous connection.", str_protocol_);
                                 return false;
                             }
 
@@ -1510,7 +1492,7 @@ namespace Fun
                                     return false;
 
                                 state_ = State.kConnected;
-                                debug.LogDebug("{0} handshaking is complete.", str_protocol_);
+                                debug.LogDebug("[{0}] Handshaking is complete.", str_protocol_);
 
                                 // Send public key (Do not change this order)
                                 if (hasEncryption(EncryptionType.kChaCha20Encryption))
@@ -1554,7 +1536,7 @@ namespace Fun
                                     return false;
                                 }
 
-                                debug.LogDebug("{0} decompress message: {1}bytes -> {2}bytes",
+                                debug.LogDebug("[{0}] Decompress message: {1}bytes -> {2}bytes",
                                                str_protocol_, msg.body.Count, decompressed.Count);
 
                                 msg.body = decompressed;
@@ -1585,19 +1567,21 @@ namespace Fun
                 object message = FunapiMessage.Deserialize(body, encoding_);
                 if (message == null)
                 {
-                    debug.LogWarning("{0} failed to deserialize a message.", str_protocol_);
+                    debug.LogWarning("[{0}] Failed to deserialize a message.", str_protocol_);
                     return;
                 }
 
-                // Checks ack and seq, gets message type
                 string msg_type = "";
+                UInt32 ack = 0;
+
+                // Checks ack and seq, gets message type
                 if (encoding_ == FunEncoding.kJson)
                 {
                     if (IsReliable)
                     {
                         if (json_helper_.HasField(message, kAckNumberField))
                         {
-                            UInt32 ack = (UInt32)json_helper_.GetIntegerField(message, kAckNumberField);
+                            ack = (UInt32)json_helper_.GetIntegerField(message, kAckNumberField);
                             onAckReceived(ack);
                         }
 
@@ -1613,6 +1597,10 @@ namespace Fun
                     {
                         msg_type = json_helper_.GetStringField(message, kMessageTypeField);
                     }
+                    else if (ack > 0)
+                    {
+                        msg_type = "_ack";
+                    }
                 }
                 else if (encoding_ == FunEncoding.kProtobuf)
                 {
@@ -1622,7 +1610,8 @@ namespace Fun
                     {
                         if (funmsg.ackSpecified)
                         {
-                            onAckReceived(funmsg.ack);
+                            ack = funmsg.ack;
+                            onAckReceived(ack);
                         }
 
                         if (funmsg.seqSpecified)
@@ -1639,6 +1628,10 @@ namespace Fun
                     else if (funmsg.msgtype2Specified)
                     {
                         msg_type = MessageTable.Lookup((MessageType)funmsg.msgtype2);
+                    }
+                    else if (ack > 0)
+                    {
+                        msg_type = "_ack";
                     }
                 }
 
@@ -1668,8 +1661,6 @@ namespace Fun
                         onClientPingMessage(message);
                         return;
                     }
-
-                    debug.LogDebug("{0} received message - '{1}'", str_protocol_, msg_type);
                 }
                 else
                 {
@@ -1682,20 +1673,40 @@ namespace Fun
                 if (debug.IsDebug)
                 {
                     StringBuilder log = new StringBuilder();
-                    log.AppendFormat("[S->C] {0}/{1}: type={2}, length={3} ",
-                                    str_protocol_, convertString(encoding_), msg_type, body.Count);
+
+                    log.AppendFormat("[{0}] [S->C] {1}: type={2}, length={3}",
+                                     str_protocol_, convertString(encoding_), msg_type, body.Count);
+
                     if (body.Count > 0)
                     {
                         if (encoding_ == FunEncoding.kJson)
                         {
                             string str = System.Text.Encoding.UTF8.GetString(body.Array, body.Offset, body.Count);
-                            log.Append(str);
+                            log.AppendFormat(" {0}", str);
                         }
                         else if (encoding_ == FunEncoding.kProtobuf)
                         {
+                            FunMessage funmsg = (FunMessage)message;
+
+                            if (funmsg.sidSpecified)
+                            {
+                                log.AppendFormat(", sid={0}", SessionId.ToString(funmsg.sid));
+                            }
+
+                            if (funmsg.seqSpecified)
+                            {
+                                log.AppendFormat(", seq={0}", funmsg.seq);
+                            }
+
+                            if (funmsg.ackSpecified)
+                            {
+                                log.AppendFormat(", ack={0}", funmsg.ack);
+                            }
+
                             // TODO : Generates json string from protobuf message.
                         }
                     }
+
                     debug.LogDebug(log.ToString());
                 }
 
@@ -1710,7 +1721,7 @@ namespace Fun
                     if (sending_.Count <= 0)
                         return;
 
-                    debug.LogWarning("{0} sending failed. Clears the sending buffer. ({1})",
+                    debug.LogWarning("[{0}] Sending failed. Clears the sending buffer. ({1})",
                                      str_protocol_, sending_.Count);
 
                     sending_.Clear();
@@ -1736,7 +1747,7 @@ namespace Fun
                                                   onPingUpdate, onPingTimeout);
                 timer_.Add(ping_timer_, true);
 
-                debug.Log("{0} ping timer started. interval: {1}s timeout: {2}s",
+                debug.Log("[{0}] Ping timer started. interval: {1}s timeout: {2}s",
                           str_protocol_, interval, tcp_option.PingTimeoutSeconds);
             }
 
@@ -1756,7 +1767,7 @@ namespace Fun
                     timer_.Remove(ping_timer_);
                     ping_timer_ = null;
 
-                    debug.Log("{0} ping timer stopped.", str_protocol_);
+                    debug.Log("[{0}] Ping timer stopped.", str_protocol_);
                 }
 
                 ping_time_ = 0;
@@ -1775,11 +1786,11 @@ namespace Fun
 
             void onPingTimeout ()
             {
-                debug.LogWarning("{0} ping timer timed out.", str_protocol_);
+                debug.LogWarning("[{0}] Ping timer timed out.", str_protocol_);
 
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kDisconnected;
-                error.message = string.Format("{0} has not received a ping message for a long time.",
+                error.message = string.Format("[{0}] Didn't received a ping message for a long time.",
                                               str_protocol_);
                 onDisconnected(error);
             }

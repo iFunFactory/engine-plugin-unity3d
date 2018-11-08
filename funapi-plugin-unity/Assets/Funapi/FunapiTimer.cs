@@ -30,7 +30,7 @@ namespace Fun
             if (list_.Remove(timer))
             {
                 if (debug != null)
-                    debug.LogDebug("[Timer] '{0}' timer deleted.", timer.name);
+                    debug.LogDebug("[Timer] '{0}' deleted.", timer.name);
                 return true;
             }
 
@@ -42,7 +42,7 @@ namespace Fun
             if (list_.Remove(name))
             {
                 if (debug != null)
-                    debug.LogDebug("[Timer] '{0}' timer deleted.", name);
+                    debug.LogDebug("[Timer] '{0}' deleted.", name);
                 return true;
             }
 
@@ -54,7 +54,7 @@ namespace Fun
             list_.Clear();
 
             if (debug != null)
-                debug.LogDebug("[Timer] all timers were deleted.");
+                debug.LogDebug("[Timer] Clear all timer.");
         }
 
         public void Update (float deltaTime)

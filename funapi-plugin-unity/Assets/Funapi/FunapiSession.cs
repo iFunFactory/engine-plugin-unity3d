@@ -73,7 +73,6 @@ namespace Fun
 
             // Sets the debug log instance.
             debug.SetDebugObject(this);
-            cmd_list_.debug = debug;
             response_timeout_.debugLog = debug;
 
             // Sets member variables.
@@ -362,21 +361,20 @@ namespace Fun
         {
             if (transport == null)
             {
-                debug.LogDebug("Session.Connect() called but the transport is null.");
+                debug.LogDebug("[Session] Connect - transport is null.");
                 return false;
             }
 
             if (!Started)
             {
-                debug.LogDebug("Session.Connect({0}) called.", transport.str_protocol);
-
                 state = State.kStarted;
+                debug.LogDebug("[Session] Starting the session.");
             }
 
             if (transport.Connected)
             {
-                debug.LogWarning("Session.Connect({0}) called but {1} has been already connected.",
-                                 transport.str_protocol, transport.str_protocol);
+                debug.LogWarning("[Session] Connect - {0} has been already connected.",
+                                 transport.str_protocol);
                 return false;
             }
 
@@ -389,25 +387,24 @@ namespace Fun
         {
             if (transport == null)
             {
-                debug.LogDebug("Session.Stop() called but the transport is null.");
+                debug.LogDebug("[Session] Stop - transport is null.");
                 return false;
             }
 
             if (!Started)
             {
-                debug.LogWarning("Session.Stop({0}) called but the session is not connected.",
-                                 transport.str_protocol);
                 return false;
             }
 
             if (transport.IsStopped)
             {
-                debug.LogWarning("Session.Stop({0}) called but {1} hasn't been connected.",
-                                 transport.str_protocol, transport.str_protocol);
+                debug.LogWarning("[Session] Stop - {0} has been already stopped.",
+                                 transport.str_protocol);
                 return false;
             }
 
-            debug.LogDebug("Session.Stop({0}) called. (state:{1})", transport.str_protocol, state_);
+            debug.LogDebug("[Session] Stopping {0} transport. (state:{1})",
+                           transport.str_protocol, state_);
 
             if (!transport.Connected)
             {
@@ -432,7 +429,7 @@ namespace Fun
             if (state == State.kWaitForStop)
                 return false;
 
-            debug.LogDebug("Session.StopAll() called. (state:{0})", state_);
+            debug.LogDebug("[Session] Stopping all. (state:{0})", state_);
 
             state = State.kWaitForStop;
 
@@ -465,7 +462,7 @@ namespace Fun
             lock (transports_lock_)
             {
                 transports_.Clear();
-                debug.Log("[Redirect] Removes all transports.");
+                debug.LogDebug("[Redirect] Removes all transports.");
             }
 
             onSessionClosed();
@@ -519,8 +516,8 @@ namespace Fun
             if (transport == null || token.Length <= 0)
                 return;
 
-            debug.Log("[Redirect] {0} sending the redirect token to the other server.",
-                      transport.str_protocol);
+            debug.LogDebug("[Redirect] {0} sending the token to the other server.",
+                           transport.str_protocol);
             debug.LogDebug("[Redirect] token: {0}", token);
 
             if (transport.encoding == FunEncoding.kJson)
@@ -890,10 +887,12 @@ namespace Fun
 
             reliable_protocol_ = getTheMostReliableProtocol();
 
-            if (default_protocol_ == TransportProtocol.kDefault)
+            if (default_protocol_ == TransportProtocol.kDefault ||
+                default_protocol_ != reliable_protocol_)
+            {
                 default_protocol_ = reliable_protocol_;
+            }
 
-            debug.LogDebug("{0} transport has been created.", transport.str_protocol);
             return transport;
         }
 
@@ -1144,7 +1143,7 @@ namespace Fun
             {
                 if (transports_.Count > 1)
                 {
-                    debug.Log("The default protocol is '{0}'", convertString(default_protocol_));
+                    debug.Log("[Session] default protocol: {0}", convertString(default_protocol_));
                 }
             }
         }
@@ -1211,7 +1210,7 @@ namespace Fun
 
             case kSessionClosedType:
                 {
-                    debug.LogWarning("Session has been closed by server.");
+                    debug.LogWarning("[Session] Closed by server.");
 
                     if (wait_for_redirect_)
                         return;
@@ -1281,7 +1280,7 @@ namespace Fun
                     object tags = json_helper_.GetObject(message, "current_tags");
                     int length = json_helper_.GetArrayCount(tags);
                     StringBuilder log = new StringBuilder();
-                    log.Append("[Redirect] current tag [");
+                    log.Append("[Redirect] Current tags [");
 
                     for (int i = 0; i < length; ++i)
                     {
@@ -1300,7 +1299,7 @@ namespace Fun
                     object tags = json_helper_.GetObject(message, "target_tags");
                     int length = json_helper_.GetArrayCount(tags);
                     StringBuilder log = new StringBuilder();
-                    log.Append("[Redirect] target tag [");
+                    log.Append("[Redirect] Target tags [");
 
                     for (int i = 0; i < length; ++i)
                     {
@@ -1347,7 +1346,7 @@ namespace Fun
                     redirect_cur_tags_.AddRange(redirect.current_tags);
 
                     StringBuilder log = new StringBuilder();
-                    log.AppendFormat("[Redirect] current tag [");
+                    log.AppendFormat("[Redirect] Current tags [");
 
                     int count = redirect_cur_tags_.Count;
                     for (int i = 0; i < count; ++i)
@@ -1366,7 +1365,7 @@ namespace Fun
                     redirect_target_tags_.AddRange(redirect.target_tags);
 
                     StringBuilder log = new StringBuilder();
-                    log.AppendFormat("[Redirect] target tag [");
+                    log.AppendFormat("[Redirect] Target tags [");
 
                     int count = redirect_target_tags_.Count;
                     for (int i = 0; i < count; ++i)
@@ -1460,8 +1459,6 @@ namespace Fun
 
                 state = State.kConnected;
                 wait_for_redirect_ = false;
-
-                debug.Log("The default protocol is '{0}'", convertString(default_protocol_));
 
                 onSessionEvent(SessionEventType.kRedirectSucceeded);
             }
