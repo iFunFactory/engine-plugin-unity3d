@@ -1256,6 +1256,28 @@ namespace Fun
                 }
             }
 
+            protected int getSendingBufferLength ()
+            {
+                int length = 0;
+
+                lock (sending_lock_)
+                {
+                    foreach (FunapiMessage msg in sending_)
+                    {
+                        if (msg.header.Count > 0)
+                        {
+                            length += msg.header.Count;
+                        }
+                        if (msg.body.Count > 0)
+                        {
+                            length += msg.body.Count;
+                        }
+                    }
+                }
+
+                return length;
+            }
+
             protected void checkPendingMessages ()
             {
                 lock (sending_lock_)
