@@ -1464,7 +1464,7 @@ namespace Fun
 
                     if (SendCallback != null)
                     {
-                        SendCallback();
+                        SendCallback(true);
                     }
                 }
 
@@ -1588,9 +1588,9 @@ namespace Fun
 
                 public event System.Action StartCallback;
                 public event System.Action CloseCallback;
-                public event System.Action<string> ErrorCallback;
-                public event System.Action SendCallback;
+                public event System.Action<bool> SendCallback;
                 public event System.Action<byte[]> ReceiveCallback;
+                public event System.Action<string> ErrorCallback;
 
                 Uri url_;
                 int native_ref_ = 0;
@@ -1652,7 +1652,7 @@ namespace Fun
                     wsock_.StartCallback += startJSCb;
                     wsock_.CloseCallback += closeJSCb;
                     wsock_.ErrorCallback += errorJSCb;
-                    wsock_.SendCallback += sendBytesJSCb;
+                    wsock_.SendCallback += sendBytesCb;
                     wsock_.ReceiveCallback += receiveBytesJSCb;
 
                     mono.StartCoroutine(wsock_.Connect());
@@ -1690,21 +1690,25 @@ namespace Fun
             {
                 try
                 {
-                    byte[] buffer = null;
+                    int length = getSendingBufferLength();
+                    byte[] buffer = new byte[length];
+                    int offset = 0;
 
                     lock (sending_lock_)
                     {
-                        FunDebug.Assert(sending_.Count > 0);
-                        FunapiMessage msg = sending_[0];
-
-                        int length = msg.header.Count + msg.body.Count;
-                        buffer = new byte[length];
-
-                        if (msg.header.Count > 0)
-                            Buffer.BlockCopy(msg.header.Array, 0, buffer, 0, msg.header.Count);
-
-                        if (msg.body.Count > 0)
-                            Buffer.BlockCopy(msg.body.Array, 0, buffer, msg.header.Count, msg.body.Count);
+                        foreach (FunapiMessage msg in sending_)
+                        {
+                            if (msg.header.Count > 0)
+                            {
+                                Buffer.BlockCopy(msg.header.Array, 0, buffer, offset, msg.header.Count);
+                                offset += msg.header.Count;
+                            }
+                            if (msg.body.Count > 0)
+                            {
+                                Buffer.BlockCopy(msg.body.Array, 0, buffer, offset, msg.body.Count);
+                                offset += msg.body.Count;
+                            }
+                        }
                     }
 
                     lock (sock_lock_)
@@ -1713,6 +1717,9 @@ namespace Fun
                         {
                             return;
                         }
+
+                        sending_length_ = length;
+
 #if UNITY_WEBGL && !UNITY_EDITOR
                         wsock_.Send(buffer);
 #else
@@ -1802,30 +1809,6 @@ namespace Fun
                 onFailure(error);
             }
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-            void sendBytesJSCb ()
-            {
-                try
-                {
-                    lock (sending_lock_)
-                    {
-                        FunDebug.Assert(sending_.Count > 0);
-                        sending_.RemoveAt(0);
-
-                        // Sends pending messages
-                        checkPendingMessages();
-                    }
-                }
-                catch (Exception e)
-                {
-                    TransportError error = new TransportError();
-                    error.type = TransportError.Type.kSendingFailed;
-                    error.message = "[Websocket] Failure in sendBytesCb: " + e.ToString();
-                    onFailure(error);
-                }
-            }
-#endif
-
             void sendBytesCb (bool completed)
             {
                 try
@@ -1836,13 +1819,43 @@ namespace Fun
                         return;
                     }
 
-                    lock (sending_lock_)
+                    int nSent = sending_length_;
+                    if (nSent > 0)
                     {
-                        FunDebug.Assert(sending_.Count > 0);
-                        sending_.RemoveAt(0);
+                        lock (sending_lock_)
+                        {
+                            while (nSent > 0)
+                            {
+                                if (sending_.Count > 0)
+                                {
+                                    // removes a sent message.
+                                    FunapiMessage msg = sending_[0];
+                                    int length = msg.header.Count + msg.body.Count;
+                                    nSent -= length;
 
-                        // Sends pending messages
-                        checkPendingMessages();
+                                    sending_.RemoveAt(0);
+                                }
+                                else
+                                {
+                                    debug.LogError("[Websocket] Sent {0} more bytes but couldn't find the sending buffer.", nSent);
+                                    break;
+                                }
+                            }
+
+                            if (sending_.Count != 0)
+                            {
+                                debug.LogError("[Websocket] {0} message(s) left in the sending buffer.", sending_.Count);
+                            }
+
+                            sending_length_ = 0;
+
+                            // Sends pending messages
+                            checkPendingMessages();
+                        }
+                    }
+                    else
+                    {
+                        debug.LogWarning("[Websocket] socket closed");
                     }
                 }
                 catch (Exception e)
@@ -1937,6 +1950,7 @@ namespace Fun
             WebSocket wsock_;
 #endif
             object sock_lock_ = new object();
+            int sending_length_ = 0;
         }
     }
 
