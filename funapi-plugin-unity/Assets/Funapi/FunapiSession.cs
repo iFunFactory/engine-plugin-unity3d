@@ -99,6 +99,7 @@ namespace Fun
                 stopAll(true);
             }
 
+            cmd_list_.Clear();
             event_.Add(releaseMonoListener);
         }
 
@@ -1166,9 +1167,6 @@ namespace Fun
             state = State.kUnknown;
 
             response_timeout_.Clear();
-
-            if (!wait_for_redirect_)
-                cmd_list_.Clear();
 
             onSessionEvent(SessionEventType.kStopped);
         }
