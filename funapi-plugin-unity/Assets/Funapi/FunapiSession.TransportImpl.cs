@@ -15,6 +15,7 @@ using System.Text;
 using WebSocketSharp;
 #if !NO_UNITY
 using UnityEngine;
+using UnityEngine.Networking;
 #endif
 using System.Runtime.InteropServices;
 
@@ -895,7 +896,11 @@ namespace Fun
                 // Sending a message
                 if (using_www_)
                 {
+#if UNITY_2017_OR_NEWER
+                    sendUWRequest(headers, msg);
+#else
                     sendWWWRequest(headers, msg);
+#endif
                 }
                 else
 #endif
@@ -926,6 +931,37 @@ namespace Fun
                     mono.StartCoroutine(wwwPost(request.www));
                 }
             }
+
+#if UNITY_2017_OR_NEWER
+            void sendUWRequest (Dictionary<string, string> headers, FunapiMessage msg)
+            {
+                Request request = new Request();
+
+                lock (request_lock_)
+                {
+                    FunDebug.Assert(cur_request_ == null);
+                    cur_request_ = request;
+                }
+
+                if (msg.body.Count > 0)
+                {
+                    request.uw_request = new UnityWebRequest(host_url_);
+                    request.uw_request.method = UnityWebRequest.kHttpVerbPOST;
+                    request.uw_request.uploadHandler = new UploadHandlerRaw(msg.body.Array);
+                    request.uw_request.downloadHandler = new DownloadHandlerBuffer();
+                }
+                else
+                {
+                    request.uw_request = UnityWebRequest.Get(host_url_);
+                }
+
+                foreach (KeyValuePair<string, string> item in headers) {
+                    request.uw_request.SetRequestHeader(item.Key, item.Value);
+                }
+                request.uw_request.SendWebRequest();
+                mono.StartCoroutine(uwRequest(request.uw_request));
+            }
+#endif
 #endif
 
             void sendHttpWebRequest (Dictionary<string, string> headers, FunapiMessage msg)
@@ -1221,6 +1257,82 @@ namespace Fun
                     onFailure(error);
                 }
             }
+
+#if UNITY_2017_OR_NEWER
+            IEnumerator uwRequest(UnityWebRequest www)
+            {
+                FunDebug.Assert(cur_request_ != null);
+
+                while (!www.isDone && !cur_request_.cancel)
+                {
+                    yield return null;
+                }
+
+                lock (request_lock_)
+                {
+                    if (cur_request_.cancel)
+                    {
+                        cur_request_ = null;
+                        yield break;
+                    }
+                }
+
+                try
+                {
+                    lock (sending_lock_)
+                    {
+                        FunDebug.Assert(sending_.Count > 0);
+                        sending_.RemoveAt(0);
+                    }
+
+                    if (www.error != null && www.error.Length > 0)
+                    {
+                        throw new Exception(www.error);
+                    }
+
+                    // Gets the headers
+                    foreach (var item in www.GetResponseHeaders())
+                    {
+                        cur_request_.headers.Add(item.Key.ToLower(), item.Value);
+                    }
+#if UNITY_WEBGL
+                    // If there is no content-length, adds the content-length.
+                    // This is for the WebGL client.
+                    if (!cur_request_.headers.ContainsKey("content-length"))
+                    {
+                        cur_request_.headers.Add("content-length", www.downloadHandler.data.Length.ToString());
+                    }
+#endif
+
+                    // Decodes message
+                    lock (receive_lock_)
+                    {
+                        onReceiveHeader(cur_request_.headers);
+
+                        Buffer.BlockCopy(www.downloadHandler.data, 0, receive_buffer_, received_size_, www.downloadHandler.data.Length);
+                        received_size_ += www.downloadHandler.data.Length;
+
+                        // Makes a raw message
+                        readBodyAndSaveMessage(cur_request_.headers);
+                    }
+
+                    lock (request_lock_)
+                    {
+                        cur_request_ = null;
+                    }
+
+                    // Checks unsent messages
+                    checkPendingMessages();
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kRequestFailed;
+                    error.message = "[HTTP] Failure in uwRequest: " + e.ToString();
+                    onFailure(error);
+                }
+            }
+#endif
 #endif
 
             void cancelRequest ()
@@ -1242,8 +1354,13 @@ namespace Fun
                             cur_request_.read_stream.Close();
 
 #if !NO_UNITY
+#if UNITY_2017_OR_NEWER
+                        if (cur_request_.www2 != null)
+                            cur_request_.cancel = true;
+#else
                         if (cur_request_.www != null)
                             cur_request_.cancel = true;
+#endif
 #endif
                         cur_request_ = null;
                     }
@@ -1270,6 +1387,9 @@ namespace Fun
 #if !NO_UNITY
                 // WWW-related
                 public WWW www = null;
+#if UNITY_2017_OR_NEWER
+                public UnityWebRequest uw_request = null;
+#endif
                 public bool cancel = false;
 #endif
                 public Dictionary<string, string> headers = new Dictionary<string, string>();
