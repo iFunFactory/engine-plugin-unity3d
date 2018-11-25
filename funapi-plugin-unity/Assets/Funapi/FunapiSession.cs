@@ -188,6 +188,10 @@ namespace Fun
 
         public override void OnPause (bool isPaused)
         {
+#if UNITY_EDITOR
+            if (UnityEditor.EditorApplication.isPaused)
+                return;
+#endif
             if (!Started)
                 return;
 
