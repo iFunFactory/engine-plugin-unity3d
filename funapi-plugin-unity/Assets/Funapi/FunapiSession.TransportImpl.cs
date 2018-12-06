@@ -896,7 +896,7 @@ namespace Fun
                 // Sending a message
                 if (using_www_)
                 {
-#if UNITY_2017_OR_NEWER
+#if UNITY_2017_1_OR_NEWER
                     sendUWRequest(headers, msg);
 #else
                     sendWWWRequest(headers, msg);
@@ -932,7 +932,7 @@ namespace Fun
                 }
             }
 
-#if UNITY_2017_OR_NEWER
+#if UNITY_2017_1_OR_NEWER
             void sendUWRequest (Dictionary<string, string> headers, FunapiMessage msg)
             {
                 Request request = new Request();
@@ -1258,7 +1258,7 @@ namespace Fun
                 }
             }
 
-#if UNITY_2017_OR_NEWER
+#if UNITY_2017_1_OR_NEWER
             IEnumerator uwRequest(UnityWebRequest www)
             {
                 FunDebug.Assert(cur_request_ != null);
@@ -1354,8 +1354,8 @@ namespace Fun
                             cur_request_.read_stream.Close();
 
 #if !NO_UNITY
-#if UNITY_2017_OR_NEWER
-                        if (cur_request_.www2 != null)
+#if UNITY_2017_1_OR_NEWER
+                        if (cur_request_.uw_request != null)
                             cur_request_.cancel = true;
 #else
                         if (cur_request_.www != null)
@@ -1387,7 +1387,7 @@ namespace Fun
 #if !NO_UNITY
                 // WWW-related
                 public WWW www = null;
-#if UNITY_2017_OR_NEWER
+#if UNITY_2017_1_OR_NEWER
                 public UnityWebRequest uw_request = null;
 #endif
                 public bool cancel = false;
