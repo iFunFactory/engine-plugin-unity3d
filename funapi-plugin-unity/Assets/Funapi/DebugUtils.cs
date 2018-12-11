@@ -9,6 +9,12 @@
 #define ENABLE_DEBUG
 #endif
 
+#if FUNAPI_DEDICATED_SERVER && !UNITY_EDITOR
+#define ENABLE_LOG
+#define ENABLE_DEBUG
+#define ENABLE_SAVE_LOG
+#endif
+
 //#define ENABLE_OUTPUT
 //#define ENABLE_SAVE_LOG
 
@@ -126,7 +132,6 @@ namespace Fun
         }
 
 #else
-
         public static void Log (string message, params object[] args)
         {
 #if ENABLE_LOG
@@ -168,6 +173,9 @@ namespace Fun
         {
             string log = string.Format("{0}[{1}] {2}", type, DateTime.Now.ToLongTimeString(), message);
 #if ENABLE_SAVE_LOG
+#if FUNAPI_DEDICATED_SERVER
+            SaveDedicatedServerLogs(log);
+#else
             lock (buffer_lock_)
             {
                 if ((log_buffer_.Length + log.Length) >= kLogBufferMax)
@@ -176,6 +184,7 @@ namespace Fun
                 log_buffer_.Append(log);
                 log_buffer_.AppendLine();
             }
+#endif
 #endif
             return log;
         }
@@ -187,7 +196,14 @@ namespace Fun
             if (path.Length > 0 && path[path.Length - 1] != '/')
                 path += "/";
             path += kLogPath;
-
+#if FUNAPI_DEDICATED_SERVER
+            if (save_path_ == null)
+            {
+                Process currentProcess = Process.GetCurrentProcess();
+                save_path_ = path + "DedicatedServer/" + currentProcess.Id.ToString() + "/";
+            }
+            path = save_path_;
+#endif
             return path;
         }
 
@@ -254,7 +270,25 @@ namespace Fun
                 Directory.Delete(path, true);
         }
 
+#if FUNAPI_DEDICATED_SERVER
+        static void SaveDedicatedServerLogs(string log)
+        {
+            lock (save_lock_)
+            {
+                string path = getSavePath();
+                if (!Directory.Exists(path))
+                    Directory.CreateDirectory(path);
 
+                path += "Log.txt";
+
+                File.AppendAllText(path, log + Environment.NewLine);
+            }
+        }
+
+
+        static string save_path_ = null;
+        static object save_lock_ = new object();
+#endif
         const string kLogPath = "Logs/";
         const int kLogBufferMax = 1024 * 1024;
 
