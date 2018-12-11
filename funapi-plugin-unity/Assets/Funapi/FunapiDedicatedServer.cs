@@ -15,7 +15,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using UnityEngine;
-
+using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Fun
 {
@@ -23,6 +24,7 @@ namespace Fun
     {
         static readonly string kInstanceName = "FunDedicatedServer";
         static FunapiDedicatedServer instance_ = null;
+        static bool use_old_version_ = false;
 
         static FunapiDedicatedServer instance
         {
@@ -48,6 +50,7 @@ namespace Fun
 
         private FunapiDedicatedServer () {}
 
+        [System.Obsolete("This property is deprecated. Please use 'void Start(string version)' instead. Please note that this property will be removed in June 2019.")]
         public static string version { private get; set; }
 
         public static bool isServer { get; private set; }
@@ -58,8 +61,11 @@ namespace Fun
 
 
 #if FUNAPI_DEDICATED_SERVER
-        public static bool Init()
+        [System.Obsolete("This function is deprecated. Please use 'void Start(string version)' instead. Please note that this funtion will be removed in June 2019.")]
+        public static bool Init ()
         {
+            use_old_version_ = true;
+
             string commandLine = System.Environment.CommandLine;
             if (!commandLine.Contains("-RunDedicatedServer"))
                 return true;
@@ -67,6 +73,27 @@ namespace Fun
             return instance.readCommandLineArgs();
         }
 
+        public static void Start (string version)
+        {
+            string commandLine = System.Environment.CommandLine;
+            if (commandLine.Contains("-RunDedicatedServer"))
+            {
+                if (!instance.setVersion(version) || !instance.readCommandLineArgs())
+                {
+#if UNITY_EDITOR
+                    UnityEditor.EditorApplication.Exit(0);
+#else
+                    Application.Quit();
+#endif
+                    return;
+                }
+                isActive = true;
+
+                instance.onStart();
+            }
+        }
+
+        [System.Obsolete("This function is deprecated. Please use 'void Start(string version)' instead. Please note that this funtion will be removed in June 2019.")]
         public static void Start ()
         {
             if (!isServer || isActive)
@@ -77,11 +104,18 @@ namespace Fun
             instance.onStart();
         }
 
+        [System.Obsolete("This function is deprecated. Please use 'void Ready(Action<object> callback)' instead. Please note that this funtion will be removed in June 2019.")]
         public static void Ready ()
         {
             instance.httpPost("ready");
         }
 
+        public static void SendReady (Action<int, string> callback)
+        {
+            instance.httpPost("ready", null, callback);
+        }
+
+        [System.Obsolete("This function is deprecated. Please note that this funtion will be removed in June 2019.")]
         public static void Stop ()
         {
             isActive = false;
@@ -92,31 +126,87 @@ namespace Fun
             return instance.getUserData(uid);
         }
 
+        public static string GetMatchDataJsonString ()
+        {
+            return instance.getMatchData();
+        }
+
         public static bool AuthUser (string uid, string token)
         {
             return instance.authUser(uid, token);
         }
 
+        [System.Obsolete("This function is deprecated. Please use 'void SendJoined(string uid, Action<object> callback)' instead. Please note that this funtion will be removed in June 2019.")]
         public static void SendJoined (string uid)
         {
             instance.httpPost("joined", instance.jsonStringWithUID(uid));
         }
 
+        [System.Obsolete("This function is deprecated. Please use 'void SendLeft(string uid, Action<object> callback)' instead. Please note that this funtion will be removed in June 2019.")]
         public static void SendLeft (string uid)
         {
             instance.httpPost("left", instance.jsonStringWithUID(uid));
         }
 
+        [System.Obsolete("This function is deprecated. Please use 'void SendCustomCallback (string json_string, Action<object> callback)' instead. Please note that this funtion will be removed in June 2019.")]
         public static void SendCustomCallback (string json_string)
         {
             instance.httpPost("callback", json_string);
         }
 
+        [System.Obsolete("This function is deprecated. Please use 'void SendResult (string json_string, Action<object> callback)' instead. Please note that this funtion will be removed in June 2019.")]
         public static void SendResult (string json_string)
         {
             instance.httpPost("result", json_string);
         }
 
+        [System.Obsolete("This function is deprecated. Please use 'void SendGameState (string json_string, Action<object> callback)' instead. Please note that this funtion will be removed in June 2019.")]
+        public static void SendGameState (string json_string)
+        {
+            instance.httpPost("state", json_string);
+        }
+
+        public static void SendJoined (string uid, Action<int, string> callback)
+        {
+            instance.httpPost("joined", instance.jsonStringWithUID(uid), null, callback);
+        }
+
+        public static void SendLeft (string uid, Action<int, string> callback)
+        {
+            instance.httpPost("left", instance.jsonStringWithUID(uid), null, callback);
+        }
+
+        public static void SendCustomCallback (string json_string, Action<int, string> callback)
+        {
+            instance.httpPost("callback", json_string, null, callback);
+        }
+
+        public static void SendResult (string json_string, Action<int, string> callback)
+        {
+            instance.httpPost("result", json_string, null, callback);
+        }
+
+        public static void SendGameState (string json_string, Action<int, string> callback)
+        {
+            instance.httpPost("state", json_string, null, callback);
+        }
+
+        bool setVersion(string version)
+        {
+            Regex regex = new Regex(@"^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$");
+            if(!regex.IsMatch(version))
+            {
+                FunDebug.LogWarning("The dedicated server version must be 'x.x.x.x' format.");
+                return false;
+            }
+
+            Dictionary<string, object> json = new Dictionary<string, object>();
+            json["version"] = version;
+
+            version_ = json_helper_.Serialize(json);
+
+            return true;
+        }
 
         bool readCommandLineArgs ()
         {
@@ -128,18 +218,33 @@ namespace Fun
 
             foreach (string n in args)
             {
+                bool not_user_arg = n.Contains(kServerVersion) || n.Contains(kManagerServer) ||
+                                    n.Contains(kHeartbeat) || n.Contains(kPort) ||
+                                    n.Contains(kMatchId) || n.Contains("RunDedicatedServer") ||
+                                    n.Contains("batchmode") || n.Contains("nographics");
+                if (!not_user_arg)
+                {
+                    user_cmd_options_.Add(n);
+                }
+
                 if (n.StartsWith("-") && n.Contains("="))
                 {
                     int index = n.IndexOf("=");
                     string key = n.Substring(1, index - 1);
                     string value = n.Substring(index + 1, n.Length - index - 1);
                     arg_list.Add(key, value);
-                    FunDebug.DebugLog1("command argument - key:{0} value:{1}", key, value);
+                    FunDebug.Log("Commandline argument - key:{0} value:{1}", key, value);
                 }
                 else if (n.Contains(kServerVersion))
                 {
                     sendVersion = true;
                 }
+            }
+
+            user_cmd_options_.RemoveAt(0); // Remove running path.
+            foreach (string cmd in user_cmd_options_)
+            {
+                FunDebug.Log("User command : {0}", cmd);
             }
 
             if (arg_list.ContainsKey(kManagerServer))
@@ -155,17 +260,10 @@ namespace Fun
 
             if (sendVersion)
             {
-                if (string.IsNullOrEmpty(version))
+                instance.httpPost(CmdVersion, use_old_version_ ? version : version_, delegate (object obj)
                 {
-                    FunDebug.LogWarning("Need to set the dedicated server version.");
-                }
-                else
-                {
-                    instance.httpPost(CmdVersion, version, delegate (object obj)
-                    {
-                        FunDebug.Log("Dedicated Server - Sent the version. ({0})", version);
-                    });
-                }
+                    FunDebug.Log("Dedicated Server - Sent the version. ({0})", version_);
+                });
 
                 return false;
             }
@@ -174,6 +272,12 @@ namespace Fun
             {
                 if (!float.TryParse(arg_list[kHeartbeat], out heartbeat_seconds_))
                     heartbeat_seconds_ = 0f;
+
+                if (heartbeat_seconds_ == 0f)
+                {
+                    FunDebug.LogWarning("'{0}' value must be greater than zero and lesser than 60 seconds.", kHeartbeat);
+                    return false;
+                }
             }
 
             if (arg_list.ContainsKey(kPort))
@@ -192,11 +296,14 @@ namespace Fun
 
             while (isActive)
             {
-                FunDebug.DebugLog2("Send a 'pending_users' request to the manager server.");
+                FunDebug.Log("Send a 'pending_users' request to host manager.");
 
                 httpPost ("pending_users", delegate (object obj)
                 {
-                    updateData(obj as Dictionary<string, object>);
+                    if (obj != null)
+                    {
+                        updateData(obj as Dictionary<string, object>);
+                    }
                 });
 
                 yield return new WaitForSeconds(update_pending_seconds_);
@@ -209,7 +316,7 @@ namespace Fun
 
             while (isActive)
             {
-                FunDebug.DebugLog2("Send a heart beat to the manager server.");
+                FunDebug.LogDebug("Send a heart beat to host manager.");
 
                 httpPost("heartbeat");
                 yield return new WaitForSeconds(heartbeat_seconds_);
@@ -221,8 +328,15 @@ namespace Fun
         {
             httpGet ("", delegate (object obj)
             {
-                Dictionary<string, object> body = obj as Dictionary<string, object>;
-                updateData(body["data"] as Dictionary<string, object>);
+                if (obj != null)
+                {
+                    updateData(obj as Dictionary<string, object>);
+                }
+
+                if (StartCallback != null)
+                {
+                    StartCallback();
+                }
             });
 
             if (heartbeat_seconds_ > 0)
@@ -258,28 +372,59 @@ namespace Fun
             return "";
         }
 
+        string getMatchData ()
+        {
+            lock (lock_match_data)
+            {
+                return match_data_;
+            }
+        }
+
         string jsonStringWithUID (string uid)
         {
             Dictionary<string, object> json = new Dictionary<string, object>();
             json["uid"] = uid;
 
-            return FunapiMessage.JsonHelper.Serialize(json);
+            return json_helper_.Serialize(json);
         }
 
         void updateData (Dictionary<string, object> data)
         {
             if (data.ContainsKey("match_data"))
             {
-                string json_string;
-                if (data["match_data"] is string)
-                    json_string = data["match_data"] as string;
-                else
-                    json_string = FunapiMessage.JsonHelper.Serialize(data["match_data"]);
-
-                if (json_string.Length > 0)
+                lock (lock_match_data)
                 {
-                    if (MatchDataCallback != null)
-                        MatchDataCallback(json_string);
+                    List<object> match_data = data["match_data"] as List<object>;
+                    if (match_data == null)
+                    {
+                        match_data = new List<object>();
+                        match_data.Add(data["match_data"]);
+                    }
+                    for (int i = 0; i < match_data.Count; ++i)
+                    {
+                        string json_string;
+                        if (match_data[i] is string)
+                        {
+                            json_string = match_data[i] as string;
+                        }
+                        else
+                        {
+                            json_string = json_helper_.Serialize(match_data[i]);
+                        }
+
+                        if (json_string.Length > 0)
+                        {
+                            if (match_data_ != json_string)
+                            {
+                                match_data_ = json_string;
+
+                                if (MatchDataCallback != null)
+                                {
+                                    MatchDataCallback(json_string);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -306,7 +451,7 @@ namespace Fun
                         if (user.ContainsKey("token"))
                             token = user["token"] as string;
 
-                        FunDebug.DebugLog1("user - uid:{0} token:{1}", uid, token);
+                        FunDebug.Log("Update user info - uid:{0} token:{1}", uid, token);
 
                         if (uid.Length > 0 && token.Length > 0)
                             users_.Add(uid, token);
@@ -317,7 +462,7 @@ namespace Fun
                             if (user_data[i] is string)
                                 json_string = user_data[i] as string;
                             else
-                                json_string = FunapiMessage.JsonHelper.Serialize(user_data[i]);
+                                json_string = json_helper_.Serialize(user_data[i]);
 
                             if (uid.Length > 0 && json_string.Length > 0)
                             {
@@ -343,26 +488,26 @@ namespace Fun
 
         void httpGet (string command, Action<object> callback = null)
         {
-            webRequest("GET", command, "", callback);
+            webRequest("GET", command, "", callback, null);
         }
 
-        void httpPost (string command, Action<object> callback = null)
+        void httpPost (string command, Action<object> callback = null, Action<int, string> user_callback = null)
         {
-            webRequest("POST", command, "", callback);
+            webRequest("POST", command, "", callback, user_callback);
         }
 
-        void httpPost (string command, string data, Action<object> callback = null)
+        void httpPost (string command, string data, Action<object> callback = null, Action<int, string> user_callback = null)
         {
-            webRequest("POST", command, data, callback);
+            webRequest("POST", command, data, callback, user_callback);
         }
 
-        void webRequest (string method, string command, string data, Action<object> callback)
+        void webRequest (string method, string command, string data, Action<object> callback, Action<int, string> user_callback)
         {
             if (!isActive && needMatchId(command))
                 return;
 
             string url = (needMatchId(command) ? server_url_with_match_id_ : server_url_) + command;
-            FunDebug.DebugLog1("FunapiDedicatedServer.webRequest called.\n  {0} {1}", method, url);
+            FunDebug.Log("FunapiDedicatedServer.webRequest called.\n  {0} {1}", method, url);
 
             // Request
             HttpWebRequest web_request = (HttpWebRequest)WebRequest.Create(url);
@@ -372,6 +517,8 @@ namespace Fun
             Request request = new Request();
             request.web_request = web_request;
             request.callback = callback;
+            request.user_callback = user_callback;
+            request.command = command;
 
             if (method == "POST")
             {
@@ -384,7 +531,10 @@ namespace Fun
             }
             else
             {
-                web_request.BeginGetResponse(new AsyncCallback(responseCb), request);
+                IAsyncResult result = web_request.BeginGetResponse(new AsyncCallback(responseCb), request);
+                ThreadPool.RegisterWaitForSingleObject(
+                        result.AsyncWaitHandle, new WaitOrTimerCallback(TimeoutCallback), request,
+                        heartbeat_seconds_ == 0 ? default_timeout_ : (int)(heartbeat_seconds_ / 2f) * 1000, true);
             }
         }
 
@@ -400,17 +550,23 @@ namespace Fun
                     stream.Write(body.Array, 0, body.Count);
                 stream.Close();
 
-                request.web_request.BeginGetResponse(new AsyncCallback(responseCb), request);
+                IAsyncResult result = request.web_request.BeginGetResponse(new AsyncCallback(responseCb), request);
+                ThreadPool.RegisterWaitForSingleObject(
+                        result.AsyncWaitHandle, new WaitOrTimerCallback(TimeoutCallback), request,
+                        heartbeat_seconds_ == 0 ? default_timeout_ : (int)(heartbeat_seconds_ / 2f) * 1000, true);
             }
             catch (Exception e)
             {
                 WebException we = e as WebException;
-                if ((we != null && we.Status == WebExceptionStatus.RequestCanceled) ||
+                if (we != null && we.Status == WebExceptionStatus.ConnectFailure)
+                {
+                    onRequestFailed((Request)ar.AsyncState);
+                }
+                else if ((we != null && we.Status == WebExceptionStatus.RequestCanceled) ||
                     (e is ObjectDisposedException || e is NullReferenceException))
                 {
                     // When Stop is called HttpWebRequest.EndGetRequestStream may return an Exception
-                    FunDebug.DebugLog1("Dedicated Server - Request operation has been cancelled.");
-                    return;
+                    FunDebug.LogDebug("Dedicated Server - Request operation has been cancelled.");
                 }
             }
         }
@@ -459,18 +615,22 @@ namespace Fun
                 }
                 else
                 {
-                    FunDebug.LogError("Dedicated manager server response failed. status:{0}",
+                    FunDebug.LogError("Host manager response failed. status:{0}",
                                       request.web_response.StatusDescription);
                 }
             }
             catch (Exception e)
             {
                 WebException we = e as WebException;
-                if ((we != null && we.Status == WebExceptionStatus.RequestCanceled) ||
+                if (we != null && we.Status == WebExceptionStatus.ConnectFailure)
+                {
+                    onRequestFailed((Request)ar.AsyncState);
+                }
+                else if ((we != null && we.Status == WebExceptionStatus.RequestCanceled) ||
                     (e is ObjectDisposedException || e is NullReferenceException))
                 {
                     // When Stop is called HttpWebRequest.EndGetResponse may return a Exception
-                    FunDebug.DebugLog1("Dedicated server request operation has been cancelled.");
+                    FunDebug.LogDebug("Dedicated server request operation has been cancelled.");
                 }
             }
         }
@@ -492,17 +652,11 @@ namespace Fun
                 {
                     if (request.web_response == null)
                     {
-                        FunDebug.LogError("Dedicated manager server response failed.");
+                        FunDebug.LogError("Host manager response failed.");
                         return;
                     }
 
-                    if (request.callback != null)
-                    {
-                        string str = System.Text.Encoding.UTF8.GetString(request.body.Array, 0, request.body.Count);
-                        object body = FunapiMessage.JsonHelper.Deserialize(str);
-
-                        request.callback(body);
-                    }
+                    webRequestCallback(request);
 
                     request.read_stream.Close();
                     request.web_response.Close();
@@ -512,14 +666,171 @@ namespace Fun
             {
                 if (e is ObjectDisposedException || e is NullReferenceException)
                 {
-                    FunDebug.DebugLog1("Dedicated server request operation has been cancelled.");
+                    FunDebug.LogDebug("Dedicated server request operation has been cancelled.");
                 }
             }
         }
 
+        void webRequestCallback(Request request)
+        {
+            int error_code = -1;
+            string error_desc = "";
+            object data = null;
+
+            if (request.failed)
+            {
+                error_code = 28;
+                error_desc = "Connection timed out / Connection refused";
+            }
+            else
+            {
+                bool invalid = false;
+                string invalid_message = "";
+
+                string str = System.Text.Encoding.UTF8.GetString(request.body.Array, 0, request.body.Count);
+                object obj = json_helper_.Deserialize(str);
+
+                Dictionary<string, object> body = obj as Dictionary<string, object>;
+
+                if (body.ContainsKey("status"))
+                {
+                    if ((body["status"] as string).ToLower() == "ok")
+                    {
+                        error_code = 0;
+                        error_desc = "";
+                        data = body.ContainsKey("data") ? body["data"] : body;
+                    }
+                    else
+                    {
+                        error_code = -1;
+                        error_desc = body.ContainsKey("error") ? body["error"] as string : "";
+                        data = body;
+                    }
+                }
+                else if (body.ContainsKey("error"))
+                {
+                    Dictionary<string, object> err_data = body["error"] as Dictionary<string, object>;
+                    if (err_data.ContainsKey("code"))
+                    {
+                        error_code = Convert.ToInt32(err_data["code"]);
+                    }
+                    else
+                    {
+                        invalid = true;
+                        invalid_message = "Dedicated Server - Response data doesn't have \"error.code\" attribute.";
+                    }
+
+                    if (error_code == 0)
+                    {
+                        if (body.ContainsKey("data"))
+                        {
+                            error_desc = "";
+                            data = body["data"];
+                        }
+                        else
+                        {
+                            invalid = true;
+                            invalid_message = "Dedicated Server - Response data doesn't have \"data\" attribute.";
+                        }
+                    }
+                    else
+                    {
+                        error_desc = err_data.ContainsKey("desc") ? err_data["desc"] as string : "";
+                    }
+                }
+                else
+                {
+                    invalid = true;
+                    invalid_message = "Dedicated Server - Response data doesn't have essential attribute.";
+                }
+
+                if (invalid)
+                {
+                    FunDebug.LogWarning(invalid_message);
+#if UNITY_EDITOR
+                    UnityEditor.EditorApplication.Exit(0);
+#else
+                    Application.Quit();
+#endif
+                    return;
+                }
+            }
+
+            if (request.callback != null)
+            {
+                if ( error_code == 0)
+                {
+                    request.callback(data);
+                }
+                else
+                {
+                    FunDebug.LogWarning("Request failed. error : {0}", error_desc);
+                }
+            }
+            if (request.user_callback != null)
+            {
+                request.user_callback(error_code, error_desc);
+            }
+        }
+
+        void TimeoutCallback(object state, bool timeout)
+        {
+            if (timeout)
+            {
+                Request request = (Request)state;
+                if (request.web_request != null)
+                {
+                    request.web_request.Abort();
+                }
+
+                onRequestFailed(request);
+            }
+        }
+
+        void onRequestFailed(Request request)
+        {
+            request.failed = true;
+
+            if (request.command == CmdVersion)
+            {
+                FunDebug.LogWarning("Failed to check a dedicated server version. Please check the host manager.");
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.Exit(0);
+#else
+                Application.Quit();
+#endif
+                return;
+            }
+            else if (request.command == "heartbeat")
+            {
+                FunDebug.LogWarning("Failed to request heartbeat.");
+                heartbeat_timeout_count_++;
+                if (heartbeat_timeout_count_ >= heartbeat_retry_threshold_)
+                {
+                    if (DisconnectedCallback != null && isActive)
+                    {
+                        DisconnectedCallback();
+                        isActive = false;
+                    }
+                }
+            }
+            else
+            {
+                webRequestCallback(request);
+            }
+        }
+
+        static public List<string> user_cmd_options
+        {
+            get
+            {
+                return instance.user_cmd_options_;
+            }
+        }
 
         class Request
         {
+            public string command = null;
             public HttpWebRequest web_request = null;
             public HttpWebResponse web_response = null;
             public Stream read_stream = null;
@@ -527,6 +838,8 @@ namespace Fun
             public ArraySegment<byte> body;
             public int read_offset = 0;
             public Action<object> callback = null;
+            public Action<int, string> user_callback = null;
+            public bool failed = false;
         }
 
         static readonly string kServerVersion = "FunapiVersion";
@@ -541,11 +854,19 @@ namespace Fun
         object lock_user_data_ = new object();
         Dictionary<string, string> users_ = new Dictionary<string, string>();
         Dictionary<string, string> user_data_ = new Dictionary<string, string>();
+        object lock_match_data = new object();
+        string match_data_ = "";
+        List<string> user_cmd_options_ = new List<string>();
+        static JsonAccessor json_helper_ = new DictionaryJsonAccessor();
 
         string server_url_ = "";
         string server_url_with_match_id_ = "";
         float heartbeat_seconds_ = 0f;
+        const int heartbeat_retry_threshold_ = 2;
+        int heartbeat_timeout_count_ = 0;
+        const int default_timeout_ = 10000; // HttpWebRequest timeout default value
         float update_pending_seconds_ = 5f;
+        string version_ = null;
 #else
         public static bool Init() { return true; }
 
@@ -553,23 +874,41 @@ namespace Fun
 
         public static void Ready() { }
 
+        public static void SendReady (Action<int, string> callback) { }
+
         public static void Stop() { }
 
         public static void SendJoined(string uid) { }
 
+        public static void SendJoined(string uid, Action<int, string> callback) { }
+
         public static void SendLeft(string uid) { }
+
+        public static void SendLeft(string uid, Action<int, string> callback) { }
 
         public static void SendCustomCallback(string json_string) { }
 
+        public static void SendCustomCallback(string json_string, Action<int, string> callback) { }
+
         public static void SendResult(string json_string) { }
 
+        public static void SendResult(string json_string, Action<int, string> callback) { }
+
+        public static void SendGameState(string json_string) { }
+
+        public static void SendGameState(string json_string, Action<int, string> callback) { }
+
         public static string GetUserDataJsonString(string uid) { return ""; }
+
+        public static string GetMatchDataJsonString() { return ""; }
 
         public static bool AuthUser(string uid, string token) { return false; }
 #endif
 
+        public static event Action StartCallback;
         public static event Action<string, string> UserDataCallback;   // uid, json string
         public static event Action<string> MatchDataCallback;          // json string
+        public static event Action DisconnectedCallback;
     }
 }
 #endif
