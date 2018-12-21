@@ -1688,6 +1688,14 @@ namespace Fun
                 {
                     if (state_ == State.kWaitForAck)
                     {
+                        lock (sending_lock_)
+                        {
+                            foreach (FunapiMessage msg in sent_queue_)
+                            {
+                                sendMessage(msg);
+                            }
+                        }
+
                         onStandby();
                     }
                 }
