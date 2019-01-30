@@ -819,8 +819,6 @@ namespace Fun
         Transport createTransport (TransportProtocol protocol, FunEncoding encoding,
                                    UInt16 port, TransportOption option = null)
         {
-            Transport transport = null;
-
             if (option == null)
             {
                 if (protocol == TransportProtocol.kTcp)
@@ -829,22 +827,16 @@ namespace Fun
                     option = new HttpTransportOption();
                 else
                     option = new TransportOption();
-
-                transport = getTransport(protocol, encoding, port, option);
-                if (transport != null)
-                    return transport;
-            }
-            else
-            {
-                transport = getTransport(protocol, encoding, port, option);
-                if (transport != null)
-                    return transport;
             }
 
             if (option_.sessionReliability && protocol == TransportProtocol.kTcp)
                 option.ReliableTransport = true;
             else
                 option.ReliableTransport = false;
+
+            Transport transport = getTransport(protocol, encoding, port, option);
+            if (transport != null)
+                return transport;
 
             try
             {
