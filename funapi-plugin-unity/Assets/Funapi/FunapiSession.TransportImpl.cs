@@ -912,28 +912,6 @@ namespace Fun
             }
 
 #if !NO_UNITY
-            void sendWWWRequest (Dictionary<string, string> headers, FunapiMessage msg)
-            {
-                Request request = new Request();
-
-                lock (request_lock_)
-                {
-                    FunDebug.Assert(cur_request_ == null);
-                    cur_request_ = request;
-                }
-
-                if (msg.body.Count > 0)
-                {
-                    request.www = new WWW(host_url_, msg.body.Array, headers);
-                    mono.StartCoroutine(wwwPost(request.www));
-                }
-                else
-                {
-                    request.www = new WWW(host_url_, null, headers);
-                    mono.StartCoroutine(wwwPost(request.www));
-                }
-            }
-
 #if UNITY_2017_1_OR_NEWER
             void sendUWRequest (Dictionary<string, string> headers, FunapiMessage msg)
             {
@@ -962,6 +940,28 @@ namespace Fun
                 }
                 request.uw_request.SendWebRequest();
                 mono.StartCoroutine(uwRequest(request.uw_request));
+            }
+#else
+            void sendWWWRequest (Dictionary<string, string> headers, FunapiMessage msg)
+            {
+                Request request = new Request();
+
+                lock (request_lock_)
+                {
+                    FunDebug.Assert(cur_request_ == null);
+                    cur_request_ = request;
+                }
+
+                if (msg.body.Count > 0)
+                {
+                    request.www = new WWW(host_url_, msg.body.Array, headers);
+                    mono.StartCoroutine(wwwPost(request.www));
+                }
+                else
+                {
+                    request.www = new WWW(host_url_, null, headers);
+                    mono.StartCoroutine(wwwPost(request.www));
+                }
             }
 #endif
 #endif
@@ -1186,80 +1186,6 @@ namespace Fun
             }
 
 #if !NO_UNITY
-            IEnumerator wwwPost (WWW www)
-            {
-                FunDebug.Assert(cur_request_ != null);
-
-                while (!www.isDone && !cur_request_.cancel)
-                {
-                    yield return null;
-                }
-
-                lock (request_lock_)
-                {
-                    if (cur_request_.cancel)
-                    {
-                        cur_request_ = null;
-                        yield break;
-                    }
-                }
-
-                try
-                {
-                    lock (sending_lock_)
-                    {
-                        FunDebug.Assert(sending_.Count > 0);
-                        sending_.RemoveAt(0);
-                    }
-
-                    if (www.error != null && www.error.Length > 0)
-                    {
-                        throw new Exception(www.error);
-                    }
-
-                    // Gets the headers
-                    foreach (var item in www.responseHeaders)
-                    {
-                        cur_request_.headers.Add(item.Key.ToLower(), item.Value);
-                    }
-#if UNITY_WEBGL
-                    // If there is no content-length, adds the content-length.
-                    // This is for the WebGL client.
-                    if (!cur_request_.headers.ContainsKey("content-length"))
-                    {
-                        cur_request_.headers.Add("content-length", www.bytes.Length.ToString());
-                    }
-#endif
-
-                    // Decodes message
-                    lock (receive_lock_)
-                    {
-                        onReceiveHeader(cur_request_.headers);
-
-                        Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
-                        received_size_ += www.bytes.Length;
-
-                        // Makes a raw message
-                        readBodyAndSaveMessage(cur_request_.headers);
-                    }
-
-                    lock (request_lock_)
-                    {
-                        cur_request_ = null;
-                    }
-
-                    // Checks unsent messages
-                    checkPendingMessages();
-                }
-                catch (Exception e)
-                {
-                    TransportError error = new TransportError();
-                    error.type = TransportError.Type.kRequestFailed;
-                    error.message = "[HTTP] Failure in wwwPost: " + e.ToString();
-                    onFailure(error);
-                }
-            }
-
 #if UNITY_2017_1_OR_NEWER
             IEnumerator uwRequest(UnityWebRequest www)
             {
@@ -1334,6 +1260,80 @@ namespace Fun
                     onFailure(error);
                 }
             }
+#else
+            IEnumerator wwwPost (WWW www)
+            {
+                FunDebug.Assert(cur_request_ != null);
+
+                while (!www.isDone && !cur_request_.cancel)
+                {
+                    yield return null;
+                }
+
+                lock (request_lock_)
+                {
+                    if (cur_request_.cancel)
+                    {
+                        cur_request_ = null;
+                        yield break;
+                    }
+                }
+
+                try
+                {
+                    lock (sending_lock_)
+                    {
+                        FunDebug.Assert(sending_.Count > 0);
+                        sending_.RemoveAt(0);
+                    }
+
+                    if (www.error != null && www.error.Length > 0)
+                    {
+                        throw new Exception(www.error);
+                    }
+
+                    // Gets the headers
+                    foreach (var item in www.responseHeaders)
+                    {
+                        cur_request_.headers.Add(item.Key.ToLower(), item.Value);
+                    }
+#if UNITY_WEBGL
+                    // If there is no content-length, adds the content-length.
+                    // This is for the WebGL client.
+                    if (!cur_request_.headers.ContainsKey("content-length"))
+                    {
+                        cur_request_.headers.Add("content-length", www.bytes.Length.ToString());
+                    }
+#endif
+
+                    // Decodes message
+                    lock (receive_lock_)
+                    {
+                        onReceiveHeader(cur_request_.headers);
+
+                        Buffer.BlockCopy(www.bytes, 0, receive_buffer_, received_size_, www.bytes.Length);
+                        received_size_ += www.bytes.Length;
+
+                        // Makes a raw message
+                        readBodyAndSaveMessage(cur_request_.headers);
+                    }
+
+                    lock (request_lock_)
+                    {
+                        cur_request_ = null;
+                    }
+
+                    // Checks unsent messages
+                    checkPendingMessages();
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kRequestFailed;
+                    error.message = "[HTTP] Failure in wwwPost: " + e.ToString();
+                    onFailure(error);
+                }
+            }
 #endif
 #endif
 
@@ -1387,10 +1387,10 @@ namespace Fun
                 public Stream read_stream = null;
                 public bool was_aborted = false;
 #if !NO_UNITY
-                // WWW-related
-                public WWW www = null;
 #if UNITY_2017_1_OR_NEWER
                 public UnityWebRequest uw_request = null;
+#else
+                public WWW www = null;
 #endif
                 public bool cancel = false;
 #endif
