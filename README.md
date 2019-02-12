@@ -5,17 +5,16 @@ Funapi plugin unity
 
 ## 기능
 
-* TCP, UDP, HTTP 프로토콜 사용 가능
+* TCP, UDP, HTTP, Websocket 프로토콜 사용 가능
 * JSON, Protobuf-net 형식의 메시지 타입 지원
 * ChaCha20, AES-128을 포함한 4종류의 암호화 타입 지원
 * 멀티캐스트, 채팅, 게임내 리소스 다운로드 등 다양한 기능 지원
-* 페이스북, 트위터의 글쓰기, 친구 정보 요청 등의 기능 지원
-
+* 페이스북, 트위터의 로그인, 친구 정보 요청 등의 기능 지원
 
 ## 서버
 
-* 서버 버전 2543 이상은 플러그인 버전 239 이상이 필요합니다.
-* FunMulticastMessage를 확장하여 사용하는 경우 **필드 번호를 16부터 사용** 하도록 수정이 필요합니다.
+* 서버 버전 3686 이상은 플러그인 버전 253 이상이 필요합니다.
+* FunMulticastMessage를 확장하여 사용하는 경우 **필드 번호를 16부터 사용** 해야 합니다.
 
 
 ## 사용방법
@@ -27,22 +26,19 @@ Funapi plugin unity
 ```text
 |- additional-plugins      # 페이스북, 트위터 플러그인
 |- csharp-samples          # C# Runtime 샘플 코드
-|- dedi-server-example     # Dedicated Server 샘플 코드
 |- funapi-plugin-unity     # 플러그인 코드
 ```
 
-클라이언트 플러그인 코드는 ``funapi-plugin-unity`` 폴더에 있습니다.
-``dedi-server-example`` 은 유니티의 Dedicated Server 와 통신하는 방법을 확인해 볼 수 있는
-샘플 프로젝트입니다. ``additional-plugins`` 에는 페이스북과 트위터용 플러그인이 있으며
- ``csharp-samples`` 폴더에는 MacOS/Linux 와 Windows 용 C# Runtime 샘플 코드가 있습니다.
+클라이언트 플러그인 코드는 ``funapi-plugin-unity`` 폴더에 있습니다. ``additional-plugins``
+에는 페이스북과 트위터용 플러그인이 있으며 ``csharp-samples`` 폴더에는 MacOS/Linux 와 Windows 용
+C# Runtime 샘플 코드가 있습니다.
 
 ### 테스트 프로젝트
-유니티를 실행해서 ``funapi-plugin-unity`` 폴더의 프로젝트를 열면 프로젝트 폴더 중에 ``Tester``
+유니티를 실행해서 ``funapi-plugin-unity`` 폴더의 프로젝트를 열면 프로젝트 폴더 중에 ``Sample``
 폴더가 있습니다. 여기에 테스트용 Scene과 샘플 코드들이 있습니다.
 
-**Tester** Scene을 열어 보면 화면 오른쪽 상단에 **OPTION** 버튼이 있는데 옵션창을 통해 테스트에
-필요한 값들을 수정할 수 있습니다. 서버 주소가 로컬로 되어 있으니 서버가 로컬에 있지 않다면 **Server**
-항목을 수정해 주세요.
+**Test** Scene을 열면 테스트 페이지가 나옵니다. 서버 주소가 로컬로 되어 있으니 서버가 로컬에 있지
+않다면 **Server** 항목을 수정해 주세요.
 
 서버를 띄우고 실행을 하면 여러가지 기능들을 테스트해 볼 수 있습니다.
 서버를 설치하고 아무것도 변경하지 않았다면 기본적으로 TCP, HTTP의 JSON 포트만 열려 있습니다.
@@ -58,21 +54,28 @@ Funapi plugin unity
 |- Funapi
 |- Plugins
 |- Resources
-|- Tester
+|- Sample
 |- FunMessageSerializer.dll
 |- messages.dll
 |- protobuf-net.dll
+|- ...
 ```
 
 위의 폴더 중 ``Funapi``, ``Plugins`` 폴더를 플러그인을 사용할 프로젝트의 ``Assets`` 폴더로
-복사하면 됩니다. **HTTPS**  를 사용한다면 ``Editor``와 ``Resources`` 폴더도 함께 복사해 주세요.
+복사하면 됩니다.
+
+암호화 기능이나 압축 기능을 사용하려면 ``Resources`` 폴더도 함께 복사해 주세요.
+**HTTPS** 를 사용하려면 ``Resources`` 폴더와 함께 ``Editor`` 폴더도 복사해 주세요.
+
+웹소켓을 사용하고 싶다면 ``websocket-sharp.dll`` 파일과 ``WebSocket.jslib`` 파일을 프로젝트의
+``Assets`` 폴더로 복사해야 됩니다.
 
 아래 세 개의 DLL은 Protobuf 메시지를 사용하기 위한 DLL인데 포함된 DLL들은 샘플용 메시지이므로
 Protobuf를 사용할 경우 서버 프로젝트에서 메시지를 정의하고 만든 DLL을 사용해야 합니다. Protobuf
 메시지를 사용하지 않더라도 플러그인 코드 내에 Protobuf를 사용하는 코드가 포함되어 있으므로 플러그인을
 사용하는 프로젝트 내에 기본으로 제공되는 DLL도 들어 있어야 합니다.
 
-자세한 사용방법은 ``Tester`` 폴더의 샘플과 도움말을 참고해 주세요.
+자세한 사용방법은 ``Sample`` 폴더의 파일과 도움말을 참고해 주세요.
 
 
 ## 도움말
@@ -91,6 +94,33 @@ Protobuf를 사용할 경우 서버 프로젝트에서 메시지를 정의하고
 ## 버전별 주요 이슈
 
 아래 설명의 버전보다 낮은 버전의 플러그인을 사용하고 있다면 플러그인 업데이트시 아래 내용을 참고해 주세요.
+
+### v276
+로그 심볼이 변경되었습니다. 기존 LOG_LEVEL 은 삭제되고 ENABLE_LOG, ENABLE_DEBUG 로 변경되었습니다.
+ENABLE_LOG 는 기본적인 로그를 출력하고 ENABLE_DEBUG 는 디버깅에 도움이 되는 로그를 출력합니다.
+ENABLE_DEBUG 는 ENABLE_LOG 가 선언되어 있어야 사용 가능합니다.
+
+### v249
+FunapiSession의 사용 방식 변경
+- 기존에는 Session마다 MonoBehaviour 객체를 생성/삭제했었는데 플러그인 종료처리가 완료되기 전에
+MonoBehaviour 객체가 삭제되어 이후 처리가 안되는 경우가 있어 플러그인용 MonoBehaviour 객체를
+하나만 두고 공용으로 사용하는 방식으로 변경하였습니다.
+- 사용이 끝난 FunapiSession 객체는 FunapiSession.Destroy() 함수를 호출해 명시적으로
+객체를 해제해 주어야 더 이상 업데이트가 이루어지지 않습니다. 앱 전체에서 시작해서 끝날
+때까지 FunapiSession 객체를 하나만 사용할 경우에는 굳이 호출하지 않아도 괜찮습니다.
+OnApplicationQuit 이 호출되면 자동으로 해제됩니다.
+
+
+AutoReconnect 기능 변경
+- AutoReconnect 옵션은 기존에는 첫 연결시에만 연결 실패시 20초 동안 4-5회 가량 재접속을 시도하는
+기능이었으나 효용성이 없어 해당 옵션이 true일 경우 연결이 종료된 것을 감지하면 항상 재연결을
+시도하는 것으로 변경 되었습니다.
+- 재접속을 시작할 때 Transport 이벤트인 kReconnecting 이벤트가 발생 하며 기존에 연결 종료시
+발생하던 다양한 타입의 Transport 이벤트는 kStopped 하나로 통일 되었습니다.
+- 재접속 시도를 멈추는 방법은 ConnectionTimeout으로 기다리는 시간을 지정하거나 kReconnecting
+이벤트 발생 후 일정 시간을 기다린 후 직접 Stop() 을 호출하는 방법이 있습니다. 재접속 시도 후
+ConnectionTimeout으로 지정한 시간을 초과했을 경우에는 재접속 시도가 중단되고 kStopped 이벤트가
+발생합니다.
 
 ### v247
 AutoReconnect 옵션은 기존에는 첫 연결시에만 연결 실패시 재접속을 시도하는 기능이었으나 연결이 종료되면
