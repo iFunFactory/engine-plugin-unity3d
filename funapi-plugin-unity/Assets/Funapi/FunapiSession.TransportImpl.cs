@@ -65,7 +65,7 @@ namespace Fun
                 TcpTransportOption tcp_option = (TcpTransportOption)option_;
                 debug.Log("[TCP] {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, " +
                           "ConnectionTimeout:{6}, AutoReconnect:{7}, Nagle:{8}, Ping:{9}",
-                          addr_.ip, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
+                          addr_.host, addr_.port, convertString(encoding_), convertString(tcp_option.Encryption),
                           convertString(tcp_option.CompressionType), tcp_option.SequenceValidation,
                           tcp_option.ConnectionTimeout, tcp_option.AutoReconnect,
                           !tcp_option.DisableNagle, tcp_option.EnablePing);
@@ -87,7 +87,7 @@ namespace Fun
                     if (disable_nagle)
                         sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
-                    sock_.BeginConnect(addr_.list, addr_.port, new AsyncCallback(this.startCb), this);
+                    sock_.BeginConnect(addr_.host, addr_.port, new AsyncCallback(this.startCb), this);
                 }
             }
 
@@ -497,6 +497,8 @@ namespace Fun
                 base.onStart();
 
                 state_ = State.kConnected;
+
+                addr_.refresh();
 
                 lock (sock_lock_)
                 {
@@ -1627,7 +1629,7 @@ namespace Fun
 
             void setAddress (string host, UInt16 port)
             {
-                addr_ = new HostIP(host, port);
+                addr_ = new HostAddr(host, port);
 
                 // Sets host url
                 host_url_ = string.Format("ws://{0}:{1}/", host, port);
@@ -1642,8 +1644,6 @@ namespace Fun
                 base.onStart();
 
                 state_ = State.kConnecting;
-
-                addr_.refresh();
 
                 lock (sock_lock_)
                 {
@@ -1942,7 +1942,7 @@ namespace Fun
             }
 
 
-            HostIP addr_;
+            HostAddr addr_;
             string host_url_;
 #if UNITY_WEBGL && !UNITY_EDITOR
             WebSocketJS wsock_;
