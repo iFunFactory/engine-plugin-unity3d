@@ -700,12 +700,8 @@ namespace Fun
                         }
                     }
 
-                    // If an error occurs during connection, stops the connection.
-                    // Or if an error occurs while connected from not UDP, stops the connection.
-                    if (state_ != State.kEstablished || protocol_ != TransportProtocol.kUdp)
-                    {
-                        event_.Add(Stop);
-                    }
+                    // If an error occurs, stops the connection.
+                    event_.Add(Stop);
                 });
             }
 
