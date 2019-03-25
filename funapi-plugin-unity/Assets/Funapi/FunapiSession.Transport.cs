@@ -49,6 +49,7 @@ namespace Fun
             kStartingFailed,
             kConnectionTimeout,
             kEncryptionFailed,
+            kDeserializeFailed,
             kSendingFailed,
             kReceivingFailed,
             kRequestFailed,
@@ -1569,7 +1570,21 @@ namespace Fun
                             resetConnectionTimeout();
                         }
 
-                        onReceivedMessage(msg.body);
+                        try
+                        {
+                            onReceivedMessage(msg.body);
+                        }
+                        catch (Exception e)
+                        {
+                            messages_.Clear();
+
+                            TransportError error = new TransportError();
+                            error.type = TransportError.Type.kDeserializeFailed;
+                            error.message = string.Format("[{0}] Failure in onReceivedMessage: {1}",
+                                                          str_protocol_, e.ToString());
+                            onFailure(error);
+                            break;
+                        }
                     }
                 }
 
