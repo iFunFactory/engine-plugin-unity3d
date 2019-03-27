@@ -1570,20 +1570,14 @@ namespace Fun
                             resetConnectionTimeout();
                         }
 
-                        try
+                        if (!onReceivedMessage(msg.body))
                         {
-                            onReceivedMessage(msg.body);
-                        }
-                        catch (Exception e)
-                        {
-                            messages_.Clear();
-
-                            TransportError error = new TransportError();
-                            error.type = TransportError.Type.kDeserializeFailed;
-                            error.message = string.Format("[{0}] Failure in onReceivedMessage: {1}",
-                                                          str_protocol_, e.ToString());
-                            onFailure(error);
-                            break;
+                            // Udp message errors are not treated as errors.
+                            if (protocol_ != TransportProtocol.kUdp)
+                            {
+                                messages_.Clear();
+                                break;
+                            }
                         }
                     }
                 }
@@ -1591,124 +1585,150 @@ namespace Fun
                 return true;
             }
 
-            void onReceivedMessage (ArraySegment<byte> body)
+            bool onReceivedMessage (ArraySegment<byte> body)
             {
                 if (body.Count <= 0)
-                    return;
+                    return true;
 
-                // Deserializing a message
-                object message = FunapiMessage.Deserialize(body, encoding_);
-                if (message == null)
-                {
-                    debug.LogWarning("[{0}] Failed to deserialize a message.", str_protocol_);
-                    return;
-                }
-
+                object message = null;
                 string msg_type = "";
-                UInt32 ack = 0;
 
-                // Checks ack and seq, gets message type
-                if (encoding_ == FunEncoding.kJson)
+                try
                 {
-                    if (IsReliable)
+                    // Deserializing a message
+                    message = FunapiMessage.Deserialize(body, encoding_);
+                    if (message == null)
                     {
-                        if (json_helper_.HasField(message, kAckNumberField))
+                        debug.LogWarning("[{0}] Failed to deserialize a message.", str_protocol_);
+                        return false;
+                    }
+
+                    UInt32 ack = 0;
+
+                    // Checks ack and seq, gets message type
+                    if (encoding_ == FunEncoding.kJson)
+                    {
+                        if (IsReliable)
                         {
-                            ack = (UInt32)json_helper_.GetIntegerField(message, kAckNumberField);
-                            onAckReceived(ack);
-                        }
-
-                        if (json_helper_.HasField(message, kSeqNumberField))
-                        {
-                            UInt32 seq = (UInt32)json_helper_.GetIntegerField(message, kSeqNumberField);
-                            if (!onSeqReceived(seq))
-                                return;
-                        }
-                    }
-
-                    if (json_helper_.HasField(message, kMessageTypeField))
-                    {
-                        msg_type = json_helper_.GetStringField(message, kMessageTypeField);
-                    }
-                    else if (ack > 0)
-                    {
-                        msg_type = "_ack";
-                    }
-                }
-                else if (encoding_ == FunEncoding.kProtobuf)
-                {
-                    FunMessage funmsg = (FunMessage)message;
-
-                    if (IsReliable)
-                    {
-                        if (funmsg.ackSpecified)
-                        {
-                            ack = funmsg.ack;
-                            onAckReceived(ack);
-                        }
-
-                        if (funmsg.seqSpecified)
-                        {
-                            if (!onSeqReceived(funmsg.seq))
-                                return;
-                        }
-                    }
-
-                    if (funmsg.msgtypeSpecified)
-                    {
-                        msg_type = funmsg.msgtype;
-                    }
-                    else if (funmsg.msgtype2Specified)
-                    {
-                        msg_type = MessageTable.Lookup((MessageType)funmsg.msgtype2);
-                    }
-                    else if (ack > 0)
-                    {
-                        msg_type = "_ack";
-                    }
-                }
-
-                // Checks sent session id
-                lock (session_id_sent_lock_)
-                {
-                    if (send_session_id_only_once_ && !session_id_has_been_sent)
-                    {
-                        if (protocol_ != TransportProtocol.kHttp &&
-                            state_ == State.kEstablished && msg_type.Length > 0)
-                        {
-                            session_id_has_been_sent = true;
-                        }
-                    }
-                }
-
-                if (msg_type.Length > 0)
-                {
-                    // Checks ping messages
-                    if (msg_type == kServerPingMessageType)
-                    {
-                        onServerPingMessage(message);
-                        return;
-                    }
-                    else if (msg_type == kClientPingMessageType)
-                    {
-                        onClientPingMessage(message);
-                        return;
-                    }
-                }
-                else
-                {
-                    if (state_ == State.kWaitForAck)
-                    {
-                        lock (sending_lock_)
-                        {
-                            foreach (FunapiMessage msg in sent_queue_)
+                            if (json_helper_.HasField(message, kAckNumberField))
                             {
-                                sendMessage(msg);
+                                ack = (UInt32)json_helper_.GetIntegerField(message, kAckNumberField);
+                                onAckReceived(ack);
+                            }
+
+                            if (json_helper_.HasField(message, kSeqNumberField))
+                            {
+                                UInt32 seq = (UInt32)json_helper_.GetIntegerField(message, kSeqNumberField);
+                                if (!onSeqReceived(seq))
+                                    return true;
                             }
                         }
 
-                        onStandby();
+                        if (json_helper_.HasField(message, kMessageTypeField))
+                        {
+                            msg_type = json_helper_.GetStringField(message, kMessageTypeField);
+                        }
+                        else if (ack > 0)
+                        {
+                            msg_type = "_ack";
+                        }
                     }
+                    else if (encoding_ == FunEncoding.kProtobuf)
+                    {
+                        FunMessage funmsg = (FunMessage)message;
+
+                        if (IsReliable)
+                        {
+                            if (funmsg.ackSpecified)
+                            {
+                                ack = funmsg.ack;
+                                onAckReceived(ack);
+                            }
+
+                            if (funmsg.seqSpecified)
+                            {
+                                if (!onSeqReceived(funmsg.seq))
+                                    return true;
+                            }
+                        }
+
+                        if (funmsg.msgtypeSpecified)
+                        {
+                            msg_type = funmsg.msgtype;
+                        }
+                        else if (funmsg.msgtype2Specified)
+                        {
+                            msg_type = MessageTable.Lookup((MessageType)funmsg.msgtype2);
+                        }
+                        else if (ack > 0)
+                        {
+                            msg_type = "_ack";
+                        }
+                    }
+
+                    // Checks sent session id
+                    lock (session_id_sent_lock_)
+                    {
+                        if (send_session_id_only_once_ && !session_id_has_been_sent)
+                        {
+                            if (protocol_ != TransportProtocol.kHttp &&
+                                state_ == State.kEstablished && msg_type.Length > 0)
+                            {
+                                session_id_has_been_sent = true;
+                            }
+                        }
+                    }
+
+                    if (msg_type.Length > 0)
+                    {
+                        // Checks ping messages
+                        if (msg_type == kServerPingMessageType)
+                        {
+                            onServerPingMessage(message);
+                            return true;
+                        }
+                        else if (msg_type == kClientPingMessageType)
+                        {
+                            onClientPingMessage(message);
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        if (state_ == State.kWaitForAck)
+                        {
+                            lock (sending_lock_)
+                            {
+                                foreach (FunapiMessage msg in sent_queue_)
+                                {
+                                    sendMessage(msg);
+                                }
+                            }
+
+                            onStandby();
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kDeserializeFailed;
+                    error.message = string.Format("[{0}] Failure in onReceivedMessage: {1}",
+                                                  str_protocol_, e.ToString());
+
+                    if (protocol_ == TransportProtocol.kUdp)
+                    {
+                        last_error_code_ = error.type;
+                        last_error_message_ = error.message;
+
+                        debug.Log(error.message);
+                    }
+                    else
+                    {
+                        onFailure(error);
+                    }
+
+                    return false;
                 }
 
                 if (debug.IsDebug)
@@ -1753,6 +1773,8 @@ namespace Fun
 
                 if (ReceivedCallback != null)
                     ReceivedCallback(this, msg_type, message);
+
+                return true;
             }
 
             protected void onFailedSending ()
