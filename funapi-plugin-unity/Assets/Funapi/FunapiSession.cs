@@ -258,9 +258,13 @@ namespace Fun
 
             Transport transport = GetTransport(protocol);
 
-            if (transport != null &&
-                (transport.IsReliable || transport.IsEstablished) &&
-                (!wait_for_redirect_ || msg_type == kRedirectConnectType))
+            // 메시지를 전송 가능한 상태인지 검사
+            // session reliabiliby 를 사용할 경우 연결이 끊긴 상태에서도 SendMessage를 호출하면 메시지를 저장해두었다가 다시 연결됐을 때 전송
+
+            if (transport != null &&                                                    // 해당 프로토콜 타입의 Transport 가 있음
+                (transport.IsReliable || transport.IsEstablished) &&                    // session reliabiliby 를 사용중이거나 연결된 상태
+                (!wait_for_redirect_ || msg_type == kRedirectConnectType) &&            // 서버 이동 중이 아니거나 서버 이동 메시지
+                (transport.encoding == FunEncoding.kJson || message is FunMessage))     // Protobuf 일 경우 메시지 타입이 FunMessage 인지 확인
             {
                 FunapiMessage msg = null;
                 if (transport.encoding == FunEncoding.kJson)
@@ -283,7 +287,9 @@ namespace Fun
                 else if (transport == null)
                     strlog.AppendFormat("There's no {0} transport.", convertString(protocol));
                 else if (!transport.IsEstablished)
-                    strlog.AppendFormat(" {0}:{1}", transport.str_protocol, transport.state);
+                    strlog.AppendFormat("{0}:{1}", transport.str_protocol, transport.state);
+                else if (transport.encoding == FunEncoding.kProtobuf && message is FunMessage == false)
+                    strlog.Append("The message type is not FunMessage.");
                 strlog.AppendFormat(" session:{0}", state_);
 
                 debug.LogWarning(strlog.ToString());
