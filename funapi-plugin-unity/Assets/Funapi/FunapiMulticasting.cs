@@ -14,25 +14,39 @@ using funapi.service.multicast_message;
 
 namespace Fun
 {
-    public class FunapiMulticastClient
+    public class FunapiMulticastClient : FunapiMulticast<object>
     {
         public FunapiMulticastClient (FunapiSession session, FunEncoding encoding)
+            : base(session, encoding)
+        {
+        }
+    }
+
+
+    public class FunapiMulticast<T>
+    {
+        public FunapiMulticast (FunapiSession session, FunEncoding encoding)
         {
             FunDebug.Assert(session != null);
 
             session_ = session;
             encoding_ = encoding;
 
-            session_.MulticastMessageCallback += onReceived;
+            session_.MulticastMessageCallback += onReceivedMessage;
         }
 
-        public void Clear ()
+        ~FunapiMulticast ()
         {
-            session_.MulticastMessageCallback -= onReceived;
+            if (session_ != null)
+            {
+                session_.MulticastMessageCallback -= onReceivedMessage;
+                session_ = null;
+            }
         }
 
         public string sender
         {
+            get { return sender_; }
             set { sender_ = value; }
         }
 
@@ -50,23 +64,22 @@ namespace Fun
         {
             if (!Connected)
             {
-                FunDebug.LogWarning("Multicast.RequestChannelList - Multicast is not connected.\n" +
-                                    "Please connect first before request a channel list.");
+                FunDebug.LogWarning("[Multicast] request a channel list but the session is not connected.");
                 return;
             }
 
             if (encoding_ == FunEncoding.kJson)
             {
-                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
-                mcast_msg[kSender] = sender_;
-                session_.SendMessage(kMulticastMsgType, mcast_msg);
+                Dictionary<string, object> mcast = new Dictionary<string, object>();
+                mcast[kSender] = sender_;
+                session_.SendMessage(kMulticastMsgType, mcast);
             }
             else
             {
-                FunMulticastMessage mcast_msg = new FunMulticastMessage();
-                mcast_msg.sender = sender_;
+                FunMulticastMessage mcast = new FunMulticastMessage();
+                mcast.sender = sender_;
 
-                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
                 session_.SendMessage(kMulticastMsgType, fun_msg);
             }
         }
@@ -80,8 +93,7 @@ namespace Fun
         {
             if (!Connected)
             {
-                FunDebug.LogWarning("Multicast.JoinChannel - Multicast is not connected.\n" +
-                                    "Please connect first before join a multicast channel.");
+                FunDebug.LogWarning("[Multicast] request to join '{0}' channel but session is not connected.", channel_id);
                 return false;
             }
 
@@ -89,93 +101,59 @@ namespace Fun
             {
                 if (channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.LogWarning("Multicast.JoinChannel - Already joined the '{0} channel.", channel_id);
+                    FunDebug.LogWarning("[Multicast] request to join '{0}' channel but already joined that channel.", channel_id);
                     return false;
                 }
 
                 channels_.Add(channel_id, handler);
             }
 
-            if (encoding_ == FunEncoding.kJson)
-            {
-                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
-                mcast_msg[kChannelId] = channel_id;
-                mcast_msg[kSender] = sender_;
-                mcast_msg[kJoin] = true;
-
-                if (token != null && token.Length > 0)
-                    mcast_msg[kToken] = token;
-
-                session_.SendMessage(kMulticastMsgType, mcast_msg);
-            }
-            else
-            {
-                FunMulticastMessage mcast_msg = new FunMulticastMessage();
-                mcast_msg.channel = channel_id;
-                mcast_msg.sender = sender_;
-                mcast_msg.join = true;
-
-                if (token != null && token.Length > 0)
-                    mcast_msg.token = token;
-
-                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
-                session_.SendMessage(kMulticastMsgType, fun_msg);
-            }
-
-            FunDebug.Log("Multicast - Request to join '{0}' channel", channel_id);
+            requestToJoin(channel_id, token);
 
             return true;
         }
 
         public bool LeaveChannel (string channel_id)
         {
-            if (!Connected)
-            {
-                FunDebug.LogWarning("Multicast.LeaveChannel - Multicast is not connected.\n" +
-                                    "If you are trying to leave a channel in which you were, " +
-                                    "connect first while preserving the session id you used for join.");
-                return false;
-            }
-
             lock (channel_lock_)
             {
-                if (!channels_.ContainsKey(channel_id))
+                if (channels_.ContainsKey(channel_id))
                 {
-                    FunDebug.LogWarning("Multicast.LeaveChannel - You are not in the '{0} channel.", channel_id);
+                    channels_.Remove(channel_id);
+                }
+                else
+                {
+                    FunDebug.LogWarning("[Multicast] request to leave '{0}' channel but you are not in that channel.", channel_id);
                     return false;
                 }
             }
 
-            lock (channel_lock_)
+            if (Connected)
             {
-                channels_.Remove(channel_id);
+                requestToLeave(channel_id);
+                onUserLeft(channel_id, sender_);
             }
-
-            sendLeaveMessage(channel_id);
-            onUserLeft(channel_id, sender_);
 
             return true;
         }
 
         public virtual void LeaveAllChannels ()
         {
-            if (!Connected)
-                return;
-
             lock (channel_lock_)
             {
                 if (channels_.Count <= 0)
                     return;
 
-                foreach (string channel_id in channels_.Keys)
+                if (Connected)
                 {
-                    sendLeaveMessage(channel_id);
-                    onUserLeft(channel_id, sender_);
+                    foreach (string channel_id in channels_.Keys)
+                    {
+                        requestToLeave(channel_id);
+                        onUserLeft(channel_id, sender_);
+                    }
                 }
 
                 channels_.Clear();
-
-                FunDebug.Log("Multicast - Leave all channels.");
             }
         }
 
@@ -191,237 +169,335 @@ namespace Fun
         /// The 'channel_id' field is mandatory.
         /// The 'sender' must fill in the message.
         /// The message shouldn't include join and leave flags.
-        public bool SendToChannel (FunMulticastMessage mcast_msg)
+        ///
+        public bool SendToChannel (FunMulticastMessage mcast)
         {
-            if (mcast_msg == null)
+            if (mcast == null)
                 return false;
 
-            FunDebug.Assert(!mcast_msg.join);
-            FunDebug.Assert(!mcast_msg.leave);
+            FunDebug.Assert(!mcast.join);
+            FunDebug.Assert(!mcast.leave);
 
-            string channel_id = mcast_msg.channel;
-            if (channel_id == "")
-            {
-                FunDebug.LogWarning("Multicast.SendToChannel - You should set a vaild channel id.");
-                return false;
-            }
-
-            lock (channel_lock_)
-            {
-                if (!Connected)
-                {
-                    FunDebug.LogWarning("Multicast.SendToChannel - Multicast is not connected.\n" +
-                                        "If you are trying to send a message in which you were, " +
-                                        "connect first while preserving the session id you used for join.");
-                    return false;
-                }
-                if (!channels_.ContainsKey(channel_id))
-                {
-                    FunDebug.LogWarning("Multicast.SendToChannel - You are not in the '{0} channel.", channel_id);
-                    return false;
-                }
-            }
-
-            mcast_msg.sender = sender_;
-
-            FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
-            session_.SendMessage(kMulticastMsgType, fun_msg);
-            return true;
+            return sendToChannel(mcast.channel, mcast);
         }
 
         /// The 'channel_id' field is mandatory.
         /// The 'sender' must fill in the message.
         /// The message shouldn't include join and leave flags.
-        public bool SendToChannel (object json_msg)
+        ///
+        public bool SendToChannel (object json)
         {
-            if (json_msg == null)
+            if (json == null)
                 return false;
 
-            FunDebug.Assert(!json_helper_.HasField(json_msg, kJoin));
-            FunDebug.Assert(!json_helper_.HasField(json_msg, kLeave));
+            FunDebug.Assert(!json_helper_.HasField(json, kJoin));
+            FunDebug.Assert(!json_helper_.HasField(json, kLeave));
 
-            string channel_id = json_helper_.GetStringField(json_msg, kChannelId);
-            if (channel_id == "")
-            {
-                FunDebug.LogWarning("Multicast.SendToChannel - You should set a vaild channel id.");
-                return false;
-            }
-
-            lock (channel_lock_)
-            {
-                if (!Connected)
-                {
-                    FunDebug.LogWarning("Multicast.SendToChannel - Multicast is not connected.\n" +
-                                        "If you are trying to send a message in which you were, " +
-                                        "connect first while preserving the session id you used for join.");
-                    return false;
-                }
-                if (!channels_.ContainsKey(channel_id))
-                {
-                    FunDebug.LogWarning("Multicast.SendToChannel - You are not in the '{0} channel.", channel_id);
-                    return false;
-                }
-            }
-
-            json_helper_.SetStringField(json_msg, kSender, sender_);
-
-            session_.SendMessage(kMulticastMsgType, json_msg);
-            return true;
+            return sendToChannel(json_helper_.GetStringField(json, kChannelId), json);
         }
 
 
-        void sendLeaveMessage (string channel_id)
+        void requestToJoin (string channel_id, string token)
         {
             if (encoding_ == FunEncoding.kJson)
             {
-                Dictionary<string, object> mcast_msg = new Dictionary<string, object>();
-                mcast_msg[kChannelId] = channel_id;
-                mcast_msg[kSender] = sender_;
-                mcast_msg[kLeave] = true;
+                Dictionary<string, object> mcast = new Dictionary<string, object>();
+                mcast[kChannelId] = channel_id;
+                mcast[kSender] = sender_;
+                mcast[kJoin] = true;
 
-                session_.SendMessage(kMulticastMsgType, mcast_msg);
+                if (!string.IsNullOrEmpty(token))
+                {
+                    mcast[kToken] = token;
+                }
+
+                session_.SendMessage(kMulticastMsgType, mcast);
             }
             else
             {
-                FunMulticastMessage mcast_msg = new FunMulticastMessage();
-                mcast_msg.channel = channel_id;
-                mcast_msg.sender = sender_;
-                mcast_msg.leave = true;
+                FunMulticastMessage mcast = new FunMulticastMessage();
+                mcast.channel = channel_id;
+                mcast.sender = sender_;
+                mcast.join = true;
 
-                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast_msg, MessageType.multicast);
+                if (!string.IsNullOrEmpty(token))
+                {
+                    mcast.token = token;
+                }
+
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
                 session_.SendMessage(kMulticastMsgType, fun_msg);
             }
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                lock (token_lock_)
+                {
+                    tokens_[channel_id] = token;
+                }
+            }
+
+            FunDebug.Log("[Multicast] requested to join '{0}' channel.", channel_id);
         }
 
-        void onUserJoined (string channel_id, string user_id)
+        void requestToLeave (string channel_id)
         {
-            FunDebug.Log("Multicast - '{0}' joined the '{1}' channel", user_id, channel_id);
-            if (JoinedCallback != null)
-                JoinedCallback(channel_id, user_id);
+            if (encoding_ == FunEncoding.kJson)
+            {
+                Dictionary<string, object> mcast = new Dictionary<string, object>();
+                mcast[kChannelId] = channel_id;
+                mcast[kSender] = sender_;
+                mcast[kLeave] = true;
+
+                session_.SendMessage(kMulticastMsgType, mcast);
+            }
+            else
+            {
+                FunMulticastMessage mcast = new FunMulticastMessage();
+                mcast.channel = channel_id;
+                mcast.sender = sender_;
+                mcast.leave = true;
+
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
+                session_.SendMessage(kMulticastMsgType, fun_msg);
+            }
+
+            FunDebug.Log("[Multicast] requested to leave '{0}' channel.", channel_id);
         }
 
-        void onUserLeft (string channel_id, string user_id)
+        bool sendToChannel (string channel_id, object message)
         {
-            FunDebug.Log("Multicast - '{0}' left the '{1}' channel", user_id, channel_id);
-            if (LeftCallback != null)
-                LeftCallback(channel_id, user_id);
-        }
+            if (message == null)
+                return false;
 
-        void onReceived (string msg_type, object body)
-        {
-            string channel_id = "";
-            string sender = "";
-            bool join = false;
-            bool leave = false;
-            int error_code = 0;
+            if (string.IsNullOrEmpty(channel_id))
+            {
+                FunDebug.LogWarning("[Multicast] can't send a message. invalid channel id.");
+                return false;
+            }
+
+            if (!Connected)
+            {
+                FunDebug.LogWarning("[Multicast] can't send a message. session is not connected.");
+                return false;
+            }
+
+            if (!InChannel(channel_id))
+            {
+                FunDebug.LogWarning("[Multicast] can't send a message. you are not in the '{0} channel.", channel_id);
+                return false;
+            }
 
             if (encoding_ == FunEncoding.kJson)
             {
-                if (json_helper_.HasField(body, kChannelId))
-                    channel_id = json_helper_.GetStringField(body, kChannelId);
+                json_helper_.SetStringField(message, kSender, sender_);
 
-                if (json_helper_.HasField(body, kSender))
-                    sender = json_helper_.GetStringField(body, kSender);
+                session_.SendMessage(kMulticastMsgType, message);
+            }
+            else
+            {
+                FunMulticastMessage mcast = message as FunMulticastMessage;
+                mcast.sender = sender_;
 
-                if (json_helper_.HasField(body, kErrorCode))
-                    error_code = (int)json_helper_.GetIntegerField(body, kErrorCode);
+                FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
+                session_.SendMessage(kMulticastMsgType, fun_msg);
+            }
 
-                if (json_helper_.HasField(body, kChannelList))
-                {
-                    if (ChannelListCallback != null)
-                    {
-                        object list = json_helper_.GetObject(body, kChannelList);
-                        ChannelListCallback(list);
-                    }
-                    return;
-                }
-                else if (json_helper_.HasField(body, kJoin))
-                {
-                    join = json_helper_.GetBooleanField(body, kJoin);
-                }
-                else if (json_helper_.HasField(body, kLeave))
-                {
-                    leave = json_helper_.GetBooleanField(body, kLeave);
-                }
+            return true;
+        }
+
+        void onReceivedMessage (string msg_type, object body)
+        {
+            if (encoding_ == FunEncoding.kJson)
+            {
+                onReceivedMessage(body);
             }
             else
             {
                 FunMessage msg = body as FunMessage;
-                FunMulticastMessage mcast_msg = FunapiMessage.GetMessage<FunMulticastMessage>(msg, MessageType.multicast);
-                if (mcast_msg == null)
-                    return;
-
-                if (mcast_msg.channelSpecified)
-                    channel_id = mcast_msg.channel;
-
-                if (mcast_msg.senderSpecified)
-                    sender = mcast_msg.sender;
-
-                if (mcast_msg.error_codeSpecified)
-                    error_code = (int)mcast_msg.error_code;
-
-                if (mcast_msg.channels.Count > 0 || (channel_id == "" && sender == ""))
+                FunMulticastMessage mcast = FunapiMessage.GetMessage<FunMulticastMessage>(msg, MessageType.multicast);
+                if (mcast != null)
                 {
-                    if (ChannelListCallback != null)
-                        ChannelListCallback(mcast_msg.channels);
-                    return;
+                    onReceivedMessage(mcast);
                 }
-                else if (mcast_msg.joinSpecified)
-                {
-                    join = mcast_msg.join;
-                }
-                else if (mcast_msg.leaveSpecified)
-                {
-                    leave = mcast_msg.leave;
-                }
-
-                body = mcast_msg;
             }
+        }
 
-            if (error_code != 0)
+        void onReceivedMessage (object json)
+        {
+            string channel_id = "";
+            string sender = "";
+
+            if (json_helper_.HasField(json, kChannelList))
             {
-                FunMulticastMessage.ErrorCode code = (FunMulticastMessage.ErrorCode)error_code;
-                FunDebug.LogWarning("Multicast.onReceived - channel: {0} error: {1}", channel_id, code);
-
-                if (code != FunMulticastMessage.ErrorCode.EC_ALREADY_JOINED)
+                if (ChannelListCallback != null)
                 {
-                    lock (channel_lock_)
-                    {
-                        if (channels_.ContainsKey(channel_id))
-                            channels_.Remove(channel_id);
-                    }
+                    object list = json_helper_.GetObject(json, kChannelList);
+                    ChannelListCallback(list);
                 }
-
-                if (ErrorCallback != null)
-                    ErrorCallback(channel_id, code);
-
                 return;
             }
 
-            lock (channel_lock_)
+            if (json_helper_.HasField(json, kChannelId))
+                channel_id = json_helper_.GetStringField(json, kChannelId);
+
+            // If the channel id is not in the channel list, ignores it.
+            if (!InChannel(channel_id))
+                return;
+
+            if (json_helper_.HasField(json, kErrorCode))
             {
-                if (!channels_.ContainsKey(channel_id))
+                int error_code = (int)json_helper_.GetIntegerField(json, kErrorCode);
+                onError(channel_id, (FunMulticastMessage.ErrorCode)error_code);
+                return;
+            }
+
+            if (json_helper_.HasField(json, kSender))
+                sender = json_helper_.GetStringField(json, kSender);
+
+            if (json_helper_.HasField(json, kJoin))
+            {
+                if (json_helper_.GetBooleanField(json, kJoin))
                 {
-                    FunDebug.LogWarning("Multicast.onReceived - You are not in the '{0} channel.", channel_id);
+                    onUserJoined(channel_id, sender);
+                    return;
+                }
+            }
+            else if (json_helper_.HasField(json, kLeave))
+            {
+                if (json_helper_.GetBooleanField(json, kLeave))
+                {
+                    onUserLeft(channel_id, sender);
                     return;
                 }
             }
 
-            if (join)
+            onMessageCallback(channel_id, sender, json);
+        }
+
+        void onReceivedMessage (FunMulticastMessage mcast)
+        {
+            string channel_id = "";
+            string sender = "";
+
+            if (mcast.channelSpecified)
+                channel_id = mcast.channel;
+
+            if (mcast.channels.Count > 0 || string.IsNullOrEmpty(channel_id))
+            {
+                if (ChannelListCallback != null)
+                {
+                    ChannelListCallback(mcast.channels);
+                }
+                return;
+            }
+
+            // If the channel id is not in the channel list, ignores it.
+            if (!InChannel(channel_id))
+                return;
+
+            if (mcast.error_codeSpecified)
+            {
+                int error_code = (int)mcast.error_code;
+                onError(channel_id, (FunMulticastMessage.ErrorCode)error_code);
+                return;
+            }
+
+            if (mcast.senderSpecified)
+                sender = mcast.sender;
+
+            if (mcast.joinSpecified && mcast.join)
             {
                 onUserJoined(channel_id, sender);
+                return;
             }
-            else if (leave)
+            else if (mcast.leaveSpecified && mcast.leave)
             {
                 onUserLeft(channel_id, sender);
+                return;
             }
-            else
+
+            onMessageCallback(channel_id, sender, mcast);
+        }
+
+        void onUserJoined (string channel_id, string user_id)
+        {
+            FunDebug.Log("[Multicast] '{0}' joined the '{1}' channel.", user_id, channel_id);
+
+            if (JoinedCallback != null)
+            {
+                JoinedCallback(channel_id, user_id);
+            }
+        }
+
+        void onUserLeft (string channel_id, string user_id)
+        {
+            FunDebug.Log("[Multicast] '{0}' left the '{1}' channel.", user_id, channel_id);
+
+            if (user_id == sender_)
+            {
+                lock (channel_lock_)
+                {
+                    if (tokens_.ContainsKey(channel_id))
+                    {
+                        tokens_.Remove(channel_id);
+                    }
+                }
+            }
+
+            if (LeftCallback != null)
+            {
+                LeftCallback(channel_id, user_id);
+            }
+        }
+
+        protected virtual void onMessageCallback (string channel_id, string user_id, object message)
+        {
+            lock (channel_lock_)
+            {
+                channels_[channel_id](channel_id, user_id, (T)message);
+            }
+        }
+
+        void onError (string channel_id, FunMulticastMessage.ErrorCode code)
+        {
+            FunDebug.LogWarning("[Multicast] error occurred. channel:{0} error:{1}", channel_id, code);
+
+            if (code == FunMulticastMessage.ErrorCode.EC_CLOSED)
+            {
+                // This error occurs when the server is closed.
+                // If the session is connected, tries to rejoin the channel.
+
+                if (Connected && InChannel(channel_id))
+                {
+                    string token = null;
+                    lock (token_lock_)
+                    {
+                        if (tokens_.ContainsKey(channel_id))
+                        {
+                            token = tokens_[channel_id];
+                        }
+                    }
+
+                    requestToJoin(channel_id, token);
+                    return;
+                }
+            }
+
+            if (code != FunMulticastMessage.ErrorCode.EC_ALREADY_JOINED)
             {
                 lock (channel_lock_)
                 {
                     if (channels_.ContainsKey(channel_id))
-                        channels_[channel_id](channel_id, sender, body);
+                    {
+                        channels_.Remove(channel_id);
+                    }
                 }
+            }
+
+            if (ErrorCallback != null)
+            {
+                ErrorCallback(channel_id, code);
             }
         }
 
@@ -435,7 +511,7 @@ namespace Fun
         const string kLeave = "_leave";
         const string kErrorCode = "_error_code";
 
-        public delegate void ChannelMessage(string channel_id, string sender, object body);
+        public delegate void ChannelMessage (string channel_id, string sender, T message);
 
         public event Action<object> ChannelListCallback;      // channel list
         public event Action<string, string> JoinedCallback;   // channel id, sender
@@ -447,6 +523,8 @@ namespace Fun
         protected string sender_ = "";
 
         FunapiSession session_ = null;
+        object token_lock_ = new object();
+        Dictionary<string, string> tokens_ = new Dictionary<string, string>();
         object channel_lock_ = new object();
         Dictionary<string, ChannelMessage> channels_ = new Dictionary<string, ChannelMessage>();
     }
