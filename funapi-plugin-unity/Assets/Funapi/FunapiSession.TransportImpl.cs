@@ -79,15 +79,25 @@ namespace Fun
 
                 addr_.refresh();
 
-                lock (sock_lock_)
+                try
                 {
-                    sock_ = new Socket(addr_.inet, SocketType.Stream, ProtocolType.Tcp);
+                    lock (sock_lock_)
+                    {
+                        sock_ = new Socket(addr_.inet, SocketType.Stream, ProtocolType.Tcp);
 
-                    bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
-                    if (disable_nagle)
-                        sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+                        bool disable_nagle = (option_ as TcpTransportOption).DisableNagle;
+                        if (disable_nagle)
+                            sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
-                    sock_.BeginConnect(addr_.host, addr_.port, new AsyncCallback(this.startCb), this);
+                        sock_.BeginConnect(addr_.host, addr_.port, new AsyncCallback(this.startCb), this);
+                    }
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kStartingFailed;
+                    error.message = "[TCP] Failure in onStart: " + e.ToString();
+                    onFailure(error);
                 }
             }
 
