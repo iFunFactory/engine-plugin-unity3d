@@ -77,10 +77,10 @@ namespace Fun
 
                 state_ = State.kConnecting;
 
-                addr_.refresh();
-
                 try
                 {
+                    addr_.refresh();
+
                     lock (sock_lock_)
                     {
                         sock_ = new Socket(addr_.inet, SocketType.Stream, ProtocolType.Tcp);
@@ -506,41 +506,51 @@ namespace Fun
             {
                 base.onStart();
 
-                state_ = State.kConnected;
-
-                addr_.refresh();
-
-                lock (sock_lock_)
+                try
                 {
-                    sock_ = new Socket(addr_.inet, SocketType.Dgram, ProtocolType.Udp);
-                    sock_.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    addr_.refresh();
 
-                    int port = 0;
-#if FIXED_UDP_LOCAL_PORT
-                    port = LocalPort.Next();
-#endif
-                    if (addr_.inet == AddressFamily.InterNetworkV6)
-                        sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
-                    else
-                        sock_.Bind(new IPEndPoint(IPAddress.Any, port));
-
-                    IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
-                    debug.LogDebug("[UDP] bind {0}:{1}", lep.Address, lep.Port);
-
-                    send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
-                    if (addr_.inet == AddressFamily.InterNetworkV6)
-                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr_.port);
-                    else
-                        receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr_.port);
-
-                    lock (receive_lock_)
+                    lock (sock_lock_)
                     {
-                        sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
-                                               ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
-                    }
-                }
+                        sock_ = new Socket(addr_.inet, SocketType.Dgram, ProtocolType.Udp);
+                        sock_.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
 
-                onStarted();
+                        int port = 0;
+#if FIXED_UDP_LOCAL_PORT
+                        port = LocalPort.Next();
+#endif
+                        if (addr_.inet == AddressFamily.InterNetworkV6)
+                            sock_.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+                        else
+                            sock_.Bind(new IPEndPoint(IPAddress.Any, port));
+
+                        IPEndPoint lep = (IPEndPoint)sock_.LocalEndPoint;
+                        debug.LogDebug("[UDP] bind {0}:{1}", lep.Address, lep.Port);
+
+                        send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
+                        if (addr_.inet == AddressFamily.InterNetworkV6)
+                            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr_.port);
+                        else
+                            receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.Any, addr_.port);
+
+                        lock (receive_lock_)
+                        {
+                            sock_.BeginReceiveFrom(receive_buffer_, 0, receive_buffer_.Length, SocketFlags.None,
+                                                ref receive_ep_, new AsyncCallback(this.receiveBytesCb), this);
+                        }
+                    }
+
+                    state_ = State.kConnected;
+
+                    onStarted();
+                }
+                catch (Exception e)
+                {
+                    TransportError error = new TransportError();
+                    error.type = TransportError.Type.kStartingFailed;
+                    error.message = "[UDP] Failure in onStart: " + e.ToString();
+                    onFailure(error);
+                }
             }
 
             protected override void onClose ()
