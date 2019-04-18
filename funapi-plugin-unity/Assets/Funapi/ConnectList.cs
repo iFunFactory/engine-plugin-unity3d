@@ -45,24 +45,15 @@ namespace Fun
 
         public bool refresh ()
         {
-            try
+            ip_list_ = Dns.GetHostAddresses(host);
+            if (ip_list_ == null || ip_list_.Length == 0)
             {
-                ip_list_ = Dns.GetHostAddresses(host);
-                if (ip_list_ == null || ip_list_.Length == 0)
-                {
-                    FunDebug.LogWarning("HostIP - Can't get any host address from '{0}'.", host);
-                    return false;
-                }
-
-                index_ = 0;
-                inet_ = ip_list_[0].AddressFamily;
-            }
-            catch (Exception e)
-            {
-                FunDebug.LogWarning("HostIP - Can't get host addresses from '{0}'.\n{1}",
-                                    host, e.ToString());
+                FunDebug.LogWarning("HostIP - Can't get any host address from '{0}'.", host);
                 return false;
             }
+
+            index_ = 0;
+            inet_ = ip_list_[0].AddressFamily;
 
             return true;
         }
