@@ -481,6 +481,15 @@ namespace Fun
             server_address_ = host;
             default_protocol_ = TransportProtocol.kDefault;
 
+            // Applying the required options to create the transport first.
+            if (redirect_option_ != null)
+            {
+                option_.sessionReliability = redirect_option_.sessionReliability;
+                option_.sendSessionIdOnlyOnce = redirect_option_.sendSessionIdOnlyOnce;
+                option_.delayedAckInterval = redirect_option_.delayedAckInterval;
+                option_.encryptionPublicKey = redirect_option_.encryptionPublicKey;
+            }
+
             // Adds transports.
             foreach (RedirectInfo info in redirect_list_.Values)
             {
@@ -816,6 +825,17 @@ namespace Fun
 
             if (SessionEventCallback != null)
                 SessionEventCallback(type, session_id_);
+        }
+
+        SessionOption getSessionOption (string flavor)
+        {
+            SessionOption option = null;
+
+            // Get option from session option callback.
+            if (SessionOptionCallback != null)
+                option = SessionOptionCallback(flavor);
+
+            return option;
         }
 
 
@@ -1408,6 +1428,7 @@ namespace Fun
             }
 
             redirect_token_ = token;
+            redirect_option_ = getSessionOption(flavor);
             wait_for_redirect_ = true;
 
             // Stopping all transports.
@@ -1459,6 +1480,10 @@ namespace Fun
 
                 state = State.kConnected;
                 wait_for_redirect_ = false;
+                if (redirect_option_ != null)
+                {
+                    option_ = redirect_option_;
+                }
 
                 onSessionEvent(SessionEventType.kRedirectSucceeded);
             }
@@ -1756,7 +1781,8 @@ namespace Fun
 
         // Funapi message-related events.
         public event Action<SessionEventType, string> SessionEventCallback;                     // type, session id
-        public event Func<string, TransportProtocol, TransportOption> TransportOptionCallback;  // flavor, protocol (return: option)
+        public event Func<string, SessionOption> SessionOptionCallback;                         // flavor, (return: session option)
+        public event Func<string, TransportProtocol, TransportOption> TransportOptionCallback;  // flavor, protocol (return: transport option)
         public event Func<TransportProtocol, FunapiCompressor> CreateCompressorCallback;        // protocol (return: compressor)
         public event Action<TransportProtocol, TransportEventType> TransportEventCallback;      // protocol, type
         public event Action<TransportProtocol, TransportError> TransportErrorCallback;          // protocol, error
@@ -1801,6 +1827,7 @@ namespace Fun
         SessionOption option_ = null;
 
         // Redirect-related variables.
+        SessionOption redirect_option_ = null;
         bool wait_for_redirect_ = false;
         string redirect_token_ = "";
         List<string> redirect_cur_tags_ = new List<string>();
