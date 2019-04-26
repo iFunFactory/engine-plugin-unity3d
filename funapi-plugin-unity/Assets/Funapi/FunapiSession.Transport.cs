@@ -1845,6 +1845,11 @@ namespace Fun
                 }
 
                 sendPingMessage();
+
+                if (ping_timer_ != null)
+                {
+                    ping_timer_.StartTimeout();
+                }
             }
 
             void onPingTimeout ()
@@ -1935,7 +1940,7 @@ namespace Fun
 
                 if (ping_timer_ != null)
                 {
-                    ping_timer_.Reset();
+                    ping_timer_.StopTimeout();
                 }
 
                 if (timestamp != 0)
