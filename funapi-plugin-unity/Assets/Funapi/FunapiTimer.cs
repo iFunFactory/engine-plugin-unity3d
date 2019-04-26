@@ -309,10 +309,20 @@ namespace Fun
             interval_ = interval;
             update_callback_ = update_callback;
             callback_ = timeout_callback;
+
+            // Send ping messages when the timer starts.
+            // For redirect, it gives a 1.5 seconds delay.
+            elapsed_update_ = interval_ - 1.5f;
         }
 
-        public void Reset ()
+        public void StartTimeout ()
         {
+            enable_timeout_ = true;
+        }
+
+        public void StopTimeout ()
+        {
+            enable_timeout_ = false;
             elapsed_ = 0f;
         }
 
@@ -321,21 +331,25 @@ namespace Fun
             if (isDone)
                 return;
 
-            // Checks timeout
-            if (elapsed_ >= timeout_)
+            if (enable_timeout_)
             {
-                callback_();
-                isDone = true;
-                return;
-            }
+                // Checks timeout
+                if (elapsed_ >= timeout_)
+                {
+                    callback_();
+                    isDone = true;
+                    return;
+                }
 
-            // Adds elapsed time after checking the timeout.
-            // This is to rule out huge delay in the update.
-            elapsed_ += deltaTime;
+                // Adds elapsed time after checking the timeout.
+                // This is to rule out huge delay in the update.
+                elapsed_ += deltaTime;
+            }
 
             // Checks update
             elapsed_update_ += deltaTime;
-            if (elapsed_update_ < interval_)
+            // Do not call an update callback while waiting for a response.
+            if (elapsed_update_ < interval_ || enable_timeout_)
                 return;
 
             update_callback_(elapsed_update_);
@@ -347,6 +361,7 @@ namespace Fun
         float timeout_ = 0f;
         float interval_ = 0f;
         float elapsed_update_ = 0f;
+        bool enable_timeout_ = false;
         Action<float> update_callback_;
     }
 }
