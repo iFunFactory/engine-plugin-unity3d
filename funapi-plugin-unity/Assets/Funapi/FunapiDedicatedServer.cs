@@ -872,6 +872,8 @@ namespace Fun
 
         public static void Start() { }
 
+        public static void Start (string version) { }
+
         public static void Ready() { }
 
         public static void SendReady (Action<int, string> callback) { }
