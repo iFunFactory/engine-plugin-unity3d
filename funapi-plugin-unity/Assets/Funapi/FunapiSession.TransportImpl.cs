@@ -497,7 +497,7 @@ namespace Fun
                 addr_ = new HostIP(host, port);
 
                 debug.Log("[UDP] {0}:{1}, {2}, {3}, Compression:{4}, Sequence:{5}, ConnectionTimeout:{6}",
-                          addr_.ip, addr_.port, convertString(encoding_), convertString(option_.Encryption),
+                          addr_.host, addr_.port, convertString(encoding_), convertString(option_.Encryption),
                           convertString(option_.CompressionType), option_.SequenceValidation,
                           option_.ConnectionTimeout);
             }
@@ -528,6 +528,7 @@ namespace Fun
                         debug.LogDebug("[UDP] bind {0}:{1}", lep.Address, lep.Port);
 
                         send_ep_ = new IPEndPoint(addr_.ip, addr_.port);
+                        debug.LogDebug("[UDP] host ip {0}", addr_.ip);
                         if (addr_.inet == AddressFamily.InterNetworkV6)
                             receive_ep_ = (EndPoint)new IPEndPoint(IPAddress.IPv6Any, addr_.port);
                         else
