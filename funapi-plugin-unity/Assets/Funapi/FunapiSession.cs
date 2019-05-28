@@ -592,6 +592,11 @@ namespace Fun
             get { return default_protocol_; }
         }
 
+        public SessionId Id
+        {
+            get { return session_id_; }
+        }
+
         public string GetSessionId ()
         {
             return (string)session_id_;
@@ -898,6 +903,7 @@ namespace Fun
                 transport.ErrorCallback += onTransportError;
                 transport.ReceivedCallback += onTransportMessage;
                 transport.mono = this;
+                transport.session = this;
 
                 transport.Init();
 
@@ -1780,10 +1786,13 @@ namespace Fun
         const string kIntMessageType = "_int#";
         const string kMessageTypeField = "_msgtype";
         const string kSessionIdField = "_sid";
+        const string kUdpHandshakeIdField = "_udp_handshake_id";
         const string kSeqNumberField = "_seq";
         const string kAckNumberField = "_ack";
         const string kEmptyMessageType = "_empty";
         const string kSessionOpenedType = "_session_opened";
+        const string kUdpHandShakeType = "_udp_handshake";
+        const string kUdpAttachedType = "_udp_attached";
         const string kSessionClosedType = "_session_closed";
         const string kMaintenanceType = "_maintenance";
         const string kMulticastMsgType = "_multicast";

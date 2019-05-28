@@ -6,6 +6,7 @@
 
 using Fun;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
@@ -345,6 +346,8 @@ namespace Fun
             //
             public FunapiMono.Listener mono { protected get; set; }
 
+            public FunapiSession session { protected get; set; }
+
             public abstract HostAddr address { get; }
 
             public TransportProtocol protocol
@@ -563,6 +566,7 @@ namespace Fun
                     next_decoding_offset_ = 0;
                 }
 
+                udp_handshake_id_ = Guid.NewGuid();
                 last_error_code_ = TransportError.Type.kNone;
                 last_error_message_ = "";
             }
@@ -830,7 +834,64 @@ namespace Fun
                 sendMessage(new FunapiMessage(protocol_, kEmptyMessageType, new FunMessage()), true);
             }
 
-            void sendAck (UInt32 ack, bool sendingFirst = false)
+            void sendUdpEmptyMessage()
+            {
+                lock (sending_lock_)
+                {
+                    if (encoding_ == FunEncoding.kJson)
+                    {
+                        first_.Add(new FunapiMessage(protocol_,
+                                                     kUdpHandShakeType,
+                                                     FunapiMessage.Deserialize("{}"),
+                                                     EncryptionType.kDefaultEncryption));
+                    }
+                    else if (encoding_ == FunEncoding.kProtobuf)
+                    {
+                        first_.Add(new FunapiMessage(protocol_,
+                                                     kUdpHandShakeType,
+                                                     new FunMessage(),
+                                                     EncryptionType.kDefaultEncryption));
+                    }
+                    if (isSendable)
+                    {
+                        sendPendingMessages();
+                    }
+                }
+            }
+
+            protected IEnumerator tryToSendUdpEmptyMessage()
+            {
+                if (session.Id.IsValid)
+                {
+                    session_id_.SetId(session.GetSessionId());
+                }
+                else
+                {
+                    session_id_.Clear();
+                }
+
+                exponential_time_ = 1f;
+
+                while (true)
+                {
+                    if (IsEstablished || IsStopped)
+                    {
+                        exponential_time_ = 0f;
+                        yield break;
+                    }
+
+                    sendUdpEmptyMessage();
+
+                    // 0.1, 0.2, 0.4, 0.8, 0.8, ...
+                    float delay_time = exponential_time_;
+                    if (exponential_time_ < 8f)
+                        exponential_time_ *= 2f;
+
+                    yield return new SleepForSeconds(delay_time / 10f);
+                }
+            }
+
+           void sendAck (UInt32 ack, bool sendingFirst = false)
             {
                 if (encoding_ == FunEncoding.kJson)
                 {
@@ -1050,7 +1111,7 @@ namespace Fun
                     }
 
                     if (msg.msg_type != null &&
-                        msg.msg_type != kAckNumberField && msg.msg_type != kEmptyMessageType)
+                        msg.msg_type != kAckNumberField && msg.msg_type != kEmptyMessageType && msg.msg_type != kUdpHandShakeType)
                     {
                         // Adds message type
                         if (encoding_ == FunEncoding.kJson)
@@ -1102,6 +1163,21 @@ namespace Fun
 
                                 sent_queue_.Enqueue(msg);
                             }
+                        }
+                    }
+
+                    if (msg.msg_type == kUdpHandShakeType)
+                    {
+                        msg.msg_type = kEmptyMessageType;
+
+                        if (encoding_ == FunEncoding.kJson)
+                        {
+                            json_helper_.SetStringField(msg.message, kUdpHandshakeIdField, udp_handshake_id_.ToString());
+                        }
+                        else if (encoding_ == FunEncoding.kProtobuf)
+                        {
+                            FunMessage proto = msg.message as FunMessage;
+                            proto.udp_handshake_id = udp_handshake_id_.ToByteArray();
                         }
                     }
                 }
@@ -1713,7 +1789,22 @@ namespace Fun
                             if (protocol_ != TransportProtocol.kHttp &&
                                 state_ == State.kEstablished && msg_type.Length > 0)
                             {
-                                session_id_has_been_sent = true;
+                                if (encoding_ == FunEncoding.kJson)
+                                {
+                                    if (!json_helper_.HasField(message, kUdpHandshakeIdField))
+                                    {
+                                        session_id_has_been_sent = true;
+                                    }
+                                }
+                                else if (encoding_ == FunEncoding.kProtobuf)
+                                {
+                                    FunMessage funmsg = (FunMessage)message;
+
+                                    if (!funmsg.udp_handshake_idSpecified)
+                                    {
+                                        session_id_has_been_sent = true;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1810,10 +1901,62 @@ namespace Fun
                     debug.LogDebug(log.ToString());
                 }
 
-                if (ReceivedCallback != null)
+                if (msg_type != kUdpAttachedType && ReceivedCallback != null)
                     ReceivedCallback(this, msg_type, message);
 
+                if (!string.IsNullOrEmpty(msg_type))
+                {
+                    if (protocol_ == TransportProtocol.kUdp && !Connected)
+                    {
+                        if (msg_type == kSessionOpenedType || msg_type == kUdpAttachedType)
+                        {
+                            processUdpFirstMessageReply(msg_type, message);
+                        }
+                    }
+                }
+
                 return true;
+            }
+
+            protected void processUdpFirstMessageReply(string msg_type, object message)
+            {
+                Guid received_udp_handshake_id = Guid.Empty;
+
+                if (encoding_ == FunEncoding.kJson)
+                {
+                    if (json_helper_.HasField(message, kUdpHandshakeIdField))
+                    {
+                        string received_id_str = json_helper_.GetStringField(message, kUdpHandshakeIdField);
+                        received_udp_handshake_id = new Guid(received_id_str);
+                    }
+                }
+                else if (encoding_ == FunEncoding.kProtobuf)
+                {
+                    FunMessage funmsg = (FunMessage)message;
+
+                    if (funmsg.udp_handshake_idSpecified)
+                    {
+                        received_udp_handshake_id = new Guid(funmsg.udp_handshake_id);
+                    }
+                }
+
+                if (received_udp_handshake_id == Guid.Empty)
+                {
+                    debug.LogWarning("[{0}] udp handshake id is null. This message is ignored. message_type:{1}", str_protocol_, msg_type);
+                    return;
+                }
+                else if (!Guid.Equals(received_udp_handshake_id, udp_handshake_id_))
+                {
+                    debug.LogWarning("[{0}] This message is ignored. " +
+                                        "It might come from previous connection. message_type:{1}", str_protocol_, msg_type);
+                    return;
+                }
+
+                if(state_ == State.kConnecting)
+                {
+                    state_ = State.kConnected;
+                    onStarted();
+                }
             }
 
             protected void onFailedSending ()
@@ -2068,6 +2211,7 @@ namespace Fun
             protected PostEventList event_ = new PostEventList();
             protected FunapiTimerList timer_ = new FunapiTimerList();
             protected bool is_paused_ = false;
+            Guid udp_handshake_id_ = Guid.Empty;
 
             // Connect-related member variables.
             ConnectState cstate_ = ConnectState.kUnknown;
