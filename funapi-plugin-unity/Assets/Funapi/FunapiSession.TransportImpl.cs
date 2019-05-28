@@ -529,6 +529,7 @@ namespace Fun
                 base.onStart();
 
                 sent_length_ = 0;
+                state_ = State.kConnecting;
 
                 try
                 {
@@ -565,9 +566,7 @@ namespace Fun
                         }
                     }
 
-                    state_ = State.kConnected;
-
-                    onStarted();
+                    mono.StartCoroutine(tryToSendUdpEmptyMessage());
                 }
                 catch (Exception e)
                 {
