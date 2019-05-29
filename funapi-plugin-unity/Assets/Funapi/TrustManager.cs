@@ -30,6 +30,13 @@ namespace Fun
             string tempPath = FunapiUtils.GetLocalDataPath + "/" + Path.GetRandomFileName();
             try
             {
+                // for pre-2018.2(.NET 4.x) versions
+                ServicePointManager.ServerCertificateValidationCallback = delegate
+                        (System.Object sender, X509Certificate certificate,
+                         X509Chain chain, SslPolicyErrors sslPolicyErrors) {
+                    return true;
+                };
+
                 // Try to download the Mozilla's root certificates file.
                 WebClient webClient = new WebClient();
                 webClient.DownloadFile(kMozillaCertificatesUrl, tempPath);
