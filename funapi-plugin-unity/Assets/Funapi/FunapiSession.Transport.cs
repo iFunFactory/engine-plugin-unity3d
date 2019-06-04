@@ -68,7 +68,7 @@ namespace Fun
         public FunCompressionType CompressionType = FunCompressionType.kNone;
         public bool ReliableTransport = false;
         public bool SequenceValidation = false;
-        public float ConnectionTimeout = 0f;
+        public float ConnectionTimeout = 10f;
 
         public override bool Equals (object obj)
         {
@@ -587,7 +587,11 @@ namespace Fun
             void setConnectionTimeout ()
             {
                 if (option_.ConnectionTimeout <= 0f)
+                {
+                    FunDebug.LogWarning("Connection timeout is disabled(0), Disabling timeout would cause the infinite waiting state." +
+                                        " It is recommended that you use it only for debugging purposes.");
                     return;
+                }
 
                 timer_.Add(new FunapiTimeoutTimer("connection",
                                                   option_.ConnectionTimeout,
