@@ -4,6 +4,7 @@
 // must not be used, disclosed, copied, or distributed without the prior
 // consent of iFunFactory Inc.
 
+using Fun;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -1204,7 +1205,7 @@ namespace Fun
                             log.AppendFormat(", ack={0}", funmsg.ack);
                         }
 
-                        // TODO : Generates json string from protobuf message.
+                        FunapiMessage.DebugString(funmsg, log);
                     }
                 }
 
@@ -1768,7 +1769,7 @@ namespace Fun
                                 log.AppendFormat(", ack={0}", funmsg.ack);
                             }
 
-                            // TODO : Generates json string from protobuf message.
+                            FunapiMessage.DebugString(funmsg, log);
                         }
                     }
 

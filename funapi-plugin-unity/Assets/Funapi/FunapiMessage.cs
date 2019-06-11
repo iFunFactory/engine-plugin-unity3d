@@ -6,12 +6,17 @@
 
 using System;
 using System.IO;
+using System.Text;
+using System.Reflection;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 // protobuf
 using ProtoBuf;
 using funapi.network.fun_message;
 using funapi.service.multicast_message;
 
+using Newtonsoft.Json.Linq;
 
 namespace Fun
 {
@@ -192,6 +197,61 @@ namespace Fun
             }
 
             return null;
+        }
+
+        public static void DebugString (FunMessage msg, StringBuilder log)
+        {
+            foreach(MessageType msg_type in Enum.GetValues(typeof(MessageType)))
+            {
+                object _msg = null;
+                Type type = MessageTable.GetType(msg_type);
+                bool succeed = Extensible.TryGetValue(serializer_, type, msg,
+                                                      (int)msg_type, DataFormat.Default, true, out _msg);
+                if (succeed)
+                {
+                    var json = JObject.FromObject(_msg);
+                    log.AppendFormat(" {0}", prettyJsonString(json.ToString()));
+
+                    debugString((IExtensible)_msg, type, log);
+                    log.AppendFormat("}}");
+                }
+            }
+        }
+
+        static void debugString (IExtensible msg, Type type, StringBuilder log)
+        {
+            MethodInfo method = typeof(MessageTable).GetMethod("GetExtensions");
+            if (method != null)
+            {
+                Dictionary<int, Type> extensions = method.Invoke(null, new object[] {type}) as Dictionary<int, Type>;
+                foreach(KeyValuePair<int, Type> pair in extensions)
+                {
+                    object _msg = null;
+                    bool succeed = Extensible.TryGetValue(serializer_, pair.Value, msg,
+                                                        pair.Key, DataFormat.Default, true, out _msg);
+                    if (succeed)
+                    {
+                        var json = JObject.FromObject(_msg);
+                        log.AppendFormat(" {0}", prettyJsonString(json.ToString()));
+
+                        debugString((IExtensible)_msg, pair.Value, log);
+                        log.AppendFormat("}}");
+                    }
+                }
+            }
+        }
+
+        static String prettyJsonString (string ugly_string)
+        {
+            ugly_string = Regex.Replace(ugly_string, @"\{|\}|\t|\n|\r|", "");
+            List<String> list = new List<String>(ugly_string.Split(','));
+            list.RemoveAll(item => item.Contains("Specified"));
+            for(int i = 0; i < list.Count; ++i)
+            {
+                list[i] = list[i].Trim();
+            }
+
+            return string.Format("{{{0}", String.Join(",", list.ToArray()));
         }
 
 
