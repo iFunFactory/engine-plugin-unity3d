@@ -1437,7 +1437,15 @@ namespace Fun
                 foreach (Transport transport in transports_.Values)
                 {
                     transport.IsRedirecting = true;
-                    transport.Stop();
+
+                    if (!option_.sessionReliability)
+                    {
+                        transport.Stop();
+                    }
+                    else
+                    {
+                        StartCoroutine(tryToStopTransport(transport));
+                    }
                 }
             }
 
