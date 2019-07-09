@@ -260,7 +260,7 @@ namespace Fun
 
             if (sendVersion)
             {
-                instance.httpPost(CmdVersion, use_old_version_ ? version : version_, delegate (object obj)
+                instance.httpPostSync(CmdVersion, use_old_version_ ? version : version_, delegate (object obj)
                 {
                     FunDebug.Log("Dedicated Server - Sent the version. ({0})", version_);
                 });
@@ -499,6 +499,68 @@ namespace Fun
         void httpPost (string command, string data, Action<object> callback = null, Action<int, string> user_callback = null)
         {
             webRequest("POST", command, data, callback, user_callback);
+        }
+
+        void httpPostSync (string command, string data, Action<object> callback = null) // for send version only
+        {
+            string url = server_url_ + command;
+
+            // Request
+            HttpWebRequest web_request = (HttpWebRequest)WebRequest.Create(url);
+            web_request.Method = "POST";
+            web_request.ContentType = "application/octet-stream";
+
+            Request request = new Request();
+            request.web_request = web_request;
+            request.callback = callback;
+            request.command = command;
+
+           try
+            {
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(data);
+                ArraySegment<byte> body = new ArraySegment<byte>(bytes);
+                web_request.ContentLength = body.Count;
+                request.body = body;
+
+                Stream stream = web_request.GetRequestStream();
+                stream.Write(request.body.Array, 0 , request.body.Count);
+                stream.Close();
+
+                request.web_response = (HttpWebResponse)web_request.GetResponse();
+                request.web_request = null;
+
+                if (request.web_response.StatusCode == HttpStatusCode.OK)
+                {
+                    request.read_stream = request.web_response.GetResponseStream();
+                    StreamReader sr = new StreamReader(request.read_stream);
+
+                    byte[] buffer = System.Text.Encoding.UTF8.GetBytes(sr.ReadToEnd());
+                    request.body = new ArraySegment<byte>(buffer);
+
+                    webRequestCallback(request);
+
+                    request.read_stream.Close();
+                    request.web_response.Close();
+                }
+                else
+                {
+                    FunDebug.LogError("Host manager response failed. status:{0}",
+                                      request.web_response.StatusDescription);
+                }
+            }
+            catch (Exception e)
+            {
+                WebException we = e as WebException;
+                if (we != null && we.Status == WebExceptionStatus.ConnectFailure)
+                {
+                    onRequestFailed(request);
+                }
+                else if ((we != null && we.Status == WebExceptionStatus.RequestCanceled) ||
+                    (e is ObjectDisposedException || e is NullReferenceException))
+                {
+                    FunDebug.LogDebug("Dedicated Server - httpPostServerVersionSync operation has been cancelled.");
+                }
+            }
         }
 
         void webRequest (string method, string command, string data, Action<object> callback, Action<int, string> user_callback)
