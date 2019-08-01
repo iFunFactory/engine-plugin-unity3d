@@ -15,8 +15,8 @@ namespace Fun
 {
     public class FunapiChatClient : FunapiMulticast<string>
     {
-        public FunapiChatClient (FunapiSession session, FunEncoding encoding)
-            : base(session, encoding)
+        public FunapiChatClient (FunapiSession session, FunEncoding encoding, TransportProtocol protocol = TransportProtocol.kDefault)
+            : base(session, encoding, protocol)
         {
         }
 
