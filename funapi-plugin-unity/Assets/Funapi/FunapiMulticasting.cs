@@ -16,8 +16,8 @@ namespace Fun
 {
     public class FunapiMulticastClient : FunapiMulticast<object>
     {
-        public FunapiMulticastClient (FunapiSession session, FunEncoding encoding)
-            : base(session, encoding)
+        public FunapiMulticastClient (FunapiSession session, FunEncoding encoding, TransportProtocol protocol = TransportProtocol.kDefault)
+            : base(session, encoding, protocol)
         {
         }
     }
@@ -25,12 +25,13 @@ namespace Fun
 
     public class FunapiMulticast<T>
     {
-        public FunapiMulticast (FunapiSession session, FunEncoding encoding)
+        public FunapiMulticast (FunapiSession session, FunEncoding encoding, TransportProtocol protocol = TransportProtocol.kDefault)
         {
             FunDebug.Assert(session != null);
 
             session_ = session;
             encoding_ = encoding;
+            protocol_ = protocol;
 
             session_.MulticastMessageCallback += onReceivedMessage;
         }
@@ -72,7 +73,7 @@ namespace Fun
             {
                 Dictionary<string, object> mcast = new Dictionary<string, object>();
                 mcast[kSender] = sender_;
-                session_.SendMessage(kMulticastMsgType, mcast);
+                session_.SendMessage(kMulticastMsgType, mcast, protocol_);
             }
             else
             {
@@ -80,7 +81,7 @@ namespace Fun
                 mcast.sender = sender_;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
-                session_.SendMessage(kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg, protocol_);
             }
         }
 
@@ -211,7 +212,7 @@ namespace Fun
                     mcast[kToken] = token;
                 }
 
-                session_.SendMessage(kMulticastMsgType, mcast);
+                session_.SendMessage(kMulticastMsgType, mcast, protocol_);
             }
             else
             {
@@ -226,7 +227,7 @@ namespace Fun
                 }
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
-                session_.SendMessage(kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg, protocol_);
             }
 
             if (!string.IsNullOrEmpty(token))
@@ -249,7 +250,7 @@ namespace Fun
                 mcast[kSender] = sender_;
                 mcast[kLeave] = true;
 
-                session_.SendMessage(kMulticastMsgType, mcast);
+                session_.SendMessage(kMulticastMsgType, mcast, protocol_);
             }
             else
             {
@@ -259,7 +260,7 @@ namespace Fun
                 mcast.leave = true;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
-                session_.SendMessage(kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg, protocol_);
             }
 
             FunDebug.Log("[Multicast] requested to leave '{0}' channel.", channel_id);
@@ -292,7 +293,7 @@ namespace Fun
             {
                 json_helper_.SetStringField(message, kSender, sender_);
 
-                session_.SendMessage(kMulticastMsgType, message);
+                session_.SendMessage(kMulticastMsgType, message, protocol_);
             }
             else
             {
@@ -300,7 +301,7 @@ namespace Fun
                 mcast.sender = sender_;
 
                 FunMessage fun_msg = FunapiMessage.CreateFunMessage(mcast, MessageType.multicast);
-                session_.SendMessage(kMulticastMsgType, fun_msg);
+                session_.SendMessage(kMulticastMsgType, fun_msg, protocol_);
             }
 
             return true;
@@ -519,6 +520,7 @@ namespace Fun
         public event Action<string, FunMulticastMessage.ErrorCode> ErrorCallback;  // channel id, error code
 
         protected JsonAccessor json_helper_ = FunapiMessage.JsonHelper;
+        protected TransportProtocol protocol_;
         protected FunEncoding encoding_;
         protected string sender_ = "";
 
