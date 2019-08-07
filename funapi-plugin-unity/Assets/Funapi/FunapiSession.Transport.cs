@@ -507,6 +507,25 @@ namespace Fun
                 onDisconnected(error);
             }
 
+            public void ForcedFail ()
+            {
+                TransportError error = new TransportError();
+                error.type = TransportError.Type.kSendingFailed;
+                error.message = string.Format("{0} forcibly closed the connection for testing.",
+                                              str_protocol_);
+                onFailure(error);
+            }
+
+            public void ForcedException ()
+            {
+                TransportError error = new TransportError();
+                error.type = TransportError.Type.kReceivingFailed;
+                error.message = string.Format("{0} forcibly failed. System.Net.Sockets.SocketException",
+                                              str_protocol_);
+                onFailure(error);
+            }
+
+
             // Creates a socket.
             protected virtual void onStart ()
             {
@@ -693,11 +712,11 @@ namespace Fun
                     if (ErrorCallback != null)
                         ErrorCallback(protocol_, error);
 
-                    if (state_ != State.kEstablished)
+                    if (auto_reconnect_ && !redirecting_)
                     {
-                        if (auto_reconnect_ && !redirecting_)
+                        if (state_ != State.kEstablished || last_error_message_.Contains("SocketException"))
                         {
-                            debug.Log("[{0}] Connection failed. Will try to connect again. " +
+                            debug.Log("[{0}] Error occurred. It will try to reconnect. " +
                                       "(state: {1}, error: {2})\n{3}\n",
                                       str_protocol_, state_, error.type, error.message);
 
