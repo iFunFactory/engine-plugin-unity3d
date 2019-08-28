@@ -167,6 +167,31 @@ namespace Fun
             addCommand(new CmdStopAll(this));
         }
 
+        public void CloseRequest ()
+        {
+            if (!Connected)
+            {
+                debug.Log("Session.CloseRequest() is called but the session is not connected.");
+                return;
+            }
+
+            Transport transport = GetTransport();
+            if (transport == null)
+            {
+                debug.LogWarning("Session.CloseRequest() is called but can't find a default transport.");
+                return;
+            }
+
+            if (transport.encoding == FunEncoding.kJson)
+            {
+                SendMessage(kCloseSessionType, FunapiMessage.Deserialize("{}"), transport.protocol);
+            }
+            else if (transport.encoding == FunEncoding.kProtobuf)
+            {
+                SendMessage(kCloseSessionType, new FunMessage(), transport.protocol);
+            }
+        }
+
 
         //
         // FunapiMono.Listener-related functions
@@ -1794,6 +1819,7 @@ namespace Fun
         const string kUdpHandShakeType = "_udp_handshake";
         const string kUdpAttachedType = "_udp_attached";
         const string kSessionClosedType = "_session_closed";
+        const string kCloseSessionType = "_close_session";
         const string kMaintenanceType = "_maintenance";
         const string kMulticastMsgType = "_multicast";
         const string kRedirectType = "_sc_redirect";
