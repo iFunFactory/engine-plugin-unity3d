@@ -55,7 +55,7 @@ namespace Fun
             {
                 string text = json_helper_.GetStringField(message, kMessage);
 
-                base.onMessageCallback(channel_id, sender, text);
+                base.onMessageCallback(channel_id, user_id, text);
             }
             else
             {
@@ -64,7 +64,7 @@ namespace Fun
                 if (chat == null)
                     return;
 
-                base.onMessageCallback(channel_id, sender, chat.text);
+                base.onMessageCallback(channel_id, user_id, chat.text);
             }
         }
 
