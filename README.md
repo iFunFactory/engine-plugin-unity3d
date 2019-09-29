@@ -24,14 +24,17 @@ Funapi plugin unity
 확인할 수 있습니다.
 
 ```text
-|- additional-plugins      # 페이스북, 트위터 플러그인
-|- csharp-samples          # C# Runtime 샘플 코드
-|- funapi-plugin-unity     # 플러그인 코드
+|- additional-plugins         # 페이스북, 트위터 플러그인
+|- csharp-samples             # C# Runtime 샘플 코드
+|- funapi-plugin-unity        # 유니티 Funapi 플러그인
+|- dedicated-server-plugin    # 데디케이티드 서버 RPC 플러그인
 ```
 
-클라이언트 플러그인 코드는 ``funapi-plugin-unity`` 폴더에 있습니다. ``additional-plugins``
-에는 페이스북과 트위터용 플러그인이 있으며 ``csharp-samples`` 폴더에는 MacOS/Linux 와 Windows 용
-C# Runtime 샘플 코드가 있습니다.
+클라이언트 플러그인 코드는 ``funapi-plugin-unity`` 폴더에 있습니다.
+``dedicated-server-plugin`` 폴더에는 데디케이티드 서버와 게임 서버 간의 통신을 할 수 있게 해주는
+RPC 플러그인이 있습니다.
+``additional-plugins`` 에는 페이스북과 트위터용 플러그인이 있으며
+``csharp-samples`` 폴더에는 MacOS/Linux 와 Windows 용 C# Runtime 샘플 코드가 있습니다.
 
 ### 테스트 프로젝트
 유니티를 실행해서 ``funapi-plugin-unity`` 폴더의 프로젝트를 열면 프로젝트 폴더 중에 ``Sample``
