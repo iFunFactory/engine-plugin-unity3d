@@ -28,7 +28,9 @@ public class TestDSRpc
         {
             DSRpcOption option = new DSRpcOption();
             option.Tag = "Test";
-            option.AddHost("127.0.0.1", 8012);
+            option.AddHost("127.0.0.1", 8016);
+            option.AddHost("127.0.0.1", 8017);
+            option.AddHost("127.0.0.1", 8018);
 
             FunapiDedicatedServerRpc rpc = new FunapiDedicatedServerRpc(option);
             rpc.SetHandler("echo", onEcho);
@@ -36,7 +38,7 @@ public class TestDSRpc
 
             rpc.Start();
 
-            setTestTimeoutWithoutFail(10f);
+            setTestTimeoutWithoutFail(30f);
         }
 
         FunDedicatedServerRpcMessage onEcho (string type, FunDedicatedServerRpcMessage request)
