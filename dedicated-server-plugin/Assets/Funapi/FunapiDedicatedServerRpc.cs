@@ -33,8 +33,7 @@ namespace Fun
         kConnected,
         kDisconnected,
         kConnectionFailed,
-        kConnectionTimedOut,
-        kPeerId
+        kConnectionTimedOut
     }
 
     // This is called when a peer receives a message from a server.
@@ -52,6 +51,9 @@ namespace Fun
         public FunapiDedicatedServerRpc (DSRpcOption option)
         {
             option_ = option;
+
+            Random rnd = new Random();
+            uid_ = (UInt32)rnd.Next() + (UInt32)rnd.Next();
 
             addSystemHandler();
             setMonoListener();
@@ -85,37 +87,17 @@ namespace Fun
 
         public override void OnUpdate (float deltaTime)
         {
-            ahead_list_.Update();
-
-            if (ahead_list_.Count > 0)
-            {
-                foreach (FunapiRpcPeer peer in ahead_list_.List)
-                {
-                    peer.Update(deltaTime);
-                }
-            }
-
-            if (peer_list_.Count > 0)
-            {
-                peer_list_.Update();
-
-                foreach (FunapiRpcPeer peer in peer_list_.Container.Values)
-                {
-                    peer.Update(deltaTime);
-                }
-            }
-
-            event_.Update(deltaTime);
+            peer_list_.Update(deltaTime);
         }
 
         public override void OnQuit ()
         {
             active_ = false;
 
-            foreach (FunapiRpcPeer peer in peer_list_.Container.Values)
+            peer_list_.ForEach(delegate (FunapiRpcPeer peer)
             {
                 peer.Close(true);
-            }
+            });
 
             event_.Clear();
 
@@ -133,7 +115,13 @@ namespace Fun
             system_handlers_[kRpcDelMessageType] = onSystemRemoveServer;
         }
 
+        uint getNextUid ()
+        {
+            return ++uid_;
+        }
 
+
+        // Connection from the address pool
         void onConnect (int index)
         {
             if (index >= option_.Addrs.Count)
@@ -145,37 +133,26 @@ namespace Fun
 
             cur_index_ = index;
 
-            FunapiRpcPeer peer = new FunapiRpcPeer(option_.DisableNagle);
+            FunapiRpcPeer peer = new FunapiRpcPeer(getNextUid(), option_.DisableNagle);
             KeyValuePair<string, ushort> addr = option_.Addrs[index];
             peer.SetAddr(addr.Key, addr.Value);
             peer.SetEventHandler(onPeerEventBeforeConnect);
             peer.SetMessageHandler(onPeerMessage);
 
-            ahead_list_.Add(peer);
+            peer_list_.Add(peer);
 
             peer.Connect();
         }
 
-        void onConnect (string peer_id, string hostname_or_ip, ushort port)
+        // Connection due to 'add_server' message
+        void onConnect (string hostname_or_ip, ushort port)
         {
-            if (peer_list_.ContainsKey(peer_id))
-            {
-                FunapiRpcPeer p = peer_list_.GetValue(peer_id);
-                if (p.state != FunapiRpcPeer.State.kConnecting &&
-                    p.state != FunapiRpcPeer.State.kConnected)
-                {
-                    p.Connect();
-                }
-                return;
-            }
-
-            FunapiRpcPeer peer = new FunapiRpcPeer(option_.DisableNagle);
+            FunapiRpcPeer peer = new FunapiRpcPeer(getNextUid(), option_.DisableNagle);
             peer.SetAddr(hostname_or_ip, port);
             peer.SetEventHandler(onPeerEvent);
             peer.SetMessageHandler(onPeerMessage);
-            peer.SetPeerId(peer_id);
 
-            ahead_list_.Add(peer);
+            peer_list_.Add(peer);
 
             peer.Connect();
         }
@@ -188,7 +165,7 @@ namespace Fun
 
             master_peer_ = peer;
 
-            FunDebug.Log("[RPC] Set Master: {0}", peer.peer_id);
+            FunDebug.Log("[Peer:{0}:{1}] Set Master: {2}", peer.addr.host, peer.addr.port, peer.peer_id);
 
             FunDedicatedServerRpcSystemMessage sysmsg = new FunDedicatedServerRpcSystemMessage();
             if (!string.IsNullOrEmpty(option_.Tag))
@@ -234,10 +211,6 @@ namespace Fun
 
             if (peer_id.Length > 0)
             {
-                peer_list_.Add(peer_id, peer);
-                ahead_list_.Remove(peer);
-
-                peer.SetEventHandler(onPeerEvent);
                 peer.SetPeerId(peer_id);
 
                 if (master_peer_ == null)
@@ -266,10 +239,11 @@ namespace Fun
                 string ip = data["ip"] as string;
                 ushort port = Convert.ToUInt16(data["port"]);
 
-                if (!peer_list_.ContainsKey(peer_id))
+                if (!peer_list_.Exists(peer_id))
+                {
                     FunDebug.Log("[Peer:{0}:{1}] Added. ({2})", ip, port, peer_id);
-
-                onConnect(peer_id, ip, port);
+                    onConnect(ip, port);
+                }
             }
         }
 
@@ -293,37 +267,39 @@ namespace Fun
             if (string.IsNullOrEmpty(peer_id))
                 return;
 
-            if (peer_list_.ContainsKey(peer_id))
+            if (peer_list_.Exists(peer_id))
             {
-                FunapiRpcPeer del_peer = peer_list_.GetValue(peer_id);
+                FunapiRpcPeer del_peer = peer_list_.Get(peer_id);
                 FunDebug.Log("[Peer:{0}:{1}] Removed. ({2})", del_peer.addr.host, del_peer.addr.port, peer_id);
+
+                peer_list_.Remove(del_peer.uid);
 
                 if (del_peer == master_peer_)
                 {
-                    FunapiRpcPeer master = null;
-                    if (peer_list_.Count > 0)
-                    {
-                        foreach (FunapiRpcPeer p in peer_list_.Container.Values)
-                        {
-                            if (p != del_peer)
-                            {
-                                master = p;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (master != null)
-                    {
-                        setMaster(master);
-                    }
-                    else
-                    {
-                        onConnect(0);
-                    }
+                    onMasterDisconnected(del_peer);
                 }
+            }
+        }
 
-                peer_list_.Remove(peer_id);
+        void onMasterDisconnected (FunapiRpcPeer peer)
+        {
+            if (peer != master_peer_)
+                return;
+
+            FunapiRpcPeer new_master = peer_list_.GetAny(peer);
+            if (new_master != null)
+            {
+                setMaster(new_master);
+            }
+            else
+            {
+                master_peer_ = null;
+
+                // If there's no valid connection, remove the last peer.
+                if (!peer.abort)
+                    peer_list_.Remove(peer.uid);
+
+                onConnect(0);
             }
         }
 
@@ -331,8 +307,11 @@ namespace Fun
         {
             onPeerEventCallback(peer, type);
 
-            if (type == PeerEventType.kConnectionFailed ||
-                type == PeerEventType.kDisconnected)
+            if (type == PeerEventType.kConnected)
+            {
+                peer.SetEventHandler(onPeerEvent);
+            }
+            else
             {
                 int index = 0;
                 if ((cur_index_ + 1) < option_.Addrs.Count)
@@ -340,15 +319,19 @@ namespace Fun
 
                 if (index == cur_index_)
                 {
-                    peer.Connect();
-                    return;
+                    if (!peer.abort)
+                    {
+                        peer.Reconnect();
+                    }
                 }
+                else
+                {
+                    peer_list_.Remove(peer);
 
-                ahead_list_.Remove(peer);
-
-                event_.Add(delegate {
-                    onConnect(index);
-                });
+                    event_.Add(delegate {
+                        onConnect(index);
+                    }, 0.5f);
+                }
             }
         }
 
@@ -359,43 +342,19 @@ namespace Fun
             if (!active_)
                 return;
 
-            if (type == PeerEventType.kDisconnected)
+            if (type == PeerEventType.kDisconnected ||
+                type == PeerEventType.kConnectionFailed ||
+                type == PeerEventType.kConnectionTimedOut)
             {
+                if (!peer.abort && peer_list_.Exists(peer.uid))
+                {
+                    peer.Reconnect();
+                }
+
                 if (peer == master_peer_)
                 {
-                    FunapiRpcPeer master = null;
-                    if (peer_list_.Count > 0)
-                    {
-                        foreach (FunapiRpcPeer p in peer_list_.Container.Values)
-                        {
-                            if (p != peer)
-                            {
-                                master = p;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (master != null)
-                    {
-                        setMaster(master);
-                    }
-                    else
-                    {
-                        onConnect(0);
-                    }
-
+                    onMasterDisconnected(peer);
                     return;
-                }
-            }
-
-            if (type == PeerEventType.kConnectionFailed ||
-                type == PeerEventType.kConnectionTimedOut ||
-                type == PeerEventType.kDisconnected)
-            {
-                if (peer_list_.ContainsKey(peer.peer_id))
-                {
-                    onConnect(peer.peer_id, peer.addr.host, peer.addr.port);
                 }
             }
         }
@@ -452,12 +411,13 @@ namespace Fun
 
 
         DSRpcOption option_;
-        int cur_index_ = 0;
+
+        uint uid_ = 0;
         bool active_ = false;
 
         FunapiRpcPeer master_peer_ = null;
-        ConcurrentSimpleList<FunapiRpcPeer> ahead_list_ = new ConcurrentSimpleList<FunapiRpcPeer>();
-        ConcurrentDictionary<string, FunapiRpcPeer> peer_list_ = new ConcurrentDictionary<string, FunapiRpcPeer>();
+        PeerList peer_list_ = new PeerList();
+        int cur_index_ = 0;
 
         object peer_event_lock_ = new object();
         PeerEventHandler peer_event_handler_;
@@ -468,16 +428,210 @@ namespace Fun
     }
 
 
+    class PeerList
+    {
+        public uint Add (FunapiRpcPeer peer)
+        {
+            if (peer == null)
+                throw new ArgumentNullException("peer");
+
+            lock (lock_)
+            {
+                pending_.Add(peer);
+            }
+
+            return peer.uid;
+        }
+
+        public bool Remove (uint uid)
+        {
+            lock (lock_)
+            {
+                if (dict_.ContainsKey(uid))
+                {
+                    dict_[uid].abort = true;
+                    return true;
+                }
+
+                List<FunapiRpcPeer> finds = pending_.FindAll(predicate(uid));
+                if (finds.Count > 0)
+                {
+                    foreach (FunapiRpcPeer peer in finds)
+                    {
+                        peer.abort = true;
+                        pending_.Remove(peer);
+                    }
+
+                    if (finds.Count > 1)
+                        FunDebug.LogWarning("There are too many peers with the same uid as '{0}'.", uid);
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool Remove (FunapiRpcPeer peer)
+        {
+            if (peer == null)
+                throw new ArgumentNullException("peer");
+
+            lock (lock_)
+            {
+                peer.abort = true;
+
+                if (list_.Contains(peer))
+                    return true;
+
+                return pending_.Remove(peer);
+            }
+        }
+
+        public void Update (float delta_time)
+        {
+            lock (lock_)
+            {
+                // Adds from pending list
+                if (pending_.Count > 0)
+                {
+                    foreach (FunapiRpcPeer peer in pending_)
+                    {
+                        list_.Add(peer);
+                        dict_[peer.uid] = peer;
+                    }
+                    pending_.Clear();
+                }
+
+                if (list_.Count > 0)
+                {
+                    // Removes peers
+                    foreach (FunapiRpcPeer peer in list_)
+                    {
+                        if (peer.abort)
+                            dict_.Remove(peer.uid);
+                    }
+                    list_.RemoveAll(t => { return t.abort; });
+
+                    // Updates peers
+                    foreach (FunapiRpcPeer peer in list_)
+                    {
+                        peer.Update(delta_time);
+                    }
+                }
+            }
+        }
+
+        public void Clear ()
+        {
+            lock (lock_)
+            {
+                pending_.Clear();
+                list_.ForEach(t => { t.abort = true; });
+            }
+        }
+
+        public bool Exists (uint uid)
+        {
+            lock (lock_)
+            {
+                if (dict_.ContainsKey(uid))
+                    return true;
+
+                return pending_.Exists(predicate(uid));
+            }
+        }
+
+        public bool Exists (string peer_id)
+        {
+            lock (lock_)
+            {
+                if (list_.Find(predicate(peer_id)) != null)
+                    return true;
+
+                return pending_.Exists(predicate(peer_id));
+            }
+        }
+
+        public FunapiRpcPeer Get (uint uid)
+        {
+            lock (lock_)
+            {
+                if (dict_.ContainsKey(uid))
+                    return dict_[uid];
+
+                return pending_.Find(predicate(uid));
+            }
+        }
+
+        public FunapiRpcPeer Get (string peer_id)
+        {
+            lock (lock_)
+            {
+                FunapiRpcPeer peer = list_.Find(predicate(peer_id));
+                if (peer != null)
+                    return peer;
+
+                return pending_.Find(predicate(peer_id));
+            }
+        }
+
+        public FunapiRpcPeer GetAny (FunapiRpcPeer exclude = null)
+        {
+            lock (lock_)
+            {
+                foreach (FunapiRpcPeer peer in list_)
+                {
+                    if (peer != exclude && !peer.abort)
+                        return peer;
+                }
+            }
+
+            return null;
+        }
+
+        public void ForEach (Action<FunapiRpcPeer> action)
+        {
+            lock (lock_)
+            {
+                if (list_.Count > 0)
+                    list_.ForEach(action);
+            }
+        }
+
+        static Predicate<FunapiRpcPeer> predicate (uint uid)
+        {
+            return t => { return t.uid == uid; };
+        }
+
+        static Predicate<FunapiRpcPeer> predicate (string peer_id)
+        {
+            return t => { return t.peer_id == peer_id; };
+        }
+
+
+        // Member variables.
+        object lock_ = new object();
+        List<FunapiRpcPeer> list_ = new List<FunapiRpcPeer>();
+        List<FunapiRpcPeer> pending_ = new List<FunapiRpcPeer>();
+        Dictionary<uint, FunapiRpcPeer> dict_ = new Dictionary<uint, FunapiRpcPeer>();
+    }
+
+
+
     class FunapiRpcPeer
     {
-        public FunapiRpcPeer (bool disable_nagle = true)
+        public FunapiRpcPeer (uint uid, bool disable_nagle = true)
         {
+            uid_ = uid;
             disable_nagle_ = disable_nagle;
+            abort = false;
         }
 
         public void SetAddr (string hostname_or_ip, ushort port)
         {
             addr_ = new HostIP(hostname_or_ip, port);
+            peer_id_ = string.Format("{0}:{1}", hostname_or_ip, port);
         }
 
         public void SetPeerId (string peer_id)
@@ -487,12 +641,23 @@ namespace Fun
 
         public void Connect ()
         {
+            onConnect();
+        }
+
+        public void Reconnect ()
+        {
             event_.Add(delegate {
                 onConnect();
             }, exponential_time_);
 
-            if (exponential_time_ > 0f)
-                logDebug("Reconnect after {0} seconds..", exponential_time_);
+            logDebug("Reconnect after {0} seconds..", exponential_time_);
+
+            if (exponential_time_ < kReconnectDelayMax)
+            {
+                exponential_time_ *= 2f;
+                if (exponential_time_ > kReconnectDelayMax)
+                    exponential_time_ = kReconnectDelayMax;
+            }
         }
 
         public void Close (bool immediately = false)
@@ -508,15 +673,6 @@ namespace Fun
                 });
             }
         }
-
-        public void Update (float deltaTime)
-        {
-            decodeMessages();
-
-            event_.Update(deltaTime);
-            timer_.Update(deltaTime);
-        }
-
 
         public void SetEventHandler (EventHandler handler)
         {
@@ -539,59 +695,64 @@ namespace Fun
         }
 
 
-        public string peer_id
+        public void Update (float deltaTime)
         {
-            get { return peer_id_; }
+            decodeMessages();
+
+            event_.Update(deltaTime);
+            timer_.Update(deltaTime);
         }
 
-        public HostIP addr
-        {
-            get { return addr_; }
-        }
 
-        public State state
+        public uint uid { get { return uid_; } }
+
+        public string peer_id { get { return peer_id_; } }
+
+        public HostIP addr { get { return addr_; } }
+
+        public State state { get { return state_; } }
+
+        public bool abort
         {
-            get { return state_; }
+            get { return abort_; }
+            set
+            {
+                abort_ = value;
+
+                if (abort_)
+                {
+                    onClose();
+                }
+            }
         }
 
 
         void onConnect ()
         {
-            if (state_ == State.kDisconnected)
+            if (abort_ || state_ != State.kDisconnected)
+                return;
+
+            state_ = State.kConnecting;
+
+            timer_.Add(new FunapiTimeoutTimer("connection", kConnectionTimeout, onTimedout), true);
+            logInfo("Connecting..");
+
+            try
             {
-                state_ = State.kConnecting;
-
-                timer_.Add(new FunapiTimeoutTimer("connection", kConnectionTimeout, onTimedout), true);
-                logInfo("Connecting..");
-
-                try
+                lock (sock_lock_)
                 {
-                    lock (sock_lock_)
-                    {
-                        sock_ = new Socket(addr_.inet, SocketType.Stream, ProtocolType.Tcp);
+                    sock_ = new Socket(addr_.inet, SocketType.Stream, ProtocolType.Tcp);
 
-                        if (disable_nagle_)
-                            sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+                    if (disable_nagle_)
+                        sock_.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
 
-                        sock_.BeginConnect(addr_.host, addr_.port, new AsyncCallback(this.onConnectCb), this);
-                    }
+                    sock_.BeginConnect(addr_.host, addr_.port, new AsyncCallback(this.onConnectCb), this);
                 }
-                catch (Exception e)
-                {
-                    logWarning("Connection failed. {0}", e.ToString());
-                    onDisconnect(PeerEventType.kConnectionFailed);
-                }
-
-                if (exponential_time_ == 0f)
-                {
-                    exponential_time_ = 1f;
-                }
-                else if (exponential_time_ < kReconnectDelayMax)
-                {
-                    exponential_time_ *= 2f;
-                    if (exponential_time_ > kReconnectDelayMax)
-                        exponential_time_ = kReconnectDelayMax;
-                }
+            }
+            catch (Exception e)
+            {
+                logWarning("Connection failed. {0}", e.ToString());
+                onDisconnect(PeerEventType.kConnectionFailed);
             }
         }
 
@@ -608,17 +769,19 @@ namespace Fun
 
         void onDisconnect (PeerEventType type)
         {
-            if (state_ == State.kDisconnected)
-                return;
-
             onClose();
-
             onEvent(type);
         }
 
         void onClose ()
         {
-            state_ = State.kDisconnected;
+            lock (state_lock_)
+            {
+                if (state_ == State.kDisconnected)
+                    return;
+
+                state_ = State.kDisconnected;
+            }
 
             decodeMessages();
 
@@ -631,6 +794,8 @@ namespace Fun
                 {
                     sock_.Close();
                     sock_ = null;
+
+                    logInfo("Connection has been closed.");
                 }
             }
 
@@ -824,9 +989,9 @@ namespace Fun
                     {
                         if (state_ == State.kConnecting)
                         {
-                            logInfo("Connected.");
-
                             state_ = State.kConnected;
+                            exponential_time_ = 1f;
+
                             onEvent(PeerEventType.kConnected);
                         }
 
@@ -973,11 +1138,7 @@ namespace Fun
         string makeLogText (string format, params object[] args)
         {
             string text = string.Format(format, args);
-
-            if (string.IsNullOrEmpty(peer_id_))
-                return string.Format("[Peer:{0}:{1}] {2}", addr_.host, addr_.port, text);
-            else
-                return string.Format("[Peer:{0}] {1}", peer_id_, text);
+            return string.Format("[Peer:{0}] {1}", peer_id_, text);
         }
 
         void logInfo (string format, params object[] args)
@@ -1010,12 +1171,15 @@ namespace Fun
         const float kReconnectDelayMax = 30f;
         const int kUnitBufferSize = 65536;
 
+        uint uid_ = 0;
         string peer_id_ = "";
         HostIP addr_;
         bool disable_nagle_;
 
         State state_ = State.kDisconnected;
-        float exponential_time_ = 0f;
+        object state_lock_ = new object();
+        float exponential_time_ = 1f;
+        bool abort_ = false;
 
         object sock_lock_ = new object();
         Socket sock_;
