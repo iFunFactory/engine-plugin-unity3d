@@ -5,11 +5,16 @@
 // consent of iFunFactory Inc.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 
 // protobuf
 using ProtoBuf;
 using funapi.distribution.fun_dedicated_server_rpc_message;
+using Newtonsoft.Json.Linq;
 
 
 namespace Fun
@@ -64,10 +69,6 @@ namespace Fun
             return default(T);
         }
 
-        public static object ParseJson (string buffer)
-        {
-            return json_helper_.Deserialize(buffer);
-        }
 
         public static byte[] Serialize (object msg)
         {
@@ -98,6 +99,64 @@ namespace Fun
         {
             MemoryStream stream = new MemoryStream(buffer.Array, buffer.Offset, buffer.Count, false);
             return serializer_.Deserialize(stream, null, msgtype_);
+        }
+
+        public static object ParseJson (string buffer)
+        {
+            return json_helper_.Deserialize(buffer);
+        }
+
+
+        public static void DebugString (FunDedicatedServerRpcMessage msg, StringBuilder log)
+        {
+            foreach (MessageType msg_type in Enum.GetValues(typeof(MessageType)))
+            {
+                object _msg = null;
+                Type type = MessageTable.GetType(msg_type);
+                bool succeed = Extensible.TryGetValue(serializer_, type, msg,
+                                                      (int)msg_type, DataFormat.Default, true, out _msg);
+                if (succeed)
+                {
+                    var json = JObject.FromObject(_msg);
+                    log.Append(prettyJsonString(json));
+
+                    debugString((IExtensible)_msg, type, log);
+                }
+            }
+        }
+
+        static void debugString (IExtensible msg, Type type, StringBuilder log)
+        {
+            MethodInfo method = typeof(MessageTable).GetMethod("GetExtensions");
+            if (method != null)
+            {
+                Dictionary<int, Type> extensions = method.Invoke(null, new object[] {type}) as Dictionary<int, Type>;
+                foreach (KeyValuePair<int, Type> pair in extensions)
+                {
+                    object _msg = null;
+                    bool succeed = Extensible.TryGetValue(serializer_, pair.Value, msg,
+                                                          pair.Key, DataFormat.Default, true, out _msg);
+                    if (succeed)
+                    {
+                        var json = JObject.FromObject(_msg);
+                        log.Append(prettyJsonString(json));
+
+                        debugString((IExtensible)_msg, pair.Value, log);
+                    }
+                }
+            }
+        }
+
+        static String prettyJsonString (JObject json)
+        {
+            List<JProperty> properties = new List<JProperty>(json.Properties());
+            foreach (JProperty item in properties)
+            {
+                if (item.Name.Contains("Specified"))
+                    item.Remove();
+            }
+
+            return Regex.Replace(json.ToString(), @" |\t|\n|\r", "");
         }
 
 
