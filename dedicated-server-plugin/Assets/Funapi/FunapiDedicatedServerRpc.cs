@@ -885,7 +885,12 @@ namespace Fun
                         if (buf == null)
                             continue;
 
-                        logDebug("[C->S] type={0}", msg.type);
+#if ENABLE_DEBUG
+                        StringBuilder log = new StringBuilder();
+                        log.AppendFormat("[Peer:{0}] [C->S] type={1}, length={2} ", peer_id_, msg.type, buf.Length);
+                        FunapiDSRpcMessage.DebugString(msg, log);
+                        FunDebug.LogDebug(log.ToString());
+#endif
 
                         sending_.Add(new ArraySegment<byte>(buf));
                     }
@@ -1076,7 +1081,12 @@ namespace Fun
                             FunDedicatedServerRpcMessage msg = obj as FunDedicatedServerRpcMessage;
                             messages_.Enqueue(msg);
 
-                            logDebug("[S->C] type={0}", msg.type);
+#if ENABLE_DEBUG
+                            StringBuilder log = new StringBuilder();
+                            log.AppendFormat("[Peer:{0}] [S->C] type={1}, length={2} ", peer_id_, msg.type, length);
+                            FunapiDSRpcMessage.DebugString(msg, log);
+                            FunDebug.LogDebug(log.ToString());
+#endif
                         }
 
                         next_decoding_offset_ = offset + length;
