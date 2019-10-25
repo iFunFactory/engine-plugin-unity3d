@@ -1488,12 +1488,13 @@ namespace Fun
 
                 state = State.kConnected;
                 wait_for_redirect_ = false;
+
                 if (redirect_option_ != null)
                 {
                     option_ = redirect_option_;
                 }
 
-                onSessionEvent(SessionEventType.kRedirectSucceeded);
+                onSessionEventCallback(SessionEventType.kRedirectSucceeded);
             }
             else
             {
@@ -1859,7 +1860,7 @@ namespace Fun
     }
 
 
-    // This class is for saving unsent messages
+    // This is used to save unsent messages during redirection.
     public class UnsentMessage
     {
         public UnsentMessage (string type, object msg, EncryptionType enc)
