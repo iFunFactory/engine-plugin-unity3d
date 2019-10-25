@@ -15,7 +15,8 @@ namespace Tester
 {
     class TesterMain
     {
-        const int kClientMax = 100;
+        const int kTestCount = 10000;
+        const int kClientMax = 30;
         const string kServerIp = "127.0.0.1";
 
 
@@ -42,36 +43,48 @@ namespace Tester
             Client.ConnectedCallback += onConnected;
             Client.StoppedCallback += onStopped;
 
-            for (int i = 1; i <= kClientMax; ++i)
+            int testCount = 0;
+            while (testCount < kTestCount)
             {
-                Client client = new Client(i);
-                list.Add(client);
-            }
+                ++testCount;
 
-            foreach (Client c in list)
-            {
-                c.Connect(TransportProtocol.kTcp, FunEncoding.kJson);
-                Thread.Sleep(10);
-            }
+                for (int i = 1; i <= kClientMax; ++i)
+                {
+                    Client client = new Client(i);
+                    list.Add(client);
+                }
 
-            while (!didAllConnect())
-            {
-                Thread.Sleep(500);
-            }
+                foreach (Client c in list)
+                {
+                    c.Connect(TransportProtocol.kTcp, FunEncoding.kJson);
+                    Thread.Sleep(10);
+                }
 
-            foreach (Client c in list)
-            {
-                c.Stop();
-                Thread.Sleep(10);
-            }
+                while (!didAllConnect())
+                {
+                    Thread.Sleep(3000);
+                }
 
-            while (!didAllStop())
-            {
-                Thread.Sleep(500);
+                foreach (Client c in list)
+                {
+                    c.Stop();
+                    Thread.Sleep(10);
+                }
+
+                while (!didAllStop())
+                {
+                    Thread.Sleep(500);
+                }
+
+                list.Clear();
+                GC.Collect();
+
+                Thread.Sleep(3000);
+                writeTitle(testCount + " test has been finished.");
             }
-            Thread.Sleep(500);
 
             FunapiMono.Stop();
+
             writeTitle("FINISHED");
 
             Process.GetCurrentProcess().Kill();
@@ -79,7 +92,7 @@ namespace Tester
 
         void onConnected (Client client)
         {
-            client.SendEchoMessageWithCount(TransportProtocol.kTcp, 5);
+            client.SendEchoMessageWithCount(TransportProtocol.kTcp, 100);
         }
 
         void onStopped (Client client)

@@ -39,6 +39,3 @@ protobuf-net.dll: ${PLUGIN_ROOT}/protobuf-net.dll
 
 websocket-sharp.dll: ${PLUGIN_ROOT}/websocket-sharp.dll
 	cp $^ .
-
-Newtonsoft.Json.dll: ${PLUGIN_ROOT}/JsonDotNet/Assemblies/Standalone/Newtonsoft.Json.dll
-	cp $^ .

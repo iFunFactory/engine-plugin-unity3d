@@ -8,6 +8,7 @@ using Fun;
 using MiniJSON;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 // protobuf
 using plugin_messages;
@@ -55,7 +56,10 @@ namespace Tester
         public void SendEchoMessageWithCount (TransportProtocol protocol, int count)
         {
             for (int i = 0; i < count; ++i)
+            {
                 SendEchoMessage(protocol);
+                Thread.Sleep(100);
+            }
         }
 
         public void SendEchoMessage (TransportProtocol protocol)
@@ -67,16 +71,18 @@ namespace Tester
                 return;
             }
 
+            ++echo_count;
+
             if (transport.encoding == FunEncoding.kJson)
             {
                 Dictionary<string, object> message = new Dictionary<string, object>();
-                message["message"] = string.Format("{0} echo message", transport.str_protocol);
+                message["message"] = string.Format("{0} echo message ({1})", transport.str_protocol, echo_count);
                 session.SendMessage("echo", message, protocol);
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
-                echo.msg = string.Format("{0} echo message", transport.str_protocol);
+                echo.msg = string.Format("{0} echo message ({1})", transport.str_protocol, echo_count);
                 FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
                 session.SendMessage("pbuf_echo", message, protocol);
             }
@@ -147,6 +153,7 @@ namespace Tester
 
 
         int client_id = 0;
+        int echo_count = 0;
         FunapiSession session = null;
     }
 }
