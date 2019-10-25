@@ -1,1 +1,1 @@
-csc /debug /define:NO_UNITY /target:exe /out:tester.exe ..\funapi-plugin-unity\Assets\Funapi\*.cs ..\funapi-plugin-unity\Assets\Plugins\MiniJSON.cs src\*.cs /r:FunMessageSerializer.dll /r:messages.dll /r:protobuf-net.dll /r:websocket-sharp.dll
+csc /debug /define:NO_UNITY /target:exe /out:tester.exe ..\funapi-plugin-unity\Assets\Funapi\*.cs ..\funapi-plugin-unity\Assets\Plugins\MiniJSON.cs src\*.cs /r:FunMessageSerializer.dll /r:messages.dll /r:protobuf-net.dll /r:websocket-sharp.dll /r:Newtonsoft.Json.dll
