@@ -164,7 +164,7 @@ namespace Fun
                 }
                 else
                 {
-                    FunDebug.Log("Announcement - All images has been downloaded.\npath:{0}", local_path_);
+                    FunDebug.Log("Announcement - All images have been downloaded.\npath:{0}", local_path_);
                     onResult(AnnounceResult.kSucceeded);
                 }
             }

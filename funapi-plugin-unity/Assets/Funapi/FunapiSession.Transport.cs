@@ -502,7 +502,7 @@ namespace Fun
             {
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kDisconnected;
-                error.message = string.Format("[{0}] Forcibly closed the connection for testing.",
+                error.message = string.Format("[{0}] The connection will be forcibly closed.",
                                               str_protocol_);
                 onDisconnected(error);
             }
@@ -511,7 +511,7 @@ namespace Fun
             {
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kSendingFailed;
-                error.message = string.Format("{0} forcibly closed the connection for testing.",
+                error.message = string.Format("{0} The connection will be forcibly closed.",
                                               str_protocol_);
                 onFailure(error);
             }
@@ -520,7 +520,8 @@ namespace Fun
             {
                 TransportError error = new TransportError();
                 error.type = TransportError.Type.kReceivingFailed;
-                error.message = string.Format("{0} forcibly failed. System.Net.Sockets.SocketException",
+                error.message = string.Format("{0} The connection will be forcibly closed." +
+                                              " (System.Net.Sockets.SocketException)",
                                               str_protocol_);
                 onFailure(error);
             }
@@ -807,15 +808,7 @@ namespace Fun
 
             void sendEmptyMessage ()
             {
-                if (encoding_ == FunEncoding.kJson)
-                {
-                    sendMessage(new FunapiMessage(protocol_, kEmptyMessageType,
-                                                  FunapiMessage.Deserialize("{}")), true);
-                }
-                else if (encoding_ == FunEncoding.kProtobuf)
-                {
-                    sendMessage(new FunapiMessage(protocol_, kEmptyMessageType, new FunMessage()), true);
-                }
+                sendMessage(new FunapiMessage(protocol_, kEmptyMessageType, new FunMessage()), true);
             }
 
             void sendAck (UInt32 ack, bool sendingFirst = false)

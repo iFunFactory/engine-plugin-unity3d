@@ -155,6 +155,7 @@ namespace Fun
                 }
 
                 channels_.Clear();
+                tokens_.Clear();
             }
         }
 
@@ -285,7 +286,7 @@ namespace Fun
 
             if (!InChannel(channel_id))
             {
-                FunDebug.LogWarning("[Multicast] can't send a message. you are not in the '{0} channel.", channel_id);
+                FunDebug.LogWarning("[Multicast] can't send a message. you aren't in '{0}' channel.", channel_id);
                 return false;
             }
 
