@@ -1278,6 +1278,9 @@ namespace Fun
                 {
                     foreach (FunapiMessage msg in sending_)
                     {
+                        if (length > 0 && (length + msg.header.Count + msg.body.Count) > kSendBufferMax)
+                            break;
+
                         if (msg.header.Count > 0)
                         {
                             length += msg.header.Count;
@@ -2008,7 +2011,8 @@ namespace Fun
             const int kPingIntervalDefault = 3;
 
             // Buffer-related constants.
-            protected const int kUnitBufferSize = 65536;
+            protected const int kUnitBufferSize = 65536; // 64kb
+            protected const int kSendBufferMax = 32768;  // 32kb
 
             // Funapi header-related constants.
             protected const string kHeaderDelimeter = "\n";
