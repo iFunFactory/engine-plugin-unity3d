@@ -21,79 +21,97 @@ namespace Tester
     {
         public Client (int id)
         {
-            client_id = id;
+            client_id_ = id;
         }
 
         public void Connect (TransportProtocol protocol, FunEncoding encoding)
         {
-            if (session == null)
+            if (session_ == null)
             {
                 SessionOption option = new SessionOption();
                 option.sessionReliability = false;
                 option.sendSessionIdOnlyOnce = false;
 
-                session = FunapiSession.Create(address, option);
-                session.SessionEventCallback += onSessionEvent;
-                session.TransportEventCallback += onTransportEvent;
-                session.TransportErrorCallback += onTransportError;
-                session.ReceivedMessageCallback += onReceivedMessage;
+                session_ = FunapiSession.Create(address, option);
+                session_.SessionEventCallback += onSessionEvent;
+                session_.TransportEventCallback += onTransportEvent;
+                session_.TransportErrorCallback += onTransportError;
+                session_.ReceivedMessageCallback += onReceivedMessage;
             }
 
-            session.Connect(protocol, encoding, getPort(protocol, encoding));
+            session_.Connect(protocol, encoding, getPort(protocol, encoding));
         }
 
         public void Stop ()
         {
-            if (session != null && session.Connected)
-                session.Stop();
+            if (session_ != null && session_.Connected)
+                session_.Stop();
+        }
+
+        public int id
+        {
+            get { return client_id_; }
         }
 
         public bool Connected
         {
-            get { return session != null && session.Connected; }
+            get { return session_ != null && session_.Connected; }
+        }
+
+        public bool IsDone
+        {
+            get { return is_done_; }
         }
 
         public void SendEchoMessageWithCount (TransportProtocol protocol, int count)
         {
+            sending_count_ = count;
+
             for (int i = 0; i < count; ++i)
             {
-                SendEchoMessage(protocol);
-                Thread.Sleep(100);
+                sendEchoMessage(protocol);
             }
         }
 
-        public void SendEchoMessage (TransportProtocol protocol)
+        void sendEchoMessage (TransportProtocol protocol)
         {
-            FunapiSession.Transport transport = session.GetTransport(protocol);
+            FunapiSession.Transport transport = session_.GetTransport(protocol);
             if (transport == null)
             {
-                FunDebug.LogWarning("SendEchoMessage - transport is null.");
+                FunDebug.LogWarning("sendEchoMessage - transport is null.");
                 return;
             }
 
-            ++echo_count;
+            ++echo_id_;
 
             if (transport.encoding == FunEncoding.kJson)
             {
                 Dictionary<string, object> message = new Dictionary<string, object>();
-                message["message"] = string.Format("{0} echo message ({1})", transport.str_protocol, echo_count);
-                session.SendMessage("echo", message, protocol);
+                message["message"] = string.Format("[{0}] echo message ({1})", client_id_, echo_id_);
+                session_.SendMessage("echo", message, protocol);
             }
             else if (transport.encoding == FunEncoding.kProtobuf)
             {
                 PbufEchoMessage echo = new PbufEchoMessage();
-                echo.msg = string.Format("{0} echo message ({1})", transport.str_protocol, echo_count);
+                echo.msg = string.Format("[{0}] echo message ({1})", client_id_, echo_id_);
                 FunMessage message = FunapiMessage.CreateFunMessage(echo, MessageType.pbuf_echo);
-                session.SendMessage("pbuf_echo", message, protocol);
+                session_.SendMessage("pbuf_echo", message, protocol);
             }
         }
 
         void onReceivedMessage (string type, object message)
         {
+            if (type == "echo" || type == "pbuf_echo")
+            {
+                --sending_count_;
+                if (sending_count_ <= 0)
+                    is_done_ = true;
+            }
+
             if (type == "echo")
             {
                 Dictionary<string, object> json = message as Dictionary<string, object>;
-                FunDebug.Log("[{0}] received: {1}", client_id, json["message"] as string);
+                FunDebug.Log("[{0}] received: {1} (left:{2})", client_id_, json["message"] as string, sending_count_);
             }
             else if (type == "pbuf_echo")
             {
@@ -103,31 +121,26 @@ namespace Tester
                     return;
 
                 PbufEchoMessage echo = obj as PbufEchoMessage;
-                FunDebug.Log("[{0}] received: {1}", client_id, echo.msg);
+                FunDebug.Log("[{0}] received: {1} (left:{2})", client_id_, echo.msg, sending_count_);
             }
         }
 
         void onSessionEvent (SessionEventType type, string sessionid)
         {
-            if (type == SessionEventType.kConnected)
-            {
-                if (ConnectedCallback != null)
-                    ConnectedCallback(this);
-            }
-            else if (type == SessionEventType.kStopped)
-            {
-                if (StoppedCallback != null)
-                    StoppedCallback(this);
-            }
+            if (type == SessionEventType.kStopped || type == SessionEventType.kClosed)
+                is_done_ = true;
         }
 
         void onTransportEvent (TransportProtocol protocol, TransportEventType type)
         {
+            if (type == TransportEventType.kStopped)
+                is_done_ = true;
         }
 
         void onTransportError (TransportProtocol protocol, TransportError error)
         {
-            session.Stop(protocol);
+            is_done_ = true;
+            session_.Stop(protocol);
         }
 
 
@@ -135,11 +148,13 @@ namespace Tester
         {
             ushort port = 0;
             if (protocol == TransportProtocol.kTcp)
-                port = (ushort)(encoding == FunEncoding.kJson ? 8011 : 8017);
+                port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8022);
             else if (protocol == TransportProtocol.kUdp)
-                port = (ushort)(encoding == FunEncoding.kJson ? 8012 : 8018);
+                port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8023);
             else if (protocol == TransportProtocol.kHttp)
-                port = (ushort)(encoding == FunEncoding.kJson ? 8013 : 8019);
+                port = (ushort)(encoding == FunEncoding.kJson ? 8018 : 8028);
+            else if (protocol == TransportProtocol.kWebsocket)
+                port = (ushort)(encoding == FunEncoding.kJson ? 8019 : 8029);
 
             return port;
         }
@@ -148,12 +163,11 @@ namespace Tester
 
         public static string address { private get; set; }
 
-        public static event Action<Client> ConnectedCallback;
-        public static event Action<Client> StoppedCallback;
+        int client_id_ = 0;
+        int echo_id_ = 0;
+        int sending_count_ = 0;
+        bool is_done_ = false;
 
-
-        int client_id = 0;
-        int echo_count = 0;
-        FunapiSession session = null;
+        FunapiSession session_ = null;
     }
 }
