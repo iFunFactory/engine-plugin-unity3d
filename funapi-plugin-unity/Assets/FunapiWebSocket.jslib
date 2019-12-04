@@ -1,7 +1,7 @@
 var LibraryWebSockets = {
 $webSocketInstances: [],
 
-SocketCreate: function(url)
+SocketJSCreate: function(url)
 {
     var str = Pointer_stringify(url);
     var socket = {
@@ -47,37 +47,37 @@ SocketCreate: function(url)
     return instance;
 },
 
-SocketState: function (socketInstance)
+SocketJSState: function (socketInstance)
 {
     var socket = webSocketInstances[socketInstance];
     return socket.socket.readyState;
 },
 
-SocketError: function (socketInstance)
+SocketJSError: function (socketInstance)
 {
     var socket = webSocketInstances[socketInstance];
     return socket.error;
 },
 
-SocketCloseReason: function (socketInstance)
+SocketJSCloseReason: function (socketInstance)
 {
     var socket = webSocketInstances[socketInstance];
     return socket.close_reason;
 },
 
-SocketCloseCode: function (socketInstance)
+SocketJSCloseCode: function (socketInstance)
 {
     var socket = webSocketInstances[socketInstance];
     return socket.close_code;
 },
 
-SocketSend: function (socketInstance, ptr, length)
+SocketJSSend: function (socketInstance, ptr, length)
 {
     var socket = webSocketInstances[socketInstance];
     socket.socket.send (HEAPU8.buffer.slice(ptr, ptr+length));
 },
 
-SocketRecvLength: function(socketInstance)
+SocketJSRecvLength: function(socketInstance)
 {
     var socket = webSocketInstances[socketInstance];
     if (socket.messages.length == 0)
@@ -85,7 +85,7 @@ SocketRecvLength: function(socketInstance)
     return socket.messages[0].length;
 },
 
-SocketRecv: function (socketInstance, ptr, length)
+SocketJSRecv: function (socketInstance, ptr, length)
 {
     var socket = webSocketInstances[socketInstance];
     if (socket.messages.length == 0)
@@ -96,7 +96,7 @@ SocketRecv: function (socketInstance, ptr, length)
     socket.messages = socket.messages.slice(1);
 },
 
-SocketClose: function (socketInstance)
+SocketJSClose: function (socketInstance)
 {
     var socket = webSocketInstances[socketInstance];
     socket.socket.close();

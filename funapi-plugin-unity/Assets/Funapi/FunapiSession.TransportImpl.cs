@@ -1455,35 +1455,35 @@ namespace Fun
                 }
 
                 [DllImport("__Internal")]
-                private static extern int SocketCreate (string url);
+                private static extern int SocketJSCreate (string url);
 
                 [DllImport("__Internal")]
-                private static extern int SocketState (int socketInstance);
+                private static extern int SocketJSState (int socketInstance);
 
                 [DllImport("__Internal")]
-                private static extern void SocketSend (int socketInstance, byte[] ptr, int length);
+                private static extern void SocketJSSend (int socketInstance, byte[] ptr, int length);
 
                 [DllImport("__Internal")]
-                private static extern void SocketRecv (int socketInstance, byte[] ptr, int length);
+                private static extern void SocketJSRecv (int socketInstance, byte[] ptr, int length);
 
                 [DllImport("__Internal")]
-                private static extern int SocketRecvLength (int socketInstance);
+                private static extern int SocketJSRecvLength (int socketInstance);
 
                 [DllImport("__Internal")]
-                private static extern void SocketClose (int socketInstance);
+                private static extern void SocketJSClose (int socketInstance);
 
                 [DllImport("__Internal")]
-                private static extern string SocketError (int socketInstance);
+                private static extern string SocketJSError (int socketInstance);
 
                 [DllImport("__Internal")]
-                private static extern string SocketCloseReason (int socketInstance);
+                private static extern string SocketJSCloseReason (int socketInstance);
 
                 [DllImport("__Internal")]
-                private static extern int SocketCloseCode (int socketInstance);
+                private static extern int SocketJSCloseCode (int socketInstance);
 
                 public void Send(byte[] buffer)
                 {
-                    SocketSend (native_ref_, buffer, buffer.Length);
+                    SocketJSSend (native_ref_, buffer, buffer.Length);
 
                     if (SendCallback != null)
                     {
@@ -1501,7 +1501,7 @@ namespace Fun
                             yield break;
                         }
 
-                        length = SocketRecvLength (native_ref_);
+                        length = SocketJSRecvLength (native_ref_);
                         if (length != 0)
                         {
                             break;
@@ -1511,7 +1511,7 @@ namespace Fun
                     }
 
                     byte[] buffer = new byte[length];
-                    SocketRecv (native_ref_, buffer, length);
+                    SocketJSRecv (native_ref_, buffer, length);
 
                     if (ReceiveCallback != null)
                     {
@@ -1530,7 +1530,7 @@ namespace Fun
                             yield break;
                         }
 
-                        reason = SocketError(native_ref_);
+                        reason = SocketJSError(native_ref_);
                         if (reason != null)
                         {
                             break;
@@ -1547,7 +1547,7 @@ namespace Fun
 
                 public IEnumerator Connect()
                 {
-                    native_ref_ = SocketCreate (url_.ToString());
+                    native_ref_ = SocketJSCreate (url_.ToString());
 
                     while (true)
                     {
@@ -1556,7 +1556,7 @@ namespace Fun
                             yield break;
                         }
 
-                        if (SocketState(native_ref_) != 0)
+                        if (SocketJSState(native_ref_) != 0)
                         {
                             break;
                         }
@@ -1572,11 +1572,11 @@ namespace Fun
 
                 public IEnumerator Close()
                 {
-                    SocketClose(native_ref_);
+                    SocketJSClose(native_ref_);
 
                     while (true)
                     {
-                        if(SocketCloseCode(native_ref_) != 0)
+                        if(SocketJSCloseCode(native_ref_) != 0)
                         {
                             break;
                         }
@@ -1596,7 +1596,7 @@ namespace Fun
                 {
                     get
                     {
-                        string reason = SocketCloseReason (native_ref_);
+                        string reason = SocketJSCloseReason (native_ref_);
                         return reason == null ? "" : reason;
                     }
                 }
@@ -1605,7 +1605,7 @@ namespace Fun
                 {
                     get
                     {
-                        return SocketCloseCode (native_ref_);
+                        return SocketJSCloseCode (native_ref_);
                     }
                 }
 
