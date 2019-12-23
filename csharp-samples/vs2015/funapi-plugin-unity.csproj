@@ -56,6 +56,10 @@
       <HintPath>..\..\funapi-plugin-unity\Assets\websocket-sharp.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="NewtonSoft.Json">
+      <HintPath>..\NewtonSoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\..\funapi-plugin-unity\Assets\Funapi\CommandList.cs">
