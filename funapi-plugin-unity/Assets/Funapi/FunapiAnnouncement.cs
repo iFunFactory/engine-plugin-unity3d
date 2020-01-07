@@ -181,6 +181,7 @@ namespace Fun
                 return;
 
             string path = local_path_ + Path.GetFileName(url);
+            url = host_url_ + kImagesUrl + url;
             if (File.Exists(path))
             {
                 // Check md5
@@ -199,7 +200,6 @@ namespace Fun
             }
             else
             {
-                url = host_url_ + kImagesUrl + url;
                 image_list_.Add(new KeyValuePair<string, string>(url, path));
             }
         }
