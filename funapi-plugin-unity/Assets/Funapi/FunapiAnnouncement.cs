@@ -43,7 +43,7 @@ namespace Fun
             web_client_.DownloadFileCompleted += downloadFileCompleteCb;
         }
 
-        public void UpdateList (int max_count)
+        public void UpdateList (int max_count, int page = 0, string cateogry = "")
         {
             if (web_client_ == null || string.IsNullOrEmpty(host_url_))
             {
@@ -54,6 +54,14 @@ namespace Fun
 
             // Request a list of announcements.
             string url = host_url_ + kAnnouncementsUrl + "?count=" + max_count;
+            if (page > 0)
+            {
+                url = url + "&page=" + page;
+            }
+            if (!String.IsNullOrEmpty(cateogry))
+            {
+                url = url + "&kind=" + WebUtility.UrlEncode(cateogry);
+            }
             web_client_.DownloadDataAsync(new Uri(url));
         }
 
