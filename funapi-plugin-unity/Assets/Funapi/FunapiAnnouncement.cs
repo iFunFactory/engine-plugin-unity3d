@@ -81,11 +81,41 @@ namespace Fun
         public string GetImagePath (int index)
         {
             Dictionary<string, object> item = GetAnnouncement(index);
-            if (item == null || !item.ContainsKey(kImageUrlKey))
+            if (item == null || !item.ContainsKey(kImageUrlKey) || !item.ContainsKey(kImageMd5Key))
                 return null;
 
             string path = item[kImageUrlKey] as string;
             return local_path_ + Path.GetFileName(path);
+        }
+
+        public List<string> GetExtraImagePaths (int index)
+        {
+            Dictionary<string, object> item = GetAnnouncement(index);
+            if (item == null || !item.ContainsKey(kExtraImagesKey))
+            {
+                return new List<string> ();
+            }
+
+            List<string> image_paths = new List<string>();
+            List<object> extra_images = item[kExtraImagesKey] as List<object>;
+            foreach (Dictionary<string, object> extra_image in extra_images)
+            {
+                if (extra_image.ContainsKey(kExtraImageUrlKey) && extra_image.ContainsKey(kExtraImageMd5Key))
+                {
+                    string path = extra_image[kExtraImageUrlKey] as string;
+                    image_paths.Add(local_path_ + Path.GetFileName(path));
+                }
+            }
+            return image_paths;
+        }
+
+        public List<string> GetAllImagePaths (int index)
+        {
+            List<string> image_paths = new List<string>();
+            image_paths.Add(GetImagePath(index));
+            image_paths.AddRange(GetExtraImagePaths(index));
+
+            return image_paths;
         }
 
         void downloadDataCompleteCb (object sender, DownloadDataCompletedEventArgs ar)
@@ -130,6 +160,18 @@ namespace Fun
                     if (node.ContainsKey(kImageUrlKey) && node.ContainsKey(kImageMd5Key))
                     {
                         checkDownloadImage(node[kImageUrlKey] as string, node[kImageMd5Key] as string);
+                    }
+
+                    if (node.ContainsKey(kExtraImagesKey))
+                    {
+                        List<object> extra_images = node[kExtraImagesKey] as List<object>;
+                        foreach (Dictionary<string, object> extra_image in extra_images)
+                        {
+                            if (extra_image.ContainsKey(kExtraImageUrlKey) && extra_image.ContainsKey(kExtraImageMd5Key))
+                            {
+                                checkDownloadImage(extra_image[kExtraImageUrlKey] as string, extra_image[kExtraImageMd5Key] as string);
+                            }
+                        }
                     }
                 }
 
@@ -227,6 +269,9 @@ namespace Fun
         const string kImagesUrl = "/images";
         const string kImageUrlKey = "image_url";
         const string kImageMd5Key = "image_md5";
+        const string kExtraImagesKey = "extra_images";
+        const string kExtraImageUrlKey = "url";
+        const string kExtraImageMd5Key = "md5";
         const string kAnnouncementsUrl = "/announcements/";
 
         // member variables.
