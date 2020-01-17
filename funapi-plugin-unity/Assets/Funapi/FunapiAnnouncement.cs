@@ -43,7 +43,7 @@ namespace Fun
             web_client_.DownloadFileCompleted += downloadFileCompleteCb;
         }
 
-        public void UpdateList (int max_count, int page = 0, string cateogry = "")
+        public void UpdateList (int max_count, int page = 0, string category = "")
         {
             if (web_client_ == null || string.IsNullOrEmpty(host_url_))
             {
@@ -58,9 +58,9 @@ namespace Fun
             {
                 url = url + "&page=" + page;
             }
-            if (!String.IsNullOrEmpty(cateogry))
+            if (!String.IsNullOrEmpty(category))
             {
-                url = url + "&kind=" + WebUtility.UrlEncode(cateogry);
+                url = url + "&kind=" + Uri.EscapeDataString(category);
             }
             web_client_.DownloadDataAsync(new Uri(url));
         }
