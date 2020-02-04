@@ -155,9 +155,9 @@ namespace Fun
                 FunDebug.LogError("LoadMozRoots - Failed to load certificate files.\n{0}", e.Message);
                 return false;
             }
-#endif
 
             ServicePointManager.ServerCertificateValidationCallback = CertValidationCallback;
+#endif
             return true;
         }
 
@@ -165,7 +165,6 @@ namespace Fun
         public static bool CertValidationCallback (System.Object sender, X509Certificate certificate,
                                                    X509Chain chain, SslPolicyErrors sslPolicyErrors)
         {
-#if !NO_UNITY
             if (sslPolicyErrors == SslPolicyErrors.None)
                 return true;
 
@@ -201,7 +200,6 @@ namespace Fun
                     }
                 }
             }
-#endif
             return true;
         }
 
