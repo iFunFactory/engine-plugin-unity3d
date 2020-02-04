@@ -25,6 +25,16 @@ namespace Fun
 {
     public class TrustManager
     {
+#if !NO_UNITY
+        [RuntimeInitializeOnLoadMethod]
+        static void OnRuntimeLoad()
+        {
+#if !NO_LOAD_MOZROOTS
+            TrustManager.LoadMozRoots();
+#endif
+        }
+#endif
+
         public static bool DownloadMozRoots ()
         {
 #if !NO_UNITY

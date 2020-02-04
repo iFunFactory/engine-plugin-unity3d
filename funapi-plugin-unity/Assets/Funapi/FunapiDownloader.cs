@@ -98,9 +98,6 @@ namespace Fun
                 total_download_size_ = 0;
                 partial_download_size_ = 0;
 
-                if (host_url.ToLower().StartsWith("https"))
-                    TrustManager.LoadMozRoots();
-
                 setMonoListener();
                 loadCachedList();
 
