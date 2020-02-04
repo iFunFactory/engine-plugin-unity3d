@@ -38,10 +38,6 @@ namespace Fun
                 setAddress(hostname_or_ip, port);
 
                 ssl_ = (option as TcpTransportOption).UseTLS;
-                if (ssl_)
-                {
-                    TrustManager.LoadMozRoots();
-                }
             }
 
             public override HostAddr address
@@ -855,9 +851,6 @@ namespace Fun
                 option = http_option;
 
                 setAddress(hostname_or_ip, port, https);
-
-                if (https)
-                    TrustManager.LoadMozRoots();
             }
 
             public override HostAddr address
