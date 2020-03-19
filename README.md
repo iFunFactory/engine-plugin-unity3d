@@ -66,6 +66,7 @@ RPC 플러그인이 있습니다.
 ```text
 |- Editor
 |- Funapi
+|- JsonDotNet
 |- Plugins
 |- Resources
 |- Sample
@@ -75,8 +76,8 @@ RPC 플러그인이 있습니다.
 |- ...
 ```
 
-위의 폴더 중 ``Funapi``, ``Plugins`` 폴더를 플러그인을 사용할 프로젝트의 ``Assets`` 폴더로
-복사하면 됩니다.
+위의 폴더 중 ``Funapi``, ``Plugins``, ``JsonDotNet`` 폴더를 플러그인을 사용할 프로젝트의
+``Assets`` 폴더로 복사하면 됩니다.
 
 암호화 기능이나 압축 기능을 사용하려면 ``Resources`` 폴더도 함께 복사해 주세요.
 **HTTPS** 를 사용하려면 ``Resources`` 폴더와 함께 ``Editor`` 폴더도 복사해 주세요.
