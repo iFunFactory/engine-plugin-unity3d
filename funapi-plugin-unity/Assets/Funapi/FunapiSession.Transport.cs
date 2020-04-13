@@ -155,6 +155,18 @@ namespace Fun
     public class WebsocketTransportOption : TransportOption
     {
         public bool WSS = false;
+        public bool EnablePing = false;
+        public bool EnablePingLog = false;
+        public int PingIntervalSeconds = 0;
+        public float PingTimeoutSeconds = 0f;
+
+        public void SetPing (int interval, float timeout, bool enable_log = false)
+        {
+            EnablePing = true;
+            EnablePingLog = enable_log;
+            PingIntervalSeconds = interval;
+            PingTimeoutSeconds = timeout;
+        }
 
         public override bool Equals (object obj)
         {
@@ -163,7 +175,12 @@ namespace Fun
 
             WebsocketTransportOption option = obj as WebsocketTransportOption;
 
-            return WSS == option.WSS;
+            return WSS == option.WSS &&
+                   EnablePing == option.EnablePing &&
+                   EnablePingLog == option.EnablePingLog &&
+                   PingIntervalSeconds == option.PingIntervalSeconds &&
+                   PingTimeoutSeconds == option.PingTimeoutSeconds;
+
         }
 
         public override int GetHashCode ()
@@ -619,6 +636,12 @@ namespace Fun
                     auto_reconnect_ = tcp_option.AutoReconnect;
                     enable_ping_ = tcp_option.EnablePing;
                     enable_ping_log_ = tcp_option.EnablePingLog;
+                }
+                else if (protocol_ == TransportProtocol.kWebsocket)
+                {
+                    WebsocketTransportOption websocket_option = opt as WebsocketTransportOption;
+                    enable_ping_ = websocket_option.EnablePing;
+                    enable_ping_log_ = websocket_option.EnablePingLog;
                 }
 
                 if (opt.Encryption != EncryptionType.kDefaultEncryption)
@@ -1983,29 +2006,53 @@ namespace Fun
             //---------------------------------------------------------------------
             // Ping-related functions
             //---------------------------------------------------------------------
+            bool isPingEnabled ()
+            {
+                return enable_ping_ && (protocol == TransportProtocol.kTcp || protocol == TransportProtocol.kWebsocket);
+
+            }
+
             void startPingTimer ()
             {
-                if (!enable_ping_ || protocol_ != TransportProtocol.kTcp)
+                if (!isPingEnabled())
+                {
                     return;
+                }
 
-                TcpTransportOption tcp_option = option_ as TcpTransportOption;
+                float interval = 0f;
+                float timeout = 0f;
+                if (protocol_ == TransportProtocol.kTcp)
+                {
+                    TcpTransportOption tcp_option = option_ as TcpTransportOption;
+                    interval = tcp_option.PingIntervalSeconds;
+                    timeout = tcp_option.PingTimeoutSeconds;
+                }
+                else // if (protocol_ == TransportProtocol.kWebsocket)
+                {
+                    WebsocketTransportOption websocket_option = option_ as WebsocketTransportOption;
+                    interval = websocket_option.PingIntervalSeconds;
+                    timeout = websocket_option.PingTimeoutSeconds;
+                }
 
-                float interval = tcp_option.PingIntervalSeconds;
-                if (interval <= 0)
+                if (interval <= 0f)
+                {
                     interval = kPingIntervalDefault;
+                }
 
-                ping_timer_ = new FunapiPingTimer(interval, tcp_option.PingTimeoutSeconds,
+                ping_timer_ = new FunapiPingTimer(interval, timeout,
                                                   onPingUpdate, onPingTimeout);
                 timer_.Add(ping_timer_, true);
 
                 debug.Log("[{0}] Ping timer started. interval: {1}s timeout: {2}s",
-                          str_protocol_, interval, tcp_option.PingTimeoutSeconds);
+                          str_protocol_, interval, timeout);
             }
 
             void stopPingTimer ()
             {
-                if (!enable_ping_ || protocol_ != TransportProtocol.kTcp)
+                if (!isPingEnabled())
+                {
                     return;
+                }
 
                 lock (sending_lock_)
                 {
@@ -2070,7 +2117,9 @@ namespace Fun
                 }
 
                 if (enable_ping_log_)
-                    debug.LogDebug("Send ping - timestamp: {0}", timestamp);
+                {
+                    debug.LogDebug("[{0}] Send ping - timestamp: {1}", str_protocol_, timestamp);
+                }
             }
 
             void onServerPingMessage (object body)
@@ -2142,8 +2191,8 @@ namespace Fun
 
                 if (enable_ping_log_)
                 {
-                    debug.LogDebug("Received ping - timestamp:{0} time={1}ms",
-                                   timestamp, ping_time_);
+                    debug.LogDebug("[{0}] Received ping - timestamp:{1} time={2}ms",
+                                   str_protocol_, timestamp, ping_time_);
                 }
             }
 
