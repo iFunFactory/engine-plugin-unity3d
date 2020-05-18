@@ -1228,6 +1228,12 @@ namespace Fun
                     }
                 }
 
+                if (msg.body.Count > kMaxPayloadSize)
+                {
+                    FunDebug.LogWarning("The message size is too large, which can cause unexpected problems. " +
+                                        "Please make the message size smaller than {0} bytes.", kMaxPayloadSize);
+                }
+
                 makeHeader(msg, uncompressed_size);
 
                 msg.ready = true;
@@ -2190,6 +2196,7 @@ namespace Fun
             const string kServerPingMessageType = "_ping_s";
             const string kClientPingMessageType = "_ping_c";
             const string kPingTimestampField = "timestamp";
+            protected const int kMaxPayloadSize = 1048576; // 1MB
 
             // for speed-up.
             static readonly char[] kHeaderDelimeterAsChars = kHeaderDelimeter.ToCharArray();
