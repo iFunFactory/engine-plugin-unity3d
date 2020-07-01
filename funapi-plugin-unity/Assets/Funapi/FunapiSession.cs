@@ -1291,6 +1291,9 @@ namespace Fun
                     MulticastMessageCallback(msg_type, message);
                 break;
 
+            case kAckMessageType:
+                return;
+
             default:
                 {
                     if (transport.encoding == FunEncoding.kProtobuf)
@@ -1815,6 +1818,7 @@ namespace Fun
         const string kSeqNumberField = "_seq";
         const string kAckNumberField = "_ack";
         const string kEmptyMessageType = "_empty";
+        const string kAckMessageType = "_ack";
         const string kSessionOpenedType = "_session_opened";
         const string kUdpHandShakeType = "_udp_handshake";
         const string kUdpAttachedType = "_udp_attached";
