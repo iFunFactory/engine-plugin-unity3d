@@ -260,6 +260,7 @@ namespace Fun
 
                 state_ = State.kUnknown;
                 cstate_ = ConnectState.kUnknown;
+                is_connection_timed_out_ = false;
 
                 decodeMessages();
 
@@ -706,6 +707,11 @@ namespace Fun
             {
                 if (state_ == State.kUnknown || state_ == State.kEstablished)
                     return;
+
+                lock (start_lock_)
+                {
+                    is_connection_timed_out_ = true;
+                }
 
                 last_error_code_ = TransportError.Type.kConnectionTimeout;
                 last_error_message_ = string.Format("[{0}] Connection waiting time has been exceeded.",
@@ -2270,6 +2276,8 @@ namespace Fun
             Guid udp_handshake_id_ = Guid.Empty;
 
             // Connect-related member variables.
+            protected object start_lock_ = new object();
+            protected bool is_connection_timed_out_ = false;
             ConnectState cstate_ = ConnectState.kUnknown;
             bool auto_reconnect_ = false;
             float exponential_time_ = 0f;

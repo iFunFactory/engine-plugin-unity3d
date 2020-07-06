@@ -214,49 +214,59 @@ namespace Fun
             {
                 try
                 {
-                    lock (sock_lock_)
+                    lock (start_lock_)
                     {
-                        if (sock_ == null)
-                            return;
-
-                        sock_.EndConnect(ar);
-                        if (sock_.Connected == false)
+                        if (is_connection_timed_out_)
                         {
-                            TransportError error = new TransportError();
-                            error.type = TransportError.Type.kStartingFailed;
-                            error.message = string.Format("[TCP] connection failed.");
-                            onFailure(error);
                             return;
                         }
-                        debug.LogDebug("[TCP] Connected. Starts handshaking..");
 
-                        if (ssl_)
+                        lock (sock_lock_)
                         {
-                            ssl_stream_ = new SslStream(new NetworkStream(sock_), false, TrustManager.CertValidationCallback);
-                        }
+                            if (sock_ == null || state_ != State.kConnecting)
+                            {
+                                return;
+                            }
 
-                        state_ = State.kHandshaking;
+                            sock_.EndConnect(ar);
+                            if (sock_.Connected == false)
+                            {
+                                TransportError error = new TransportError();
+                                error.type = TransportError.Type.kStartingFailed;
+                                error.message = string.Format("[TCP] connection failed.");
+                                onFailure(error);
+                                return;
+                            }
+                            debug.LogDebug("[TCP] Connected. Starts handshaking..");
 
-                        lock (receive_lock_)
-                        {
-                            // Wait for handshaking message.
                             if (ssl_)
                             {
-                                if (ssl_stream_ == null)
-                                {
-                                    debug.LogWarning("[TCP] SSL stream is null.");
-                                    return;
-                                }
-
-                                ssl_stream_.BeginAuthenticateAsClient(addr_.host, new AsyncCallback(this.authenticateCb), ssl_stream_);
+                                ssl_stream_ = new SslStream(new NetworkStream(sock_), false, TrustManager.CertValidationCallback);
                             }
-                            else
-                            {
-                                ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
-                                List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
-                                buffer.Add(wrapped);
 
-                                sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                            state_ = State.kHandshaking;
+
+                            lock (receive_lock_)
+                            {
+                                // Wait for handshaking message.
+                                if (ssl_)
+                                {
+                                    if (ssl_stream_ == null)
+                                    {
+                                        debug.LogWarning("[TCP] SSL stream is null.");
+                                        return;
+                                    }
+
+                                    ssl_stream_.BeginAuthenticateAsClient(addr_.host, new AsyncCallback(this.authenticateCb), ssl_stream_);
+                                }
+                                else
+                                {
+                                    ArraySegment<byte> wrapped = new ArraySegment<byte>(receive_buffer_, 0, receive_buffer_.Length);
+                                    List<ArraySegment<byte>> buffer = new List<ArraySegment<byte>>();
+                                    buffer.Add(wrapped);
+
+                                    sock_.BeginReceive(buffer, SocketFlags.None, new AsyncCallback(this.receiveBytesCb), this);
+                                }
                             }
                         }
                     }
@@ -1803,20 +1813,36 @@ namespace Fun
 #if UNITY_WEBGL && !UNITY_EDITOR
             void startJSCb ()
             {
-                state_ = State.kHandshaking;
+                lock (start_lock_)
+                {
+                    if (is_connection_timed_out_ || state_ != State.kConnecting)
+                    {
+                        return;
+                    }
 
-                debug.LogDebug("[Websocket] Connected. Starts handshaking..");
+                    state_ = State.kHandshaking;
 
-                mono.StartCoroutine(wsock_.Recv());
-                mono.StartCoroutine(wsock_.GetError());
+                    debug.LogDebug("[Websocket] Connected. Starts handshaking..");
+
+                    mono.StartCoroutine(wsock_.Recv());
+                    mono.StartCoroutine(wsock_.GetError());
+                }
             }
 #endif
 
             void startCb (object sender, EventArgs args)
             {
-                state_ = State.kHandshaking;
+                lock (start_lock_)
+                {
+                    if (is_connection_timed_out_ || state_ != State.kConnecting)
+                    {
+                        return;
+                    }
 
-                debug.LogDebug("[Websocket] Connected. Starts handshaking..");
+                    state_ = State.kHandshaking;
+
+                    debug.LogDebug("[Websocket] Connected. Starts handshaking..");
+                }
             }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
