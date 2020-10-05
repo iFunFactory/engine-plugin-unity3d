@@ -1160,7 +1160,8 @@ namespace Fun
                         // Adds sequence number & ack number
                         if (IsReliable || IsSendingSequence)
                         {
-                            if (msg.msg_type != kServerPingMessageType && msg.msg_type != kClientPingMessageType)
+                            if (msg.msg_type != kServerPingMessageType && msg.msg_type != kClientPingMessageType &&
+                                msg.msg_type != kCloseSessionType)
                             {
                                 msg.seq = getNextSeq();
 
