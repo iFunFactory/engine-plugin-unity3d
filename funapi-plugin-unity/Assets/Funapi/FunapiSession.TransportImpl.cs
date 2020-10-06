@@ -1903,6 +1903,14 @@ namespace Fun
             {
                 try
                 {
+                    lock (sock_lock_)
+                    {
+                        if (wsock_ == null)
+                        {
+                            return;
+                        }
+                    }
+
                     if (!completed)
                     {
                         debug.LogError("[Websocket] Failed to transfer messages.");

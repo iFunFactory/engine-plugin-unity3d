@@ -468,7 +468,7 @@ namespace Fun
                         return true;
 
                     // Waiting for unsent messages.
-                    if (protocol_ == TransportProtocol.kTcp)
+                    if (protocol_ == TransportProtocol.kTcp || protocol_ == TransportProtocol.kWebsocket)
                     {
                         if (Connected && HasUnsentMessages)
                             return true;
