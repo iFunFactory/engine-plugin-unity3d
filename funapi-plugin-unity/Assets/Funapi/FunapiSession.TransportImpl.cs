@@ -1418,10 +1418,16 @@ namespace Fun
 #if !NO_UNITY
 #if UNITY_2017_1_OR_NEWER
                         if (cur_request_.uw_request != null)
+                        {
                             cur_request_.cancel = true;
+                            return;
+                        }
 #else
                         if (cur_request_.www != null)
+                        {
                             cur_request_.cancel = true;
+                            return;
+                        }
 #endif
 #endif
                         cur_request_ = null;
