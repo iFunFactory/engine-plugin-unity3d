@@ -1083,8 +1083,6 @@ namespace Fun
                 }
 
                 // Checks buffer's space
-                received_size_ = 0;
-                next_decoding_offset_ = 0;
                 checkReceiveBuffer(body_length);
             }
 
@@ -1215,7 +1213,7 @@ namespace Fun
                         lock (receive_lock_)
                         {
                             // Makes a raw message
-                            readBodyAndSaveMessage(request.headers);
+                            readBodyAndSaveMessage(request.headers, next_decoding_offset_);
                         }
 
                         request.read_stream.Close();
@@ -1301,7 +1299,7 @@ namespace Fun
                         received_size_ += www.downloadHandler.data.Length;
 
                         // Makes a raw message
-                        readBodyAndSaveMessage(cur_request_.headers);
+                        readBodyAndSaveMessage(cur_request_.headers, next_decoding_offset_);
                     }
 
                     lock (request_lock_)
@@ -1375,7 +1373,7 @@ namespace Fun
                         received_size_ += www.bytes.Length;
 
                         // Makes a raw message
-                        readBodyAndSaveMessage(cur_request_.headers);
+                        readBodyAndSaveMessage(cur_request_.headers, next_decoding_offset_);
                     }
 
                     lock (request_lock_)

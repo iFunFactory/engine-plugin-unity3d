@@ -1614,9 +1614,18 @@ namespace Fun
 
                     if (body_length > 0)
                     {
-                        byte[] buffer = new byte[body_length];
-                        Buffer.BlockCopy(receive_buffer_, offset, buffer, 0, body_length);
-                        message.body = new ArraySegment<byte>(buffer, 0, body_length);
+                        // UDP(datagram) always keeps the receive buffer at unit buffer size(64kb) and reuses it.
+                        // Because it fails to receive a message if the buffer size is insufficient.
+                        if (protocol_ == TransportProtocol.kUdp)
+                        {
+                            byte[] buffer = new byte[body_length];
+                            Buffer.BlockCopy(receive_buffer_, offset, buffer, 0, body_length);
+                            message.body = new ArraySegment<byte>(buffer, 0, body_length);
+                        }
+                        else
+                        {
+                            message.body = new ArraySegment<byte>(receive_buffer_, offset, body_length);
+                        }
                     }
                     else
                     {
