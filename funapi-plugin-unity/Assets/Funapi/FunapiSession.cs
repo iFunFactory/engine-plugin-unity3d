@@ -27,6 +27,17 @@ namespace Fun
         kRedirectFailed         // Server move failed
     };
 
+    public enum CloseReasonType
+    {
+        kServerDid = 0,
+        kIdle,
+        kUnknownSessionId,
+        kEventTimeout,
+        kClientRequested,
+        kRedirection,           // This type is not used because session closed event is not called during redirection.
+        kNone = 100
+    };
+
     // Session option
     public class SessionOption
     {
@@ -79,6 +90,7 @@ namespace Fun
             state = State.kUnknown;
             server_address_ = hostname_or_ip;
             option_ = option;
+            close_reason_ = CloseReasonType.kNone;
 
             // Sets response callback handlers.
             response_timeout_.SetCallbackHandler<int>(onResponseTimeoutCallback);
@@ -110,6 +122,8 @@ namespace Fun
         public void Connect (TransportProtocol protocol, FunEncoding encoding,
                              UInt16 port, TransportOption option = null)
         {
+            close_reason_ = CloseReasonType.kNone;
+
             Transport transport = createTransport(protocol, encoding, port, option);
             if (transport == null)
             {
@@ -652,6 +666,11 @@ namespace Fun
 
                 return false;
             }
+        }
+
+        public CloseReasonType CloseReason
+        {
+            get { return close_reason_; }
         }
 
         // ping time in milliseconds
@@ -1268,6 +1287,39 @@ namespace Fun
                     if (wait_for_redirect_)
                         return;
 
+                    if (close_reason_ == CloseReasonType.kNone)
+                    {
+                        FunEncoding encoding = transport.encoding;
+                        if (encoding == FunEncoding.kJson)
+                        {
+                            Dictionary<string, object> json = message as Dictionary<string, object>;
+                            if (json.ContainsKey(kCloseReasonType))
+                            {
+                                int reason = 0;
+                                if (Int32.TryParse(json[kCloseReasonType].ToString(), out reason))
+                                {
+                                    close_reason_ = (CloseReasonType)reason;
+                                }
+                            }
+                        }
+                        else if (encoding == FunEncoding.kProtobuf)
+                        {
+                            FunMessage msg = message as FunMessage;
+                            FunMessageExtension ext = FunapiMessage.GetMessage<FunMessageExtension>(msg, MessageType.extension);
+                            if (ext != null)
+                            {
+                                SessionCloseMessage session_close = ext.session_close as SessionCloseMessage;
+                                if (session_close != null )
+                                {
+                                    if (session_close.reasonSpecified)
+                                    {
+                                        close_reason_ = (CloseReasonType)session_close.reason;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     addCommand(new CmdStopAll(this, true));
                     addCommand(new CmdEvent("onSessionClosed", onSessionClosed));
                 }
@@ -1833,6 +1885,7 @@ namespace Fun
         const string kMulticastMsgType = "_multicast";
         const string kRedirectType = "_sc_redirect";
         const string kRedirectConnectType = "_cs_redirect_connect";
+        const string kCloseReasonType = "_reason2";
 
         // Funapi message-related events.
         public event Action<SessionEventType, string> SessionEventCallback;                     // type, session id
@@ -1875,6 +1928,7 @@ namespace Fun
         string server_address_ = "";
         object state_lock_ = new object();
         CommandList cmd_list_ = new CommandList();
+        CloseReasonType close_reason_;
 
         // Session-related variables.
         SessionId session_id_ = new SessionId();
