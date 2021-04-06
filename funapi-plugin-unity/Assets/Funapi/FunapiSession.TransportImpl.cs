@@ -1258,6 +1258,7 @@ namespace Fun
                 {
                     if (cur_request_.cancel)
                     {
+                        cur_request_.uw_request.Dispose();
                         cur_request_ = null;
                         yield break;
                     }
@@ -1304,6 +1305,7 @@ namespace Fun
 
                     lock (request_lock_)
                     {
+                        cur_request_.uw_request.Dispose();
                         cur_request_ = null;
                     }
 
