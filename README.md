@@ -17,10 +17,12 @@ Funapi Plugin 은 다음 버전의 유니티 3D 를 지원합니다.
 
 | 유니티 3D 버전 | Windows | macOS | Android | iOS |
 |:-------------:|:-------:|:-----:|:-------:|:---:|
-| 5             | o       | o     | o       | o   |
-| 2017          | o       | o     | o       | o   |
-| 2018          | o       | o     | o       | o   |
-| 2019          | o       | o     | o       | o   |
+| 5.x           | o       | o     | o       | o   |
+| 2017.x        | o       | o     | o       | o   |
+| 2018.x        | o       | o     | o       | o   |
+| 2019.x        | o       | o     | o       | o   |
+| 2020.x        | o       | o     | o       | o   |
+| 2021.x        | o       | o     | o       | o   |
 
 * Android 의 경우 arm 만 지원합니다.
 * Android 5 (API Level 22) 이하 버전에서는 deflate 압축 기능이 동작하지 않습니다.
