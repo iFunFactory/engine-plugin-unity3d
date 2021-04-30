@@ -1390,7 +1390,10 @@ namespace Fun
                 FunMessage msg = message as FunMessage;
                 FunRedirectMessage redirect = FunapiMessage.GetMessage<FunRedirectMessage>(msg, MessageType._sc_redirect);
                 if (redirect == null)
+                {
+                    debug.LogWarning("onRedirectMessage - Invalid redirect message");
                     return;
+                }
 
                 host = redirect.host;
                 token = redirect.token;
@@ -1509,9 +1512,11 @@ namespace Fun
                 FunMessage msg = message as FunMessage;
                 FunRedirectConnectMessage redirect = FunapiMessage.GetMessage<FunRedirectConnectMessage>(msg, MessageType._cs_redirect_connect);
                 if (redirect == null)
-                    return;
-
-                if (redirect.result != FunRedirectConnectMessage.Result.OK)
+                {
+                    succeeded = false;
+                    debug.LogWarning("onRedirectMessage - Invalid redirect result message");
+                }
+                else if (redirect.result != FunRedirectConnectMessage.Result.OK)
                 {
                     succeeded = false;
                     debug.LogWarning("Redirect failed. error code: {0}", redirect.result);
