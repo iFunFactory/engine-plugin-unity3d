@@ -31,6 +31,7 @@ namespace Fun
     public enum PeerEventType
     {
         kConnected,
+        kEstablished,
         kDisconnected,
         kConnectionFailed,
         kConnectionTimedOut
@@ -185,7 +186,48 @@ namespace Fun
 
         void onSystemMaster (FunapiRpcPeer peer, FunDedicatedServerRpcMessage msg)
         {
+            // Get peer id list from peer list
+            List<string> old_peers = new List<string>();
+            peer_list_.ForEach(delegate (FunapiRpcPeer p)
+            {
+                old_peers.Add(p.peer_id);
+            });
+            old_peers.Remove(peer.peer_id);
+
+            FunDedicatedServerRpcSystemMessage sysmsg = FunapiDSRpcMessage.GetMessage<FunDedicatedServerRpcSystemMessage>(msg, MessageType.ds_rpc_sys);
+            List<object> server_list = FunapiDSRpcMessage.ParseJson(sysmsg.data) as List<object>;
+            foreach (Dictionary<string, object> data in server_list)
+            {
+                if (data.ContainsKey("id") && data.ContainsKey("ip") && data.ContainsKey("port"))
+                {
+                    string peer_id = data["id"] as string;
+                    string ip = data["ip"] as string;
+                    ushort port = Convert.ToUInt16(data["port"]);
+
+                    if (!peer_list_.Exists(peer_id))
+                    {
+                        FunDebug.Log("[Peer:{0}:{1}] Added. ({2})", ip, port, peer_id);
+                        onConnect(ip, port);
+                    }
+                    else
+                    {
+                        old_peers.Remove(peer_id);
+                    }
+                }
+            }
+
+            // Remove invalid peers from peer list
+            foreach (string peer_id in old_peers)
+            {
+                FunapiRpcPeer p = peer_list_.Get(peer_id);
+                if (p.state != FunapiRpcPeer.State.kDisconnected)
+                {
+                    p.Close(true);
+                }
+                peer_list_.Remove(p);
+            }
         }
+
 
         void onSystemInfo (FunapiRpcPeer peer, FunDedicatedServerRpcMessage msg)
         {
@@ -286,7 +328,7 @@ namespace Fun
             if (peer != master_peer_)
                 return;
 
-            FunapiRpcPeer new_master = peer_list_.GetAny(peer);
+            FunapiRpcPeer new_master = peer_list_.GetAnyAvailable(peer);
             if (new_master != null)
             {
                 setMaster(new_master);
@@ -370,10 +412,16 @@ namespace Fun
 
         void onPeerMessage (FunapiRpcPeer peer, FunDedicatedServerRpcMessage msg)
         {
+            string type = msg.type;
+
+            if (system_handlers_.ContainsKey(type))
+            {
+                system_handlers_[type](peer, msg);
+                return;
+            }
+
             if (!msg.is_request)
                 return;
-
-            string type = msg.type;
 
             lock (handler_lock_)
             {
@@ -390,12 +438,6 @@ namespace Fun
                     }
                     return;
                 }
-            }
-
-            if (system_handlers_.ContainsKey(type))
-            {
-                system_handlers_[type](peer, msg);
-                return;
             }
 
             FunDebug.Log("[RPC] handler not found '{0}'", type);
@@ -576,13 +618,13 @@ namespace Fun
             }
         }
 
-        public FunapiRpcPeer GetAny (FunapiRpcPeer exclude = null)
+        public FunapiRpcPeer GetAnyAvailable (FunapiRpcPeer exclude = null)
         {
             lock (lock_)
             {
                 foreach (FunapiRpcPeer peer in list_)
                 {
-                    if (peer != exclude && !peer.abort)
+                    if (peer != exclude && !peer.abort && peer.state == FunapiRpcPeer.State.kEstablished)
                         return peer;
                 }
             }
@@ -636,6 +678,11 @@ namespace Fun
 
         public void SetPeerId (string peer_id)
         {
+            lock (state_lock_)
+            {
+                state_ = State.kEstablished;
+            }
+
             peer_id_ = peer_id;
         }
 
@@ -732,6 +779,12 @@ namespace Fun
             if (abort_ || state_ != State.kDisconnected)
                 return;
 
+            lock (recv_lock_)
+            {
+                received_size_ = 0;
+                next_decoding_offset_ = 0;
+            }
+
             state_ = State.kConnecting;
 
             timer_.Add(new FunapiTimeoutTimer("connection", kConnectionTimeout, onTimedout), true);
@@ -758,7 +811,7 @@ namespace Fun
 
         void onTimedout ()
         {
-            if (state_ == State.kConnected || state_ == State.kDisconnected)
+            if (state_ > State.kConnected) // state_ == State.kConnected || state_ == State.kEstablished || state_ == State.kDisconnected
                 return;
 
             logWarning("Connection timed out.");
@@ -860,7 +913,8 @@ namespace Fun
         {
             lock (send_lock_)
             {
-                if (state_ != State.kConnected || sending_.Count != 0)
+                bool is_sendable = (state_ == State.kConnected || state_ == State.kEstablished) && sending_.Count == 0;
+                if (!is_sendable)
                     return;
 
                 onSend();
@@ -1171,6 +1225,7 @@ namespace Fun
         {
             kConnecting,
             kConnected,
+            kEstablished,
             kDisconnected
         }
 
