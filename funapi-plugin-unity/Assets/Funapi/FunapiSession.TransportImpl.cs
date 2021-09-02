@@ -1732,7 +1732,9 @@ namespace Fun
                     wsock_.OnClose += closeCb;
                     wsock_.OnError += errorCb;
                     wsock_.OnMessage += receiveBytesCb;
-
+#if UNITY_2018_3_OR_NEWER && CSHARP_7_3_OR_NEWER
+                    wsock_.SslConfiguration.EnabledSslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+#endif
                     wsock_.ConnectAsync();
 #endif
                 }
